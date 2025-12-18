@@ -1,0 +1,566 @@
+"use client"
+
+import { useState } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Plus, Search, ArrowUpRight, ArrowDownRight, Eye, TrendingUp, Wallet } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+
+type SavingsAccount = {
+  id: string
+  accountNumber: string
+  memberName: string
+  memberId: string
+  accountType: string
+  balance: string
+  interestRate: number
+  status: "active" | "dormant" | "closed"
+  openedDate: string
+  lastTransaction: string
+}
+
+const mockAccounts: SavingsAccount[] = [
+  {
+    id: "1",
+    accountNumber: "SAV001234",
+    memberName: "Sarah Johnson",
+    memberId: "ACC001234",
+    accountType: "Regular Savings",
+    balance: "₹25,430.00",
+    interestRate: 3.5,
+    status: "active",
+    openedDate: "2023-01-15",
+    lastTransaction: "2024-12-10",
+  },
+  {
+    id: "2",
+    accountNumber: "SAV001235",
+    memberName: "Michael Chen",
+    memberId: "ACC001235",
+    accountType: "Premium Savings",
+    balance: "₹85,250.00",
+    interestRate: 4.5,
+    status: "active",
+    openedDate: "2023-02-20",
+    lastTransaction: "2024-12-12",
+  },
+  {
+    id: "3",
+    accountNumber: "SAV001236",
+    memberName: "Emily Davis",
+    memberId: "ACC001236",
+    accountType: "Regular Savings",
+    balance: "₹12,100.00",
+    interestRate: 3.5,
+    status: "active",
+    openedDate: "2023-03-10",
+    lastTransaction: "2024-12-08",
+  },
+  {
+    id: "4",
+    accountNumber: "SAV001237",
+    memberName: "James Wilson",
+    memberId: "ACC001237",
+    accountType: "High Yield Savings",
+    balance: "₹45,890.00",
+    interestRate: 5.0,
+    status: "active",
+    openedDate: "2023-04-05",
+    lastTransaction: "2024-12-11",
+  },
+]
+
+type Transaction = {
+  id: string
+  type: "deposit" | "withdrawal"
+  amount: string
+  date: string
+  description: string
+  balance: string
+}
+
+const mockTransactions: Transaction[] = [
+  {
+    id: "1",
+    type: "deposit",
+    amount: "₹5,000.00",
+    date: "2024-12-10",
+    description: "Cash Deposit",
+    balance: "₹25,430.00",
+  },
+  {
+    id: "2",
+    type: "withdrawal",
+    amount: "₹1,200.00",
+    date: "2024-12-08",
+    description: "ATM Withdrawal",
+    balance: "₹20,430.00",
+  },
+  {
+    id: "3",
+    type: "deposit",
+    amount: "₹3,500.00",
+    date: "2024-12-05",
+    description: "Check Deposit",
+    balance: "₹21,630.00",
+  },
+  {
+    id: "4",
+    type: "deposit",
+    amount: "₹2,800.00",
+    date: "2024-12-01",
+    description: "Transfer In",
+    balance: "₹18,130.00",
+  },
+]
+
+export default function SavingsPage() {
+  const [searchQuery, setSearchQuery] = useState("")
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [isOpenAccountOpen, setIsOpenAccountOpen] = useState(false)
+  const [isTransactionOpen, setIsTransactionOpen] = useState(false)
+  const [selectedAccount, setSelectedAccount] = useState<SavingsAccount | null>(null)
+  const [transactionType, setTransactionType] = useState<"deposit" | "withdrawal">("deposit")
+
+  const filteredAccounts = mockAccounts.filter((account) => {
+    const matchesSearch =
+      account.accountNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      account.memberName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      account.memberId.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesStatus = statusFilter === "all" || account.status === statusFilter
+    return matchesSearch && matchesStatus
+  })
+
+  const totalBalance = mockAccounts.reduce((sum, acc) => sum + Number.parseFloat(acc.balance.replace(/[₹,]/g, "")), 0)
+  const activeAccounts = mockAccounts.filter((acc) => acc.status === "active").length
+  const activeAccountsBalance = mockAccounts
+    .filter((acc) => acc.status === "active")
+    .reduce((sum, acc) => sum + Number.parseFloat(acc.balance.replace(/[₹,]/g, "")), 0)
+
+  return (
+    <div className="flex h-screen overflow-hidden">
+      {/*<DashboardSidebar />*/}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {/*<DashboardHeader />*/}
+        <main className="flex-1 overflow-y-auto bg-background p-6">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-foreground">Savings Accounts</h1>
+              <p className="text-muted-foreground">Manage deposits, withdrawals, and account balances</p>
+            </div>
+            <Button onClick={() => setIsOpenAccountOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Open Account
+            </Button>
+          </div>
+
+          <div className="mb-6 grid gap-4 md:grid-cols-3">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="rounded-lg bg-blue-50 p-3">
+                    <Wallet className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <Badge variant="secondary" className="text-teal-600">
+                    <TrendingUp className="mr-1 h-3 w-3" />
+                    +8.5%
+                  </Badge>
+                </div>
+                <div className="mt-4">
+                  <h3 className="text-sm font-medium text-muted-foreground">Total Balance</h3>
+                  <p className="mt-1 text-2xl font-bold text-foreground">₹{totalBalance.toLocaleString()}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{mockAccounts.length} Total Accounts</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="rounded-lg bg-teal-50 p-3">
+                    <Wallet className="h-6 w-6 text-teal-600" />
+                  </div>
+                  <Badge variant="secondary" className="text-teal-600">
+                    Active
+                  </Badge>
+                </div>
+                <div className="mt-4">
+                  <h3 className="text-sm font-medium text-muted-foreground">Active Accounts</h3>
+                  <p className="mt-1 text-2xl font-bold text-foreground">{activeAccounts}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    ₹{activeAccountsBalance.toLocaleString()} Balance
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="rounded-lg bg-purple-50 p-3">
+                    <TrendingUp className="h-6 w-6 text-purple-600" />
+                  </div>
+                  <Badge variant="secondary" className="text-teal-600">
+                    Avg.
+                  </Badge>
+                </div>
+                <div className="mt-4">
+                  <h3 className="text-sm font-medium text-muted-foreground">Avg. Interest Rate</h3>
+                  <p className="mt-1 text-2xl font-bold text-foreground">4.1%</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by account number, member name, or ID..."
+                    className="pl-10"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Filter by status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="dormant">Dormant</SelectItem>
+                      <SelectItem value="closed">Closed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Account Number</TableHead>
+                    <TableHead>Member</TableHead>
+                    <TableHead>Account Type</TableHead>
+                    <TableHead>Balance</TableHead>
+                    <TableHead>Interest Rate</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredAccounts.map((account) => (
+                    <TableRow key={account.id}>
+                      <TableCell className="font-mono font-medium">{account.accountNumber}</TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{account.memberName}</div>
+                          <div className="text-sm text-muted-foreground">{account.memberId}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>{account.accountType}</TableCell>
+                      <TableCell className="font-semibold">{account.balance}</TableCell>
+                      <TableCell>{account.interestRate}%</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={account.status === "active" ? "default" : "secondary"}
+                          className={account.status === "active" ? "bg-teal-100 text-teal-700" : ""}
+                        >
+                          {account.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              Actions
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => setSelectedAccount(account)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedAccount(account)
+                                setTransactionType("deposit")
+                                setIsTransactionOpen(true)
+                              }}
+                            >
+                              <ArrowDownRight className="mr-2 h-4 w-4" />
+                              Deposit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedAccount(account)
+                                setTransactionType("withdrawal")
+                                setIsTransactionOpen(true)
+                              }}
+                            >
+                              <ArrowUpRight className="mr-2 h-4 w-4" />
+                              Withdraw
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          {/* Open Account Dialog */}
+          <Dialog open={isOpenAccountOpen} onOpenChange={setIsOpenAccountOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Open Savings Account</DialogTitle>
+                <DialogDescription>Create a new savings account for a member</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="member">Select Member</Label>
+                  <Select>
+                    <SelectTrigger id="member">
+                      <SelectValue placeholder="Search and select member" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Sarah Johnson (ACC001234)</SelectItem>
+                      <SelectItem value="2">Michael Chen (ACC001235)</SelectItem>
+                      <SelectItem value="3">Emily Davis (ACC001236)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="account-type">Account Type</Label>
+                  <Select>
+                    <SelectTrigger id="account-type">
+                      <SelectValue placeholder="Select account type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="regular">Regular Savings (3.5%)</SelectItem>
+                      <SelectItem value="premium">Premium Savings (4.5%)</SelectItem>
+                      <SelectItem value="high-yield">High Yield Savings (5.0%)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="initial-deposit">Initial Deposit</Label>
+                  <Input id="initial-deposit" type="number" placeholder="0.00" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="notes">Notes (Optional)</Label>
+                  <Input id="notes" placeholder="Add any additional notes" />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsOpenAccountOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={() => setIsOpenAccountOpen(false)}>Open Account</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Transaction Dialog */}
+          <Dialog open={isTransactionOpen} onOpenChange={setIsTransactionOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{transactionType === "deposit" ? "Make Deposit" : "Make Withdrawal"}</DialogTitle>
+                <DialogDescription>
+                  {transactionType === "deposit"
+                    ? "Add funds to the savings account"
+                    : "Withdraw funds from the savings account"}
+                </DialogDescription>
+              </DialogHeader>
+              {selectedAccount && (
+                <div className="grid gap-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Account</Label>
+                    <div className="rounded-lg border border-border bg-muted p-3">
+                      <p className="font-mono font-medium">{selectedAccount.accountNumber}</p>
+                      <p className="text-sm text-muted-foreground">{selectedAccount.memberName}</p>
+                      <p className="mt-2 text-lg font-semibold">Current Balance: {selectedAccount.balance}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="amount">Amount</Label>
+                    <Input id="amount" type="number" placeholder="0.00" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Input
+                      id="description"
+                      placeholder={transactionType === "deposit" ? "Cash Deposit" : "ATM Withdrawal"}
+                    />
+                  </div>
+                </div>
+              )}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsTransactionOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={() => setIsTransactionOpen(false)}>
+                  {transactionType === "deposit" ? "Deposit" : "Withdraw"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* View Account Details Dialog */}
+          <Dialog open={!!selectedAccount && !isTransactionOpen} onOpenChange={() => setSelectedAccount(null)}>
+            <DialogContent className="max-w-3xl">
+              <DialogHeader>
+                <DialogTitle>Account Details</DialogTitle>
+                <DialogDescription>Savings account information and transaction history</DialogDescription>
+              </DialogHeader>
+              {selectedAccount && (
+                <Tabs defaultValue="overview" className="w-full">
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="overview">Overview</TabsTrigger>
+                    <TabsTrigger value="transactions">Transactions</TabsTrigger>
+                    <TabsTrigger value="interest">Interest</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="overview" className="space-y-4">
+                    <div className="grid gap-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-muted-foreground">Account Number</Label>
+                          <p className="font-mono font-medium">{selectedAccount.accountNumber}</p>
+                        </div>
+                        <div>
+                          <Label className="text-muted-foreground">Account Type</Label>
+                          <p className="font-medium">{selectedAccount.accountType}</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-muted-foreground">Member Name</Label>
+                          <p className="font-medium">{selectedAccount.memberName}</p>
+                        </div>
+                        <div>
+                          <Label className="text-muted-foreground">Member ID</Label>
+                          <p className="font-mono font-medium">{selectedAccount.memberId}</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-muted-foreground">Interest Rate</Label>
+                          <p className="font-medium">{selectedAccount.interestRate}% per annum</p>
+                        </div>
+                        <div>
+                          <Label className="text-muted-foreground">Status</Label>
+                          <div className="mt-1">
+                            <Badge variant="default" className="bg-teal-100 text-teal-700">
+                              {selectedAccount.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-muted-foreground">Current Balance</Label>
+                        <p className="text-3xl font-bold text-foreground">{selectedAccount.balance}</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-muted-foreground">Opened Date</Label>
+                          <p className="font-medium">{selectedAccount.openedDate}</p>
+                        </div>
+                        <div>
+                          <Label className="text-muted-foreground">Last Transaction</Label>
+                          <p className="font-medium">{selectedAccount.lastTransaction}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="transactions" className="space-y-4">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Balance</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {mockTransactions.map((txn) => (
+                          <TableRow key={txn.id}>
+                            <TableCell>{txn.date}</TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="secondary"
+                                className={
+                                  txn.type === "deposit" ? "bg-teal-100 text-teal-700" : "bg-orange-100 text-orange-700"
+                                }
+                              >
+                                {txn.type === "deposit" ? (
+                                  <ArrowDownRight className="mr-1 h-3 w-3" />
+                                ) : (
+                                  <ArrowUpRight className="mr-1 h-3 w-3" />
+                                )}
+                                {txn.type}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{txn.description}</TableCell>
+                            <TableCell className="font-semibold">{txn.amount}</TableCell>
+                            <TableCell className="font-mono">{txn.balance}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TabsContent>
+                  <TabsContent value="interest" className="space-y-4">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base">Interest Calculation Summary</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Annual Interest Rate</span>
+                          <span className="font-semibold">{selectedAccount.interestRate}%</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Interest Earned (YTD)</span>
+                          <span className="font-semibold text-teal-600">₹892.45</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Last Interest Credit</span>
+                          <span className="font-medium">2024-12-01</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Next Interest Credit</span>
+                          <span className="font-medium">2025-01-01</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                </Tabs>
+              )}
+            </DialogContent>
+          </Dialog>
+        </main>
+      </div>
+    </div>
+  )
+}
