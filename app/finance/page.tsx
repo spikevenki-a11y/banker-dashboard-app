@@ -61,10 +61,10 @@ const interestData = [
 ]
 
 const revenueBreakdown = [
-  { source: "Loan Interest", amount: "$128,500", percentage: 63, trend: "up" },
-  { source: "Account Fees", amount: "$35,200", percentage: 17, trend: "up" },
-  { source: "Service Charges", amount: "$28,400", percentage: 14, trend: "down" },
-  { source: "Other Income", amount: "$12,500", percentage: 6, trend: "up" },
+  { source: "Loan Interest", amount: "₹128,500", percentage: 63, trend: "up" },
+  { source: "Account Fees", amount: "₹35,200", percentage: 17, trend: "up" },
+  { source: "Service Charges", amount: "₹28,400", percentage: 14, trend: "down" },
+  { source: "Other Income", amount: "₹12,500", percentage: 6, trend: "up" },
 ]
 
 export default function FinancePage() {
@@ -103,7 +103,7 @@ export default function FinancePage() {
                 </div>
                 <div className="mt-4">
                   <h3 className="text-sm font-medium text-muted-foreground">Total Deposits</h3>
-                  <p className="mt-1 text-2xl font-bold text-foreground">$48.5M</p>
+                  <p className="mt-1 text-2xl font-bold text-foreground">₹48.5M</p>
                   <p className="mt-1 text-xs text-muted-foreground">Savings + Fixed Deposits</p>
                 </div>
               </CardContent>
@@ -122,7 +122,7 @@ export default function FinancePage() {
                 </div>
                 <div className="mt-4">
                   <h3 className="text-sm font-medium text-muted-foreground">Total Loans</h3>
-                  <p className="mt-1 text-2xl font-bold text-foreground">$41.0M</p>
+                  <p className="mt-1 text-2xl font-bold text-foreground">₹41.0M</p>
                   <p className="mt-1 text-xs text-muted-foreground">Outstanding loan balance</p>
                 </div>
               </CardContent>
@@ -141,7 +141,7 @@ export default function FinancePage() {
                 </div>
                 <div className="mt-4">
                   <h3 className="text-sm font-medium text-muted-foreground">Interest Earned</h3>
-                  <p className="mt-1 text-2xl font-bold text-foreground">$202.6K</p>
+                  <p className="mt-1 text-2xl font-bold text-foreground">₹202.6K</p>
                   <p className="mt-1 text-xs text-muted-foreground">Total interest income</p>
                 </div>
               </CardContent>
@@ -160,7 +160,7 @@ export default function FinancePage() {
                 </div>
                 <div className="mt-4">
                   <h3 className="text-sm font-medium text-muted-foreground">Interest Paid</h3>
-                  <p className="mt-1 text-2xl font-bold text-foreground">$108.2K</p>
+                  <p className="mt-1 text-2xl font-bold text-foreground">₹108.2K</p>
                   <p className="mt-1 text-xs text-muted-foreground">Total interest expense</p>
                 </div>
               </CardContent>
@@ -269,21 +269,21 @@ export default function FinancePage() {
                     <div className="flex items-center justify-between rounded-lg border border-border bg-muted p-4">
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Total Interest Earned</p>
-                        <p className="text-2xl font-bold text-teal-600">$202,600</p>
+                        <p className="text-2xl font-bold text-teal-600">₹202,600</p>
                       </div>
                       <TrendingUp className="h-8 w-8 text-teal-600" />
                     </div>
                     <div className="flex items-center justify-between rounded-lg border border-border bg-muted p-4">
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Total Interest Paid</p>
-                        <p className="text-2xl font-bold text-orange-600">$108,200</p>
+                        <p className="text-2xl font-bold text-orange-600">₹108,200</p>
                       </div>
                       <TrendingDown className="h-8 w-8 text-orange-600" />
                     </div>
                     <div className="flex items-center justify-between rounded-lg border border-primary bg-primary/5 p-4">
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Net Interest Income</p>
-                        <p className="text-3xl font-bold text-primary">$94,400</p>
+                        <p className="text-3xl font-bold text-primary">₹94,400</p>
                       </div>
                       <DollarSign className="h-8 w-8 text-primary" />
                     </div>
@@ -337,18 +337,18 @@ export default function FinancePage() {
                         <Wallet className="h-4 w-4 text-blue-600" />
                         <span className="text-sm font-medium">Savings Accounts</span>
                       </div>
-                      <span className="font-semibold">$24.5M</span>
+                      <span className="font-semibold">₹24.5M</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <FileText className="h-4 w-4 text-teal-600" />
                         <span className="text-sm font-medium">Fixed Deposits</span>
                       </div>
-                      <span className="font-semibold">$18.2M</span>
+                      <span className="font-semibold">₹18.2M</span>
                     </div>
                     <div className="flex items-center justify-between border-t border-border pt-4">
                       <span className="text-sm font-semibold">Total Deposits</span>
-                      <span className="text-lg font-bold text-foreground">$42.7M</span>
+                      <span className="text-lg font-bold text-foreground">₹42.7M</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -363,25 +363,25 @@ export default function FinancePage() {
                         <CreditCard className="h-4 w-4 text-purple-600" />
                         <span className="text-sm font-medium">Personal Loans</span>
                       </div>
-                      <span className="font-semibold">$12.5M</span>
+                      <span className="font-semibold">₹12.5M</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <CreditCard className="h-4 w-4 text-orange-600" />
                         <span className="text-sm font-medium">Business Loans</span>
                       </div>
-                      <span className="font-semibold">$15.3M</span>
+                      <span className="font-semibold">₹15.3M</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <CreditCard className="h-4 w-4 text-blue-600" />
                         <span className="text-sm font-medium">Mortgage Loans</span>
                       </div>
-                      <span className="font-semibold">$13.2M</span>
+                      <span className="font-semibold">₹13.2M</span>
                     </div>
                     <div className="flex items-center justify-between border-t border-border pt-4">
                       <span className="text-sm font-semibold">Total Loans</span>
-                      <span className="text-lg font-bold text-foreground">$41.0M</span>
+                      <span className="text-lg font-bold text-foreground">₹41.0M</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -430,7 +430,7 @@ export default function FinancePage() {
                     </div>
                     <div className="mt-4">
                       <h3 className="text-sm font-medium text-muted-foreground">Loan Interest</h3>
-                      <p className="mt-1 text-2xl font-bold text-teal-600">$128.5K</p>
+                      <p className="mt-1 text-2xl font-bold text-teal-600">₹128.5K</p>
                       <p className="mt-1 text-xs text-muted-foreground">63% of total income</p>
                     </div>
                   </CardContent>
@@ -445,7 +445,7 @@ export default function FinancePage() {
                     </div>
                     <div className="mt-4">
                       <h3 className="text-sm font-medium text-muted-foreground">FD Interest Expense</h3>
-                      <p className="mt-1 text-2xl font-bold text-orange-600">$65.4K</p>
+                      <p className="mt-1 text-2xl font-bold text-orange-600">₹65.4K</p>
                       <p className="mt-1 text-xs text-muted-foreground">60% of total expense</p>
                     </div>
                   </CardContent>
@@ -525,7 +525,7 @@ export default function FinancePage() {
                     <div className="space-y-4">
                       <div className="text-center">
                         <p className="text-sm text-muted-foreground">Year-to-Date Total</p>
-                        <p className="mt-2 text-4xl font-bold text-primary">$204,600</p>
+                        <p className="mt-2 text-4xl font-bold text-primary">₹204,600</p>
                       </div>
                       <div className="flex items-center justify-center gap-2">
                         <Badge variant="secondary" className="text-teal-600">
