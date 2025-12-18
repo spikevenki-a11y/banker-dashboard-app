@@ -52,8 +52,8 @@ type Member = {
 const mockMembers: Member[] = [
   {
     id: "1",
-    name: "Sarah Johnson",
-    email: "sarah.johnson@email.com",
+    name: "Vengatesh",
+    email: "Vengatesh.m@email.com",
     phone: "+1 (555) 123-4567",
     accountNumber: "ACC001234",
     kycStatus: "verified",
@@ -66,8 +66,8 @@ const mockMembers: Member[] = [
   },
   {
     id: "2",
-    name: "Michael Chen",
-    email: "michael.chen@email.com",
+    name: "Priya",
+    email: "priya.s@email.com",
     phone: "+1 (555) 234-5678",
     accountNumber: "ACC001235",
     kycStatus: "verified",
@@ -80,8 +80,8 @@ const mockMembers: Member[] = [
   },
   {
     id: "3",
-    name: "Emily Davis",
-    email: "emily.davis@email.com",
+    name: "Surya",
+    email: "surya.d@email.com",
     phone: "+1 (555) 345-6789",
     accountNumber: "ACC001236",
     kycStatus: "pending",
@@ -94,8 +94,8 @@ const mockMembers: Member[] = [
   },
   {
     id: "4",
-    name: "James Wilson",
-    email: "james.wilson@email.com",
+    name: "Sudarsan",
+    email: "sudarsan.r@email.com",
     phone: "+1 (555) 456-7890",
     accountNumber: "ACC001237",
     kycStatus: "verified",
@@ -108,8 +108,8 @@ const mockMembers: Member[] = [
   },
   {
     id: "5",
-    name: "Lisa Anderson",
-    email: "lisa.anderson@email.com",
+    name: "Muniyandi",
+    email: "muniyandi.g@email.com",
     phone: "+1 (555) 567-8901",
     accountNumber: "ACC001238",
     kycStatus: "verified",

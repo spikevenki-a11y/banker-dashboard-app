@@ -17,7 +17,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Search, ArrowUpRight, ArrowDownRight, Eye, TrendingUp, Wallet } from "lucide-react"
+import { Plus, Search, ArrowUpRight, ArrowDownRight, Eye, TrendingUp, Wallet,LockKeyhole } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 type SavingsAccount = {
@@ -37,7 +37,7 @@ const mockAccounts: SavingsAccount[] = [
   {
     id: "1",
     accountNumber: "SAV001234",
-    memberName: "Sarah Johnson",
+    memberName: "Vengatesh",
     memberId: "ACC001234",
     accountType: "Regular Savings",
     balance: "₹25,430.00",
@@ -49,7 +49,7 @@ const mockAccounts: SavingsAccount[] = [
   {
     id: "2",
     accountNumber: "SAV001235",
-    memberName: "Michael Chen",
+    memberName: "Priya",
     memberId: "ACC001235",
     accountType: "Premium Savings",
     balance: "₹85,250.00",
@@ -61,19 +61,19 @@ const mockAccounts: SavingsAccount[] = [
   {
     id: "3",
     accountNumber: "SAV001236",
-    memberName: "Emily Davis",
+    memberName: "Surya",
     memberId: "ACC001236",
     accountType: "Regular Savings",
     balance: "₹12,100.00",
     interestRate: 3.5,
-    status: "active",
+    status: "dormant",
     openedDate: "2023-03-10",
     lastTransaction: "2024-12-08",
   },
   {
     id: "4",
     accountNumber: "SAV001237",
-    memberName: "James Wilson",
+    memberName: "Sudarsan",
     memberId: "ACC001237",
     accountType: "High Yield Savings",
     balance: "₹45,890.00",
@@ -147,8 +147,12 @@ export default function SavingsPage() {
 
   const totalBalance = mockAccounts.reduce((sum, acc) => sum + Number.parseFloat(acc.balance.replace(/[₹,]/g, "")), 0)
   const activeAccounts = mockAccounts.filter((acc) => acc.status === "active").length
+  const inactiveAccounts = mockAccounts.filter((acc) => acc.status === "dormant").length
   const activeAccountsBalance = mockAccounts
     .filter((acc) => acc.status === "active")
+    .reduce((sum, acc) => sum + Number.parseFloat(acc.balance.replace(/[₹,]/g, "")), 0)
+  const inactiveAccountsBalance = mockAccounts
+    .filter((acc) => acc.status === "dormant")
     .reduce((sum, acc) => sum + Number.parseFloat(acc.balance.replace(/[₹,]/g, "")), 0)
 
   return (
@@ -212,15 +216,18 @@ export default function SavingsPage() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="rounded-lg bg-purple-50 p-3">
-                    <TrendingUp className="h-6 w-6 text-purple-600" />
+                    <LockKeyhole className="h-6 w-6 text-purple-600" />
                   </div>
                   <Badge variant="secondary" className="text-teal-600">
-                    Avg.
+                    Inactive
                   </Badge>
                 </div>
                 <div className="mt-4">
-                  <h3 className="text-sm font-medium text-muted-foreground">Avg. Interest Rate</h3>
-                  <p className="mt-1 text-2xl font-bold text-foreground">4.1%</p>
+                  <h3 className="text-sm font-medium text-muted-foreground">Inactive Accounts</h3>
+                  <p className="mt-1 text-2xl font-bold text-foreground">{inactiveAccounts}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    ₹{inactiveAccountsBalance.toLocaleString()} Balance
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -344,9 +351,9 @@ export default function SavingsPage() {
                       <SelectValue placeholder="Search and select member" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="1">Sarah Johnson (ACC001234)</SelectItem>
-                      <SelectItem value="2">Michael Chen (ACC001235)</SelectItem>
-                      <SelectItem value="3">Emily Davis (ACC001236)</SelectItem>
+                      <SelectItem value="1">Vengatesh (ACC001234)</SelectItem>
+                      <SelectItem value="2">Priya (ACC001235)</SelectItem>
+                      <SelectItem value="3">Surya (ACC001236)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

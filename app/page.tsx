@@ -1,3 +1,5 @@
+"use client"
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Users, Wallet, FileText, CreditCard, ArrowUpRight, ArrowDownRight } from "lucide-react"
 import { Badge } from "@/components/ui/badge"

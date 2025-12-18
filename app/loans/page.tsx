@@ -43,7 +43,7 @@ const mockLoans: Loan[] = [
   {
     id: "1",
     loanNumber: "LN001234",
-    memberName: "Sarah Johnson",
+    memberName: "Vengatesh",
     memberId: "ACC001234",
     loanType: "Personal Loan",
     loanAmount: "₹25,000.00",
@@ -60,7 +60,7 @@ const mockLoans: Loan[] = [
   {
     id: "2",
     loanNumber: "LN001235",
-    memberName: "Michael Chen",
+    memberName: "Priya",
     memberId: "ACC001235",
     loanType: "Business Loan",
     loanAmount: "₹100,000.00",
@@ -77,7 +77,7 @@ const mockLoans: Loan[] = [
   {
     id: "3",
     loanNumber: "LN001236",
-    memberName: "Emily Davis",
+    memberName: "Surya",
     memberId: "ACC001236",
     loanType: "Personal Loan",
     loanAmount: "₹15,000.00",
@@ -94,7 +94,7 @@ const mockLoans: Loan[] = [
   {
     id: "4",
     loanNumber: "LN001237",
-    memberName: "James Wilson",
+    memberName: "Sudarsan",
     memberId: "ACC001237",
     loanType: "Mortgage Loan",
     loanAmount: "₹250,000.00",
@@ -111,7 +111,7 @@ const mockLoans: Loan[] = [
   {
     id: "5",
     loanNumber: "LN001238",
-    memberName: "Lisa Anderson",
+    memberName: "Muniyandi",
     memberId: "ACC001238",
     loanType: "Personal Loan",
     loanAmount: "₹10,000.00",
@@ -406,9 +406,9 @@ export default function LoansPage() {
                       <SelectValue placeholder="Search and select member" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="1">Sarah Johnson (ACC001234)</SelectItem>
-                      <SelectItem value="2">Michael Chen (ACC001235)</SelectItem>
-                      <SelectItem value="3">Emily Davis (ACC001236)</SelectItem>
+                      <SelectItem value="1">Vengatesh (ACC001234)</SelectItem>
+                      <SelectItem value="2">Priya (ACC001235)</SelectItem>
+                      <SelectItem value="3">Surya (ACC001236)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

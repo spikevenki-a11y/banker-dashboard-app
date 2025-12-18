@@ -39,7 +39,7 @@ const mockFDs: FixedDeposit[] = [
   {
     id: "1",
     fdNumber: "FD001234",
-    memberName: "Sarah Johnson",
+    memberName: "Vengatesh",
     memberId: "ACC001234",
     principal: "₹50,000.00",
     interestRate: 6.5,
@@ -53,7 +53,7 @@ const mockFDs: FixedDeposit[] = [
   {
     id: "2",
     fdNumber: "FD001235",
-    memberName: "Michael Chen",
+    memberName: "Priya",
     memberId: "ACC001235",
     principal: "₹100,000.00",
     interestRate: 7.0,
@@ -67,7 +67,7 @@ const mockFDs: FixedDeposit[] = [
   {
     id: "3",
     fdNumber: "FD001236",
-    memberName: "Emily Davis",
+    memberName: "Surya",
     memberId: "ACC001236",
     principal: "₹25,000.00",
     interestRate: 6.0,
@@ -81,7 +81,7 @@ const mockFDs: FixedDeposit[] = [
   {
     id: "4",
     fdNumber: "FD001237",
-    memberName: "James Wilson",
+    memberName: "Sudarsan",
     memberId: "ACC001237",
     principal: "₹75,000.00",
     interestRate: 6.75,
@@ -324,9 +324,9 @@ export default function FixedDepositsPage() {
                       <SelectValue placeholder="Search and select member" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="1">Sarah Johnson (ACC001234)</SelectItem>
-                      <SelectItem value="2">Michael Chen (ACC001235)</SelectItem>
-                      <SelectItem value="3">Emily Davis (ACC001236)</SelectItem>
+                      <SelectItem value="1">Vengatesh (ACC001234)</SelectItem>
+                      <SelectItem value="2">Priya (ACC001235)</SelectItem>
+                      <SelectItem value="3">Surya (ACC001236)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
