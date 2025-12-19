@@ -17,7 +17,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Search, ArrowUpRight, ArrowDownRight, Eye, TrendingUp, Wallet,LockKeyhole } from "lucide-react"
+import { Plus, Search, ArrowUpRight, ArrowDownRight, Eye, TrendingUp, Wallet,LockKeyhole,UserX } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 type SavingsAccount = {
@@ -133,6 +133,8 @@ export default function SavingsPage() {
   const [statusFilter, setStatusFilter] = useState("all")
   const [isOpenAccountOpen, setIsOpenAccountOpen] = useState(false)
   const [isTransactionOpen, setIsTransactionOpen] = useState(false)
+  const [isViewAccountOpen, setIsViewAccountOpen] = useState(false)
+  const [isAccountClosure, setIsAccountClosure] = useState(false)
   const [selectedAccount, setSelectedAccount] = useState<SavingsAccount | null>(null)
   const [transactionType, setTransactionType] = useState<"deposit" | "withdrawal">("deposit")
 
@@ -302,7 +304,7 @@ export default function SavingsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setSelectedAccount(account)}>
+                            <DropdownMenuItem onClick={() => {setSelectedAccount(account); setIsViewAccountOpen(true)}}>
                               <Eye className="mr-2 h-4 w-4" />
                               View Details
                             </DropdownMenuItem>
@@ -325,6 +327,15 @@ export default function SavingsPage() {
                             >
                               <ArrowUpRight className="mr-2 h-4 w-4" />
                               Withdraw
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedAccount(account)
+                                setIsAccountClosure(true)
+                              }}
+                            >
+                              <UserX className="mr-2 h-4 w-4 text-red-500" />
+                              Closure
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -434,7 +445,7 @@ export default function SavingsPage() {
           </Dialog>
 
           {/* View Account Details Dialog */}
-          <Dialog open={!!selectedAccount && !isTransactionOpen} onOpenChange={() => setSelectedAccount(null)}>
+          <Dialog open={!!selectedAccount && isViewAccountOpen} onOpenChange={() => setSelectedAccount(null)}>
             <DialogContent className="max-w-3xl">
               <DialogHeader>
                 <DialogTitle>Account Details</DialogTitle>
