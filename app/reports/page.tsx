@@ -29,8 +29,8 @@ const reportCategories = [
     bgColor: "bg-blue-50",
     reports: [
       { name: "Member List Report", description: "Comprehensive list of all members with details" },
-      { name: "New Member Registration", description: "Recently registered members" },
-      { name: "Active Members Report", description: "Currently active member accounts" },
+      //{ name: "New Member Registration", description: "Recently registered members" },
+      //{ name: "Active Members Report", description: "Currently active member accounts" },
       { name: "Inactive Members Report", description: "Dormant and inactive accounts" },
       { name: "Member KYC Status", description: "KYC verification status of all members" },
     ],
@@ -42,7 +42,7 @@ const reportCategories = [
     bgColor: "bg-teal-50",
     reports: [
       { name: "Savings Account Statement", description: "Detailed account statements with transactions" },
-      { name: "Savings Balance Report", description: "Current balance summary of all accounts" },
+      { name: "Savings Outstanding Report", description: "Outstanding balance summary of all accounts" },
       { name: "Deposit Summary", description: "Total deposits by period" },
       { name: "Withdrawal Summary", description: "Total withdrawals by period" },
       { name: "Interest Calculation Report", description: "Interest earned and credited details" },
@@ -56,7 +56,7 @@ const reportCategories = [
     bgColor: "bg-purple-50",
     reports: [
       { name: "FD Maturity Report", description: "Upcoming and matured fixed deposits" },
-      { name: "Active FD List", description: "All currently active fixed deposits" },
+      { name: "Outstanding FD Report", description: "All currently active fixed deposits" },
       { name: "FD Interest Report", description: "Interest calculations and payouts" },
       { name: "FD Closure Report", description: "Closed and premature closure details" },
       { name: "FD Renewal Report", description: "Renewed fixed deposit details" },
@@ -70,11 +70,11 @@ const reportCategories = [
     reports: [
       { name: "Loan Disbursement Report", description: "All disbursed loans by period" },
       { name: "Loan Outstanding Report", description: "Current outstanding loan balances" },
-      { name: "EMI Collection Report", description: "EMI payments collected" },
+      //{ name: "EMI Collection Report", description: "EMI payments collected" },
       { name: "Overdue Loans Report", description: "Loans with overdue payments" },
       { name: "Loan Closure Report", description: "Fully repaid and closed loans" },
       { name: "NPA Report", description: "Non-performing assets analysis" },
-      { name: "Loan Application Status", description: "Pending and approved applications" },
+      //{ name: "Loan Application Status", description: "Pending and approved applications" },
     ],
   },
   {

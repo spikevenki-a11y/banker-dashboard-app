@@ -100,7 +100,7 @@ export default function FixedDepositsPage() {
   const [isCreateFDOpen, setIsCreateFDOpen] = useState(false)
   const [selectedFD, setSelectedFD] = useState<FixedDeposit | null>(null)
   const [isActionDialogOpen, setIsActionDialogOpen] = useState(false)
-  const [actionType, setActionType] = useState<"renew" | "premature" | null>(null)
+  const [actionType, setActionType] = useState<"renew" | "premature" | "close" | null>(null)
 
   const filteredFDs = mockFDs.filter((fd) => {
     const matchesSearch =
@@ -173,7 +173,7 @@ export default function FixedDepositsPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="hidden">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="rounded-lg bg-purple-50 p-3">
@@ -284,6 +284,32 @@ export default function FixedDepositsPage() {
                               >
                                 <RefreshCw className="mr-2 h-4 w-4" />
                                 Renew FD
+                              </DropdownMenuItem>
+                            )}
+                            {fd.status === "matured" && (
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedFD(fd)
+                                  setActionType("close")
+                                  setIsActionDialogOpen(true)
+                                }}
+                                className="text-red-600"
+                              >
+                                <RefreshCw className="mr-2 h-4 w-4" />
+                                Closure
+                              </DropdownMenuItem>
+                            )}
+                            {fd.status === "active" && (
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedFD(fd)
+                                  setActionType("premature")
+                                  setIsActionDialogOpen(true)
+                                }}
+                                className="text-blue-600"
+                              >
+                                <FileText className="mr-2 h-4 w-4" />
+                                Interest Withdrawal
                               </DropdownMenuItem>
                             )}
                             {fd.status === "active" && (

@@ -22,6 +22,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Progress } from "@/components/ui/progress"
 
 type Loan = {
+  multidisbursement: "Yes" | "No"
   id: string
   loanNumber: string
   memberName: string
@@ -56,6 +57,7 @@ const mockLoans: Loan[] = [
     paidEmis: 18,
     totalEmis: 24,
     outstandingBalance: "₹6,937.50",
+    multidisbursement: "No"
   },
   {
     id: "2",
@@ -73,6 +75,7 @@ const mockLoans: Loan[] = [
     paidEmis: 28,
     totalEmis: 60,
     outstandingBalance: "₹67,990.40",
+    multidisbursement: "Yes"
   },
   {
     id: "3",
@@ -83,13 +86,14 @@ const mockLoans: Loan[] = [
     loanAmount: "₹15,000.00",
     interestRate: 9.0,
     tenure: 12,
-    status: "pending",
+    status: "approved",
     applicationDate: "2024-12-10",
     disbursementDate: null,
     emiAmount: "₹1,304.17",
     paidEmis: 0,
     totalEmis: 12,
     outstandingBalance: "₹15,000.00",
+    multidisbursement: "Yes"
   },
   {
     id: "4",
@@ -107,6 +111,7 @@ const mockLoans: Loan[] = [
     paidEmis: 55,
     totalEmis: 240,
     outstandingBalance: "₹218,445.30",
+    multidisbursement: "Yes"
   },
   {
     id: "5",
@@ -122,8 +127,9 @@ const mockLoans: Loan[] = [
     disbursementDate: "2024-01-01",
     emiAmount: "₹869.44",
     paidEmis: 10,
-    totalEmis: 12,
+    totalEmis: 12,  
     outstandingBalance: "₹1,738.88",
+    multidisbursement: "No"
   },
 ]
 
@@ -189,6 +195,28 @@ export default function LoansPage() {
   const totalLoans = mockLoans.reduce((sum, loan) => sum + Number.parseFloat(loan.loanAmount.replace(/[₹,]/g, "")), 0)
   const activeLoans = mockLoans.filter((loan) => loan.status === "active").length
   const pendingLoans = mockLoans.filter((loan) => loan.status === "pending").length
+  const approvedLoans = mockLoans.filter((loan) => loan.status === "approved").length
+  const pendingLoaAmts = mockLoans.reduce(
+                          (sum, loan) =>
+                            loan.status === "pending"
+                              ? sum + Number.parseFloat(loan.loanAmount.replace(/[₹,]/g, ""))
+                              : sum,
+                          0
+                        )
+  const overdueLoaAmts = mockLoans.reduce(
+                          (sum, loan) =>
+                            loan.status === "overdue"
+                              ? sum + Number.parseFloat(loan.loanAmount.replace(/[₹,]/g, ""))
+                              : sum,
+                          0
+                        )
+  const approvedLoaAmts = mockLoans.reduce(
+                          (sum, loan) =>
+                            loan.status === "approved"
+                              ? sum + Number.parseFloat(loan.loanAmount.replace(/[₹,]/g, ""))
+                              : sum,
+                          0
+                        )
   const overdueLoans = mockLoans.filter((loan) => loan.status === "overdue").length
 
   return (
@@ -216,12 +244,17 @@ export default function LoansPage() {
                 </div>
                 <div className="mt-4">
                   <h3 className="text-sm font-medium text-muted-foreground">Total Loans</h3>
-                  <p className="mt-1 text-2xl font-bold text-foreground">₹{totalLoans.toLocaleString()}</p>
+                  <p className="mt-1 text-2xl font-bold text-foreground">₹{totalLoans.toLocaleString()}</p><p className="mt-1 text-sm text-muted-foreground">
+                    {mockLoans.filter(
+                      loan => loan.status === "active" || loan.status === "overdue"
+                    ).length}{" "}
+                    Total Accounts
+                  </p>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="hidden">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="rounded-lg bg-teal-50 p-3">
@@ -245,6 +278,26 @@ export default function LoansPage() {
                 <div className="mt-4">
                   <h3 className="text-sm font-medium text-muted-foreground">Pending Applications</h3>
                   <p className="mt-1 text-2xl font-bold text-foreground">{pendingLoans}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    ₹{pendingLoaAmts.toLocaleString()}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="rounded-lg bg-orange-50 p-3">
+                    <Clock className="h-6 w-6 text-blue-600" />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <h3 className="text-sm font-medium text-muted-foreground">Sanctioned Applications</h3>
+                  <p className="mt-1 text-2xl font-bold text-foreground">{approvedLoans}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    ₹{approvedLoaAmts.toLocaleString()}
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -259,6 +312,9 @@ export default function LoansPage() {
                 <div className="mt-4">
                   <h3 className="text-sm font-medium text-muted-foreground">Overdue</h3>
                   <p className="mt-1 text-2xl font-bold text-foreground">{overdueLoans}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    ₹{overdueLoaAmts.toLocaleString()}
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -374,10 +430,16 @@ export default function LoansPage() {
                                   <DropdownMenuItem className="text-destructive">Reject</DropdownMenuItem>
                                 </>
                               )}
-                              {loan.status === "active" && (
+                              {((loan.status === "active" && loan.multidisbursement === "Yes") ||( loan.status === "approved")) && (
                                 <DropdownMenuItem>
                                   <CreditCard className="mr-2 h-4 w-4" />
-                                  Record Payment
+                                  Disbursument
+                                </DropdownMenuItem>
+                              )}
+                              {(loan.status === "active" || loan.status === "overdue") && (
+                                <DropdownMenuItem>
+                                  <CreditCard className="mr-2 h-4 w-4" />
+                                  Collection
                                 </DropdownMenuItem>
                               )}
                             </DropdownMenuContent>

@@ -14,11 +14,21 @@ export default function FASPage() {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card className="hover:shadow-lg transition-shadow cursor-pointer">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Chart of Accounts</CardTitle>
+            <CardTitle className="text-sm font-medium">Verify Vouchers</CardTitle>
             <Calculator className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-xs text-muted-foreground">Manage your accounting structure</p>
+            <p className="text-xs text-muted-foreground">Verify Vouchers $ Cancel Vouchers</p>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">DayEnd</CardTitle>
+            <Calculator className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground">Close the current Financial Day</p>
           </CardContent>
         </Card>
 
@@ -34,16 +44,6 @@ export default function FASPage() {
 
         <Card className="hover:shadow-lg transition-shadow cursor-pointer">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">General Ledger</CardTitle>
-            <Calculator className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-xs text-muted-foreground">View ledger accounts</p>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Trial Balance</CardTitle>
             <Calculator className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -51,8 +51,8 @@ export default function FASPage() {
             <p className="text-xs text-muted-foreground">View account balances</p>
           </CardContent>
         </Card>
-
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+        
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer hidden">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Financial Reports</CardTitle>
             <Calculator className="h-4 w-4 text-muted-foreground" />
@@ -62,13 +62,23 @@ export default function FASPage() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer hidden">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Budget Management</CardTitle>
             <Calculator className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">Plan and track budgets</p>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Audit</CardTitle>
+            <Calculator className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground">Audit Module</p>
           </CardContent>
         </Card>
       </div>

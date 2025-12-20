@@ -43,6 +43,11 @@ const routes = [
     href: "/loans",
   },
   {
+    label: "Bank Level",
+    icon: Calculator,
+    href: "/bank-level",
+  },
+  {
     label: "FAS",
     icon: Calculator,
     href: "/fas",
