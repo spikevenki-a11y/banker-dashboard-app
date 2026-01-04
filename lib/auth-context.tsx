@@ -4,7 +4,6 @@ import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
 import { createClient } from "./supabase/client"
 import type { AuthContextType, User } from "./types"
-import { getSession } from "@/lib/auth/session"
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
@@ -12,50 +11,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const supabase = createClient()
-  const session = getSession() 
 
   useEffect(() => {
-    const getUserProfile = async (session: any) => {
+    const checkStoredUser = () => {
       try {
-        const userIdOrEmail = session.user.id || session.user.email
-        const query = session.user.id
-          ? supabase.from("profiles").select("*").eq("id", userIdOrEmail)
-          : supabase.from("profiles").select("*").eq("email", userIdOrEmail)
+        const storedUserStr = localStorage.getItem("banker_user")
+        if (storedUserStr) {
+          const storedUser = JSON.parse(storedUserStr)
+          const initials = storedUser.fullName
+            ? storedUser.fullName
+                .split(" ")
+                .map((n: string) => n[0])
+                .join("")
+                .toUpperCase()
+            : "B"
 
-        const { data: profile, error } = await query.single()
-        if (error) throw error
-
-        if (profile) {
           setUser({
-            id: profile.id,
-            name: profile.full_name || "Banker",
-            email: profile.email,
-            role: profile.role || "staff",
-            branch: profile.branch || "Main Branch",
-            initials: (profile.full_name || "B")
-              .split(" ")
-              .map((n: string) => n[0])
-              .join("")
-              .toUpperCase(),
+            id: storedUser.id,
+            name: storedUser.fullName || "Banker",
+            email: storedUser.email || "",
+            role: storedUser.role || "staff",
+            branch: storedUser.branch || "Main Branch",
+            initials,
           })
         }
       } catch (error) {
-        console.log("[v1] Error fetching profile:", error)
-        setUser(null)
+        console.error("[v0] Error loading stored user:", error)
       } finally {
         setIsLoading(false)
       }
     }
 
+    checkStoredUser()
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
-        getUserProfile(session.user)
-      } else {
+        // Real Supabase auth session
+        const initials = (session.user.user_metadata?.full_name || "B")
+          .split(" ")
+          .map((n: string) => n[0])
+          .join("")
+          .toUpperCase()
+
+        setUser({
+          id: session.user.id,
+          name: session.user.user_metadata?.full_name || "Banker",
+          email: session.user.email || "",
+          role: session.user.user_metadata?.role || "staff",
+          branch: session.user.user_metadata?.branch || "Main Branch",
+          initials,
+        })
+      } else if (!localStorage.getItem("banker_user")) {
         setUser(null)
-        setIsLoading(false)
       }
+      setIsLoading(false)
     })
 
     return () => {
@@ -64,6 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [supabase])
 
   const logout = async () => {
+    localStorage.removeItem("banker_user")
     await supabase.auth.signOut()
     setUser(null)
   }
@@ -84,7 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext)
-  if (!context) {
+  if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider")
   }
   return context

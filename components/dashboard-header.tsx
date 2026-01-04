@@ -12,18 +12,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-// <CHANGE> Import useAuth hook and useRouter
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
 
 export function DashboardHeader() {
-  // <CHANGE> Get user from auth context
   const { user, logout } = useAuth()
   const router = useRouter()
 
-  // <CHANGE> Handle logout
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await logout()
     router.push("/login")
   }
 
@@ -34,11 +31,9 @@ export function DashboardHeader() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input placeholder="Search members, accounts, transactions..." className="pl-10" />
         </div>
-        {/* <CHANGE> Display branch info dynamically */}
         {user && (
           <div className="ml-4 flex items-center gap-2 rounded-md bg-primary/10 px-3 py-1">
-            <span className="text-xs font-medium text-primary">{user.branch.name}</span>
-            <span className="text-xs text-muted-foreground">({user.branch.code})</span>
+            <span className="text-xs font-medium text-primary">{user.branch}</span>
           </div>
         )}
       </div>
@@ -50,11 +45,8 @@ export function DashboardHeader() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="gap-2">
-              {/* <CHANGE> Display user avatar and name dynamically */}
               <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-primary text-primary-foreground">
-                  {user?.initials || "U"}
-                </AvatarFallback>
+                <AvatarFallback className="bg-primary text-primary-foreground">{user?.initials || "U"}</AvatarFallback>
               </Avatar>
               <div className="flex flex-col items-start">
                 <span className="text-sm font-medium">{user?.name || "User"}</span>
@@ -71,7 +63,6 @@ export function DashboardHeader() {
             </DropdownMenuItem>
             <DropdownMenuItem>Settings</DropdownMenuItem>
             <DropdownMenuSeparator />
-            {/* <CHANGE> Add logout functionality */}
             <DropdownMenuItem onClick={handleLogout}>
               <LogOut className="mr-2 h-4 w-4" />
               Log out

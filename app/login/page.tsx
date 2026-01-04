@@ -9,8 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { ShieldCheck, Building2, AlertCircle, Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Console } from "console"
-console.log("Login page loaded")
+
 const DEMO_USERS = [
   { username: "sldb00001", password: "password123", label: "Admin - Head Office" },
   { username: "sldb00002", password: "password123", label: "Staff - Downtown Branch" },
@@ -23,39 +22,35 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const router = useRouter()
-  // const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault()
+    e.preventDefault()
+    setIsLoading(true)
+    setError(null)
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || "Login failed")
+      }
 
-  if (isSubmitting) return // prevent double submit
+      localStorage.setItem("banker_user", JSON.stringify(data.user))
 
-  setIsSubmitting(true)
-  setError(null)
-  console.log("Submitting login for:", username)
-  try {
-    const response = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    })
-    console.log("Login response received")
-    const data = await response.json()
-    console.log("Login response data:", data)
-    if (!response.ok) {
-      throw new Error(data.error || "Login failed")
+      // Redirect to admin dashboard
+      router.push(data.redirectUrl)
+      router.refresh()
+    } catch (error: unknown) {
+      console.log("Login error:", error)
+      setError(error instanceof Error ? error.message : "An error occurred")
+    } finally {
+      setIsLoading(false)
     }
-
-    router.push(data.redirectUrl)
-    router.refresh()
-  } catch (error) {
-    console.log("Login error:", error)
-    setError(error instanceof Error ? error.message : "An error occurred")
-  } finally {
-    setIsSubmitting(false)
   }
-}
-
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#f8f9fa] p-4 font-sans">
@@ -73,12 +68,12 @@ export default function LoginPage() {
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
-            {/* {error && (
+            {error && (
               <Alert variant="destructive" className="py-2">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription className="text-xs">{error}</AlertDescription>
               </Alert>
-            )} */}
+            )}
             <div className="space-y-2">
               <Label htmlFor="username">User Name</Label>
               <Input
