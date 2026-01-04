@@ -39,12 +39,12 @@ export async function updateSession(request: NextRequest) {
 
   if (
     // protect all routes except login and auth-related
-    !request.nextUrl.pathname.startsWith("/login") &&
+    !request.nextUrl.pathname.startsWith("/") &&
     !request.nextUrl.pathname.startsWith("/auth") &&
     !user
   ) {
     const url = request.nextUrl.clone()
-    url.pathname = "/login"
+    url.pathname = "/"
     return NextResponse.redirect(url)
   }
 
