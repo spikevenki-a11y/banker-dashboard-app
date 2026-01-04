@@ -79,6 +79,10 @@ export async function POST(request: Request) {
     }
 
     console.log("[v0] Login successful, returning response")
+    let redirectUrl = "/dashboard"
+    if (user.role == "admin") {
+      redirectUrl = "/admin"
+    }
     return NextResponse.json({
       success: true,
       user: {
@@ -87,7 +91,7 @@ export async function POST(request: Request) {
         fullName: user.full_name,
         role: user.role,
       },
-      redirectUrl: "/dashboard",
+      redirectUrl: redirectUrl,
     })
   } catch (error) {
     console.error("[v0] Unexpected error in login route:", error)

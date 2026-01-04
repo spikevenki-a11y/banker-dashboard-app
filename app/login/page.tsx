@@ -42,7 +42,7 @@ export default function LoginPage() {
       localStorage.setItem("banker_user", JSON.stringify(data.user))
 
       // Redirect to dashboard
-      router.push("/dashboard")
+      router.push(data.redirectUrl)
       router.refresh()
     } catch (error: unknown) {
       console.error("[v0] Login error:", error)
