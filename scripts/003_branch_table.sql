@@ -1,4 +1,3 @@
-
 -- ============================================================================
 -- TABLE: Branch
 -- ============================================================================
@@ -32,4 +31,3 @@ CREATE TABLE branchparameters (
 
 ALTER TABLE branchparameters ENABLE ROW LEVEL SECURITY;
 -- RLS Policies for branchparameters table
-
