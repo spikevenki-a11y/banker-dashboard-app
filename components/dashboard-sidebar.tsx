@@ -14,13 +14,21 @@ import {
   Building2,
   Calculator,
   BarChart3,
+  ShieldAlert,
 } from "lucide-react"
+import { useAuth } from "@/lib/auth-context"
 
 const routes = [
   {
     label: "Dashboard",
     icon: LayoutDashboard,
-    href: "/",
+    href: "/dashboard",
+  },
+  {
+    label: "Admin",
+    icon: ShieldAlert,
+    href: "/admin",
+    requiresAdmin: true,
   },
   {
     label: "Members",
@@ -66,6 +74,14 @@ const routes = [
 
 export function DashboardSidebar() {
   const pathname = usePathname()
+  const { user } = useAuth()
+
+  const visibleRoutes = routes.filter((route: any) => {
+    if (route.requiresAdmin) {
+      return user?.role === "admin"
+    }
+    return true
+  })
 
   return (
     <div className="flex h-full w-64 flex-col border-r border-border bg-sidebar">
@@ -74,7 +90,7 @@ export function DashboardSidebar() {
         <span className="ml-2 text-lg font-semibold text-sidebar-foreground">NextZen</span>
       </div>
       <nav className="flex-1 space-y-1 px-3 py-4">
-        {routes.map((route) => (
+        {visibleRoutes.map((route) => (
           <Link
             key={route.href}
             href={route.href}

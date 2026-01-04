@@ -11,16 +11,15 @@ import { ShieldCheck, Building2, AlertCircle, Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 const DEMO_USERS = [
-  { username: "sldb00001", password: "password123", label: "Admin - Head Office" },
-  { username: "sldb00002", password: "password123", label: "Staff - Downtown Branch" },
-  { username: "sldb00003", password: "password123", label: "Staff - Westside Branch" },
+  { username: "admin001", password: "password123", label: "Admin - System Admin" },
+  { username: "sldb00001", password: "password123", label: "Staff - Downtown Branch" },
+  { username: "sldb00002", password: "password123", label: "Staff - Westside Branch" },
 ]
 
 export default function LoginPage() {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
 
@@ -41,11 +40,11 @@ export default function LoginPage() {
 
       localStorage.setItem("banker_user", JSON.stringify(data.user))
 
-      // Redirect to admin dashboard
-      router.push(data.redirectUrl)
+      // Redirect to dashboard
+      router.push("/dashboard")
       router.refresh()
     } catch (error: unknown) {
-      console.log("Login error:", error)
+      console.error("[v0] Login error:", error)
       setError(error instanceof Error ? error.message : "An error occurred")
     } finally {
       setIsLoading(false)
@@ -121,8 +120,8 @@ export default function LoginPage() {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
-            <Button className="w-full" type="submit" disabled={isSubmitting}>
-              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Sign in"}
+            <Button className="w-full" type="submit" disabled={isLoading}>
+              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Sign in"}
             </Button>
           </CardFooter>
         </form>
