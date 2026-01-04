@@ -113,7 +113,8 @@ const recentActivities = [
 export default function DashboardPage() {
   const { user, isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
-
+  
+  console.log("[v0] DashboardPage - isAuthenticated:", isAuthenticated, "isLoading:", isLoading)
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push("/login")

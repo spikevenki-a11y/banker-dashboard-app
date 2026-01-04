@@ -11,7 +11,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const supabase = createClient()
-
+  console.log("[user ",user)
+  console.log("[v0] AuthProvider initialized")
   useEffect(() => {
     const checkStoredUser = () => {
       try {
@@ -96,6 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext)
+  console.log("[v0] useAuth context:", context)
   if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider")
   }

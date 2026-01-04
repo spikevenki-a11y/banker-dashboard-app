@@ -12,8 +12,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 
 const DEMO_USERS = [
   { username: "admin001", password: "password123", label: "Admin - System Admin" },
-  { username: "sldb00001", password: "password123", label: "Staff - Downtown Branch" },
-  { username: "sldb00002", password: "password123", label: "Staff - Westside Branch" },
+  { username: "sldb00011", password: "password123", label: "Staff - Downtown Branch" },
+  { username: "sldb00012", password: "password123", label: "Staff - Westside Branch" },
 ]
 
 export default function LoginPage() {
