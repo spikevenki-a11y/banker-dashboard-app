@@ -6,6 +6,9 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Bar, BarChart, Line, LineChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/lib/auth-context"
 
 const stats = [
   {
@@ -108,11 +111,26 @@ const recentActivities = [
 ]
 
 export default function DashboardPage() {
+  const { user, isAuthenticated, isLoading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push("/login")
+    }
+  }, [isAuthenticated, isLoading, router])
+
+  if (isLoading || !isAuthenticated) {
+    return null
+  }
+
   return (
     <>
       <div className="mb-6">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground">Welcome back! Here's your banking overview.</p>
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">Welcome back, {user?.name}!</h1>
+        <p className="text-muted-foreground">
+          Monitoring banking operations for <span className="font-semibold text-primary">{user?.branch?.name}</span>.
+        </p>
       </div>
 
       {/* Stats Cards */}

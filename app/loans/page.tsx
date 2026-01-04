@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useAuth } from "@/lib/auth-context"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -38,6 +39,7 @@ type Loan = {
   paidEmis: number
   totalEmis: number
   outstandingBalance: string
+  branchId: string
 }
 
 const mockLoans: Loan[] = [
@@ -57,7 +59,8 @@ const mockLoans: Loan[] = [
     paidEmis: 18,
     totalEmis: 24,
     outstandingBalance: "₹6,937.50",
-    multidisbursement: "No"
+    multidisbursement: "No",
+    branchId: "1", // Chennai branch
   },
   {
     id: "2",
@@ -75,7 +78,8 @@ const mockLoans: Loan[] = [
     paidEmis: 28,
     totalEmis: 60,
     outstandingBalance: "₹67,990.40",
-    multidisbursement: "Yes"
+    multidisbursement: "Yes",
+    branchId: "2", // Bangalore branch
   },
   {
     id: "3",
@@ -93,7 +97,8 @@ const mockLoans: Loan[] = [
     paidEmis: 0,
     totalEmis: 12,
     outstandingBalance: "₹15,000.00",
-    multidisbursement: "Yes"
+    multidisbursement: "Yes",
+    branchId: "1", // Chennai branch
   },
   {
     id: "4",
@@ -111,7 +116,8 @@ const mockLoans: Loan[] = [
     paidEmis: 55,
     totalEmis: 240,
     outstandingBalance: "₹218,445.30",
-    multidisbursement: "Yes"
+    multidisbursement: "Yes",
+    branchId: "1", // Chennai branch
   },
   {
     id: "5",
@@ -127,9 +133,10 @@ const mockLoans: Loan[] = [
     disbursementDate: "2024-01-01",
     emiAmount: "₹869.44",
     paidEmis: 10,
-    totalEmis: 12,  
+    totalEmis: 12,
     outstandingBalance: "₹1,738.88",
-    multidisbursement: "No"
+    multidisbursement: "No",
+    branchId: "2", // Bangalore branch
   },
 ]
 
@@ -178,12 +185,16 @@ const mockEMISchedule: EMISchedule[] = [
 ]
 
 export default function LoansPage() {
+  const { user } = useAuth()
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [isNewLoanOpen, setIsNewLoanOpen] = useState(false)
   const [selectedLoan, setSelectedLoan] = useState<Loan | null>(null)
 
-  const filteredLoans = mockLoans.filter((loan) => {
+  const branchFilteredLoans =
+    user?.role === "admin" ? mockLoans : mockLoans.filter((loan) => loan.branchId === user?.branchId)
+
+  const filteredLoans = branchFilteredLoans.filter((loan) => {
     const matchesSearch =
       loan.loanNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
       loan.memberName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -192,32 +203,26 @@ export default function LoansPage() {
     return matchesSearch && matchesStatus
   })
 
-  const totalLoans = mockLoans.reduce((sum, loan) => sum + Number.parseFloat(loan.loanAmount.replace(/[₹,]/g, "")), 0)
-  const activeLoans = mockLoans.filter((loan) => loan.status === "active").length
-  const pendingLoans = mockLoans.filter((loan) => loan.status === "pending").length
-  const approvedLoans = mockLoans.filter((loan) => loan.status === "approved").length
-  const pendingLoaAmts = mockLoans.reduce(
-                          (sum, loan) =>
-                            loan.status === "pending"
-                              ? sum + Number.parseFloat(loan.loanAmount.replace(/[₹,]/g, ""))
-                              : sum,
-                          0
-                        )
-  const overdueLoaAmts = mockLoans.reduce(
-                          (sum, loan) =>
-                            loan.status === "overdue"
-                              ? sum + Number.parseFloat(loan.loanAmount.replace(/[₹,]/g, ""))
-                              : sum,
-                          0
-                        )
-  const approvedLoaAmts = mockLoans.reduce(
-                          (sum, loan) =>
-                            loan.status === "approved"
-                              ? sum + Number.parseFloat(loan.loanAmount.replace(/[₹,]/g, ""))
-                              : sum,
-                          0
-                        )
-  const overdueLoans = mockLoans.filter((loan) => loan.status === "overdue").length
+  const totalLoans = branchFilteredLoans.reduce(
+    (sum, loan) => sum + Number.parseFloat(loan.loanAmount.replace(/[₹,]/g, "")),
+    0,
+  )
+  const activeLoans = branchFilteredLoans.filter((loan) => loan.status === "active").length
+  const pendingLoans = branchFilteredLoans.filter((loan) => loan.status === "pending").length
+  const approvedLoans = branchFilteredLoans.filter((loan) => loan.status === "approved").length
+  const pendingLoaAmts = branchFilteredLoans.reduce(
+    (sum, loan) => (loan.status === "pending" ? sum + Number.parseFloat(loan.loanAmount.replace(/[₹,]/g, "")) : sum),
+    0,
+  )
+  const overdueLoaAmts = branchFilteredLoans.reduce(
+    (sum, loan) => (loan.status === "overdue" ? sum + Number.parseFloat(loan.loanAmount.replace(/[₹,]/g, "")) : sum),
+    0,
+  )
+  const approvedLoaAmts = branchFilteredLoans.reduce(
+    (sum, loan) => (loan.status === "approved" ? sum + Number.parseFloat(loan.loanAmount.replace(/[₹,]/g, "")) : sum),
+    0,
+  )
+  const overdueLoans = branchFilteredLoans.filter((loan) => loan.status === "overdue").length
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -226,7 +231,11 @@ export default function LoansPage() {
           <div className="mb-6 flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-foreground">Loan Management</h1>
-              <p className="text-muted-foreground">Process applications, track EMIs, and manage repayments</p>
+              <p className="text-muted-foreground">
+                {user?.role === "admin"
+                  ? "All branches - Process applications, track EMIs, and manage repayments"
+                  : `${user?.branch.name} - Process applications, track EMIs, and manage repayments`}
+              </p>
             </div>
             <Button onClick={() => setIsNewLoanOpen(true)} className="gap-2">
               <Plus className="h-4 w-4" />
@@ -244,10 +253,9 @@ export default function LoansPage() {
                 </div>
                 <div className="mt-4">
                   <h3 className="text-sm font-medium text-muted-foreground">Total Loans</h3>
-                  <p className="mt-1 text-2xl font-bold text-foreground">₹{totalLoans.toLocaleString()}</p><p className="mt-1 text-sm text-muted-foreground">
-                    {mockLoans.filter(
-                      loan => loan.status === "active" || loan.status === "overdue"
-                    ).length}{" "}
+                  <p className="mt-1 text-2xl font-bold text-foreground">₹{totalLoans.toLocaleString()}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {branchFilteredLoans.filter((loan) => loan.status === "active" || loan.status === "overdue").length}{" "}
                     Total Accounts
                   </p>
                 </div>
@@ -278,9 +286,7 @@ export default function LoansPage() {
                 <div className="mt-4">
                   <h3 className="text-sm font-medium text-muted-foreground">Pending Applications</h3>
                   <p className="mt-1 text-2xl font-bold text-foreground">{pendingLoans}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    ₹{pendingLoaAmts.toLocaleString()}
-                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">₹{pendingLoaAmts.toLocaleString()}</p>
                 </div>
               </CardContent>
             </Card>
@@ -295,9 +301,7 @@ export default function LoansPage() {
                 <div className="mt-4">
                   <h3 className="text-sm font-medium text-muted-foreground">Sanctioned Applications</h3>
                   <p className="mt-1 text-2xl font-bold text-foreground">{approvedLoans}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    ₹{approvedLoaAmts.toLocaleString()}
-                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">₹{approvedLoaAmts.toLocaleString()}</p>
                 </div>
               </CardContent>
             </Card>
@@ -312,9 +316,7 @@ export default function LoansPage() {
                 <div className="mt-4">
                   <h3 className="text-sm font-medium text-muted-foreground">Overdue</h3>
                   <p className="mt-1 text-2xl font-bold text-foreground">{overdueLoans}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    ₹{overdueLoaAmts.toLocaleString()}
-                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">₹{overdueLoaAmts.toLocaleString()}</p>
                 </div>
               </CardContent>
             </Card>
@@ -392,24 +394,6 @@ export default function LoansPage() {
                         </TableCell>
                         <TableCell className="font-semibold">{loan.outstandingBalance}</TableCell>
                         <TableCell>
-                          <Badge
-                            variant={loan.status === "active" ? "default" : "secondary"}
-                            className={
-                              loan.status === "active"
-                                ? "bg-teal-100 text-teal-700"
-                                : loan.status === "pending"
-                                  ? "bg-orange-100 text-orange-700"
-                                  : loan.status === "overdue"
-                                    ? "bg-red-100 text-red-700"
-                                    : loan.status === "approved"
-                                      ? "bg-blue-100 text-blue-700"
-                                      : "bg-gray-100 text-gray-700"
-                            }
-                          >
-                            {loan.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="sm">
@@ -430,10 +414,11 @@ export default function LoansPage() {
                                   <DropdownMenuItem className="text-destructive">Reject</DropdownMenuItem>
                                 </>
                               )}
-                              {((loan.status === "active" && loan.multidisbursement === "Yes") ||( loan.status === "approved")) && (
+                              {((loan.status === "active" && loan.multidisbursement === "Yes") ||
+                                loan.status === "approved") && (
                                 <DropdownMenuItem>
                                   <CreditCard className="mr-2 h-4 w-4" />
-                                  Disbursument
+                                  Disbursement
                                 </DropdownMenuItem>
                               )}
                               {(loan.status === "active" || loan.status === "overdue") && (

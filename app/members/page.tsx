@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useAuth } from "@/lib/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -47,6 +48,7 @@ type Member = {
   savingsAccounts: number
   fixedDeposits: number
   loans: number
+  branchId: string
 }
 
 const mockMembers: Member[] = [
@@ -63,6 +65,7 @@ const mockMembers: Member[] = [
     savingsAccounts: 2,
     fixedDeposits: 1,
     loans: 0,
+    branchId: "1", // Chennai branch
   },
   {
     id: "2",
@@ -77,6 +80,7 @@ const mockMembers: Member[] = [
     savingsAccounts: 3,
     fixedDeposits: 2,
     loans: 1,
+    branchId: "2", // Bangalore branch
   },
   {
     id: "3",
@@ -91,6 +95,7 @@ const mockMembers: Member[] = [
     savingsAccounts: 1,
     fixedDeposits: 0,
     loans: 0,
+    branchId: "1", // Chennai branch
   },
   {
     id: "4",
@@ -105,6 +110,7 @@ const mockMembers: Member[] = [
     savingsAccounts: 2,
     fixedDeposits: 3,
     loans: 2,
+    branchId: "1", // Chennai branch
   },
   {
     id: "5",
@@ -119,17 +125,22 @@ const mockMembers: Member[] = [
     savingsAccounts: 1,
     fixedDeposits: 0,
     loans: 0,
+    branchId: "2", // Bangalore branch
   },
 ]
 
 export default function MembersPage() {
+  const { user } = useAuth()
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [selectedMember, setSelectedMember] = useState<Member | null>(null)
   const [activeAction, setActiveAction] = useState<string | null>(null)
 
-  const filteredMembers = mockMembers.filter((member) => {
+  const branchFilteredMembers =
+    user?.role === "admin" ? mockMembers : mockMembers.filter((member) => member.branchId === user?.branchId)
+
+  const filteredMembers = branchFilteredMembers.filter((member) => {
     const matchesSearch =
       member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       member.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -144,7 +155,11 @@ export default function MembersPage() {
         <main className="flex-1 overflow-y-auto bg-background p-6">
           <div className="mb-6">
             <h1 className="text-3xl font-bold tracking-tight text-foreground">Member Management</h1>
-            <p className="text-muted-foreground">Manage customer accounts and member operations</p>
+            <p className="text-muted-foreground">
+              {user?.role === "admin"
+                ? "All branches - Manage customer accounts and member operations"
+                : `${user?.branch.name} - Manage customer accounts and member operations`}
+            </p>
           </div>
 
           <div className="mb-8 grid gap-4 md:grid-cols-2 lg:grid-cols-5">

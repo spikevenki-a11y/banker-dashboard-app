@@ -1,10 +1,9 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
-import { Analytics } from "@vercel/analytics/next"
-import { DashboardSidebar } from "@/components/dashboard-sidebar"
-import { DashboardHeader } from "@/components/dashboard-header"
 import "./globals.css"
+import { AuthProvider } from "@/lib/auth-context"
+import { DashboardWrapper } from "./_components/dashboard-wrapper"
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
@@ -40,14 +39,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans antialiased`}>
-        <div className="flex h-screen overflow-hidden">
-          <DashboardSidebar />
-          <div className="flex flex-1 flex-col overflow-hidden">
-            <DashboardHeader />
-            <main className="flex-1 overflow-y-auto bg-background p-6">{children}</main>
-          </div>
-        </div>
-        <Analytics />
+        <AuthProvider>
+          <DashboardWrapper>{children}</DashboardWrapper>
+        </AuthProvider>
       </body>
     </html>
   )
