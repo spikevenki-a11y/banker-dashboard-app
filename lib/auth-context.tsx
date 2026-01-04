@@ -4,6 +4,7 @@ import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
 import { createClient } from "./supabase/client"
 import type { AuthContextType, User } from "./types"
+import { log } from "node:console"
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
@@ -25,6 +26,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (error) throw error
 
         if (profile) {
+          console.log("profile enterin");
+          
           setUser({
             id: profile.id,
             name: profile.full_name || "Banker",
@@ -39,7 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           })
         }
       } catch (error) {
-        console.error("[v0] Error fetching profile:", error)
+        console.log("[v0] Error fetching profile:", error)
       } finally {
         setIsLoading(false)
       }
