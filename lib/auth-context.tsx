@@ -2,7 +2,6 @@
 
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
-import { createClient } from "./supabase/client"
 import type { AuthContextType, User } from "./types"
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -10,14 +9,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const supabase = createClient()
-
-  console.log("[v0] AuthProvider initialized")
 
   useEffect(() => {
-    const checkAuth = async () => {
+    const loadUser = () => {
       try {
-        // First check localStorage (synchronous)
         const storedUserStr = localStorage.getItem("banker_user")
         if (storedUserStr) {
           const storedUser = JSON.parse(storedUserStr)
@@ -37,72 +32,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             branch: storedUser.branch || "Main Branch",
             initials,
           })
-          setIsLoading(false)
-          return
-        }
-
-        // Then check Supabase session
-        const {
-          data: { session },
-        } = await supabase.auth.getSession()
-
-        if (session?.user) {
-          const initials = (session.user.user_metadata?.full_name || "B")
-            .split(" ")
-            .map((n: string) => n[0])
-            .join("")
-            .toUpperCase()
-
-          setUser({
-            id: session.user.id,
-            name: session.user.user_metadata?.full_name || "Banker",
-            email: session.user.email || "",
-            role: session.user.user_metadata?.role || "staff",
-            branch: session.user.user_metadata?.branch || "Main Branch",
-            initials,
-          })
         }
       } catch (error) {
-        console.error("[v0] Error loading auth:", error)
+        console.error("[v0] Error loading user from localStorage:", error)
       } finally {
         setIsLoading(false)
       }
     }
 
-    checkAuth()
+    loadUser()
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user) {
-        const initials = (session.user.user_metadata?.full_name || "B")
-          .split(" ")
-          .map((n: string) => n[0])
-          .join("")
-          .toUpperCase()
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "banker_user") {
+        if (e.newValue) {
+          const storedUser = JSON.parse(e.newValue)
+          const initials = storedUser.fullName
+            ? storedUser.fullName
+                .split(" ")
+                .map((n: string) => n[0])
+                .join("")
+                .toUpperCase()
+            : "B"
 
-        setUser({
-          id: session.user.id,
-          name: session.user.user_metadata?.full_name || "Banker",
-          email: session.user.email || "",
-          role: session.user.user_metadata?.role || "staff",
-          branch: session.user.user_metadata?.branch || "Main Branch",
-          initials,
-        })
-      } else if (!localStorage.getItem("banker_user")) {
-        setUser(null)
+          setUser({
+            id: storedUser.id,
+            name: storedUser.fullName || "Banker",
+            email: storedUser.email || "",
+            role: storedUser.role || "staff",
+            branch: storedUser.branch || "Main Branch",
+            initials,
+          })
+        } else {
+          setUser(null)
+        }
       }
-    })
-
-    return () => {
-      subscription.unsubscribe()
     }
-  }, [supabase])
+
+    window.addEventListener("storage", handleStorageChange)
+    return () => window.removeEventListener("storage", handleStorageChange)
+  }, [])
 
   const logout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" })
+    } catch (error) {
+      console.error("[v0] Error calling logout API:", error)
+    }
+
     localStorage.removeItem("banker_user")
-    await supabase.auth.signOut()
     setUser(null)
+    window.location.href = "/login"
   }
 
   const value = {
@@ -111,8 +90,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     logout,
     isLoading,
   }
-
-  console.log("[v0] Auth state:", value)
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
