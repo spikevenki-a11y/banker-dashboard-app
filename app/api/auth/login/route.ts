@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createClient } from "@supabase/supabase-js"
 import { createSession } from "@/lib/auth/session"
 import { NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
@@ -17,13 +17,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Username and password are required" }, { status: 400 })
     }
 
-    console.log("[v0] Creating Supabase client")
-    const supabase = await createClient()
+    console.log("[v0] Creating Supabase client with service role")
+    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    })
 
     console.log("[v0] Querying user:", username)
     const { data: user, error: userError } = await supabase
       .from("users")
-      .select("id, username, password, full_name, role, is_active,branch")
+      .select("id, username, password, full_name, role, is_active, branch_id")
       .eq("username", username)
       .maybeSingle()
 
