@@ -4,6 +4,7 @@ export interface User {
   email: string
   role: "staff" | "manager" | "admin" | "role1"
   branch: string
+  branch_id?: number
   initials: string
 }
 

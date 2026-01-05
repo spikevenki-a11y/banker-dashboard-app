@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/auth-context"
+import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -26,7 +27,6 @@ import {
   Ban,
   Wallet,
   FileText,
-  CreditCard,
   UserPlus,
   ArrowUpCircle,
   ArrowDownCircle,
@@ -37,97 +37,17 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 
 type Member = {
   id: string
-  name: string
+  member_id: string
+  full_name: string
   email: string
   phone: string
-  accountNumber: string
-  kycStatus: "verified" | "pending" | "rejected"
-  status: "active" | "inactive"
-  joinDate: string
-  totalBalance: string
-  savingsAccounts: number
-  fixedDeposits: number
-  loans: number
-  branchId: string
+  address: string
+  account_type: string
+  account_balance: number
+  status: string
+  joined_date: string
+  branch_id: number
 }
-
-const mockMembers: Member[] = [
-  {
-    id: "1",
-    name: "Vengatesh",
-    email: "Vengatesh.m@email.com",
-    phone: "+1 (555) 123-4567",
-    accountNumber: "ACC001234",
-    kycStatus: "verified",
-    status: "active",
-    joinDate: "2023-01-15",
-    totalBalance: "₹45,230",
-    savingsAccounts: 2,
-    fixedDeposits: 1,
-    loans: 0,
-    branchId: "1", // Chennai branch
-  },
-  {
-    id: "2",
-    name: "Priya",
-    email: "priya.s@email.com",
-    phone: "+1 (555) 234-5678",
-    accountNumber: "ACC001235",
-    kycStatus: "verified",
-    status: "active",
-    joinDate: "2023-02-20",
-    totalBalance: "₹128,450",
-    savingsAccounts: 3,
-    fixedDeposits: 2,
-    loans: 1,
-    branchId: "2", // Bangalore branch
-  },
-  {
-    id: "3",
-    name: "Surya",
-    email: "surya.d@email.com",
-    phone: "+1 (555) 345-6789",
-    accountNumber: "ACC001236",
-    kycStatus: "pending",
-    status: "active",
-    joinDate: "2023-03-10",
-    totalBalance: "₹22,100",
-    savingsAccounts: 1,
-    fixedDeposits: 0,
-    loans: 0,
-    branchId: "1", // Chennai branch
-  },
-  {
-    id: "4",
-    name: "Sudarsan",
-    email: "sudarsan.r@email.com",
-    phone: "+1 (555) 456-7890",
-    accountNumber: "ACC001237",
-    kycStatus: "verified",
-    status: "active",
-    joinDate: "2023-04-05",
-    totalBalance: "₹67,890",
-    savingsAccounts: 2,
-    fixedDeposits: 3,
-    loans: 2,
-    branchId: "1", // Chennai branch
-  },
-  {
-    id: "5",
-    name: "Muniyandi",
-    email: "muniyandi.g@email.com",
-    phone: "+1 (555) 567-8901",
-    accountNumber: "ACC001238",
-    kycStatus: "verified",
-    status: "inactive",
-    joinDate: "2022-12-15",
-    totalBalance: "₹8,450",
-    savingsAccounts: 1,
-    fixedDeposits: 0,
-    loans: 0,
-    branchId: "2", // Bangalore branch
-  },
-]
 
 export default function MembersPage() {
   const { user } = useAuth()
@@ -136,16 +56,46 @@ export default function MembersPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [selectedMember, setSelectedMember] = useState<Member | null>(null)
   const [activeAction, setActiveAction] = useState<string | null>(null)
+  const [members, setMembers] = useState<Member[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  const branchFilteredMembers =
-    user?.role === "admin" ? mockMembers : mockMembers.filter((member) => member.branchId === user?.branchId)
+  useEffect(() => {
+    const loadMembers = async () => {
+      setIsLoading(true)
+      const supabase = createClient()
 
-  const filteredMembers = branchFilteredMembers.filter((member) => {
+      try {
+        let query = supabase.from("members").select("*")
+
+        if (user?.role !== "admin" && user?.branch_id) {
+          query = query.eq("branch_id", user.branch_id)
+        }
+
+        const { data, error } = await query
+
+        if (error) {
+          console.error("[v0] Error loading members:", error)
+        } else {
+          setMembers(data || [])
+        }
+      } catch (error) {
+        console.error("[v0] Failed to load members:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    if (user) {
+      loadMembers()
+    }
+  }, [user])
+
+  const filteredMembers = members.filter((member) => {
     const matchesSearch =
-      member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.accountNumber.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === "all" || member.status === statusFilter
+      member.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      member.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      member.member_id?.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesStatus = statusFilter === "all" || member.status?.toLowerCase() === statusFilter.toLowerCase()
     return matchesSearch && matchesStatus
   })
 
@@ -158,7 +108,7 @@ export default function MembersPage() {
             <p className="text-muted-foreground">
               {user?.role === "admin"
                 ? "All branches - Manage customer accounts and member operations"
-                : `${user?.branch.name} - Manage customer accounts and member operations`}
+                : `Branch ${user?.branch_id} - Manage customer accounts and member operations`}
             </p>
           </div>
 
@@ -267,89 +217,65 @@ export default function MembersPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Member</TableHead>
-                    <TableHead>Account Number</TableHead>
-                    <TableHead>KYC Status</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Total Balance</TableHead>
-                    <TableHead>Accounts</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredMembers.map((member) => (
-                    <TableRow key={member.id}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{member.name}</div>
-                          <div className="text-sm text-muted-foreground">{member.email}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">{member.accountNumber}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={member.kycStatus === "verified" ? "default" : "secondary"}
-                          className={
-                            member.kycStatus === "verified"
-                              ? "bg-teal-100 text-teal-700"
-                              : member.kycStatus === "pending"
-                                ? "bg-orange-100 text-orange-700"
-                                : "bg-red-100 text-red-700"
-                          }
-                        >
-                          {member.kycStatus}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={member.status === "active" ? "default" : "secondary"}>{member.status}</Badge>
-                      </TableCell>
-                      <TableCell className="font-semibold">{member.totalBalance}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-3 text-sm">
-                          <span className="flex items-center gap-1">
-                            <Wallet className="h-3 w-3" />
-                            {member.savingsAccounts}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <FileText className="h-3 w-3" />
-                            {member.fixedDeposits}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <CreditCard className="h-3 w-3" />
-                            {member.loans}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              Actions
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setSelectedMember(member)}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">
-                              <Ban className="mr-2 h-4 w-4" />
-                              Deactivate
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
+              {isLoading ? (
+                <p>Loading members...</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Member</TableHead>
+                      <TableHead>Account Number</TableHead>
+                      <TableHead>KYC Status</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Total Balance</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredMembers.map((member) => (
+                      <TableRow key={member.id}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{member.full_name}</div>
+                            <div className="text-sm text-muted-foreground">{member.email}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">{member.member_id}</TableCell>
+                        <TableCell>
+                          <Badge variant={member.kyc_completed === "Yes" ? "default" : "secondary"}>{member.kyc_completed}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={member.status === "active" ? "default" : "secondary"}>{member.status}</Badge>
+                        </TableCell>
+                        <TableCell className="font-semibold">{member.account_balance}</TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                Actions
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setSelectedMember(member)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-destructive">
+                                <Ban className="mr-2 h-4 w-4" />
+                                Deactivate
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
 
@@ -431,11 +357,11 @@ export default function MembersPage() {
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <Label className="text-muted-foreground">Full Name</Label>
-                          <p className="font-medium">{selectedMember.name}</p>
+                          <p className="font-medium">{selectedMember.full_name}</p>
                         </div>
                         <div>
                           <Label className="text-muted-foreground">Account Number</Label>
-                          <p className="font-mono font-medium">{selectedMember.accountNumber}</p>
+                          <p className="font-mono font-medium">{selectedMember.member_id}</p>
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
@@ -450,28 +376,17 @@ export default function MembersPage() {
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <Label className="text-muted-foreground">KYC Status</Label>
-                          <div className="mt-1">
-                            <Badge
-                              variant={selectedMember.kycStatus === "verified" ? "default" : "secondary"}
-                              className={
-                                selectedMember.kycStatus === "verified"
-                                  ? "bg-teal-100 text-teal-700"
-                                  : "bg-orange-100 text-orange-700"
-                              }
-                            >
-                              {selectedMember.kycStatus}
-                            </Badge>
-                          </div>
+                          <Label className="text-muted-foreground">Address</Label>
+                          <p className="font-medium">{selectedMember.address}</p>
                         </div>
                         <div>
                           <Label className="text-muted-foreground">Member Since</Label>
-                          <p className="font-medium">{selectedMember.joinDate}</p>
+                          <p className="font-medium">{selectedMember.joined_date}</p>
                         </div>
                       </div>
                       <div>
                         <Label className="text-muted-foreground">Total Balance</Label>
-                        <p className="text-2xl font-bold text-foreground">{selectedMember.totalBalance}</p>
+                        <p className="text-2xl font-bold text-foreground">{selectedMember.account_balance}</p>
                       </div>
                     </div>
                   </TabsContent>
@@ -484,23 +399,16 @@ export default function MembersPage() {
                         <div className="flex items-center justify-between">
                           <span className="flex items-center gap-2 text-muted-foreground">
                             <Wallet className="h-4 w-4" />
-                            Savings Accounts
+                            Account Type
                           </span>
-                          <span className="font-semibold">{selectedMember.savingsAccounts}</span>
+                          <span className="font-semibold">{selectedMember.account_type}</span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="flex items-center gap-2 text-muted-foreground">
                             <FileText className="h-4 w-4" />
-                            Fixed Deposits
+                            Status
                           </span>
-                          <span className="font-semibold">{selectedMember.fixedDeposits}</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="flex items-center gap-2 text-muted-foreground">
-                            <CreditCard className="h-4 w-4" />
-                            Active Loans
-                          </span>
-                          <span className="font-semibold">{selectedMember.loans}</span>
+                          <span className="font-semibold">{selectedMember.status}</span>
                         </div>
                       </CardContent>
                     </Card>
@@ -529,9 +437,9 @@ export default function MembersPage() {
                       <SelectValue placeholder="Choose member" />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockMembers.map((member) => (
+                      {members.map((member) => (
                         <SelectItem key={member.id} value={member.id}>
-                          {member.name} - {member.accountNumber}
+                          {member.full_name} - {member.member_id}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -573,9 +481,9 @@ export default function MembersPage() {
                       <SelectValue placeholder="Choose member" />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockMembers.map((member) => (
+                      {members.map((member) => (
                         <SelectItem key={member.id} value={member.id}>
-                          {member.name} - {member.accountNumber}
+                          {member.full_name} - {member.member_id}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -636,9 +544,9 @@ export default function MembersPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Members</SelectItem>
-                      {mockMembers.map((member) => (
+                      {members.map((member) => (
                         <SelectItem key={member.id} value={member.id}>
-                          {member.name} - {member.accountNumber}
+                          {member.full_name} - {member.member_id}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -672,9 +580,9 @@ export default function MembersPage() {
                       <SelectValue placeholder="Choose member" />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockMembers.map((member) => (
+                      {members.map((member) => (
                         <SelectItem key={member.id} value={member.id}>
-                          {member.name} - {member.accountNumber}
+                          {member.full_name} - {member.member_id}
                         </SelectItem>
                       ))}
                     </SelectContent>
