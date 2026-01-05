@@ -11,11 +11,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const supabase = createClient()
-  console.log("[user ",user)
+
   console.log("[v0] AuthProvider initialized")
+
   useEffect(() => {
-    const checkStoredUser = () => {
+    const checkAuth = async () => {
       try {
+        // First check localStorage (synchronous)
         const storedUserStr = localStorage.getItem("banker_user")
         if (storedUserStr) {
           const storedUser = JSON.parse(storedUserStr)
@@ -35,21 +37,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             branch: storedUser.branch || "Main Branch",
             initials,
           })
+          setIsLoading(false)
+          return
+        }
+
+        // Then check Supabase session
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+
+        if (session?.user) {
+          const initials = (session.user.user_metadata?.full_name || "B")
+            .split(" ")
+            .map((n: string) => n[0])
+            .join("")
+            .toUpperCase()
+
+          setUser({
+            id: session.user.id,
+            name: session.user.user_metadata?.full_name || "Banker",
+            email: session.user.email || "",
+            role: session.user.user_metadata?.role || "staff",
+            branch: session.user.user_metadata?.branch || "Main Branch",
+            initials,
+          })
         }
       } catch (error) {
-        console.error("[v0] Error loading stored user:", error)
+        console.error("[v0] Error loading auth:", error)
       } finally {
         setIsLoading(false)
       }
     }
 
-    checkStoredUser()
+    checkAuth()
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
-        // Real Supabase auth session
         const initials = (session.user.user_metadata?.full_name || "B")
           .split(" ")
           .map((n: string) => n[0])
@@ -67,7 +92,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else if (!localStorage.getItem("banker_user")) {
         setUser(null)
       }
-      setIsLoading(false)
     })
 
     return () => {
@@ -81,23 +105,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null)
   }
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isAuthenticated: !!user,
-        logout,
-        isLoading,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  )
+  const value = {
+    user,
+    isAuthenticated: !!user,
+    logout,
+    isLoading,
+  }
+
+  console.log("[v0] Auth state:", value)
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {
   const context = useContext(AuthContext)
-  console.log("[v0] useAuth context:", context)
   if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider")
   }

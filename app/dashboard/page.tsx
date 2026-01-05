@@ -6,48 +6,22 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Bar, BarChart, Line, LineChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
+import { createClient } from "@/lib/supabase/client"
 
-const stats = [
-  {
-    title: "Total Members",
-    value: "2,847",
-    change: "+12.5%",
-    trend: "up",
-    icon: Users,
-    color: "text-blue-600",
-    bgColor: "bg-blue-50",
-  },
-  {
-    title: "Active Loans",
-    value: "458",
-    change: "+8.2%",
-    trend: "up",
-    icon: CreditCard,
-    color: "text-purple-600",
-    bgColor: "bg-purple-50",
-  },
-  {
-    title: "Total Deposits",
-    value: "₹24.5L",
-    change: "+15.3%",
-    trend: "up",
-    icon: Wallet,
-    color: "text-teal-600",
-    bgColor: "bg-teal-50",
-  },
-  {
-    title: "Fixed Deposits",
-    value: "₹18.2L",
-    change: "-2.4%",
-    trend: "down",
-    icon: FileText,
-    color: "text-orange-600",
-    bgColor: "bg-orange-50",
-  },
-]
+interface Member {
+  id: string
+  member_id: string
+  full_name: string
+  email: string | null
+  phone: string | null
+  account_type: string
+  account_balance: number
+  status: string
+  joined_date: string
+}
 
 const depositData = [
   { month: "Jan", amount: 18500 },
@@ -113,8 +87,40 @@ const recentActivities = [
 export default function DashboardPage() {
   const { user, isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
-  
+  const [members, setMembers] = useState<Member[]>([])
+  const [membersLoading, setMembersLoading] = useState(true)
+
   console.log("[v0] DashboardPage - isAuthenticated:", isAuthenticated, "isLoading:", isLoading)
+
+  useEffect(() => {
+    async function fetchMembers() {
+      try {
+        const supabase = createClient()
+        const { data, error } = await supabase
+          .from("members")
+          .select("*")
+          .order("joined_date", { ascending: false })
+          .limit(10)
+
+        if (error) {
+          console.error("[v0] Error fetching members:", error)
+          return
+        }
+
+        console.log("[v0] Fetched members:", data)
+        setMembers(data || [])
+      } catch (error) {
+        console.error("[v0] Exception fetching members:", error)
+      } finally {
+        setMembersLoading(false)
+      }
+    }
+
+    if (isAuthenticated) {
+      fetchMembers()
+    }
+  }, [isAuthenticated])
+
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push("/login")
@@ -124,6 +130,51 @@ export default function DashboardPage() {
   if (isLoading || !isAuthenticated) {
     return null
   }
+
+  const totalMembers = members.length
+  const activeMembers = members.filter((m) => m.status === "Active").length
+  const totalBalance = members.reduce((sum, m) => sum + Number(m.account_balance), 0)
+  const savingsMembers = members.filter((m) => m.account_type === "Savings")
+  const fdMembers = members.filter((m) => m.account_type === "Fixed Deposit")
+
+  const stats = [
+    {
+      title: "Total Members",
+      value: totalMembers.toString(),
+      change: "+12.5%",
+      trend: "up" as const,
+      icon: Users,
+      color: "text-blue-600",
+      bgColor: "bg-blue-50",
+    },
+    {
+      title: "Active Loans",
+      value: "458",
+      change: "+8.2%",
+      trend: "up" as const,
+      icon: CreditCard,
+      color: "text-purple-600",
+      bgColor: "bg-purple-50",
+    },
+    {
+      title: "Total Deposits",
+      value: `₹${(totalBalance / 1000).toFixed(1)}K`,
+      change: "+15.3%",
+      trend: "up" as const,
+      icon: Wallet,
+      color: "text-teal-600",
+      bgColor: "bg-teal-50",
+    },
+    {
+      title: "Fixed Deposits",
+      value: fdMembers.length.toString(),
+      change: "-2.4%",
+      trend: "down" as const,
+      icon: FileText,
+      color: "text-orange-600",
+      bgColor: "bg-orange-50",
+    },
+  ]
 
   return (
     <>
@@ -228,6 +279,56 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Recent Members */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Recent Members</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {membersLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <p className="text-muted-foreground">Loading members...</p>
+            </div>
+          ) : members.length === 0 ? (
+            <div className="flex items-center justify-center py-8">
+              <p className="text-muted-foreground">No members found</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Member ID</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Account Type</TableHead>
+                  <TableHead>Balance</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {members.map((member) => (
+                  <TableRow key={member.id}>
+                    <TableCell className="font-medium">{member.member_id}</TableCell>
+                    <TableCell>{member.full_name}</TableCell>
+                    <TableCell>{member.account_type}</TableCell>
+                    <TableCell>₹{Number(member.account_balance).toLocaleString()}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={member.status === "Active" ? "default" : "secondary"}
+                        className={
+                          member.status === "Active" ? "bg-teal-100 text-teal-700" : "bg-orange-100 text-orange-700"
+                        }
+                      >
+                        {member.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Recent Activities */}
       <Card>

@@ -40,10 +40,12 @@ export default function LoginPage() {
       }
 
       localStorage.setItem("banker_user", JSON.stringify(data.user))
+      console.log("[v0] User stored in localStorage, redirecting...")
+
+      await new Promise((resolve) => setTimeout(resolve, 100))
 
       // Redirect to dashboard
       router.push(data.redirectUrl)
-      router.refresh()
     } catch (error: unknown) {
       console.error("[v0] Login error:", error)
       setError(error instanceof Error ? error.message : "An error occurred")
