@@ -49,6 +49,17 @@ type Member = {
   branch_id: number
 }
 
+type NewMemberForm = {
+  full_name: string
+  email: string
+  phone: string
+  address: string
+  account_type: string
+  dob: string
+  id_type: string
+  id_number: string
+}
+
 export default function MembersPage() {
   const { user } = useAuth()
   const [searchQuery, setSearchQuery] = useState("")
@@ -59,6 +70,18 @@ export default function MembersPage() {
   const [members, setMembers] = useState<Member[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
+  const [newMember, setNewMember] = useState<NewMemberForm>({
+    full_name: "",
+    email: "",
+    phone: "",
+    address: "",
+    account_type: "Savings",
+    dob: "",
+    id_type: "",
+    id_number: "",
+  })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
   useEffect(() => {
     const loadMembers = async () => {
       setIsLoading(true)
@@ -68,7 +91,10 @@ export default function MembersPage() {
         let query = supabase.from("members").select("*")
 
         if (user?.role !== "admin" && user?.branch_id) {
-          query = query.eq("branch_id", user.branch_id)
+          const branchId = typeof user.branch_id === "string" ? Number.parseInt(user.branch_id) : user.branch_id
+          if (!isNaN(branchId)) {
+            query = query.eq("branch_id", branchId)
+          }
         }
 
         const { data, error } = await query
@@ -76,6 +102,7 @@ export default function MembersPage() {
         if (error) {
           console.error("[v0] Error loading members:", error)
         } else {
+          console.log("[v0] Fetched members:", data)
           setMembers(data || [])
         }
       } catch (error) {
@@ -89,6 +116,76 @@ export default function MembersPage() {
       loadMembers()
     }
   }, [user])
+
+  const generateMemberId = () => {
+    const maxId = members.reduce((max, member) => {
+      const numPart = Number.parseInt(member.member_id.replace("MEM", ""))
+      return numPart > max ? numPart : max
+    }, 0)
+    return `MEM${String(maxId + 1).padStart(3, "0")}`
+  }
+
+  const handleEnrollMember = async () => {
+    if (!newMember.full_name || !newMember.phone) {
+      alert("Please fill in all required fields")
+      return
+    }
+
+    setIsSubmitting(true)
+    const supabase = createClient()
+
+    try {
+      const branchId = user?.branch_id
+        ? typeof user.branch_id === "string"
+          ? Number.parseInt(user.branch_id)
+          : user.branch_id
+        : 1
+
+      const memberData = {
+        member_id: generateMemberId(),
+        full_name: newMember.full_name,
+        email: newMember.email || null,
+        phone: newMember.phone,
+        address: newMember.address || null,
+        account_type: newMember.account_type,
+        account_balance: 0,
+        branch_id: branchId,
+        status: "Active",
+        joined_date: new Date().toISOString(),
+      }
+
+      const { data, error } = await supabase.from("members").insert([memberData]).select()
+
+      if (error) {
+        console.error("[v0] Error creating member:", error)
+        alert("Failed to create member: " + error.message)
+      } else {
+        console.log("[v0] Member created:", data)
+        // Add new member to the list
+        if (data && data[0]) {
+          setMembers([...members, data[0]])
+        }
+        // Reset form and close dialog
+        setNewMember({
+          full_name: "",
+          email: "",
+          phone: "",
+          address: "",
+          account_type: "Savings",
+          dob: "",
+          id_type: "",
+          id_number: "",
+        })
+        setIsAddDialogOpen(false)
+        alert("Member enrolled successfully!")
+      }
+    } catch (error) {
+      console.error("[v0] Failed to create member:", error)
+      alert("Failed to create member")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   const filteredMembers = members.filter((member) => {
     const matchesSearch =
@@ -108,11 +205,11 @@ export default function MembersPage() {
             <p className="text-muted-foreground">
               {user?.role === "admin"
                 ? "All branches - Manage customer accounts and member operations"
-                : `Branch ${user?.branch_id} - Manage customer accounts and member operations`}
+                : `${user?.branch || "Your branch"} - Manage customer accounts and member operations`}
             </p>
           </div>
 
-          <div className="mb-8 grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          <div className="mb-6 grid gap-4 md:grid-cols-3">
             <Card
               className="cursor-pointer transition-all hover:shadow-lg hover:border-primary"
               onClick={() => setIsAddDialogOpen(true)}
@@ -242,7 +339,9 @@ export default function MembersPage() {
                         </TableCell>
                         <TableCell className="font-mono text-sm">{member.member_id}</TableCell>
                         <TableCell>
-                          <Badge variant={member.kyc_completed === "Yes" ? "default" : "secondary"}>{member.kyc_completed}</Badge>
+                          <Badge variant={member.kyc_completed === "Yes" ? "default" : "secondary"}>
+                            {member.kyc_completed === "Yes" ? "Completed" : "Pending"}
+                          </Badge>
                         </TableCell>
                         <TableCell>
                           <Badge variant={member.status === "active" ? "default" : "secondary"}>{member.status}</Badge>
@@ -288,32 +387,77 @@ export default function MembersPage() {
               <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="name">Full Name</Label>
-                    <Input id="name" placeholder="Vengatesh" />
+                    <Label htmlFor="name">Full Name *</Label>
+                    <Input
+                      id="name"
+                      placeholder="John Doe"
+                      value={newMember.full_name}
+                      onChange={(e) => setNewMember({ ...newMember, full_name: e.target.value })}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
-                    <Input id="email" type="email" placeholder="john.doe@email.com" />
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="john.doe@email.com"
+                      value={newMember.email}
+                      onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
+                    />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Phone Number</Label>
-                    <Input id="phone" placeholder="+1 (555) 123-4567" />
+                    <Label htmlFor="phone">Phone Number *</Label>
+                    <Input
+                      id="phone"
+                      placeholder="+1 (555) 123-4567"
+                      value={newMember.phone}
+                      onChange={(e) => setNewMember({ ...newMember, phone: e.target.value })}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="dob">Date of Birth</Label>
-                    <Input id="dob" type="date" />
+                    <Input
+                      id="dob"
+                      type="date"
+                      value={newMember.dob}
+                      onChange={(e) => setNewMember({ ...newMember, dob: e.target.value })}
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="address">Address</Label>
-                  <Input id="address" placeholder="123 Main St, City, State ZIP" />
+                  <Input
+                    id="address"
+                    placeholder="123 Main St, City, State ZIP"
+                    value={newMember.address}
+                    onChange={(e) => setNewMember({ ...newMember, address: e.target.value })}
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
+                    <Label htmlFor="account-type">Account Type</Label>
+                    <Select
+                      value={newMember.account_type}
+                      onValueChange={(value) => setNewMember({ ...newMember, account_type: value })}
+                    >
+                      <SelectTrigger id="account-type">
+                        <SelectValue placeholder="Select account type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Savings">Savings</SelectItem>
+                        <SelectItem value="Current">Current</SelectItem>
+                        <SelectItem value="Fixed Deposit">Fixed Deposit</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="id-type">ID Type</Label>
-                    <Select>
+                    <Select
+                      value={newMember.id_type}
+                      onValueChange={(value) => setNewMember({ ...newMember, id_type: value })}
+                    >
                       <SelectTrigger id="id-type">
                         <SelectValue placeholder="Select ID type" />
                       </SelectTrigger>
@@ -321,20 +465,28 @@ export default function MembersPage() {
                         <SelectItem value="passport">Passport</SelectItem>
                         <SelectItem value="drivers-license">Driver's License</SelectItem>
                         <SelectItem value="national-id">National ID</SelectItem>
+                        <SelectItem value="aadhar">Aadhar Card</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="id-number">ID Number</Label>
-                    <Input id="id-number" placeholder="123456789" />
-                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="id-number">ID Number</Label>
+                  <Input
+                    id="id-number"
+                    placeholder="123456789"
+                    value={newMember.id_number}
+                    onChange={(e) => setNewMember({ ...newMember, id_number: e.target.value })}
+                  />
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} disabled={isSubmitting}>
                   Cancel
                 </Button>
-                <Button onClick={() => setIsAddDialogOpen(false)}>Create Member</Button>
+                <Button onClick={handleEnrollMember} disabled={isSubmitting}>
+                  {isSubmitting ? "Creating..." : "Create Member"}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
