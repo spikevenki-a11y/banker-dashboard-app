@@ -28,10 +28,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const userData = {
           id: storedUser.id,
-          name: storedUser.fullName || "Banker",
+          name: storedUser.fullName ,
           email: storedUser.email || "",
-          role: storedUser.role || "staff",
-          branch: storedUser.branch || "Main Branch",
+          role: storedUser.role,
+          branch: storedUser.branch,
           initials,
         }
         console.log("[v0] AuthProvider setting user:", userData)

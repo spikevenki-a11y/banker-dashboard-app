@@ -8,6 +8,7 @@ export interface SessionData {
   username: string
   fullName: string
   role: string
+  branch: string
 }
 
 export async function createSession(sessionData: SessionData) {

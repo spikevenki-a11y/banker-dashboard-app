@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     console.log("[v0] Querying user:", username)
     const { data: user, error: userError } = await supabase
       .from("users")
-      .select("id, username, password, full_name, role, is_active, branch_id")
+      .select("id, username, password, full_name, role, is_active, branch")
       .eq("username", username)
       .maybeSingle()
 
@@ -37,6 +37,7 @@ export async function POST(request: Request) {
       error: userError?.message,
       username: user?.username,
       role: user?.role,
+      branch: user?.branch,
     })
 
     if (userError) {
@@ -76,6 +77,7 @@ export async function POST(request: Request) {
         username: user.username,
         fullName: user.full_name,
         role: user.role,
+        branch: user.branch,
       })
       console.log("[v0] Session created successfully")
     } catch (sessionError) {
@@ -95,6 +97,7 @@ export async function POST(request: Request) {
         username: user.username,
         fullName: user.full_name,
         role: user.role,
+        branch: user.branch,
       },
       redirectUrl: redirectUrl,
     })
