@@ -75,7 +75,7 @@ export default function MembersPage() {
     email: "",
     phone: "",
     address: "",
-    account_type: "Savings",
+    account_type: "Nominal",
     dob: "",
     id_type: "",
     id_number: "",
@@ -90,8 +90,8 @@ export default function MembersPage() {
       try {
         let query = supabase.from("members").select("*")
 
-        if (user?.role !== "admin" && user?.branch_id) {
-          const branchId = typeof user.branch_id === "string" ? Number.parseInt(user.branch_id) : user.branch_id
+        if (user?.role !== "admin" && user?.branch) {
+          const branchId = typeof user.branch === "string" ? Number.parseInt(user.branch) : user.branch
           if (!isNaN(branchId)) {
             query = query.eq("branch_id", branchId)
           }
@@ -142,7 +142,7 @@ export default function MembersPage() {
         : 1
 
       const memberData = {
-        member_id: generateMemberId(),
+        member_id: 'MEM006',      
         full_name: newMember.full_name,
         email: newMember.email || null,
         phone: newMember.phone,
@@ -171,7 +171,7 @@ export default function MembersPage() {
           email: "",
           phone: "",
           address: "",
-          account_type: "Savings",
+          account_type: "Nominal",
           dob: "",
           id_type: "",
           id_number: "",
@@ -446,9 +446,8 @@ export default function MembersPage() {
                         <SelectValue placeholder="Select account type" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Savings">Savings</SelectItem>
-                        <SelectItem value="Current">Current</SelectItem>
-                        <SelectItem value="Fixed Deposit">Fixed Deposit</SelectItem>
+                        <SelectItem value="Nominal">Nominal</SelectItem>
+                        <SelectItem value="Associate">Associate</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

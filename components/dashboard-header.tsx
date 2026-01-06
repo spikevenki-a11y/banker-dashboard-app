@@ -21,7 +21,7 @@ export function DashboardHeader() {
 
   const handleLogout = async () => {
     await logout()
-    router.push("/login")
+    router.push("/")
   }
 
   return (
