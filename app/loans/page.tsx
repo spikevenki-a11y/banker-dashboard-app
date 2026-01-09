@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Search, Eye, CreditCard, AlertCircle, CheckCircle, Clock } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Progress } from "@/components/ui/progress"
+import { DashboardWrapper } from "../_components/dashboard-wrapper"
 
 type Loan = {
   multidisbursement: "Yes" | "No"
@@ -225,6 +226,7 @@ export default function LoansPage() {
   const overdueLoans = branchFilteredLoans.filter((loan) => loan.status === "overdue").length
 
   return (
+    <DashboardWrapper>
     <div className="flex h-screen overflow-hidden">
       <div className="flex flex-1 flex-col overflow-hidden">
         <main className="flex-1 overflow-y-auto bg-background p-6">
@@ -688,5 +690,6 @@ export default function LoansPage() {
         </main>
       </div>
     </div>
+    </DashboardWrapper>
   )
 }

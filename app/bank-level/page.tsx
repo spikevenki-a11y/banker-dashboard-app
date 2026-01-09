@@ -2,9 +2,11 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Calculator } from "lucide-react"
+import { DashboardWrapper } from "../_components/dashboard-wrapper"
 
 export default function FASPage() {
   return (
+    <DashboardWrapper>
     <div className="p-8">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-foreground">Bank Level</h1>
@@ -136,5 +138,6 @@ export default function FASPage() {
         </Card>
       </div>
     </div>
+    </DashboardWrapper>
   )
 }

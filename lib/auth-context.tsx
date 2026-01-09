@@ -54,6 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const handleLoginEvent = () => {
       console.log("[v0] AuthProvider received login event")
       loadUser()
+      setIsLoading(false)
     }
 
     const handleStorageChange = (e: StorageEvent) => {

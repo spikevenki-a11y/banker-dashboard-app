@@ -30,6 +30,7 @@ import {
 } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { DashboardWrapper } from "../_components/dashboard-wrapper"
 
 const monthlyData = [
   { month: "Jan", deposits: 22500, loans: 18000, revenue: 4500 },
@@ -69,6 +70,7 @@ const revenueBreakdown = [
 
 export default function FinancePage() {
   return (
+    <DashboardWrapper>
     <div className="flex h-screen overflow-hidden">
       <div className="flex flex-1 flex-col overflow-hidden">
         <main className="flex-1 overflow-y-auto bg-background p-6">
@@ -562,5 +564,6 @@ export default function FinancePage() {
         </main>
       </div>
     </div>
+    </DashboardWrapper>
   )
 }

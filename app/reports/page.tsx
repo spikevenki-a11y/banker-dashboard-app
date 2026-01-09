@@ -20,6 +20,7 @@ import {
   Download,
   Search,
 } from "lucide-react"
+import { DashboardWrapper } from "../_components/dashboard-wrapper"
 
 const reportCategories = [
   {
@@ -164,6 +165,7 @@ export default function ReportsPage() {
     .filter((category) => category.reports.length > 0)
 
   return (
+    <DashboardWrapper>
     <div className="flex-1 space-y-6 p-8">
       <div className="flex items-center justify-between">
         <div>
@@ -303,5 +305,6 @@ export default function ReportsPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </DashboardWrapper>
   )
 }

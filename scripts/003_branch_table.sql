@@ -31,3 +31,14 @@ CREATE TABLE branchparameters (
 
 ALTER TABLE branchparameters ENABLE ROW LEVEL SECURITY;
 -- RLS Policies for branchparameters table
+
+
+alter table public.branchparameters
+  add column statecode int,
+  add column districtcode int,
+  add column branchtypecode int,
+  add column branchcode int;
+
+
+  alter table public.branchparameters
+  add column sldbcode bigint;

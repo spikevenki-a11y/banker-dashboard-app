@@ -14,3 +14,16 @@ export interface AuthContextType {
   isLoading: boolean
   logout: () => Promise<void>
 }
+export interface Members {
+  id: string
+  member_id: string
+  full_name: string
+  email: string
+  phone: string
+  address: string
+  account_type: string
+  account_balance: number
+  status: string
+  joined_date: string
+  branch_id: number
+} 

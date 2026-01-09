@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Search, Eye, FileText, TrendingUp, Calendar, RefreshCw } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DashboardWrapper } from "../_components/dashboard-wrapper"
 
 type FixedDeposit = {
   id: string
@@ -116,6 +117,7 @@ export default function FixedDepositsPage() {
   const maturedFDs = mockFDs.filter((fd) => fd.status === "matured").length
 
   return (
+    <DashboardWrapper>
     <div className="flex h-screen overflow-hidden">
       <div className="flex flex-1 flex-col overflow-hidden">
         <main className="flex-1 overflow-y-auto bg-background p-6">
@@ -614,5 +616,6 @@ export default function FixedDepositsPage() {
         </main>
       </div>
     </div>
+    </DashboardWrapper>
   )
 }

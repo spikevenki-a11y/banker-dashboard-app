@@ -34,6 +34,7 @@ import {
   XCircle,
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DashboardWrapper } from "../_components/dashboard-wrapper"
 
 type Member = {
   id: string
@@ -60,6 +61,7 @@ type NewMemberForm = {
   id_number: string
 }
 
+
 export default function MembersPage() {
   const { user } = useAuth()
   const [searchQuery, setSearchQuery] = useState("")
@@ -81,13 +83,34 @@ export default function MembersPage() {
     id_number: "",
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
-
+  // useEffect(
+  //   ()=> {
+      // const resData = fetch("/api/configs")
+      // .then(res => res.json())
+      // .then(setMembers);
+      // console.log("Fetched members data:", resData);
+  //   }
+  // )
   useEffect(() => {
     const loadMembers = async () => {
       setIsLoading(true)
       const supabase = createClient()
 
+      const res = await fetch("/api/configs");
+
+      const resData = await res.json();
+      console.log("Pool Fetched members data:", resData[0]);
+      console.log("Pool Fetched members data:", resData[0].nextvalue);
+
       try {
+
+      // const response = await fetch("/api/banker/members", {
+      //           method: "POST",
+      //           headers: { "Content-Type": "application/json" },
+      //           body: JSON.stringify({ }),
+      //         })
+      // const data = await response.json() 
+      // setMembers(data.data || [])
         let query = supabase.from("members").select("*")
 
         if (user?.role !== "admin" && user?.branch) {
@@ -197,6 +220,7 @@ export default function MembersPage() {
   })
 
   return (
+    <DashboardWrapper>
     <div className="flex h-screen overflow-hidden">
       <div className="flex flex-1 flex-col overflow-hidden">
         <main className="flex-1 overflow-y-auto bg-background p-6">
@@ -785,5 +809,6 @@ export default function MembersPage() {
         </main>
       </div>
     </div>
+    </DashboardWrapper>
   )
 }

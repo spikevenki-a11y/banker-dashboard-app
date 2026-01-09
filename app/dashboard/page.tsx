@@ -10,6 +10,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { createClient } from "@/lib/supabase/client"
+import { DashboardWrapper } from "../_components/dashboard-wrapper"
 
 interface Member {
   id: string
@@ -99,6 +100,7 @@ export default function DashboardPage() {
         const { data, error } = await supabase
           .from("members")
           .select("*")
+          .eq("branch_id", user?.branch)
           .order("joined_date", { ascending: false })
           .limit(10)
 
@@ -178,6 +180,7 @@ export default function DashboardPage() {
 
   return (
     <>
+    <DashboardWrapper>
       <div className="mb-6">
         <h1 className="text-3xl font-bold tracking-tight text-foreground">Welcome back, {user?.name}!</h1>
         <p className="text-muted-foreground">
@@ -369,6 +372,7 @@ export default function DashboardPage() {
           </Table>
         </CardContent>
       </Card>
+      </DashboardWrapper>
     </>
   )
 }

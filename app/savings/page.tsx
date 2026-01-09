@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Search, ArrowUpRight, ArrowDownRight, Eye, TrendingUp, Wallet,LockKeyhole,UserX } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DashboardWrapper } from "../_components/dashboard-wrapper"
 
 type SavingsAccount = {
   id: string
@@ -158,6 +159,7 @@ export default function SavingsPage() {
     .reduce((sum, acc) => sum + Number.parseFloat(acc.balance.replace(/[₹,]/g, "")), 0)
 
   return (
+    <DashboardWrapper>
     <div className="flex h-screen overflow-hidden">
       {/*<DashboardSidebar />*/}
       <div className="flex flex-1 flex-col overflow-hidden">
@@ -580,5 +582,6 @@ export default function SavingsPage() {
         </main>
       </div>
     </div>
+    </DashboardWrapper>
   )
 }

@@ -26,6 +26,7 @@ import {
   Shield,
   Search,
 } from "lucide-react"
+import { DashboardWrapper } from "../_components/dashboard-wrapper"
 
 export default function SettingsPage() {
   const [selectedConfig, setSelectedConfig] = useState<string | null>(null)
@@ -172,6 +173,7 @@ export default function SettingsPage() {
   })
 
   return (
+    <DashboardWrapper>
     <div className="flex-1 space-y-6 p-8">
       <div>
         <h2 className="text-3xl font-bold tracking-tight text-foreground">Settings & Configuration</h2>
@@ -281,5 +283,6 @@ export default function SettingsPage() {
         </Dialog>
       )}
     </div>
+    </DashboardWrapper>
   )
 }
