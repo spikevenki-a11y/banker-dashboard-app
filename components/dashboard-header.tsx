@@ -14,10 +14,18 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
 
 export function DashboardHeader() {
-  const { user, logout } = useAuth()
+  const { logout } = useAuth()
   const router = useRouter()
+
+  const [identity, setIdentity] = useState(null)
+  useEffect(() => {
+    fetch("/api/auth/identity", { credentials: "include" })
+      .then(r => r.json())
+      .then(setIdentity)
+  }, [])
 
   const handleLogout = async () => {
     await logout()
@@ -31,9 +39,9 @@ export function DashboardHeader() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input placeholder="Search members, accounts, transactions..." className="pl-10" />
         </div>
-        {user && (
+        {identity && (
           <div className="ml-4 flex items-center gap-2 rounded-md bg-primary/10 px-3 py-1">
-            <span className="text-xs font-medium text-primary">{user.branch}</span>
+            <span className="text-xs font-medium text-primary">{identity.branch}</span>
           </div>
         )}
       </div>
@@ -46,11 +54,11 @@ export function DashboardHeader() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="gap-2">
               <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-primary text-primary-foreground">{user?.initials || "U"}</AvatarFallback>
+                <AvatarFallback className="bg-primary text-primary-foreground">{identity?.initials || "U"}</AvatarFallback>
               </Avatar>
               <div className="flex flex-col items-start">
-                <span className="text-sm font-medium">{user?.name || "User"}</span>
-                <span className="text-xs text-muted-foreground">{user?.role || "Staff"}</span>
+                <span className="text-sm font-medium">{identity?.name || "User"}</span>
+                <span className="text-xs text-muted-foreground">{identity?.role || "Staff"}</span>
               </div>
             </Button>
           </DropdownMenuTrigger>

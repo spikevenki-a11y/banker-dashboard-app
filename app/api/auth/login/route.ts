@@ -1,114 +1,131 @@
+export const runtime = "nodejs"
 import { createClient } from "@supabase/supabase-js"
 import { createSession } from "@/lib/auth/session"
 import { NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
+import { cookies } from "next/headers"
 
 export async function POST(request: Request) {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } }
+  )
+
   try {
-    console.log("[v0] Login API route hit")
+    const { username, password } = await request.json()
+    if (!username || !password)
+      return NextResponse.json({ error: "Username and password required" }, { status: 400 })
 
-    const body = await request.json()
-    console.log("[v0] Request body parsed:", { username: body.username })
-
-    const { username, password } = body
-
-    if (!username || !password) {
-      console.log("[v0] Missing credentials")
-      return NextResponse.json({ error: "Username and password are required" }, { status: 400 })
-    }
-
-    console.log("[v0] Creating Supabase client with service role")
-    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    })
-
-    console.log("[v0] Querying user:", username)
-    const { data: user, error: userError } = await supabase
+    const { data: user } = await supabase
       .from("users")
       .select("id, username, password, full_name, role, is_active, branch")
       .eq("username", username)
       .maybeSingle()
 
-    console.log("[v0] Query result:", {
-      found: !!user,
-      error: userError?.message,
-      username: user?.username,
-      role: user?.role,
-      branch: user?.branch,
-    })
+    if (!user || !user.is_active)
+      return NextResponse.json({ error: "Invalid username or inactive account" }, { status: 401 })
 
-    if (userError) {
-      console.error("[v0] Database error:", userError)
-      return NextResponse.json({ error: "Database error: " + userError.message }, { status: 500 })
-    }
+    // // Branch business day check
+    // const { data: day } = await supabase
+    //   .from("branch_business_day")
+    //   .select("business_date,is_open")
+    //   .eq("branch_id", user.branch)
+    //   .maybeSingle()
 
-    if (!user) {
-      console.log("[v0] User not found")
-      return NextResponse.json({ error: "Invalid username or password" }, { status: 401 })
-    }
+    // if (!day?.is_open)
+    //   return NextResponse.json({ error: "Branch day not opened" }, { status: 403 })
 
-    if (!user.is_active) {
-      console.log("[v0] User inactive")
-      return NextResponse.json({ error: "Account is not active" }, { status: 401 })
-    }
+    // Failed attempt lock check
+    const { data: fail } = await supabase
+      .from("staff_login_failures")
+      .select("*")
+      .eq("staff_id", user.id)
+      .maybeSingle()
 
-    console.log("[v0] Verifying password with bcrypt")
-    let isPasswordValid = false
-    try {
-      isPasswordValid = await bcrypt.compare(password, user.password)
-      console.log("[v0] Password valid:", isPasswordValid)
-    } catch (bcryptError) {
-      console.error("[v0] Bcrypt error:", bcryptError)
-      return NextResponse.json({ error: "Authentication error" }, { status: 500 })
-    }
+    if (fail?.locked_until && new Date(fail.locked_until) > new Date())
+      return NextResponse.json({ error: "Account locked temporarily" }, { status: 403 })
 
-    if (!isPasswordValid) {
-      console.log("[v0] Invalid password")
-      return NextResponse.json({ error: "Invalid username or password" }, { status: 401 })
-    }
+    const isValid = await bcrypt.compare(password, user.password)
 
-    console.log("[v0] Creating session")
-    try {
-      await createSession({
-        userId: user.id,
-        username: user.username,
-        fullName: user.full_name,
-        role: user.role,
-        branch: user.branch,
+    if (!isValid) {
+      const count = (fail?.failure_count || 0) + 1
+      await supabase.from("staff_login_failures").upsert({
+        staff_id: user.id,
+        failure_count: count,
+        locked_until: count >= 3 ? new Date(Date.now() + 30 * 60000) : null,
       })
-      console.log("[v0] Session created successfully")
-    } catch (sessionError) {
-      console.error("[v0] Session error:", sessionError)
-      return NextResponse.json({ error: "Failed to create session" }, { status: 500 })
+
+      await supabase.from("staff_login_audit").insert({
+        staff_id: user.id,
+        branch_id: user.branch,
+        ip_address: request.headers.get("x-forwarded-for"),
+        success: false,
+        failure_reason: "Invalid password",
+      })
+
+      return NextResponse.json({ error: "Invalid username or password" }, { status: 401 })
     }
 
-    console.log("[v0] Login successful, returning response")
-    let redirectUrl = "/dashboard"
-    if (user.role == "admin") {
-      redirectUrl = "/admin"
-    }
-    return NextResponse.json({
+    // Successful login cleanup + audit
+    await supabase.from("staff_login_failures").delete().eq("staff_id", user.id)
+
+    await supabase.from("staff_login_audit").insert({
+      staff_id: user.id,
+      branch_id: user.branch,
+      ip_address: request.headers.get("x-forwarded-for"),
       success: true,
-      user: {
-        id: user.id,
-        username: user.username,
-        fullName: user.full_name,
-        role: user.role,
-        branch: user.branch,
-      },
-      redirectUrl: redirectUrl,
     })
-  } catch (error) {
-    console.error("[v0] Unexpected error in login route:", error)
-    return NextResponse.json(
-      {
-        error: "Login failed",
-        details: error instanceof Error ? error.message : String(error),
-      },
-      { status: 500 },
-    )
+
+    // Create secured session
+    // await createSession({
+    //   userId: user.id,
+    //   username: user.username,
+    //   fullName: user.full_name,
+    //   role: user.role,
+    //   branch: user.branch,
+    //   businessDate: new Date().toISOString().split("T")[0], // Placeholder for business date,
+    // })
+
+    // const sessionData = {
+    //   userId: user.id,
+    //   fullName: user.full_name,
+    //   role: user.role,
+    //   branch: user.branch,
+    //   businessDate: new Date().toISOString().split("T")[0], // Placeholder for business date,
+    // }
+
+    // const res = NextResponse.json({
+    //   success: true,
+    //   redirectUrl: user.role === "admin" ? "/admin" : "/dashboard",
+    // })
+    // res.cookies.set("banker_session", JSON.stringify(sessionData), {
+    //   httpOnly: true,
+    //   secure: false,
+    //   sameSite: "strict",
+    //   path: "/",
+    //   domain: "localhost",
+    //   maxAge: 60 * 60 * 24, // 12 hours
+    // })
+
+    // return res
+    const res = NextResponse.json({
+      success: true,
+      redirectUrl: user.role === "admin" ? "/admin" : "/dashboard",
+    })
+
+    createSession(res, {
+      userId: user.id,
+      fullName: user.full_name,
+      role: user.role,
+      branch: user.branch,
+      branch_name: user.branch,
+      businessDate: new Date().toISOString().split("T")[0], // Placeholder for business date,
+    })
+
+    return res
+  } catch (err) {
+    console.error("LOGIN ERROR:", err)
+    return NextResponse.json({ error: "Login failed" }, { status: 500 })
   }
 }

@@ -86,52 +86,34 @@ const recentActivities = [
 ]
 
 export default function DashboardPage() {
-  const { user, isAuthenticated, isLoading } = useAuth()
+  console.log("[v0] Rendering DashboardPage")
   const router = useRouter()
   const [members, setMembers] = useState<Member[]>([])
   const [membersLoading, setMembersLoading] = useState(true)
 
+  const { user, isAuthenticated, isLoading } = useAuth()
   console.log("[v0] DashboardPage - isAuthenticated:", isAuthenticated, "isLoading:", isLoading)
 
-  useEffect(() => {
-    async function fetchMembers() {
-      try {
-        const supabase = createClient()
-        const { data, error } = await supabase
-          .from("members")
-          .select("*")
-          .eq("branch_id", user?.branch)
-          .order("joined_date", { ascending: false })
-          .limit(10)
 
-        if (error) {
-          console.error("[v0] Error fetching members:", error)
-          return
-        }
+  // useEffect(() => {
+  //   if (isAuthenticated) {
+  //     fetch("/api/dashboard/members", { credentials: "include" })
+  //       .then(res => res.json())
+  //       .then(setMembers)
+  //       .finally(() => setMembersLoading(false))
+  //   }
+  // }, [isAuthenticated])
 
-        console.log("[v0] Fetched members:", data)
-        setMembers(data || [])
-      } catch (error) {
-        console.error("[v0] Exception fetching members:", error)
-      } finally {
-        setMembersLoading(false)
-      }
-    }
+  // useEffect(() => {
+  //   if (!isLoading && !isAuthenticated) {
+  //     console.log("[v0] User not authenticated, redirecting to login...")
+  //      router.push("/")
+  //   }
+  // }, [isAuthenticated, isLoading, router])
 
-    if (isAuthenticated) {
-      fetchMembers()
-    }
-  }, [isAuthenticated])
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push("/")
-    }
-  }, [isAuthenticated, isLoading, router])
-
-  if (isLoading || !isAuthenticated) {
-    return null
-  }
+  // if (isLoading || !isAuthenticated) {
+  //   return null
+  // }
 
   const totalMembers = members.length
   const activeMembers = members.filter((m) => m.status === "Active").length

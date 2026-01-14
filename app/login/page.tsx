@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { ShieldCheck, Building2, AlertCircle, Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useAuth } from "@/lib/auth-context"
-import { useEffect } from "react"
+// import { useAuth } from "@/lib/auth-context"
 
 
 const DEMO_USERS = [
@@ -27,8 +27,17 @@ export default function LoginPage() {
     const router = useRouter()
     const [isLoading, setIsLoading] = useState(false)
     const { user, isAuthenticated } = useAuth()
-
-  
+    if (isAuthenticated) {
+      console.log("[v0] User is already authenticated, redirecting to dashboard...")
+      router.push("/dashboard")
+    }
+    // if (!isAuthenticated) {
+    //   console.log("[v0] User is not authenticated, redirecting to login...")
+    //   //router.push("/login")
+    // }else{
+    //   console.log("[v0] User is authenticated, redirecting to dashboard...")
+    // }
+    // console.log("[v0] Authenticated user in LoginPage:", user)
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault()
       setIsLoading(true)
@@ -45,17 +54,17 @@ export default function LoginPage() {
           throw new Error(data.error || "Login failed")
         }
   
-        localStorage.setItem("banker_user", JSON.stringify(data.user))
-        console.log("[v0] User stored in localStorage, dispatching login event...")
+        // localStorage.setItem("banker_user", JSON.stringify(data.user))
+        // console.log("[v0] User stored in localStorage, dispatching login event...")
   
         // Dispatch custom event to notify AuthProvider
         window.dispatchEvent(new Event("banker_login"))
   
-        await new Promise((resolve) => setTimeout(resolve, 150))
+        // await new Promise((resolve) => setTimeout(resolve, 150))
   
         // Redirect to dashboard
         console.log("[v0] Redirecting to:", data.redirectUrl)
-        router.push(data.redirectUrl)
+        router.push("/dashboard")
       } catch (error: unknown) {
         console.error("[v0] Login error:", error)
         setError(error instanceof Error ? error.message : "An error occurred")

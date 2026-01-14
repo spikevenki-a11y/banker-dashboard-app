@@ -9,21 +9,27 @@ export interface SessionData {
   fullName: string
   role: string
   branch: string
+  businessDate?: string
 }
+import { NextResponse } from "next/server"
 
-export async function createSession(sessionData: SessionData) {
-  const cookieStore = await cookies()
-  const sessionString = JSON.stringify(sessionData)
-  const encodedSession = Buffer.from(sessionString).toString("base64")
-
-  cookieStore.set(SESSION_COOKIE_NAME, encodedSession, {
+export function createSession(res: NextResponse, data: any) {
+  res.cookies.set("banker_session", JSON.stringify(data), {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: SESSION_MAX_AGE,
     path: "/",
+    secure: process.env.NODE_ENV === "production",
   })
 }
+
+// export async function createSession(data: any) {
+//   (await cookies()).set("banker_session", JSON.stringify(data), {
+//     httpOnly: true,
+//     secure: true,
+//     sameSite: "lax",
+//     path: "/",
+//   })
+// }
 
 export async function getSession(): Promise<SessionData | null> {
   const cookieStore = await cookies()
@@ -43,5 +49,9 @@ export async function getSession(): Promise<SessionData | null> {
 
 export async function deleteSession() {
   const cookieStore = await cookies()
-  cookieStore.delete(SESSION_COOKIE_NAME)
+  cookieStore.delete("banker_session")
+}
+
+export function destroySession(res: NextResponse) {
+  res.cookies.delete("banker_session")
 }

@@ -1,106 +1,44 @@
 "use client"
+import { createContext, useContext, useEffect, useState } from "react"
 
-import type React from "react"
-import { createContext, useContext, useState, useEffect } from "react"
-import type { AuthContextType, User } from "./types"
+const AuthContext = createContext<any>(null)
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
-
-const LOGIN_EVENT = "banker_login"
-
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
+export function AuthProvider({ children } : { children: React.ReactNode }) {
+  const [user, setUser] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  const loadUser = () => {
+  const loadUser = async () => {
     try {
-      const storedUserStr = localStorage.getItem("banker_user")
-      console.log("[v0] AuthProvider loading user:", storedUserStr)
-      if (storedUserStr) {
-        const storedUser = JSON.parse(storedUserStr)
-        const initials = storedUser.fullName
-          ? storedUser.fullName
-              .split(" ")
-              .map((n: string) => n[0])
-              .join("")
-              .toUpperCase()
-          : "B"
-
-        const userData = {
-          id: storedUser.id,
-          name: storedUser.fullName ,
-          email: storedUser.email || "",
-          role: storedUser.role,
-          branch: storedUser.branch,
-          initials,
-        }
-        console.log("[v0] AuthProvider setting user:", userData)
-        setUser(userData)
-      } else {
-        console.log("[v0] AuthProvider: No user in localStorage")
-        setUser(null)
-      }
-    } catch (error) {
-      console.error("[v0] Error loading user from localStorage:", error)
+      const res = await fetch("/api/auth/me", { credentials: "include" })
+      const data = await res.json()
+      setUser(data || null)
+    } catch {
       setUser(null)
     } finally {
-      setIsLoading(false)
+      setIsLoading(false)   // ⬅ only after /me completes
     }
   }
 
   useEffect(() => {
     loadUser()
-
-    const handleLoginEvent = () => {
-      console.log("[v0] AuthProvider received login event")
-      loadUser()
-      setIsLoading(false)
-    }
-
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === "banker_user") {
-        console.log("[v0] AuthProvider detected storage change")
-        loadUser()
-      }
-    }
-
-    window.addEventListener(LOGIN_EVENT, handleLoginEvent)
-    window.addEventListener("storage", handleStorageChange)
-
-    return () => {
-      window.removeEventListener(LOGIN_EVENT, handleLoginEvent)
-      window.removeEventListener("storage", handleStorageChange)
-    }
   }, [])
-
-  const logout = async () => {
+    const logout = async () => {
     try {
-      await fetch("/api/auth/logout", { method: "POST" })
-    } catch (error) {
-      console.error("[v0] Error calling logout API:", error)
+      console.log("Logging out user...")
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      })
+    } finally {
+      setUser(null)
+      window.location.href = "/"
     }
-
-    localStorage.removeItem("banker_user")
-    setUser(null)
-    window.location.href = "/"
   }
-
-  const value = {
-    user,
-    isAuthenticated: !!user,
-    logout,
-    isLoading,
-  }
-
-  console.log("[v0] AuthProvider state:", { isAuthenticated: !!user, isLoading, hasUser: !!user })
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={{ user, isLoading, logout }}>
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
-export function useAuth() {
-  const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider")
-  }
-  return context
-}
+export const useAuth = () => useContext(AuthContext)

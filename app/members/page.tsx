@@ -32,9 +32,11 @@ import {
   ArrowDownCircle,
   PiggyBank,
   XCircle,
+  Plus,
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { DashboardWrapper } from "../_components/dashboard-wrapper"
+import { log } from "console"
 
 type Member = {
   id: string
@@ -52,6 +54,7 @@ type Member = {
 
 type NewMemberForm = {
   full_name: string
+  father_name?: string
   email: string
   phone: string
   address: string
@@ -61,19 +64,71 @@ type NewMemberForm = {
   id_number: string
 }
 
+type NewCustomerForm = {
+  gender: string | undefined
+  state: string | number | readonly string[] | undefined
+  district: string | number | readonly string[] | undefined
+  taluk: string | number | readonly string[] | undefined
+  village: string | number | readonly string[] | undefined
+  address2: string | number | readonly string[] | undefined
+  address1: string | number | readonly string[] | undefined
+  aadhar_id: string | number | readonly string[] | undefined
+  pan_card_number: string | number | readonly string[] | undefined
+  full_name: string
+  father_name?: string
+  email: string
+  phone: string
+  dob: string
+}
+const emptyCustomer = {
+  full_name: "",
+  father_name: "",
+  gender: "M",
+  dob: "",
+  aadhar_id: "",
+  pan_card_number: "",
+  phone: "",
+  email: "",
+  address1: "",
+  address2: "",
+  village: "",
+  taluk: "",
+  district: "",
+  state: "Tamil Nadu",
+}
+
+
 
 export default function MembersPage() {
   const { user } = useAuth()
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [isCustomerAddDialogOpen, setIsCustomerAddDialogOpen] = useState(false)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [selectedMember, setSelectedMember] = useState<Member | null>(null)
   const [activeAction, setActiveAction] = useState<string | null>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [newCustomer, setNewCustomer] = useState<NewCustomerForm>({
+    full_name: "",
+    father_name: "",
+    email: "",
+    phone: "",
+    address1: "",
+    address2: "",
+    dob: "",
+    aadhar_id: "",
+    pan_card_number: "",
+    district:"",
+    state:"",
+    taluk:"",
+    village:"",
+    gender:""
+  })
 
   const [newMember, setNewMember] = useState<NewMemberForm>({
     full_name: "",
+    father_name: "",
     email: "",
     phone: "",
     address: "",
@@ -100,7 +155,7 @@ export default function MembersPage() {
 
       const resData = await res.json();
       console.log("Pool Fetched members data:", resData[0]);
-      console.log("Pool Fetched members data:", resData[0].nextvalue);
+      // console.log("Pool Fetched members data:", resData[0].nextvalue);
 
       try {
 
@@ -121,7 +176,7 @@ export default function MembersPage() {
         }
 
         const { data, error } = await query
-
+        console.log("the data is ",data)
         if (error) {
           console.error("[v0] Error loading members:", error)
         } else {
@@ -209,28 +264,58 @@ export default function MembersPage() {
       setIsSubmitting(false)
     }
   }
+  const handleCreateCustomer = async () => {
+  setIsSubmitting(true)
+  console.log(JSON.stringify(newCustomer))
+    try {
+      const res = await fetch("/api/customers/create", {
+        method:"POST",
+        credentials:"include",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify(newCustomer)
+      })
 
-  const filteredMembers = members.filter((member) => {
-    const matchesSearch =
-      member.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.member_id?.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === "all" || member.status?.toLowerCase() === statusFilter.toLowerCase()
-    return matchesSearch && matchesStatus
-  })
+      const data = await res.json()
+      if(!res.ok) throw new Error(data.error)
+
+      alert("Customer created : "+data.customer_code)
+      setNewCustomer(emptyCustomer) 
+      setIsCustomerAddDialogOpen(false)
+    } catch(e:any) {
+      console.log(e.message)
+    } finally {
+      setIsSubmitting(false)
+    }
+
+  }
+
+  // const filteredMembers = members.filter((member) => {
+  //   const matchesSearch =
+  //     member.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+  //     member.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+  //     member.member_id?.toLowerCase().includes(searchQuery.toLowerCase())
+  //   const matchesStatus = statusFilter === "all" || member.status?.toLowerCase() === statusFilter.toLowerCase()
+  //   return matchesSearch && matchesStatus
+  // })
 
   return (
     <DashboardWrapper>
     <div className="flex h-screen overflow-hidden">
       <div className="flex flex-1 flex-col overflow-hidden">
         <main className="flex-1 overflow-y-auto bg-background p-6">
-          <div className="mb-6">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground">Member Management</h1>
             <p className="text-muted-foreground">
               {user?.role === "admin"
                 ? "All branches - Manage customer accounts and member operations"
                 : `${user?.branch || "Your branch"} - Manage customer accounts and member operations`}
             </p>
+            </div>
+            <Button onClick = {() => setIsCustomerAddDialogOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Create Customer
+            </Button>
           </div>
 
           <div className="mb-6 grid gap-4 md:grid-cols-3">
@@ -338,69 +423,232 @@ export default function MembersPage() {
               </div>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {/* {isLoading ? (
                 <p>Loading members...</p>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Member</TableHead>
-                      <TableHead>Account Number</TableHead>
-                      <TableHead>KYC Status</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Total Balance</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredMembers.map((member) => (
-                      <TableRow key={member.id}>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">{member.full_name}</div>
-                            <div className="text-sm text-muted-foreground">{member.email}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-mono text-sm">{member.member_id}</TableCell>
-                        <TableCell>
-                          <Badge variant={member.kyc_completed === "Yes" ? "default" : "secondary"}>
-                            {member.kyc_completed === "Yes" ? "Completed" : "Pending"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={member.status === "active" ? "default" : "secondary"}>{member.status}</Badge>
-                        </TableCell>
-                        <TableCell className="font-semibold">{member.account_balance}</TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                Actions
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => setSelectedMember(member)}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="text-destructive">
-                                <Ban className="mr-2 h-4 w-4" />
-                                Deactivate
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
+              //   <Table>
+              //     <TableHeader>
+              //       <TableRow>
+              //         <TableHead>Member</TableHead>
+              //         <TableHead>Account Number</TableHead>
+              //         <TableHead>KYC Status</TableHead>
+              //         <TableHead>Status</TableHead>
+              //         <TableHead>Total Balance</TableHead>
+              //         <TableHead>Actions</TableHead>
+              //       </TableRow>
+              //     </TableHeader>
+              //     <TableBody>
+              //       {filteredMembers.map((member) => (
+              //         <TableRow key={member.id}>
+              //           <TableCell>
+              //             <div>
+              //               <div className="font-medium">{member.full_name}</div>
+              //               <div className="text-sm text-muted-foreground">{member.email}</div>
+              //             </div>
+              //           </TableCell>
+              //           <TableCell className="font-mono text-sm">{member.member_id}</TableCell>
+              //           <TableCell>
+              //             <Badge variant={member.kyc_completed === "Yes" ? "default" : "secondary"}>
+              //               {member.kyc_completed === "Yes" ? "Completed" : "Pending"}
+              //             </Badge>
+              //           </TableCell>
+              //           <TableCell>
+              //             <Badge variant={member.status === "active" ? "default" : "secondary"}>{member.status}</Badge>
+              //           </TableCell>
+              //           <TableCell className="font-semibold">{member.account_balance}</TableCell>
+              //           <TableCell>
+              //             <DropdownMenu>
+              //               <DropdownMenuTrigger asChild>
+              //                 <Button variant="ghost" size="sm">
+              //                   Actions
+              //                 </Button>
+              //               </DropdownMenuTrigger>
+              //               <DropdownMenuContent align="end">
+              //                 <DropdownMenuItem onClick={() => setSelectedMember(member)}>
+              //                   <Eye className="mr-2 h-4 w-4" />
+              //                   View Details
+              //                 </DropdownMenuItem>
+              //                 <DropdownMenuItem>
+              //                   <Edit className="mr-2 h-4 w-4" />
+              //                   Edit
+              //                 </DropdownMenuItem>
+              //                 <DropdownMenuItem className="text-destructive">
+              //                   <Ban className="mr-2 h-4 w-4" />
+              //                   Deactivate
+              //                 </DropdownMenuItem>
+              //               </DropdownMenuContent>
+              //             </DropdownMenu>
+              //           </TableCell>
+              //         </TableRow>
+              //       ))}
+              //     </TableBody>
+              //   </Table>
+              )} */}
             </CardContent>
           </Card>
+
+          <Dialog open={isCustomerAddDialogOpen} onOpenChange={setIsCustomerAddDialogOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Add New Customer</DialogTitle>
+                <DialogDescription>Enter customer details to create a new Customer</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Full Name *</Label>
+                    <Input
+                      id="name"
+                      placeholder="John Doe"
+                      value={newCustomer.full_name}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, full_name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="father-name">Father Name *</Label>
+                    <Input
+                      id="father_name"
+                      placeholder="John Doe"
+                      value={newCustomer.father_name}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, father_name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="john.doe@email.com"
+                      value={newCustomer.email}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
+                    />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone Number *</Label>
+                    <Input
+                      id="phone"
+                      placeholder="+1 (555) 123-4567"
+                      value={newCustomer.phone}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="dob">Date of Birth</Label>
+                    <Input
+                      id="dob"
+                      type="date"
+                      value={newCustomer.dob}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, dob: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="address1">Address Line 1</Label>
+                  <Input
+                    id="address1"
+                    placeholder="123 Main St, City, State ZIP"
+                    value={newCustomer.address1}
+                    onChange={(e) => setNewCustomer({ ...newCustomer, address1: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="address2">Address Line 2</Label>
+                  <Input
+                    id="address2"
+                    placeholder="123 Main St, City, State ZIP"
+                    value={newCustomer.address2}
+                    onChange={(e) => setNewCustomer({ ...newCustomer, address2: e.target.value })}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="village">Village *</Label>
+                    <Input
+                      id="village"
+                      placeholder="John Doe"
+                      value={newCustomer.village}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, village: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="taluk">Taluk *</Label>
+                    <Input
+                      id="taluk"
+                      placeholder="John Doe"
+                      value={newCustomer.taluk}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, taluk: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="district">District *</Label>
+                    <Input
+                      id="district"
+                      placeholder="John Doe"
+                      value={newCustomer.district}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, district: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="state">State *</Label>
+                    <Input
+                      id="state"
+                      placeholder="John Doe"
+                      value={newCustomer.state}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, state: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="gender-type">Gender</Label>
+                    <Select
+                      value={newCustomer.gender}
+                      onValueChange={(value) => setNewCustomer({ ...newCustomer, gender: value })}
+                      defaultValue="Male"
+                    >
+                      <SelectTrigger id="gender">
+                        <SelectValue placeholder="Select gender" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="male" >Male</SelectItem>
+                        <SelectItem value="female">Female</SelectItem>
+                        <SelectItem value="others">Others</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pan-card-number">PAN Card No</Label>
+                  <Input
+                    id="pan-card-number"
+                    placeholder="ABCDE1234F"
+                    value={newCustomer.pan_card_number}
+                    onChange={(e) => setNewCustomer({ ...newCustomer, pan_card_number: e.target.value })}
+                  />
+                </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="aadhar-id">Aadhar ID</Label>
+                  <Input
+                    id="aadhar-id"
+                    placeholder="123456789"
+                    value={newCustomer.aadhar_id}
+                    onChange={(e) => setNewCustomer({ ...newCustomer, aadhar_id: e.target.value })}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsCustomerAddDialogOpen(false)} disabled={isSubmitting}>
+                  Cancel
+                </Button>
+                <Button onClick={handleCreateCustomer} disabled={isSubmitting}>
+                  {isSubmitting ? "Creating..." : "Create Customer"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogContent className="max-w-2xl">

@@ -9,31 +9,18 @@ import { Loader2 } from "lucide-react"
 
 
 
-export default function DashboardPage() {
+export default function MainPage() {
   
   const router = useRouter()
-  const [isLoading, setIsLoading] = useState(false)
-  const { user, isAuthenticated } = useAuth()
+  const { user, isAuthenticated, isLoading } = useAuth()
 
   useEffect(() => {
-      if (!isLoading && isAuthenticated) {
-        router.push("/dashboard")
-      }else if (!isLoading && !isAuthenticated) {
-        router.push("/login")
-      }
-  }, [isAuthenticated, isLoading, router])
-  // if (isAuthenticated) {
-  //    // loading spinner
-  //   return (
-  //     <div className="flex min-h-screen items-center justify-center bg-[#f8f9fa]">
-  //       <div className="flex flex-col items-center gap-4">
-  //         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-  //         <p className="text-sm text-slate-600">Loading dashboard...</p>
-  //       </div>
-  //     </div>
-  //   )
-  // }
+    if (isLoading) return
 
+    if (isAuthenticated) router.replace("/dashboard")
+    else router.replace("/login")
+  }, [isAuthenticated, isLoading])
+  
   return (
     
       <div className="flex min-h-screen items-center justify-center bg-[#f8f9fa]">
