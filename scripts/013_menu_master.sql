@@ -30,4 +30,3 @@ FROM ui_menus WHERE label='Administration';
 
 INSERT INTO ui_menus(label,route,icon,parent_id,sort_order,permission_code)
 SELECT 'Day Open / Close','/admin/day','Clock',id,3,'DAY_OPEN';
-

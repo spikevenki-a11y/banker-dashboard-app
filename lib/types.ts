@@ -26,4 +26,4 @@ export interface Members {
   status: string
   joined_date: string
   branch_id: number
-} 
+}

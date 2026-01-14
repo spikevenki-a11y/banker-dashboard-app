@@ -93,5 +93,3 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_enforce_ldb_hierarchy
 BEFORE INSERT OR UPDATE ON branchparameters
 FOR EACH ROW EXECUTE FUNCTION enforce_ldb_hierarchy();
-
-
