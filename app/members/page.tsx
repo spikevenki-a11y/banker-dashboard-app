@@ -225,7 +225,7 @@ export default function MembersPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
 
-      alert("Customer created : " + data.member_no)
+      alert("Customer created : " + data.membership_no)
       setNewCustomer(emptyCustomer)
       setIsCustomerAddDialogOpen(false)
     } catch (e: any) {
