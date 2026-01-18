@@ -12,6 +12,7 @@ export async function POST(req: Request) {
     if (!aadhaar_no) {
       return NextResponse.json({ error: "Aadhaar number is required" }, { status: 400 })
     }
+    console.log("Looking up Aadhaar:", aadhaar_no)
 
     // Lookup customer by Aadhaar
     const { rows } = await pool.query(
@@ -42,7 +43,7 @@ export async function POST(req: Request) {
     if (rows.length === 0) {
       return NextResponse.json({ found: false }, { status: 404 })
     }
-
+    console.log("Customer found:", rows[0])
     return NextResponse.json({ found: true, customer: rows[0] })
   } catch (error: any) {
     console.error("[v0] Customer lookup error:", error)

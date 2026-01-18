@@ -19,6 +19,19 @@ CREATE TABLE memberships (
     created_at TIMESTAMP DEFAULT now()
 );
 
+ALTER TABLE public.memberships
+DROP CONSTRAINT memberships_customer_code_fkey;
+
+
+ALTER TABLE public.memberships
+ALTER COLUMN customer_code TYPE character(8)
+USING customer_code::character(8);
+
+ALTER TABLE public.memberships
+ADD CONSTRAINT memberships_customer_code_fkey
+FOREIGN KEY (customer_code)
+REFERENCES customers (customer_code);
+
 
 CREATE TABLE membership_sequences (
     branch_id BIGINT PRIMARY KEY REFERENCES branchparameters(branch_id),

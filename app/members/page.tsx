@@ -47,7 +47,7 @@ type Member = {
   email: string
   phone: string
   address: string
-  account_type: string
+  member_type: string
   account_balance: number
   status: string
   joined_date: string
@@ -62,7 +62,7 @@ type NewMemberForm = {
   email: string
   phone: string
   address: string
-  account_type: string
+  member_type: string
   dob: string
   id_type: string
   id_number: string
@@ -114,6 +114,7 @@ export default function MembersPage() {
   const [isSearching, setIsSearching] = useState(false)
   const [isCustomerNotFoundOpen, setIsCustomerNotFoundOpen] = useState(false)
   const [fieldsReadOnly, setFieldsReadOnly] = useState(true)
+  const [memberFieldsReadOnly, setMemberFieldsReadOnly] = useState(true)
   const [newCustomer, setNewCustomer] = useState<NewCustomerForm>({
     full_name: "",
     father_name: "",
@@ -139,7 +140,7 @@ export default function MembersPage() {
     email: "",
     phone: "",
     address: "",
-    account_type: "Nominal",
+    member_type: "Nominal",
     dob: "",
     id_type: "",
     id_number: "",
@@ -210,64 +211,25 @@ export default function MembersPage() {
   }
 
   const handleEnrollMember = async () => {
-    if (!newMember.full_name || !newMember.phone) {
-      alert("Please fill in all required fields")
-      return
-    }
-
+    
     setIsSubmitting(true)
-    const supabase = createClient()
-
+    console.log(JSON.stringify(newCustomer))
     try {
-      const branchId = user?.branch_id
-        ? typeof user.branch_id === "string"
-          ? Number.parseInt(user.branch_id)
-          : user.branch_id
-        : 1
+      const res = await fetch("/api/memberships/create", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newMember),
+      })
 
-      const memberData = {
-        member_id: "MEM006",
-        full_name: newMember.full_name,
-        email: newMember.email || null,
-        phone: newMember.phone,
-        address: newMember.address || null,
-        account_type: newMember.account_type,
-        account_balance: 0,
-        branch_id: branchId,
-        status: "Active",
-        joined_date: new Date().toISOString(),
-      }
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
 
-      const { data, error } = await supabase.from("members").insert([memberData]).select()
-
-      if (error) {
-        console.error("[v0] Error creating member:", error)
-        alert("Failed to create member: " + error.message)
-      } else {
-        console.log("[v0] Member created:", data)
-        // Add new member to the list
-        if (data && data[0]) {
-          setMembers([...members, data[0]])
-        }
-        // Reset form and close dialog
-        setNewMember({
-          aadhaar_no: "",
-          customer_code: "",
-          full_name: "",
-          email: "",
-          phone: "",
-          address: "",
-          account_type: "Nominal",
-          dob: "",
-          id_type: "",
-          id_number: "",
-        })
-        setIsAddDialogOpen(false)
-        alert("Member enrolled successfully!")
-      }
-    } catch (error) {
-      console.error("[v0] Failed to create member:", error)
-      alert("Failed to create member")
+      alert("Customer created : " + data.member_no)
+      setNewCustomer(emptyCustomer)
+      setIsCustomerAddDialogOpen(false)
+    } catch (e: any) {
+      console.log(e.message)
     } finally {
       setIsSubmitting(false)
     }
@@ -326,6 +288,7 @@ export default function MembersPage() {
             `${customer.address_line1 || ""} ${customer.address_line2 || ""}, ${customer.village || ""}, ${customer.taluk || ""}, ${customer.district || ""}, ${customer.state || ""}`.trim(),
         })
         setFieldsReadOnly(true)
+        setMemberFieldsReadOnly(false)
       } else {
         setIsCustomerNotFoundOpen(true)
       }
@@ -710,8 +673,8 @@ export default function MembersPage() {
                     <div className="flex gap-2">
                       <Input
                         id="aadhaar"
-                        placeholder="Enter 12-digit Aadhaar number"
-                        maxLength={12}
+                        placeholder="Enter 16-digit Aadhaar number"
+                        maxLength={16}
                         value={newMember.aadhaar_no}
                         onChange={(e) => {
                           const value = e.target.value.replace(/\D/g, "")
@@ -720,7 +683,7 @@ export default function MembersPage() {
                       />
                       <Button
                         onClick={handleAadhaarSearch}
-                        disabled={isSearching || newMember.aadhaar_no.length !== 12}
+                        disabled={isSearching || newMember.aadhaar_no.length !== 16}
                         className="shrink-0"
                       >
                         {isSearching ? "Searching..." : "Search"}
@@ -792,11 +755,11 @@ export default function MembersPage() {
                     <div className="space-y-2">
                       <Label htmlFor="account-type">Account Type</Label>
                       <Select
-                        value={newMember.account_type}
-                        onValueChange={(value) => setNewMember({ ...newMember, account_type: value })}
-                        disabled={fieldsReadOnly}
+                        value={newMember.member_type}
+                        onValueChange={(value) => setNewMember({ ...newMember, member_type: value })}
+                        disabled={memberFieldsReadOnly}
                       >
-                        <SelectTrigger id="account-type" className={fieldsReadOnly ? "bg-muted" : ""}>
+                        <SelectTrigger id="account-type" className={memberFieldsReadOnly ? "bg-muted" : ""}>
                           <SelectValue placeholder="Select account type" />
                         </SelectTrigger>
                         <SelectContent>
@@ -831,7 +794,7 @@ export default function MembersPage() {
                         email: "",
                         phone: "",
                         address: "",
-                        account_type: "Nominal",
+                        member_type: "Nominal",
                         dob: "",
                         id_type: "",
                         id_number: "",
@@ -844,7 +807,7 @@ export default function MembersPage() {
                   </Button>
                   <Button
                     onClick={handleEnrollMember}
-                    disabled={isSubmitting || fieldsReadOnly || !newMember.full_name}
+                    disabled={isSubmitting || memberFieldsReadOnly || !newMember.full_name}
                   >
                     {isSubmitting ? "Creating..." : "Create Member"}
                   </Button>
@@ -938,7 +901,7 @@ export default function MembersPage() {
                               <Wallet className="h-4 w-4" />
                               Account Type
                             </span>
-                            <span className="font-semibold">{selectedMember.account_type}</span>
+                            <span className="font-semibold">{selectedMember.member_type}</span>
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="flex items-center gap-2 text-muted-foreground">
