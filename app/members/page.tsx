@@ -115,6 +115,8 @@ export default function MembersPage() {
   const [isCustomerNotFoundOpen, setIsCustomerNotFoundOpen] = useState(false)
   const [fieldsReadOnly, setFieldsReadOnly] = useState(true)
   const [memberFieldsReadOnly, setMemberFieldsReadOnly] = useState(true)
+  const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false)
+  const [createdMemberNo, setCreatedMemberNo] = useState<string>("")
   const [newCustomer, setNewCustomer] = useState<NewCustomerForm>({
     full_name: "",
     father_name: "",
@@ -211,7 +213,6 @@ export default function MembersPage() {
   }
 
   const handleEnrollMember = async () => {
-    
     setIsSubmitting(true)
     console.log(JSON.stringify(newCustomer))
     try {
@@ -225,11 +226,30 @@ export default function MembersPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
 
-      alert("Customer created : " + data.membership_no)
-      setNewCustomer(emptyCustomer)
-      setIsCustomerAddDialogOpen(false)
+      // Close the add member dialog and open success dialog
+      setIsAddDialogOpen(false)
+      setCreatedMemberNo(data.membership_no)
+      setIsSuccessDialogOpen(true)
+      
+      // Reset form
+      setNewMember({
+        aadhaar_no: "",
+        customer_code: "",
+        full_name: "",
+        father_name: "",
+        email: "",
+        phone: "",
+        address: "",
+        member_type: "Nominal",
+        dob: "",
+        id_type: "",
+        id_number: "",
+      })
+      setFieldsReadOnly(true)
+      setMemberFieldsReadOnly(true)
     } catch (e: any) {
       console.log(e.message)
+      alert("Failed to create member: " + e.message)
     } finally {
       setIsSubmitting(false)
     }
@@ -1131,6 +1151,57 @@ export default function MembersPage() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+
+            {/* Success Dialog after member enrollment */}
+            <AlertDialog open={isSuccessDialogOpen} onOpenChange={setIsSuccessDialogOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2 text-green-600">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-6 w-6"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    Member Created Successfully!
+                  </AlertDialogTitle>
+                  <AlertDialogDescription className="text-base">
+                    <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4">
+                      <p className="text-sm text-green-700">New member has been enrolled with the following details:</p>
+                      <p className="mt-2 text-lg font-semibold text-green-800">
+                        Member No: <span className="font-mono">{createdMemberNo}</span>
+                      </p>
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="flex gap-2 sm:justify-end">
+                  <AlertDialogAction
+                    onClick={() => setIsSuccessDialogOpen(false)}
+                    className="bg-transparent border border-input hover:bg-accent hover:text-accent-foreground text-foreground"
+                  >
+                    Close
+                  </AlertDialogAction>
+                  <AlertDialogAction
+                    onClick={() => {
+                      setIsSuccessDialogOpen(false)
+                      setActiveAction("share-deposit")
+                    }}
+                    className="bg-teal-600 hover:bg-teal-700 text-white"
+                  >
+                    <ArrowUpCircle className="mr-2 h-4 w-4" />
+                    Share Deposit
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </main>
         </div>
       </div>
