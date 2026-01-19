@@ -944,45 +944,88 @@ export default function MembersPage() {
             </Dialog>
 
             <Dialog open={activeAction === "share-deposit"} onOpenChange={() => setActiveAction(null)}>
-              <DialogContent className="max-w-md">
+              <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                  <DialogTitle>Share Deposit</DialogTitle>
+                  <DialogTitle className="text-xl">Share Deposit</DialogTitle>
                   <DialogDescription>Add shares for a member account</DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
+                <div className="grid gap-6 py-6">
+                  {/* Membership Number */}
                   <div className="space-y-2">
-                    <Label htmlFor="share-member">Select Member</Label>
-                    <Select>
-                      <SelectTrigger id="share-member">
-                        <SelectValue placeholder="Choose member" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {members.map((member) => (
-                          <SelectItem key={member.id} value={member.id}>
-                            {member.full_name} - {member.member_id}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="membership-number" className="text-sm font-medium">
+                      Membership Number *
+                    </Label>
+                    <Input
+                      id="membership-number"
+                      placeholder="Enter membership number"
+                      defaultValue={createdMemberNo || ""}
+                    />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="share-amount">Number of Shares</Label>
-                    <Input id="share-amount" type="number" placeholder="100" />
+
+                  {/* Member Name and Member Type - Display fields */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Member Name</Label>
+                      <div className="rounded-md border border-input bg-muted/50 px-3 py-2 text-sm">
+                        {members.find((m) => m.member_id === createdMemberNo)?.full_name || "—"}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Member Type</Label>
+                      <div className="rounded-md border border-input bg-muted/50 px-3 py-2 text-sm">
+                        {members.find((m) => m.member_id === createdMemberNo)?.member_type || "—"}
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="share-value">Share Value</Label>
-                    <Input id="share-value" type="number" placeholder="10.00" />
+
+                  {/* Voucher Type and Voucher Number */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="voucher-type" className="text-sm font-medium">
+                        Voucher Type *
+                      </Label>
+                      <Select>
+                        <SelectTrigger id="voucher-type">
+                          <SelectValue placeholder="Select voucher type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="receipt">Receipt</SelectItem>
+                          <SelectItem value="cash">Cash</SelectItem>
+                          <SelectItem value="transfer">Transfer</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="voucher-number" className="text-sm font-medium">
+                        Voucher Number *
+                      </Label>
+                      <Input id="voucher-number" placeholder="Enter voucher number" />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="share-total">Total Amount</Label>
-                    <Input id="share-total" type="text" placeholder="₹1,000.00" disabled />
+
+                  {/* Particulars and Amount */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="particulars" className="text-sm font-medium">
+                        Particulars
+                      </Label>
+                      <Input id="particulars" placeholder="Enter particulars" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="amount" className="text-sm font-medium">
+                        Amount *
+                      </Label>
+                      <Input id="amount" type="number" placeholder="Enter amount" />
+                    </div>
                   </div>
                 </div>
-                <DialogFooter>
+                <DialogFooter className="gap-2 sm:gap-0">
                   <Button variant="outline" onClick={() => setActiveAction(null)}>
                     Cancel
                   </Button>
-                  <Button onClick={() => setActiveAction(null)}>Process Deposit</Button>
+                  <Button onClick={() => setActiveAction(null)} className="bg-teal-600 hover:bg-teal-700">
+                    Save
+                  </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
