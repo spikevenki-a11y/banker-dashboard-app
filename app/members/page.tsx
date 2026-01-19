@@ -1,5 +1,19 @@
 "use client"
 
+import { Badge } from "@/components/ui/badge"
+
+import { TableCell } from "@/components/ui/table"
+
+import { TableBody } from "@/components/ui/table"
+
+import { TableHead } from "@/components/ui/table"
+
+import { TableRow } from "@/components/ui/table"
+
+import { TableHeader } from "@/components/ui/table"
+
+import { Table } from "@/components/ui/table"
+
 import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { createClient } from "@/lib/supabase/client"
@@ -117,6 +131,10 @@ export default function MembersPage() {
   const [memberFieldsReadOnly, setMemberFieldsReadOnly] = useState(true)
   const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false)
   const [createdMemberNo, setCreatedMemberNo] = useState<string>("")
+  const [isMemberSearchOpen, setIsMemberSearchOpen] = useState(false)
+  const [memberSearchQuery, setMemberSearchQuery] = useState("")
+  const [selectedShareDepositMember, setSelectedShareDepositMember] = useState<Member | null>(null)
+  const [shareDepositMemberNo, setShareDepositMemberNo] = useState("")
   const [newCustomer, setNewCustomer] = useState<NewCustomerForm>({
     full_name: "",
     father_name: "",
@@ -943,23 +961,40 @@ export default function MembersPage() {
               </DialogContent>
             </Dialog>
 
-            <Dialog open={activeAction === "share-deposit"} onOpenChange={() => setActiveAction(null)}>
+            <Dialog open={activeAction === "share-deposit"} onOpenChange={() => {
+              setActiveAction(null)
+              setSelectedShareDepositMember(null)
+              setShareDepositMemberNo("")
+            }}>
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
                   <DialogTitle className="text-xl">Share Deposit</DialogTitle>
                   <DialogDescription>Add shares for a member account</DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-6 py-6">
-                  {/* Membership Number */}
+                  {/* Membership Number with Search Button */}
                   <div className="space-y-2">
                     <Label htmlFor="membership-number" className="text-sm font-medium">
                       Membership Number *
                     </Label>
-                    <Input
-                      id="membership-number"
-                      placeholder="Enter membership number"
-                      defaultValue={createdMemberNo || ""}
-                    />
+                    <div className="flex gap-2">
+                      <Input
+                        id="membership-number"
+                        placeholder="Enter membership number"
+                        value={shareDepositMemberNo || createdMemberNo || ""}
+                        onChange={(e) => setShareDepositMemberNo(e.target.value)}
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsMemberSearchOpen(true)}
+                        className="shrink-0"
+                      >
+                        <Search className="mr-2 h-4 w-4" />
+                        Search
+                      </Button>
+                    </div>
                   </div>
 
                   {/* Member Name and Member Type - Display fields */}
@@ -967,13 +1002,13 @@ export default function MembersPage() {
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">Member Name</Label>
                       <div className="rounded-md border border-input bg-muted/50 px-3 py-2 text-sm">
-                        {members.find((m) => m.member_id === createdMemberNo)?.full_name || "—"}
+                        {selectedShareDepositMember?.full_name || members.find((m) => m.member_id === (shareDepositMemberNo || createdMemberNo))?.full_name || "—"}
                       </div>
                     </div>
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">Member Type</Label>
                       <div className="rounded-md border border-input bg-muted/50 px-3 py-2 text-sm">
-                        {members.find((m) => m.member_id === createdMemberNo)?.member_type || "—"}
+                        {selectedShareDepositMember?.member_type || members.find((m) => m.member_id === (shareDepositMemberNo || createdMemberNo))?.member_type || "—"}
                       </div>
                     </div>
                   </div>
@@ -1025,6 +1060,103 @@ export default function MembersPage() {
                   </Button>
                   <Button onClick={() => setActiveAction(null)} className="bg-teal-600 hover:bg-teal-700">
                     Save
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Member Search Popup */}
+            <Dialog open={isMemberSearchOpen} onOpenChange={setIsMemberSearchOpen}>
+              <DialogContent className="max-w-2xl max-h-[80vh]">
+                <DialogHeader>
+                  <DialogTitle>Search Member</DialogTitle>
+                  <DialogDescription>Search and select a member for share deposit</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  {/* Search Input */}
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Search by name, member ID, or phone..."
+                      value={memberSearchQuery}
+                      onChange={(e) => setMemberSearchQuery(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button variant="outline" onClick={() => setMemberSearchQuery("")}>
+                      Clear
+                    </Button>
+                  </div>
+
+                  {/* Members List */}
+                  <div className="border rounded-md max-h-[400px] overflow-y-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Member ID</TableHead>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Phone</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead className="text-right">Action</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {members
+                          .filter((member) => {
+                            const query = memberSearchQuery.toLowerCase()
+                            return (
+                              !query ||
+                              member.full_name?.toLowerCase().includes(query) ||
+                              member.member_id?.toLowerCase().includes(query) ||
+                              member.phone?.toLowerCase().includes(query)
+                            )
+                          })
+                          .map((member) => (
+                            <TableRow key={member.id} className="cursor-pointer hover:bg-muted/50">
+                              <TableCell className="font-medium">{member.member_id}</TableCell>
+                              <TableCell>{member.full_name}</TableCell>
+                              <TableCell>{member.phone || "—"}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{member.member_type}</Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedShareDepositMember(member)
+                                    setShareDepositMemberNo(member.member_id)
+                                    setIsMemberSearchOpen(false)
+                                    setMemberSearchQuery("")
+                                  }}
+                                >
+                                  Select
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        {members.filter((member) => {
+                          const query = memberSearchQuery.toLowerCase()
+                          return (
+                            !query ||
+                            member.full_name?.toLowerCase().includes(query) ||
+                            member.member_id?.toLowerCase().includes(query) ||
+                            member.phone?.toLowerCase().includes(query)
+                          )
+                        }).length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                              No members found
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => {
+                    setIsMemberSearchOpen(false)
+                    setMemberSearchQuery("")
+                  }}>
+                    Close
                   </Button>
                 </DialogFooter>
               </DialogContent>
