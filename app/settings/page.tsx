@@ -1,5 +1,17 @@
 "use client"
 
+import { DialogFooter } from "@/components/ui/dialog"
+
+import { DialogDescription } from "@/components/ui/dialog"
+
+import { DialogTitle } from "@/components/ui/dialog"
+
+import { DialogHeader } from "@/components/ui/dialog"
+
+import { DialogContent } from "@/components/ui/dialog"
+
+import { Dialog } from "@/components/ui/dialog"
+
 import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -7,13 +19,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import {
   Users,
   Wallet,
@@ -25,6 +37,7 @@ import {
   Bell,
   Shield,
   Search,
+  ArrowLeft,
 } from "lucide-react"
 import { DashboardWrapper } from "../_components/dashboard-wrapper"
 
@@ -172,117 +185,139 @@ export default function SettingsPage() {
     )
   })
 
+  const selectedSection = configSections.find((s) => s.id === selectedConfig)
+
   return (
     <DashboardWrapper>
-    <div className="flex-1 space-y-6 p-8">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight text-foreground">Settings & Configuration</h2>
-        <p className="text-muted-foreground">Manage system-wide configurations for all banking modules</p>
-      </div>
-
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          type="text"
-          placeholder="Search settings and configurations..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
-      </div>
-
-      {filteredSections.length > 0 ? (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredSections.map((section) => (
-            <Card
-              key={section.id}
-              className="cursor-pointer transition-all hover:shadow-lg hover:border-primary/50"
-              onClick={() => setSelectedConfig(section.id)}
-            >
-              <CardHeader>
-                <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${section.bgColor}`}>
-                  <section.icon className={`h-6 w-6 ${section.color}`} />
-                </div>
-                <CardTitle className="mt-4">{section.title}</CardTitle>
-                <CardDescription>{section.description}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button variant="outline" className="w-full bg-transparent">
-                  Configure
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <Search className="h-12 w-12 text-muted-foreground/50 mb-4" />
-          <h3 className="text-lg font-semibold text-foreground">No configurations found</h3>
-          <p className="text-sm text-muted-foreground mt-1">Try adjusting your search query</p>
-        </div>
-      )}
-
-      {selectedConfig && (
-        <Dialog open={!!selectedConfig} onOpenChange={() => setSelectedConfig(null)}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-3">
-                {(() => {
-                  const section = configSections.find((s) => s.id === selectedConfig)
-                  if (!section) return null
-                  const Icon = section.icon
-                  return (
-                    <>
-                      <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${section.bgColor}`}>
-                        <Icon className={`h-5 w-5 ${section.color}`} />
-                      </div>
-                      {section.title}
-                    </>
-                  )
-                })()}
-              </DialogTitle>
-              <DialogDescription>{configSections.find((s) => s.id === selectedConfig)?.description}</DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-6 py-4">
-              {configSections
-                .find((s) => s.id === selectedConfig)
-                ?.settings.map((setting, idx) => (
-                  <div key={idx} className="space-y-2">
-                    {setting.type === "boolean" ? (
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor={`setting-${idx}`} className="text-sm font-medium">
-                          {setting.label}
-                        </Label>
-                        <Switch id={`setting-${idx}`} defaultChecked={setting.value as boolean} />
-                      </div>
-                    ) : (
-                      <>
-                        <Label htmlFor={`setting-${idx}`} className="text-sm font-medium">
-                          {setting.label}
-                        </Label>
-                        <Input
-                          id={`setting-${idx}`}
-                          defaultValue={setting.value as string}
-                          type={setting.type === "number" ? "number" : "text"}
-                          placeholder={`Enter ${setting.label.toLowerCase()}`}
-                        />
-                      </>
-                    )}
-                  </div>
-                ))}
+      <div className="flex-1 space-y-6 p-8">
+        {/* Show main view when no config is selected */}
+        {!selectedConfig ? (
+          <>
+            <div>
+              <h2 className="text-3xl font-bold tracking-tight text-foreground">Settings & Configuration</h2>
+              <p className="text-muted-foreground">Manage system-wide configurations for all banking modules</p>
             </div>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setSelectedConfig(null)}>
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search settings and configurations..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            {filteredSections.length > 0 ? (
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {filteredSections.map((section) => (
+                  <Card
+                    key={section.id}
+                    className="cursor-pointer transition-all hover:shadow-lg hover:border-primary/50"
+                    onClick={() => setSelectedConfig(section.id)}
+                  >
+                    <CardHeader>
+                      <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${section.bgColor}`}>
+                        <section.icon className={`h-6 w-6 ${section.color}`} />
+                      </div>
+                      <CardTitle className="mt-4">{section.title}</CardTitle>
+                      <CardDescription>{section.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Button variant="outline" className="w-full bg-transparent">
+                        Configure
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Search className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                <h3 className="text-lg font-semibold text-foreground">No configurations found</h3>
+                <p className="text-sm text-muted-foreground mt-1">Try adjusting your search query</p>
+              </div>
+            )}
+          </>
+        ) : (
+          /* Show configuration detail view in main content area */
+          <>
+            {/* Header with back button */}
+            <div className="flex items-center gap-4">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setSelectedConfig(null)}
+                className="h-10 w-10 bg-transparent"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div className="flex items-center gap-3">
+                {selectedSection && (
+                  <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${selectedSection.bgColor}`}>
+                    <selectedSection.icon className={`h-6 w-6 ${selectedSection.color}`} />
+                  </div>
+                )}
+                <div>
+                  <h2 className="text-2xl font-bold tracking-tight text-foreground">{selectedSection?.title}</h2>
+                  <p className="text-muted-foreground">{selectedSection?.description}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Configuration Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Configuration Settings</CardTitle>
+                <CardDescription>View and modify the settings for this module</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[50%]">Setting</TableHead>
+                      <TableHead className="w-[30%]">Value</TableHead>
+                      <TableHead className="w-[20%] text-right">Type</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedSection?.settings.map((setting, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell className="font-medium">{setting.label}</TableCell>
+                        <TableCell>
+                          {setting.type === "boolean" ? (
+                            <Switch defaultChecked={setting.value as boolean} />
+                          ) : (
+                            <Input
+                              defaultValue={setting.value as string}
+                              type={setting.type === "number" ? "number" : "text"}
+                              className="max-w-[200px]"
+                            />
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium capitalize">
+                            {setting.type}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setSelectedConfig(null)} className="bg-transparent">
                 Cancel
               </Button>
               <Button onClick={() => setSelectedConfig(null)}>Save Changes</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-    </div>
+            </div>
+          </>
+        )}
+      </div>
     </DashboardWrapper>
   )
 }
