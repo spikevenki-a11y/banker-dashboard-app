@@ -1,22 +1,10 @@
 "use client"
 
-import { DialogFooter } from "@/components/ui/dialog"
 
-import { DialogDescription } from "@/components/ui/dialog"
-
-import { DialogTitle } from "@/components/ui/dialog"
-
-import { DialogHeader } from "@/components/ui/dialog"
-
-import { DialogContent } from "@/components/ui/dialog"
-
-import { Dialog } from "@/components/ui/dialog"
-
-import { useState } from "react"
+import { JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal, useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import {
   Table,
@@ -28,166 +16,107 @@ import {
 } from "@/components/ui/table"
 import {
   Users,
-  Wallet,
-  FileText,
-  CreditCard,
-  TrendingUp,
-  Building2,
-  DollarSign,
-  Bell,
-  Shield,
   Search,
   ArrowLeft,
 } from "lucide-react"
 import { DashboardWrapper } from "../_components/dashboard-wrapper"
+import { iconMap } from "@/lib/iconMap"
 
 export default function SettingsPage() {
   const [selectedConfig, setSelectedConfig] = useState<string | null>(null)
+  const [configSections, setConfigSections] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState("")
+  const [isLoading, setIsLoading] = useState(true)
 
-  const configSections = [
-    {
-      id: "membership",
-      title: "Membership Configuration",
-      description: "Configure member enrollment, KYC requirements, and account types",
-      icon: Users,
-      color: "text-blue-600",
-      bgColor: "bg-blue-50",
-      settings: [
-        { label: "Minimum Share Capital", value: "₹1,000", type: "currency" },
-        { label: "Maximum Shares per Member", value: "1000", type: "number" },
-        { label: "KYC Verification Required", value: true, type: "boolean" },
-        { label: "Auto Account Number Generation", value: true, type: "boolean" },
-      ],
-    },
-    {
-      id: "savings",
-      title: "Savings Configuration",
-      description: "Set interest rates, minimum balance, and withdrawal limits",
-      icon: Wallet,
-      color: "text-teal-600",
-      bgColor: "bg-teal-50",
-      settings: [
-        { label: "Annual Interest Rate", value: "4.5", type: "percentage" },
-        { label: "Minimum Balance", value: "₹500", type: "currency" },
-        { label: "Maximum Withdrawal per Day", value: "₹50,000", type: "currency" },
-        { label: "Interest Calculation Method", value: "Daily Balance", type: "text" },
-      ],
-    },
-    {
-      id: "fixed-deposits",
-      title: "Fixed Deposit Configuration",
-      description: "Configure FD interest rates, tenure options, and premature withdrawal penalties",
-      icon: FileText,
-      color: "text-purple-600",
-      bgColor: "bg-purple-50",
-      settings: [
-        { label: "1 Year FD Rate", value: "6.5", type: "percentage" },
-        { label: "2 Year FD Rate", value: "7.0", type: "percentage" },
-        { label: "3 Year FD Rate", value: "7.5", type: "percentage" },
-        { label: "Premature Withdrawal Penalty", value: "1.0", type: "percentage" },
-        { label: "Minimum FD Amount", value: "₹10,000", type: "currency" },
-      ],
-    },
-    {
-      id: "loans",
-      title: "Loan Configuration",
-      description: "Set loan interest rates, processing fees, and eligibility criteria",
-      icon: CreditCard,
-      color: "text-orange-600",
-      bgColor: "bg-orange-50",
-      settings: [
-        { label: "Personal Loan Rate", value: "12.0", type: "percentage" },
-        { label: "Business Loan Rate", value: "10.5", type: "percentage" },
-        { label: "Mortgage Loan Rate", value: "8.5", type: "percentage" },
-        { label: "Processing Fee", value: "1.5", type: "percentage" },
-        { label: "Maximum Loan Amount", value: "₹50,00,000", type: "currency" },
-      ],
-    },
-    {
-      id: "dividend",
-      title: "Dividend Configuration",
-      description: "Configure dividend calculation, distribution frequency, and eligibility",
-      icon: TrendingUp,
-      color: "text-green-600",
-      bgColor: "bg-green-50",
-      settings: [
-        { label: "Annual Dividend Rate", value: "8.0", type: "percentage" },
-        { label: "Distribution Frequency", value: "Annual", type: "text" },
-        { label: "Minimum Shares for Dividend", value: "10", type: "number" },
-        { label: "Auto Credit to Savings", value: true, type: "boolean" },
-      ],
-    },
-    {
-      id: "shares",
-      title: "Share Management",
-      description: "Configure share pricing, transfer rules, and withdrawal policies",
-      icon: DollarSign,
-      color: "text-indigo-600",
-      bgColor: "bg-indigo-50",
-      settings: [
-        { label: "Share Price", value: "₹100", type: "currency" },
-        { label: "Allow Share Transfers", value: true, type: "boolean" },
-        { label: "Share Withdrawal Lock Period", value: "12", type: "number" },
-        { label: "Withdrawal Penalty Rate", value: "2.0", type: "percentage" },
-      ],
-    },
-    {
-      id: "organization",
-      title: "Organization Settings",
-      description: "Bank details, branch information, and operational hours",
-      icon: Building2,
-      color: "text-cyan-600",
-      bgColor: "bg-cyan-50",
-      settings: [
-        { label: "Bank Name", value: "NextZen Bank", type: "text" },
-        { label: "Registration Number", value: "BANK12345", type: "text" },
-        { label: "Operating Days", value: "Mon-Sat", type: "text" },
-        { label: "Working Hours", value: "9:00 AM - 5:00 PM", type: "text" },
-      ],
-    },
-    {
-      id: "security",
-      title: "Security & Compliance",
-      description: "Password policies, session management, and audit settings",
-      icon: Shield,
-      color: "text-red-600",
-      bgColor: "bg-red-50",
-      settings: [
-        { label: "Password Expiry Days", value: "90", type: "number" },
-        { label: "Session Timeout (minutes)", value: "30", type: "number" },
-        { label: "Two-Factor Authentication", value: true, type: "boolean" },
-        { label: "Enable Audit Logs", value: true, type: "boolean" },
-      ],
-    },
-    {
-      id: "notifications",
-      title: "Notifications & Alerts",
-      description: "Email, SMS, and in-app notification preferences",
-      icon: Bell,
-      color: "text-yellow-600",
-      bgColor: "bg-yellow-50",
-      settings: [
-        { label: "Email Notifications", value: true, type: "boolean" },
-        { label: "SMS Alerts", value: true, type: "boolean" },
-        { label: "Transaction Alerts Above", value: "₹10,000", type: "currency" },
-        { label: "Daily Summary Report", value: true, type: "boolean" },
-      ],
-    },
-  ]
-
+  const transformConfigResponse = (apiData: any[]) => {
+  return apiData.map((section) => ({
+    id: section.id,
+    title: section.title,
+    description: section.description,
+    icon: iconMap[section.icon] ?? Users, // fallback
+    color: section.color,
+    bgColor: section.bgColor,
+    settings: section.settings.map((s: any) => ({
+      settingId: s.settingId,   // 🔑 REQUIRED
+      label: s.label,
+      value: s.value,
+      type: s.type,
+    })),
+  }))
+}
+  
   const filteredSections = configSections.filter((section) => {
     const searchLower = searchQuery.toLowerCase()
     return (
       section.title.toLowerCase().includes(searchLower) ||
       section.description.toLowerCase().includes(searchLower) ||
-      section.settings.some((setting) => setting.label.toLowerCase().includes(searchLower))
+      section.settings.some((setting: { label: string }) => setting.label.toLowerCase().includes(searchLower))
     )
   })
 
-  const selectedSection = configSections.find((s) => s.id === selectedConfig)
+  
+useEffect(() => {
+  async function loadSettings() {
+    setIsLoading(true)
 
+    try {
+      const [uiRes, shareRes] = await Promise.all([
+        fetch("/api/configs", { credentials: "include" }),
+        fetch("/api/configs/share", { credentials: "include" }),
+      ])
+
+      const uiData = await uiRes.json()
+      const shareJson = await shareRes.json()
+
+      let sections = transformConfigResponse(uiData)
+
+      // Merge share config values into UI settings
+      if (shareJson?.success) {
+        sections = sections.map((section) => {
+          if (section.id !== "shares") return section
+
+          return {
+            ...section,
+            settings: section.settings.map((s: any) => ({
+              ...s,
+              value:
+                shareJson.data[s.settingId] !== undefined
+                  ? shareJson.data[s.settingId]
+                  : s.value,
+            })),
+          }
+        })
+      }
+
+      setConfigSections(sections)
+    } catch (err) {
+      console.error("Failed to load settings:", err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  loadSettings()
+}, [])
+
+
+  const selectedSection = configSections.find((s) => s.id === selectedConfig)
+  if (isLoading) {
+    return (
+      <DashboardWrapper>
+        <div className="flex h-[70vh] items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-primary" />
+            <p className="text-sm text-muted-foreground">
+              Loading settings...
+            </p>
+          </div>
+        </div>
+      </DashboardWrapper>
+    ) 
+  }
   return (
+    
     <DashboardWrapper>
       <div className="flex-1 space-y-6 p-8">
         {/* Show main view when no config is selected */}
@@ -276,13 +205,13 @@ export default function SettingsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[50%]">Setting</TableHead>
+                      <TableHead className="w-[60%]">Setting</TableHead>
                       <TableHead className="w-[30%]">Value</TableHead>
-                      <TableHead className="w-[20%] text-right">Type</TableHead>
+                      {/* <TableHead className="w-[20%] text-right">Type</TableHead> */}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {selectedSection?.settings.map((setting, idx) => (
+                    {selectedSection?.settings.map((setting: { label: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; type: string; value: string | boolean }, idx: Key | null | undefined) => (
                       <TableRow key={idx}>
                         <TableCell className="font-medium">{setting.label}</TableCell>
                         <TableCell>
@@ -296,11 +225,11 @@ export default function SettingsPage() {
                             />
                           )}
                         </TableCell>
-                        <TableCell className="text-right">
+                        {/* <TableCell className="text-right">
                           <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium capitalize">
                             {setting.type}
                           </span>
-                        </TableCell>
+                        </TableCell> */}
                       </TableRow>
                     ))}
                   </TableBody>

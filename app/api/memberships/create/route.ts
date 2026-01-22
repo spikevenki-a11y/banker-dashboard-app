@@ -4,25 +4,31 @@ import pool from "@/lib/connection/db"
 
 export async function POST(req: Request) {
   const c = (await cookies()).get("banker_session")
-  if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  if (!c) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
 
   const u = JSON.parse(c.value)
   const { customer_code, member_type } = await req.json()
 
-  // Permission check
-  const { rowCount: perm } = await pool.query(`
+  /* -------------------- PERMISSION CHECK -------------------- */
+  const { rowCount: perm } = await pool.query(
+    `
     SELECT 1
     FROM users usr
     JOIN role_permissions rp ON rp.role = usr.role
     JOIN permissions p ON p.permission_code = rp.permission_code
-    WHERE usr.id = $1 AND p.permission_code = 'MEMBER_CREATE'
-  `, [u.userId])
+    WHERE usr.id = $1
+      AND p.permission_code = 'MEMBER_CREATE'
+    `,
+    [u.userId]
+  )
 
   if (!perm) {
     return NextResponse.json({ error: "No permission" }, { status: 403 })
   }
 
-  // Customer exists
+  /* -------------------- CUSTOMER CHECK -------------------- */
   const { rows: [cust] } = await pool.query(
     `SELECT customer_code FROM customers WHERE customer_code = $1`,
     [customer_code]
@@ -32,13 +38,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Customer not found" }, { status: 404 })
   }
 
-  // Block only ACTIVE membership
-  const { rowCount: dup } = await pool.query(`
-    SELECT 1 FROM memberships
+  /* -------------------- ACTIVE MEMBERSHIP CHECK -------------------- */
+  const { rowCount: dup } = await pool.query(
+    `
+    SELECT 1
+    FROM memberships
     WHERE customer_code = $1
       AND branch_id = $2
       AND status = 'ACTIVE'
-  `, [customer_code, u.branch])
+    `,
+    [customer_code, u.branch]
+  )
 
   if (dup) {
     return NextResponse.json(
@@ -48,34 +58,46 @@ export async function POST(req: Request) {
   }
 
   const client = await pool.connect()
+
   try {
     await client.query("BEGIN")
 
-    let membershipClass: 'A' | 'B'
+    /* -------------------- MEMBERSHIP TYPE LOGIC -------------------- */
+    let membershipClass: "A" | "B"
     let prefix: string
     let seqColumn: string
 
-    if (member_type === 'Associate') {
-      membershipClass = 'A'
-      prefix = '01'
-      seqColumn = 'a_last_number'
+    if (member_type === "Associate") {
+      membershipClass = "A"
+      prefix = "01"
+      seqColumn = "a_last_number"
     } else {
-      membershipClass = 'B'
-      prefix = '02'
-      seqColumn = 'b_last_number'
+      membershipClass = "B"
+      prefix = "02"
+      seqColumn = "b_last_number"
     }
-    // Atomic sequence increment
-    const { rows: [seq] } = await client.query(`
+
+    /* -------------------- SEQUENCE INCREMENT -------------------- */
+    const { rows: [seq] } = await client.query(
+      `
       UPDATE membership_sequences
       SET ${seqColumn} = ${seqColumn} + 1
       WHERE branch_id = $1
       RETURNING ${seqColumn}
-    `, [u.branch])
+      `,
+      [u.branch]
+    )
 
-    const runningNo = String(seq[seqColumn]).padStart(5, '0')
+    if (!seq) {
+      throw new Error("Membership sequence not initialized for branch")
+    }
+
+    const runningNo = String(seq[seqColumn]).padStart(5, "0")
     const membershipNo = `${u.branch}${prefix}${runningNo}`
-    
-    await client.query(`
+
+    /* -------------------- INSERT MEMBERSHIP -------------------- */
+    const { rows: [membership] } = await client.query(
+      `
       INSERT INTO memberships (
         customer_code,
         branch_id,
@@ -84,24 +106,55 @@ export async function POST(req: Request) {
         membership_no,
         join_date,
         status
-      ) VALUES ($1,$2,$3,'INDIVIDUAL',$4,now(),'ACTIVE')
-    `, [
-      customer_code,
-      u.branch,
-      membershipClass,
-      membershipNo
-    ])
+      )
+      VALUES ($1,$2,$3,'INDIVIDUAL',$4,now(),'ACTIVE')
+      RETURNING id
+      `,
+      [
+        customer_code,
+        u.branch,
+        membershipClass,
+        membershipNo
+      ]
+    )
+
+    const membershipId = membership.id
+
+    /* -------------------- CREATE SHARE MASTER (NO MONEY) -------------------- */
+    await client.query(
+      `
+      INSERT INTO member_shares (
+        branch_id,
+        membership_id,
+        share_balance,
+        status,
+        share_opened_date
+      )
+      VALUES ($1,$2,0,'ACTIVE',now())
+      `,
+      [
+        u.branch,
+        membershipId
+      ]
+    )
 
     await client.query("COMMIT")
 
     return NextResponse.json({
       success: true,
-      membership_no: membershipNo
+      membership_no: membershipNo,
+      membership_id: membershipId,
+      share_account_created: true
     })
 
-  } catch (e) {
+  } catch (error) {
     await client.query("ROLLBACK")
-    throw e
+    console.error("Membership create error:", error)
+
+    return NextResponse.json(
+      { error: "Failed to create membership" },
+      { status: 500 }
+    )
   } finally {
     client.release()
   }

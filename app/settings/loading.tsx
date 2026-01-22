@@ -1,23 +1,14 @@
 import { Skeleton } from "@/components/ui/skeleton"
+import { Loader2 } from "lucide-react"
 
 export default function SettingsLoading() {
-  return (
-    <div className="flex-1 space-y-6 p-8">
-      <div>
-        <Skeleton className="h-9 w-80" />
-        <Skeleton className="mt-2 h-5 w-96" />
+   return (
+    
+      <div className="flex min-h-screen items-center justify-center bg-[#f8f9fa]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-slate-600">Loading LDB Banking System...</p>
+        </div>
       </div>
-
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {Array.from({ length: 9 }).map((_, i) => (
-          <div key={i} className="rounded-lg border border-border p-6 space-y-4">
-            <Skeleton className="h-12 w-12 rounded-lg" />
-            <Skeleton className="h-6 w-48" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        ))}
-      </div>
-    </div>
   )
 }

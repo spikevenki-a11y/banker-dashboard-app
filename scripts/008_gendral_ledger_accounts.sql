@@ -11,7 +11,9 @@ create table public.generalledgeraccounts (
   modifieddate timestamp with time zone
 ) tablespace pg_default;
 
-
+ALTER TABLE gl_batches
+ ADD CONSTRAINT uq_gl_batches_branch_id_batch_id
+  UNIQUE (branch_id, batch_id);
 -- =====================================
 -- Erode Branch Chart of Accounts
 -- Branch ID: 23080102
