@@ -166,61 +166,80 @@ export default function MembersPage() {
     id_number: "",
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [currentShareBalance, setCurrentShareBalance] = useState<number | null>(null)
+  const [isFetchingMember, setIsFetchingMember] = useState(false)
+  const [memberFetchError, setMemberFetchError] = useState<string | null>(null)
+  const [voucherType, setVoucherType] = useState<"CASH" | "TRANSFER" | "">("")
+  const [shareAmount, setShareAmount] = useState("")
+  const [particulars, setParticulars] = useState("")
+  const [isSaving, setIsSaving] = useState(false)
+  const [transactionType, setTransactionType] = useState("Share Deposit")
+  const [formError, setFormError] = useState<string | null>(null)
+  const [selectedBatch, setSelectedBatch] = useState< number | 0>(0)
+  const [isBatchPopupOpen, setIsBatchPopupOpen] = useState(false)
+  const [incompleteBatches, setIncompleteBatches] = useState<any[]>([])
+  const [identity, setIdentity] = useState<{ businessDate?: string } | null>(null)
+  useEffect(() => {
+    fetch("/api/auth/identity", { credentials: "include" })
+      .then(r => r.json())
+      .then(setIdentity)
+  }, [])
+
+
   // useEffect(
   //   ()=> {
   // const resData = fetch("/api/configs")
   // .then(res => res.json())
   // .then(setMembers);
   // console.log("Fetched members data:", resData);
-  //   }
+  //   }, []
   // )
   useEffect(() => {
+    if (!user) return
+
+    let isActive = true // prevent state update after unmount
+
     const loadMembers = async () => {
       setIsLoading(true)
-      const supabase = createClient()
-
-      const res = await fetch("/api/configs")
-
-      const resData = await res.json()
-      console.log("Pool Fetched members data:", resData[0])
-      // console.log("Pool Fetched members data:", resData[0].nextvalue);
 
       try {
-        // const response = await fetch("/api/banker/members", {
-        //           method: "POST",
-        //           headers: { "Content-Type": "application/json" },
-        //           body: JSON.stringify({ }),
-        //         })
-        // const data = await response.json()
-        // setMembers(data.data || [])
-        let query = supabase.from("members").select("*")
+        console.log("Loading members...")
+        const response = await fetch("/api/memberships/loadmember", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
 
-        if (user?.role !== "admin" && user?.branch) {
-          const branchId = typeof user.branch === "string" ? Number.parseInt(user.branch) : user.branch
-          if (!isNaN(branchId)) {
-            query = query.eq("branch_id", branchId)
-          }
+        const data = await response.json()
+
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || "Failed to load members")
         }
 
-        const { data, error } = await query
-        console.log("the data is ", data)
-        if (error) {
-          console.error("[v0] Error loading members:", error)
-        } else {
-          console.log("[v0] Fetched members:", data)
-          setMembers(data || [])
+        if (isActive) {
+          setMembers(data.data ?? [])
         }
       } catch (error) {
-        console.error("[v0] Failed to load members:", error)
+        console.error("[Members] Load failed:", error)
+        if (isActive) {
+          setMembers([])
+        }
       } finally {
-        setIsLoading(false)
+        if (isActive) {
+          setIsLoading(false)
+        }
       }
     }
 
-    if (user) {
-      loadMembers()
+    loadMembers()
+
+    return () => {
+      isActive = false
     }
   }, [user])
+
 
   const generateMemberId = () => {
     const maxId = members.reduce((max, member) => {
@@ -337,6 +356,189 @@ export default function MembersPage() {
       setIsSearching(false)
     }
   }
+  const handleMembershipBlur = async () => {
+    if (!shareDepositMemberNo) return
+
+    setIsFetchingMember(true)
+    setMemberFetchError(null)
+
+    try {
+      const res = await fetch(
+        `/api/memberships/share_details?membership_no=${shareDepositMemberNo}`,
+        { credentials: "include" }
+      )
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to fetch member details")
+      }
+
+      setSelectedShareDepositMember({
+        id: data.membership_id,
+        member_id: data.membership_no,
+        full_name: data.full_name,
+        email: data.email || "",
+        phone: data.phone || "",
+        address: data.address || "",
+        member_type: data.membership_class,
+        account_balance: data.account_balance || 0,
+        status: data.status || "active",
+        joined_date: data.joined_date || "",
+        branch_id: data.branch_id || 0
+      })
+
+      setCurrentShareBalance(data.share_balance)
+
+    } catch (err: any) {
+      setSelectedShareDepositMember(null)
+      setCurrentShareBalance(null)
+      setMemberFetchError(err.message)
+    } finally {
+      setIsFetchingMember(false)
+    }
+  }
+
+
+  const handleShareDepositSave = async () => {
+    console.log("Submitting share deposit...")
+    if(!shareDepositMemberNo || !voucherType || !shareAmount) {
+      setFormError("Please fill in all required fields")
+      alert("Please fill in all required fields")
+    }
+    if (!shareDepositMemberNo) {
+      setFormError("Membership number is required")
+      return
+    }
+
+    if (!voucherType) {
+      setFormError("Please select voucher type")
+      return
+    }
+
+    if (!shareAmount || Number(shareAmount) <= 0) {
+      setFormError("Enter a valid amount")
+      return
+    }
+
+    if (!selectedShareDepositMember) {
+      setFormError("Invalid membership")
+      return
+    }
+
+    setIsSaving(true)
+    setFormError(null)
+    
+    console.log("Processing share deposit...")
+    try {
+      if(transactionType=="Share Deposit"){
+        console.log("Calling share deposit API...")
+        console.log("Membership No:", shareDepositMemberNo, "Voucher Type:", voucherType, "Amount:", shareAmount, "Particulars:", particulars)
+        const res = await fetch("/api/share/deposit", {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            membership_no: shareDepositMemberNo,
+            voucher_type: voucherType,
+            amount: Number(shareAmount),
+            narration: particulars || "Share deposit",
+            selectedBatch: selectedBatch,
+          }), 
+        })
+
+        const data = await res.json()
+
+        if (!res.ok) {
+          console.error("Share deposit error:", data.error)
+          throw new Error(data.error || "Share deposit failed")
+        }
+
+        /* ---------- SUCCESS ---------- */
+        alert(
+          `Share deposit saved successfully.\nVoucher No: ${data.voucher_no}\nStatus: ${data.status}`
+        )
+      }else if(transactionType=="Share Withdrawal"){
+        console.log("Calling share withdrawal API...")
+        const res = await fetch("/api/share/withdraw", {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            membership_no: shareDepositMemberNo,
+            voucher_type: voucherType,
+            amount: Number(shareAmount),
+            narration: particulars || "Share deposit",
+            selectedBatch: selectedBatch,
+          }), 
+        })
+
+        const data = await res.json()
+
+        if (!res.ok) {
+          console.error("Share deposit error:", data.error)
+          throw new Error(data.error || "Share deposit failed")
+        }
+
+        /* ---------- SUCCESS ---------- */
+        alert(
+          `Share deposit saved successfully.\nVoucher No: ${data.voucher_no}\nStatus: ${data.status}`
+        )
+
+      }
+      // Reset form
+      setShareDepositMemberNo("")
+      setSelectedShareDepositMember(null)
+      setCurrentShareBalance(null)
+      setVoucherType("")
+      setShareAmount("")
+      setParticulars("")
+      setActiveAction(null)
+
+    } catch (err: any) {
+      setFormError(err.message)
+    } finally {
+      console.log("Share deposit process completed.")
+      setIsSaving(false)
+    }
+    console.log("Share deposit submission handled.")
+  }
+
+  
+  const loadIncompleteBatches = async () => {
+    console.log("Loading incomplete batches...")
+    setIsBatchPopupOpen(true)
+    // setBatchLoading(true)
+    // setBatchError(null)
+    console.log("Loading incomplete batches...")
+    try {
+      const res = await fetch("/api/fas/incomplete-batches", {
+        method: "GET",
+        credentials: "include",
+      })
+
+      const data = await res.json()
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to load batches")
+      }
+
+      setIncompleteBatches(data.data || [])
+    } catch (err: any) {
+      console.error("Load incomplete batches error:", err)
+      setBatchError(err.message)
+      setIncompleteBatches([])
+    } finally {
+      setBatchLoading(false)
+    }
+  }
+
+
+
 
   // const filteredMembers = members.filter((member) => {
   //   const matchesSearch =
@@ -361,7 +563,11 @@ export default function MembersPage() {
                     : `${user?.branch || "Your branch"} - Manage customer accounts and member operations`}
                 </p>
               </div>
-              <Button onClick={() => setIsCustomerAddDialogOpen(true)} className="gap-2">
+              <Button onClick={() => {
+                  setIsCustomerAddDialogOpen(true)
+                  setFieldsReadOnly(false)
+                }
+              } className="gap-2">
                 <Plus className="h-4 w-4" />
                 Create Customer
               </Button>
@@ -385,7 +591,11 @@ export default function MembersPage() {
 
               <Card
                 className="cursor-pointer transition-all hover:shadow-lg hover:border-teal-500"
-                onClick={() => setActiveAction("share-deposit")}
+                onClick={() => {
+                    setActiveAction("share-deposit")
+                    setTransactionType("Share Deposit")
+                  }
+                }
               >
                 <CardHeader className="pb-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-teal-50">
@@ -400,7 +610,11 @@ export default function MembersPage() {
 
               <Card
                 className="cursor-pointer transition-all hover:shadow-lg hover:border-orange-500"
-                onClick={() => setActiveAction("share-withdrawal")}
+                onClick={() => {
+                    setActiveAction("share-deposit")
+                    setTransactionType("Share Withdrawal")
+                  }
+                }
               >
                 <CardHeader className="pb-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-50">
@@ -565,11 +779,11 @@ export default function MembersPage() {
                     <div className="space-y-2">
                       <Label htmlFor="email">Email</Label>
                       <Input
-                        id="email"
+                        id="nc_email"
                         type="email"
                         placeholder="john.doe@email.com"
                         value={newCustomer.email}
-                        onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
+                        onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
                       />
                     </div>
                   </div>
@@ -711,8 +925,8 @@ export default function MembersPage() {
                     <div className="flex gap-2">
                       <Input
                         id="aadhaar"
-                        placeholder="Enter 16-digit Aadhaar number"
-                        maxLength={16}
+                        placeholder="Enter 12-digit Aadhaar number"
+                        maxLength={12}
                         value={newMember.aadhaar_no}
                         onChange={(e) => {
                           const value = e.target.value.replace(/\D/g, "")
@@ -721,7 +935,7 @@ export default function MembersPage() {
                       />
                       <Button
                         onClick={handleAadhaarSearch}
-                        disabled={isSearching || newMember.aadhaar_no.length !== 16}
+                        disabled={isSearching || newMember.aadhaar_no.length !== 12}
                         className="shrink-0"
                       >
                         {isSearching ? "Searching..." : "Search"}
@@ -965,13 +1179,41 @@ export default function MembersPage() {
               setActiveAction(null)
               setSelectedShareDepositMember(null)
               setShareDepositMemberNo("")
-            }}>
+              }}>
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
                   <DialogTitle className="text-xl">Share Deposit</DialogTitle>
                   <DialogDescription>Add shares for a member account</DialogDescription>
                 </DialogHeader>
+                {formError && (
+                  <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">
+                    {formError}
+                  </div>
+                )}
+
                 <div className="grid gap-6 py-6">
+
+                  {/* Member Name and Member Type - Display fields */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Transaction Type</Label>
+                      <div className="rounded-md border border-input bg-muted/50 px-3 py-2 text-sm">
+                          <input
+                            name="transactiontype"
+                            value={transactionType}
+                            onChange={(e) => setTransactionType(e.target.value)}
+                            placeholder="Share Deposit"
+                            disabled  
+                          />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Transaction Date</Label>
+                      <div className="rounded-md border border-input bg-muted/50 px-3 py-2 text-sm">
+                        {identity?.businessDate}
+                      </div>
+                    </div>
+                  </div>
                   {/* Membership Number with Search Button */}
                   <div className="space-y-2">
                     <Label htmlFor="membership-number" className="text-sm font-medium">
@@ -983,6 +1225,7 @@ export default function MembersPage() {
                         placeholder="Enter membership number"
                         value={shareDepositMemberNo || createdMemberNo || ""}
                         onChange={(e) => setShareDepositMemberNo(e.target.value)}
+                        onBlur={handleMembershipBlur}
                         className="flex-1"
                       />
                       <Button
@@ -1016,26 +1259,60 @@ export default function MembersPage() {
                   {/* Voucher Type and Voucher Number */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
+                      <Label className="text-sm font-medium">Current Share Balance</Label>
+                      <div className="rounded-md border border-input bg-muted/50 px-3 py-2 text-sm">
+                        {isFetchingMember
+                          ? "Loading..."
+                          : currentShareBalance !== null
+                            ? `₹ ${currentShareBalance.toFixed(2)}`
+                            : "—"}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
                       <Label htmlFor="voucher-type" className="text-sm font-medium">
                         Voucher Type *
                       </Label>
-                      <Select>
-                        <SelectTrigger id="voucher-type">
-                          <SelectValue placeholder="Select voucher type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="receipt">Receipt</SelectItem>
-                          <SelectItem value="cash">Cash</SelectItem>
-                          <SelectItem value="transfer">Transfer</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        <Select
+                      
+                          value={voucherType || ""}
+                          onValueChange={(value) => setVoucherType(value === "CASH" ? "CASH" : value === "TRANSFER" ? "TRANSFER" : "")}
+                        >
+                          <SelectTrigger id="voucher-type" className="w-full">
+                            <SelectValue placeholder="Select voucher type" />
+                          </SelectTrigger>
+                          <SelectContent
+                          >
+                            <SelectItem value="CASH">Cash</SelectItem>
+                            <SelectItem value="TRANSFER">Transfer</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="voucher-number" className="text-sm font-medium">
-                        Voucher Number *
-                      </Label>
-                      <Input id="voucher-number" placeholder="Enter voucher number" />
-                    </div>
+                  </div>
+                  {/* Batch and Select batch */}
+                  <div className="grid gap-6 ">
+                          {voucherType === "TRANSFER" && (
+                            <div className="grid  gap-4">
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">GL Batch ID</Label>
+                                <div className="flex gap-2">
+                                  <Input
+                                    id="gl-batch-id"
+                                    value={selectedBatch && selectedBatch !== 0 ? selectedBatch : "New Batch"}
+                                    readOnly
+                                    placeholder="Select or create batch"
+                                  />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => loadIncompleteBatches()}
+                                >
+                                  Select Batch
+                                </Button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                   </div>
 
                   {/* Particulars and Amount */}
@@ -1044,13 +1321,21 @@ export default function MembersPage() {
                       <Label htmlFor="particulars" className="text-sm font-medium">
                         Particulars
                       </Label>
-                      <Input id="particulars" placeholder="Enter particulars" />
+                      <Input id="particulars" placeholder="Enter particulars" 
+
+                        value={particulars || ""}
+                        onChange={(e) => setParticulars(e.target.value)}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="amount" className="text-sm font-medium">
                         Amount *
                       </Label>
-                      <Input id="amount" type="number" placeholder="Enter amount" />
+                      <Input id="amount" type="number" placeholder="Enter amount" 
+
+                        value={shareAmount || ""}
+                        onChange={(e) => setShareAmount(e.target.value)}
+                      />
                     </div>
                   </div>
                 </div>
@@ -1058,11 +1343,83 @@ export default function MembersPage() {
                   <Button variant="outline" onClick={() => setActiveAction(null)}>
                     Cancel
                   </Button>
-                  <Button onClick={() => setActiveAction(null)} className="bg-teal-600 hover:bg-teal-700">
-                    Save
+                  
+                  <Button
+                      onClick={handleShareDepositSave}
+                      disabled={isSaving || !selectedShareDepositMember}
+                      className="bg-teal-600 hover:bg-teal-700"
+                    >
+                    {isSaving ? "Saving..." : "Save"}
                   </Button>
+
                 </DialogFooter>
               </DialogContent>
+            </Dialog>
+
+            <Dialog open={isBatchPopupOpen} onOpenChange={setIsBatchPopupOpen}>
+              <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                  <DialogTitle>Select GL Batch</DialogTitle>
+                  <DialogDescription>
+                    Choose an incomplete batch or create a new one
+                  </DialogDescription>
+                </DialogHeader>
+                
+                <div className="flex justify-between pt-4">
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setSelectedBatch(0)
+                      setIsBatchPopupOpen(false)
+                    }}
+                  >
+                    + Create New Batch
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsBatchPopupOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Batch ID</TableHead>
+                      <TableHead>Debit</TableHead>
+                      <TableHead>Credit</TableHead>
+                      <TableHead>Difference</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+
+                  <TableBody>
+                    {incompleteBatches.map((b) => (
+                      <TableRow key={b.batch_id}>
+                        <TableCell>{b.batch_id}</TableCell>
+                        <TableCell>{b.total_debit}</TableCell>
+                        <TableCell>{b.total_credit}</TableCell>
+                        <TableCell className="text-red-600">
+                          {b.difference}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setSelectedBatch(b.batch_id)
+                              setIsBatchPopupOpen(false)
+                            }}
+                          >
+                            Select
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+
+                </DialogContent>
             </Dialog>
 
             {/* Member Search Popup */}
@@ -1383,3 +1740,11 @@ export default function MembersPage() {
     </DashboardWrapper>
   )
 }
+function setBatchLoading(arg0: boolean) {
+  throw new Error("Function not implemented.")
+}
+
+function setBatchError(arg0: null) {
+  throw new Error("Function not implemented.")
+}
+

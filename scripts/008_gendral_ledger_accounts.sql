@@ -1,4 +1,4 @@
-create table public.generalledgeraccounts (
+create table public.chart_of_accounts (
   branch_id bigint not null,
   accountcode bigint not null,
   accountname varchar(200) not null,
@@ -22,12 +22,12 @@ ALTER TABLE gl_batches
 -- -----------------------------
 -- 1️⃣ Liabilities (Parent + Children)
 -- -----------------------------
-INSERT INTO public.generalledgeraccounts
+INSERT INTO public.chart_of_accounts
 (branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate)
 VALUES
 (23080102, 10000000, 'Liabilities', 1, b'1', 0, 0, b'1', now(), now());
 
-INSERT INTO public.generalledgeraccounts
+INSERT INTO public.chart_of_accounts
 (branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate)
 VALUES
 (23080102, 11000000, 'Share Capital',        1, b'1', 10000000, 0, b'1', now(), now()),
@@ -43,12 +43,12 @@ VALUES
 -- 2️⃣ Assets (Parent + Children)
 -- Ordered: Loans & Advances, Investments, Cash & Bank, Fixed Assets, Sundry Debtors, Other Assets
 -- -----------------------------
-INSERT INTO public.generalledgeraccounts
+INSERT INTO public.chart_of_accounts
 (branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate)
 VALUES
 (23080102, 20000000, 'Assets', 2, b'1', 0, 0, b'1', now(), now());
 
-INSERT INTO public.generalledgeraccounts
+INSERT INTO public.chart_of_accounts
 (branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate)
 VALUES
 (23080102, 21000000, 'Loans and Advances',     2, b'1', 20000000, 0, b'1', now(), now()),
@@ -61,12 +61,12 @@ VALUES
 -- -----------------------------
 -- 3️⃣ Income (Parent + Children)
 -- -----------------------------
-INSERT INTO public.generalledgeraccounts
+INSERT INTO public.chart_of_accounts
 (branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate)
 VALUES
 (23080102, 30000000, 'Income', 3, b'1', 0, 0, b'1', now(), now());
 
-INSERT INTO public.generalledgeraccounts
+INSERT INTO public.chart_of_accounts
 (branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate)
 VALUES
 (23080102, 31000000, 'Interest Received',  3, b'1', 30000000, 0, b'1', now(), now()),
@@ -76,12 +76,12 @@ VALUES
 -- -----------------------------
 -- 4️⃣ Expenses (Parent + Children)
 -- -----------------------------
-INSERT INTO public.generalledgeraccounts
+INSERT INTO public.chart_of_accounts
 (branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate)
 VALUES
 (23080102, 40000000, 'Expenses', 4, b'1', 0, 0, b'1', now(), now());
 
-INSERT INTO public.generalledgeraccounts
+INSERT INTO public.chart_of_accounts
 (branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate)
 VALUES
 (23080102, 41000000, 'Interest Paid',        4, b'1', 40000000, 0, b'1', now(), now()),
@@ -93,12 +93,12 @@ VALUES
 -- -----------------------------
 -- 5️⃣ Profit & Loss (Parent + Child)
 -- -----------------------------
-INSERT INTO public.generalledgeraccounts
+INSERT INTO public.chart_of_accounts
 (branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate)
 VALUES
 (23080102, 50000000, 'Profit & Loss Account', 5, b'1', 0, 0, b'1', now(), now());
 
-INSERT INTO public.generalledgeraccounts
+INSERT INTO public.chart_of_accounts
 (branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate)
 VALUES
 (23080102, 51000000, 'Net Profit/Loss', 5, b'1', 50000000, 0, b'1', now(), now());
@@ -112,12 +112,12 @@ VALUES
 -- -----------------------------
 -- 1️⃣ Liabilities (Parent + Children)
 -- -----------------------------
-INSERT INTO public.generalledgeraccounts
+INSERT INTO public.chart_of_accounts
 (branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate)
 VALUES
 (23080101, 10000000, 'Liabilities', 1, b'1', 0, 0, b'1', now(), now());
 
-INSERT INTO public.generalledgeraccounts
+INSERT INTO public.chart_of_accounts
 (branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate)
 VALUES
 (23080101, 11000000, 'Share Capital',        1, b'1', 10000000, 0, b'1', now(), now()),
@@ -133,12 +133,12 @@ VALUES
 -- 2️⃣ Assets (Parent + Children)
 -- Ordered: Loans & Advances, Investments, Cash & Bank, Fixed Assets, Sundry Debtors, Other Assets
 -- -----------------------------
-INSERT INTO public.generalledgeraccounts
+INSERT INTO public.chart_of_accounts
 (branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate)
 VALUES
 (23080101, 20000000, 'Assets', 2, b'1', 0, 0, b'1', now(), now());
 
-INSERT INTO public.generalledgeraccounts
+INSERT INTO public.chart_of_accounts
 (branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate)
 VALUES
 (23080101, 21000000, 'Loans and Advances',     2, b'1', 20000000, 0, b'1', now(), now()),
@@ -151,12 +151,12 @@ VALUES
 -- -----------------------------
 -- 3️⃣ Income (Parent + Children)
 -- -----------------------------
-INSERT INTO public.generalledgeraccounts
+INSERT INTO public.chart_of_accounts
 (branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate)
 VALUES
 (23080101, 30000000, 'Income', 3, b'1', 0, 0, b'1', now(), now());
 
-INSERT INTO public.generalledgeraccounts
+INSERT INTO public.chart_of_accounts
 (branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate)
 VALUES
 (23080101, 31000000, 'Interest Received',  3, b'1', 30000000, 0, b'1', now(), now()),
@@ -166,12 +166,12 @@ VALUES
 -- -----------------------------
 -- 4️⃣ Expenses (Parent + Children)
 -- -----------------------------
-INSERT INTO public.generalledgeraccounts
+INSERT INTO public.chart_of_accounts
 (branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate)
 VALUES
 (23080101, 40000000, 'Expenses', 4, b'1', 0, 0, b'1', now(), now());
 
-INSERT INTO public.generalledgeraccounts
+INSERT INTO public.chart_of_accounts
 (branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate)
 VALUES
 (23080101, 41000000, 'Interest Paid',        4, b'1', 40000000, 0, b'1', now(), now()),
@@ -183,12 +183,18 @@ VALUES
 -- -----------------------------
 -- 5️⃣ Profit & Loss (Parent + Child)
 -- -----------------------------
-INSERT INTO public.generalledgeraccounts
+INSERT INTO public.chart_of_accounts
 (branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate)
 VALUES
 (23080101, 50000000, 'Profit & Loss Account', 5, b'1', 0, 0, b'1', now(), now());
 
-INSERT INTO public.generalledgeraccounts
+INSERT INTO public.chart_of_accounts
 (branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate)
 VALUES
 (23080101, 51000000, 'Net Profit/Loss', 5, b'1', 50000000, 0, b'1', now(), now());
+
+
+INSERT INTO public.chart_of_accounts
+(branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate)
+VALUES
+(23080101, 23100000, 'Cash In Hand',           2, b'1', 23000000, 0, b'1', now(), now());

@@ -26,15 +26,15 @@ export async function POST(request: Request) {
     if (!user || !user.is_active)
       return NextResponse.json({ error: "Invalid username or inactive account" }, { status: 401 })
 
-    // // Branch business day check
-    // const { data: day } = await supabase
-    //   .from("branch_business_day")
-    //   .select("business_date,is_open")
-    //   .eq("branch_id", user.branch)
-    //   .maybeSingle()
+    // Branch business day check
+    const { data: day } = await supabase
+      .from("branch_business_day")
+      .select("business_date,is_open")
+      .eq("branch_id", user.branch)
+      .maybeSingle()
 
-    // if (!day?.is_open)
-    //   return NextResponse.json({ error: "Branch day not opened" }, { status: 403 })
+    if (!day?.is_open)
+      return NextResponse.json({ error: "Branch day not opened" }, { status: 403 })
 
     // Failed attempt lock check
     const { data: fail } = await supabase
@@ -120,7 +120,8 @@ export async function POST(request: Request) {
       role: user.role,
       branch: user.branch,
       branch_name: user.branch,
-      businessDate: new Date().toISOString().split("T")[0], // Placeholder for business date,
+      businessDate: day!.business_date, 
+      // businessDate: new Date().toISOString().split("T")[0], // Placeholder for business date,
     })
 
     return res

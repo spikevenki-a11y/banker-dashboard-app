@@ -44,6 +44,11 @@ export function DashboardHeader() {
             <span className="text-xs font-medium text-primary">{identity.branch}</span>
           </div>
         )}
+        
+          <div className="ml-4 flex items-center gap-2 rounded-md bg-red-100 px-3 py-1">
+            <span className="text-xs font-medium text-red-500 underline">{identity?.businessDate || "No Date"}</span>
+          </div>
+        
       </div>
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" className="relative">
