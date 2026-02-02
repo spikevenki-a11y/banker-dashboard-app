@@ -66,3 +66,44 @@ CREATE TABLE public.customer_kycdetails (
         ON UPDATE CASCADE
          ON DELETE CASCADE
 ) TABLESPACE pg_default;
+
+
+create table public.customers (
+  id uuid not null default gen_random_uuid (),
+  customer_code character(8) not null,
+  full_name text not null,
+  father_name text null,
+  gender character varying(10) null,
+  date_of_birth date not null,
+  aadhaar_no character(16) null,
+  pan_no character(10) null,
+  mobile_no character varying(15) null,
+  email character varying(100) null,
+  address_line1 text null,
+  address_line2 text null,
+  village text null,
+  taluk text null,
+  district text null,
+  state text null default 'Tamil Nadu'::text,
+  pincode character varying(10) null,
+  is_active boolean null default true,
+  created_at timestamp without time zone null default now(),
+  updated_at timestamp without time zone null default now(),
+  customer_type text not null,
+  constraint customers_pkey primary key (id),
+  constraint customers_customer_code_key unique (customer_code),
+  constraint customers_pan_no_key unique (pan_no),
+  constraint customers_gender_check check (
+    (
+      (gender)::text = any (
+        (
+          array[
+            'male'::character varying,
+            'female'::character varying,
+            'others'::character varying
+          ]
+        )::text[]
+      )
+    )
+  )
+) TABLESPACE pg_default;

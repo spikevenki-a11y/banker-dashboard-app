@@ -1,27 +1,31 @@
-CREATE TABLE member_shares (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-
-  membership_id UUID NOT NULL
-    REFERENCES memberships(id)
-    ON DELETE RESTRICT,
-
-  share_amount NUMERIC(12,2) NOT NULL
-    CHECK (share_amount >= 0),
-
-  share_opened_date DATE NOT NULL,
-
-  closing_date DATE NULL,
-
-  status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE'
-    CHECK (status IN ('ACTIVE', 'CLOSED')),
-
-  created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(),
-
-  updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(),
-
-  CONSTRAINT member_shares_unique_membership
-    UNIQUE (membership_id)
-);
+create table public.member_shares (
+  id uuid not null default gen_random_uuid (),
+  membership_id uuid not null,
+  share_balance numeric(12, 2) not null,
+  share_opened_date date not null,
+  closing_date date null,
+  status character varying(20) not null default 'ACTIVE'::character varying,
+  created_at timestamp without time zone null default now(),
+  updated_at timestamp without time zone null default now(),
+  branch_id bigint not null,
+  membership_no bigint null,
+  constraint member_shares_pkey primary key (id),
+  constraint member_shares_unique_membership unique (membership_id),
+  constraint member_shares_membership_id_fkey foreign KEY (membership_id) references memberships (id) on delete RESTRICT,
+  constraint member_shares_share_amount_check check ((share_balance >= (0)::numeric)),
+  constraint member_shares_status_check check (
+    (
+      (status)::text = any (
+        (
+          array[
+            'ACTIVE'::character varying,
+            'CLOSED'::character varying
+          ]
+        )::text[]
+      )
+    )
+  )
+) TABLESPACE pg_default;
 
 
 CREATE TABLE member_share_transactions (

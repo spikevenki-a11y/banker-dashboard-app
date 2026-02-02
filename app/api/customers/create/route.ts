@@ -53,8 +53,9 @@ export async function POST(req: Request) {
         gender,
         date_of_birth,
         mobile_no,
-        email
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7)
+        email,
+        customer_type
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
     `,
       [
         code,
@@ -64,6 +65,7 @@ export async function POST(req: Request) {
         body.dob,
         body.phone,
         body.email,
+        body.customer_type,
       ]
     )
 
@@ -148,8 +150,9 @@ export async function POST(req: Request) {
     await client.query("ROLLBACK")
 
     if (e.code === "23505") {
+      console.error("Duplicate KYC document detected:", e.detail)
       return NextResponse.json(
-        { error: "Duplicate KYC document detected" },
+          { error: "Duplicate KYC document detected" },
         { status: 409 }
       )
     }

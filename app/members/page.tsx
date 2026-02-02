@@ -14,6 +14,9 @@ import { TableHeader } from "@/components/ui/table"
 
 import { Table } from "@/components/ui/table"
 
+import { Camera, PenTool } from "lucide-react"
+
+
 import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { createClient } from "@/lib/supabase/client"
@@ -53,6 +56,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Checkbox } from "@/components/ui/checkbox"
+import { useRouter } from "next/navigation";
+// import router, { useRouter } from "next/router"
 
 
 
@@ -76,16 +82,38 @@ type NewMemberForm = {
   customer_code?: string
   full_name: string
   father_name?: string
+  gender : string
+  customer_type? : string 
+  house_no? : string 
+  street? : string 
+  village? : string 
+  thaluk? : string 
+  district? : string 
+  state? : string 
+  pincode? : string
   email: string
   phone: string
   address: string
   member_type: string
-  dob: string
+  date_of_birth: string
+  dob?: string
+  pan_no?: string
+  ration_no?: string
+  driving_license_no?: string
   id_type: string
   id_number: string
 }
 
 type NewCustomerForm = {
+  customer_type: string | number | readonly string[] | undefined
+  permanant_phone: string | number | readonly string[] | undefined
+  permanant_state: string | number | readonly string[] | undefined
+  permanant_pin_code: string | number | readonly string[] | undefined
+  permanant_district: string | number | readonly string[] | undefined
+  permanant_taluk: string | number | readonly string[] | undefined
+  permanant_village: string | number | readonly string[] | undefined
+  permanant_street: string | number | readonly string[] | undefined
+  permanant_house_no: string | number | readonly string[] | undefined
   ledger_folio_number: string | number | readonly string[] | undefined
   board_resolution_number: string | number | readonly string[] | undefined
   board_resolution_date: string | number | readonly string[] | undefined
@@ -154,14 +182,11 @@ street: "",
 ration_no: "",
 driving_license_no: "",
 voter_id: "",
-age: "",
-aadhar_id: "",
-pan_card_number: "",
-address1: "",
-address2: "",
+age: ""
 }
 
 export default function MembersPage() {
+  // const router = useRouter()
   const { user } = useAuth()
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
@@ -173,6 +198,7 @@ export default function MembersPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSearching, setIsSearching] = useState(false)
   const [isCustomerNotFoundOpen, setIsCustomerNotFoundOpen] = useState(false)
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [fieldsReadOnly, setFieldsReadOnly] = useState(true)
   const [memberFieldsReadOnly, setMemberFieldsReadOnly] = useState(true)
   const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false)
@@ -216,6 +242,14 @@ export default function MembersPage() {
     driving_license_no: "",
     voter_id: "",
     age: "",
+    permanant_phone: "",
+    permanant_state: "",
+    permanant_pin_code: "",
+    permanant_district: "",
+    permanant_taluk: "",
+    permanant_village: "",
+    permanant_street: "",
+    permanant_house_no: "",
   })
 
   const [newMember, setNewMember] = useState<NewMemberForm>({
@@ -223,11 +257,12 @@ export default function MembersPage() {
     customer_code: "",
     full_name: "",
     father_name: "",
+    gender : "",
     email: "",
     phone: "",
     address: "",
     member_type: "Nominal",
-    dob: "",
+    date_of_birth: "",
     id_type: "",
     id_number: "",
   })
@@ -245,6 +280,31 @@ export default function MembersPage() {
   const [isBatchPopupOpen, setIsBatchPopupOpen] = useState(false)
   const [incompleteBatches, setIncompleteBatches] = useState<any[]>([])
   const [identity, setIdentity] = useState<{ businessDate?: string } | null>(null)
+  const [photo, setPhoto] = useState<File | null>(null)
+  const [signature, setSignature] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [memberPreview, setMemberPreview] = useState<string | null>(null)
+  const [signaturePreview, setSignaturePreview] = useState<string | null>(null)
+  const [sameAsPermanent, setSameAsPermanent] = useState(false)
+  const router = useRouter();
+
+
+  useEffect(() => {
+    if (!photo) return
+    const url = URL.createObjectURL(photo)
+    setPhotoPreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [photo])
+
+  useEffect(() => {
+    if (!signature) return
+    const url = URL.createObjectURL(signature)
+    setSignaturePreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [signature])
+
+
+
   useEffect(() => {
     fetch("/api/auth/identity", { credentials: "include" })
       .then(r => r.json())
@@ -340,10 +400,12 @@ export default function MembersPage() {
         customer_code: "",
         full_name: "",
         father_name: "",
+        gender: "",
         email: "",
         phone: "",
         address: "",
         member_type: "Nominal",
+        date_of_birth: "",
         dob: "",
         id_type: "",
         id_number: "",
@@ -406,9 +468,17 @@ export default function MembersPage() {
           father_name: customer.father_name || "",
           email: customer.email || "",
           phone: customer.mobile_no || "",
-          dob: customer.date_of_birth || "",
-          address:
-            `${customer.address_line1 || ""} ${customer.address_line2 || ""}, ${customer.village || ""}, ${customer.taluk || ""}, ${customer.district || ""}, ${customer.state || ""}`.trim(),
+          date_of_birth: customer.date_of_birth || "",
+          house_no: customer.house_no || "",
+          street: customer.street || "",
+          village: customer.village || "",
+          thaluk: customer.taluk || "",
+          district: customer.district || "",
+          state: customer.state || "",
+          pincode: customer.pincode || "",
+          pan_no: customer.pan_no || "",
+          ration_no: customer.ration_no || "",
+          driving_license_no: customer.driving_license_no || ""
         })
         setFieldsReadOnly(true)
         setMemberFieldsReadOnly(false)
@@ -637,11 +707,8 @@ export default function MembersPage() {
                     : `${user?.branch || "Your branch"} - Manage customer accounts and member operations`}
                 </p>
               </div>
-              <Button onClick={() => {
-                  setIsCustomerAddDialogOpen(true)
-                  setFieldsReadOnly(false)
-                }
-              } className="gap-2">
+              <Button onClick={() => router.push("/customers")}
+                className="gap-2">
                 <Plus className="h-4 w-4" />
                 Create Customer
               </Button>
@@ -662,7 +729,22 @@ export default function MembersPage() {
                   <CardDescription className="mt-1">Register new customer</CardDescription>
                 </CardContent>
               </Card>
-
+              
+              <Card
+                className="cursor-pointer transition-all hover:shadow-lg hover:border-primary"
+                onClick={() => setIsViewDialogOpen(true)}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                    <UserPlus className="h-6 w-6 text-primary" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <CardTitle className="text-lg">View Member</CardTitle>
+                  <CardDescription className="mt-1">View Member details</CardDescription>
+                </CardContent>
+              </Card>
+              
               <Card
                 className="cursor-pointer transition-all hover:shadow-lg hover:border-teal-500"
                 onClick={() => {
@@ -841,6 +923,7 @@ export default function MembersPage() {
                       {/* <TabsTrigger value="assetdetails">Asset Details</TabsTrigger> */}
                     </TabsList>
                     <TabsContent value="personal">
+
                       <div className="grid gap-4 px-4 py-4">
                         <div className="grid grid-cols-3 gap-4">
                           <div className="space-y-2">
@@ -1059,11 +1142,71 @@ export default function MembersPage() {
                             </div>
                           </div>
                       </div>
+                      
+                      <div className="flex gap-8 px-4 py-4 border-b">
+
+                        {/* PHOTO */}
+                        <label className="cursor-pointer">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            hidden
+                            onChange={(e) => setPhoto(e.target.files?.[0] || null)}
+                          />
+
+                          <div className="h-32 w-32 border-2 border-dashed rounded-md flex items-center justify-center hover:bg-muted transition overflow-hidden">
+                            {photoPreview ? (
+                              <img
+                                src={photoPreview}
+                                alt="Photo Preview"
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                <Camera className="h-8 w-8" />
+                                <span className="text-sm">Upload Photo</span>
+                              </div>
+                            )}
+                          </div>
+                        </label>
+
+                        {/* SIGNATURE */}
+                        <label className="cursor-pointer">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            hidden
+                            onChange={(e) => setSignature(e.target.files?.[0] || null)}
+                          />
+
+                          <div className="h-32 w-32 border-2 border-dashed rounded-md flex items-center justify-center hover:bg-muted transition overflow-hidden bg-white">
+                            {signaturePreview ? (
+                              <img
+                                src={signaturePreview}
+                                alt="Signature Preview"
+                                className="h-full w-full object-contain"
+                              />
+                            ) : (
+                              <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                <PenTool className="h-8 w-8" />
+                                <span className="text-sm">Upload Signature</span>
+                              </div>
+                            )}
+                          </div>
+                        </label>
+
+                      </div>
+
                     </TabsContent>
                     <TabsContent value="address">
                       {/* Address tab content can go here if needed */}
                       
-                      <div className="grid gap-4 px-4 py-4">
+                      <div className="grid gap-4 px-4 py-4 border-b">
+                        
+                        <div className="flex">
+                          <div className="text-lg font-semibold flex items-center gap-1 px-4"><div className="h-4 w-1 bg-primary rounded" />Current Address</div>
+                           
+                        </div>
                         <div className="grid grid-cols-4 gap-4">
                           <div className="space-y-2">
                             <Label htmlFor="house_no">House Number</Label>
@@ -1154,69 +1297,204 @@ export default function MembersPage() {
                         </div>  
 
                       </div>
+                      <div className="grid gap-4 px-4 py-4 border-b">
+                        <div className="flex">
+                          <div className="text-lg font-semibold flex items-center gap-1 px-4"><div className="h-4 w-1 bg-primary rounded" />Permanent Address</div>
+                                            
+                          {/* Checkbox */}
+                          <div className="flex items-center justify-end gap-2 text-sm px-4">
+                            <Checkbox
+                              id="same_address"
+                              checked={sameAsPermanent}
+                              onCheckedChange={(checked: boolean) => setSameAsPermanent(checked)}
+                            />
+                            <Label htmlFor="same_address" className="cursor-pointer">
+                              Current address same as permanent
+                            </Label>
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-4 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="permanant_house_no">Permanent House Number</Label>
+                            <Input
+                              id="permanant_house_no"
+                              placeholder="123 Main St, City, State ZIP"
+                              value={newCustomer.permanant_house_no}
+                              onChange={(e) => setNewCustomer({ ...newCustomer, permanant_house_no: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="permanant_street">Street</Label>
+                            <Input
+                              id="permanant_street"
+                              placeholder="123 Main St, City, State ZIP"
+                              value={newCustomer.permanant_street}
+                              onChange={(e) => setNewCustomer({ ...newCustomer, permanant_street: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="permanant_village">Village *</Label>
+                            <Input
+                              id="permanant_village"
+                              placeholder="John Doe"
+                              value={newCustomer.permanant_village}
+                              onChange={(e) => setNewCustomer({ ...newCustomer, permanant_village: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="permanant_taluk">Taluk *</Label>
+                            <Input
+                              id="permanant_taluk"
+                              placeholder="John Doe"
+                              value={newCustomer.permanant_taluk}
+                              onChange={(e) => setNewCustomer({ ...newCustomer, permanant_taluk: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="permanant_district">District *</Label>
+                            <Input
+                              id="permanant_district"
+                              placeholder="John Doe"
+                              value={newCustomer.permanant_district}
+                              onChange={(e) => setNewCustomer({ ...newCustomer, permanant_district: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="permanant_state">State *</Label>
+                            <Input
+                              id="permanant_state"
+                              placeholder="John Doe"
+                              value={newCustomer.permanant_state}
+                              onChange={(e) => setNewCustomer({ ...newCustomer, permanant_state: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="permanant_pin_code">Pin Code *</Label>
+                            <Input
+                              id="permanant_pin_code"
+                              placeholder="John Doe"
+                              value={newCustomer.permanant_pin_code}
+                              onChange={(e) => setNewCustomer({ ...newCustomer, permanant_pin_code: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="permanant_phone">Phone Number *</Label>
+                            <Input
+                              id="permanant_phone"
+                              placeholder="+91 9876543210"
+                              value={newCustomer.permanant_phone}
+                              onChange={(e) => setNewCustomer({ ...newCustomer, permanant_phone: e.target.value })}
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="permanent_email">Email</Label>
+                            <Input
+                              id="permanent_email"
+                              type="email"
+                              placeholder="john.doe@email.com"
+                              value={newCustomer.email}
+                              onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
+                            />
+                          </div>
+                        </div>  
+
+                      </div>
                       
                     </TabsContent>
                     <TabsContent value="kycdetails">
                       {/* Address tab content can go here if needed */}
-                      <div className="grid gap-4 px-4 py-4">
-                        <div className="grid gap-4 grid-cols-2" >
-                          <div className="space-y-2">
-                            <Label htmlFor="pan-card-number">PAN Card No</Label>
-                            <Input
-                              id="pan-card-number"
-                              placeholder="ABCDE1234F"
-                              value={newCustomer.pan_card_number}
-                              onChange={(e) => setNewCustomer({ ...newCustomer, pan_card_number: e.target.value })}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="aadhar-id">Aadhar ID</Label>
-                            <Input
-                              id="aadhar-id"
-                              placeholder="1234 5678 9123"
-                              maxLength={14} // 12 digits + 2 spaces
-                              value={formatAadhar(newCustomer.aadhar_id)}
-                              onChange={(e) => {
-                                const rawValue = e.target.value.replace(/\D/g, "").slice(0, 12);
-                                setNewCustomer({
-                                  ...newCustomer,
-                                  aadhar_id: rawValue, // stored WITHOUT spaces
-                                });
-                              }}
-                            />
-                          </div>
+                      
+                      <div className="px-4 py-4">
 
+                        {/* Header Row */}
+                        <div className="grid grid-cols-3 gap-4 bg-muted px-3 py-2 text-sm font-medium rounded-t-md">
+                          <div>Document Type</div>
+                          <div>Document Number</div>
+                          <div className="px-10">Status</div>
                         </div>
-                        
-                        <div className="grid gap-4 py-4 grid-cols-3" >
-                          <div className="space-y-2">
-                            <Label htmlFor="ration-no">Ration No</Label>
-                            <Input
-                              id="ration-no"
-                              placeholder="123456789"
-                              value={newCustomer.ration_no}
-                              onChange={(e) => setNewCustomer({ ...newCustomer, ration_no: e.target.value })}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="voter_id">Voter ID</Label>
-                            <Input
-                              id="voter_id"
-                              placeholder="123456789"
-                              value={newCustomer.voter_id}
-                              onChange={(e) => setNewCustomer({ ...newCustomer, voter_id: e.target.value })}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="driving_license_no">Driving License No</Label>
-                            <Input
-                              id="driving_license_no"
-                              placeholder="123456789"
-                              value={newCustomer.driving_license_no}
-                              onChange={(e) => setNewCustomer({ ...newCustomer, driving_license_no: e.target.value })}
-                            />
-                          </div>
+
+                        {/* PAN */}
+                        <div className="grid grid-cols-3 gap-4 px-3 py-2 border-b items-center">
+                          <div>PAN Card</div>
+                          <Input
+                            placeholder="ABCDE1234F"
+                            value={newCustomer.pan_card_number}
+                            onChange={(e) =>
+                              setNewCustomer({ ...newCustomer, pan_card_number: e.target.value })
+                            }
+                          />
+                          <span className="text-xs text-muted-foreground px-10">
+                            {newCustomer.pan_card_number ? "Entered" : "Pending"}
+                          </span>
                         </div>
+
+                        {/* AADHAR */}
+                        <div className="grid grid-cols-3 gap-4 px-3 py-2 border-b items-center">
+                          <div>Aadhar</div>
+                          <Input
+                            placeholder="1234 5678 9123"
+                            maxLength={14}
+                            value={formatAadhar(newCustomer.aadhar_id)}
+                            onChange={(e) => {
+                              const rawValue = e.target.value.replace(/\D/g, "").slice(0, 12)
+                              setNewCustomer({ ...newCustomer, aadhar_id: rawValue })
+                            }}
+                          />
+                          <span className="text-xs text-muted-foreground px-10">
+                            {newCustomer.aadhar_id ? "Entered" : "Pending"}
+                          </span>
+                        </div>
+
+                        {/* RATION */}
+                        <div className="grid grid-cols-3 gap-4 px-3 py-2 border-b items-center">
+                          <div>Ration Card</div>
+                          <Input
+                            placeholder="123456789"
+                            value={newCustomer.ration_no}
+                            onChange={(e) =>
+                              setNewCustomer({ ...newCustomer, ration_no: e.target.value })
+                            }
+                          />
+                          <span className="text-xs text-muted-foreground px-10">
+                            {newCustomer.ration_no ? "Entered" : "Optional"}
+                          </span>
+                        </div>
+
+                        {/* VOTER */}
+                        <div className="grid grid-cols-3 gap-4 px-3 py-2 border-b items-center">
+                          <div>Voter ID</div>
+                          <Input
+                            placeholder="123456789"
+                            value={newCustomer.voter_id}
+                            onChange={(e) =>
+                              setNewCustomer({ ...newCustomer, voter_id: e.target.value })
+                            }
+                          />
+                          <span className="text-xs text-muted-foreground px-10">
+                            {newCustomer.voter_id ? "Entered" : "Optional"}
+                          </span>
+                        </div>
+
+                        {/* DL */}
+                        <div className="grid grid-cols-3 gap-4 px-3 py-2 items-center">
+                          <div>Driving License</div>
+                          <Input
+                            placeholder="123456789"
+                            value={newCustomer.driving_license_no}
+                            onChange={(e) =>
+                              setNewCustomer({ ...newCustomer, driving_license_no: e.target.value })
+                            }
+                          />
+                          <span className="text-xs text-muted-foreground px-10">
+                            {newCustomer.driving_license_no ? "Entered" : "Optional"}
+                          </span>
+                        </div>
+
                       </div>
                     </TabsContent>
                     {/* <TabsContent value="assetdetails">
@@ -1384,10 +1662,12 @@ export default function MembersPage() {
                         customer_code: "",
                         full_name: "",
                         father_name: "",
+                        gender: "",
                         email: "",
                         phone: "",
                         address: "",
                         member_type: "Nominal",
+                        date_of_birth: "",
                         dob: "",
                         id_type: "",
                         id_number: "",
@@ -1414,6 +1694,149 @@ export default function MembersPage() {
                     <DialogDescription>
                       Search by Aadhaar to enroll an existing customer
                     </DialogDescription>
+                    <div className="space-y-2 px-4 py-4">
+                      <Label htmlFor="aadhaar">Aadhaar Card Number *</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="aadhaar"
+                          placeholder="Enter 12-digit Aadhaar number"
+                          maxLength={12}
+                          value={newMember.aadhaar_no}
+                          onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, "")
+                          setNewMember({ ...newMember, aadhaar_no: value })
+                          }}
+                        />
+                        <Button
+                          onClick={handleAadhaarSearch}
+                          disabled={isSearching || newMember.aadhaar_no.length !== 12}
+                          className="shrink-0"
+                          >
+                          {isSearching ? "Searching..." : "Search"}
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="mt-4 border-t pt-4"></div>
+                    <div className="mt-2 text-sm text-muted-foreground">
+                      
+                      <div className="grid grid-cols-3 gap-4 border-b">
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-1 gap-4">
+                            <div className="space-y-2 px-5 ">
+                                
+                                <Label htmlFor="customer_type">Customer Type</Label>
+                                <select
+                                    id="customer_type"
+                                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    value={newCustomer.customer_type}
+                                    onChange={(e) => setNewCustomer({ ...newCustomer, customer_type: e.target.value })}
+                                  >
+                                    <option value="">Select Category</option>
+                                    <option value="individual">Individual</option>
+                                    <option value="organization">Organization</option>
+                                </select>
+                            </div>
+                            <div className="space-y-2 px-5">
+                              <Label>Account Type</Label>
+                              <Select
+                                value={newMember.member_type}
+                                onValueChange={(value) =>
+                                  setNewMember({ ...newMember, member_type: value })
+                                }
+                                // disabled={memberFieldsReadOnly}
+                              >
+                                <SelectTrigger
+                                  className={`${memberFieldsReadOnly ? "bg-muted" : ""} w-full`}
+                                >
+                                  <SelectValue placeholder="Select account type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Nominal">Nominal</SelectItem>
+                                  <SelectItem value="Associate">Associate</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          </div>
+                          
+                          <div className="space-y-2">
+                              <div className="grid grid-cols-1 gap-4">
+                                  <div className="space-y-2">
+                                  <Label htmlFor="name">Full Name *</Label>
+                                  <Input
+                                      id="name"
+                                      placeholder="John Doe"
+                                      value={newCustomer.full_name}
+                                      onChange={(e) => setNewCustomer({ ...newCustomer, full_name: e.target.value })}
+                                  />
+                                  </div>
+                                  <div className="space-y-2">
+                                      <Label htmlFor="father-name">Father Name *</Label>
+                                      <Input
+                                          id="father_name"
+                                          placeholder="Daddy's Name"
+                                          value={newCustomer.father_name}
+                                          onChange={(e) => setNewCustomer({ ...newCustomer, father_name: e.target.value })}
+                                  />
+                                  </div>
+                              </div> 
+                          </div>
+                          
+              
+                          <div className="flex gap-8 px-4 py-4 ">
+              
+                              {/* PHOTO */}
+                              <label className="cursor-pointer">
+                                  <input
+                                  type="file"
+                                  accept="image/*"
+                                  hidden
+                                  onChange={(e) => setPhoto(e.target.files?.[0] || null)}
+                                  />
+              
+                                  <div className="h-32 w-32 border-2 border-dashed rounded-md flex items-center justify-center hover:bg-muted transition overflow-hidden">
+                                  {photoPreview ? (
+                                      <img
+                                      src={photoPreview}
+                                      alt="Photo Preview"
+                                      className="h-full w-full object-cover"
+                                      />
+                                  ) : (
+                                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                      <Camera className="h-8 w-8" />
+                                      <span className="text-sm">Upload Photo</span>
+                                      </div>
+                                  )}
+                                  </div>
+                              </label>
+              
+                              {/* SIGNATURE */}
+                              <label className="cursor-pointer">
+                                  <input
+                                  type="file"
+                                  accept="image/*"
+                                  hidden
+                                  onChange={(e) => setSignature(e.target.files?.[0] || null)}
+                                  />
+              
+                                  <div className="h-32 w-32 border-2 border-dashed rounded-md flex items-center justify-center hover:bg-muted transition overflow-hidden bg-white">
+                                  {signaturePreview ? (
+                                      <img
+                                      src={signaturePreview}
+                                      alt="Signature Preview"
+                                      className="h-full w-full object-contain"
+                                      />
+                                  ) : (
+                                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                      <PenTool className="h-8 w-8" />
+                                      <span className="text-sm">Upload Signature</span>
+                                      </div>
+                                  )}
+                                  </div>
+                              </label>
+                          </div>
+                      </div>
+                    </div>
                   </DialogHeader>
 
                   <Tabs defaultValue="personal" className="w-full">
@@ -1425,38 +1848,16 @@ export default function MembersPage() {
                     {/* PERSONAL DETAILS TAB */}
                     <TabsContent value="personal">
                       <div className="grid gap-4 py-4">
-                        {/* Aadhaar */}
-                        <div className="space-y-2">
-                          <Label htmlFor="aadhaar">Aadhaar Card Number *</Label>
-                          <div className="flex gap-2">
-                            <Input
-                              id="aadhaar"
-                              placeholder="Enter 12-digit Aadhaar number"
-                              maxLength={12}
-                              value={newMember.aadhaar_no}
-                              onChange={(e) => {
-                                const value = e.target.value.replace(/\D/g, "")
-                                setNewMember({ ...newMember, aadhaar_no: value })
-                              }}
-                            />
-                            <Button
-                              onClick={handleAadhaarSearch}
-                              disabled={isSearching || newMember.aadhaar_no.length !== 12}
-                              className="shrink-0"
-                            >
-                              {isSearching ? "Searching..." : "Search"}
-                            </Button>
-                          </div>
-                        </div>
 
                         {/* Name + Father */}
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-3 gap-4">
                           <div className="space-y-2">
-                            <Label>Full Name *</Label>
+                            <Label>Date of Birth</Label>
                             <Input
-                              value={newMember.full_name}
+                              value={newMember.dob}
+                              type="date"
                               onChange={(e) =>
-                                setNewMember({ ...newMember, full_name: e.target.value })
+                                setNewMember({ ...newMember, dob: e.target.value })
                               }
                               readOnly={fieldsReadOnly}
                               className={fieldsReadOnly ? "bg-muted" : ""}
@@ -1464,17 +1865,24 @@ export default function MembersPage() {
                           </div>
 
                           <div className="space-y-2">
-                            <Label>Father Name</Label>
-                            <Input
-                              value={newMember.father_name}
-                              onChange={(e) =>
-                                setNewMember({ ...newMember, father_name: e.target.value })
-                              }
-                              readOnly={fieldsReadOnly}
-                              className={fieldsReadOnly ? "bg-muted" : ""}
-                            />
+                            <Label>Gender</Label>
+                            <Select
+                              value={newMember.gender}
+                              onValueChange={(value) => setNewMember({ ...newMember, gender: value })}
+                              
+                              >
+                              <SelectTrigger id="gender" className={`w-full ${fieldsReadOnly ? "bg-muted" : ""}`}>
+                                  <SelectValue placeholder="Select gender" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                  <SelectItem value="male">Male</SelectItem>
+                                  <SelectItem value="female">Female</SelectItem>
+                                  <SelectItem value="others">Others</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
                         </div>
+                        <div className="space-y-2"></div>
 
                         {/* Email + Phone */}
                         <div className="grid grid-cols-2 gap-4">
@@ -1519,26 +1927,6 @@ export default function MembersPage() {
                             />
                           </div>
 
-                          <div className="space-y-2">
-                            <Label>Account Type</Label>
-                            <Select
-                              value={newMember.member_type}
-                              onValueChange={(value) =>
-                                setNewMember({ ...newMember, member_type: value })
-                              }
-                              disabled={memberFieldsReadOnly}
-                            >
-                              <SelectTrigger
-                                className={memberFieldsReadOnly ? "bg-muted" : ""}
-                              >
-                                <SelectValue placeholder="Select account type" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Nominal">Nominal</SelectItem>
-                                <SelectItem value="Associate">Associate</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
                         </div>
                       </div>
                     </TabsContent>
@@ -1562,9 +1950,103 @@ export default function MembersPage() {
                   </Tabs>
 
                   <DialogFooter>
-                    {/* footer stays same */}
+                    
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsAddDialogOpen(false)
+                      setNewMember({
+                        aadhaar_no: "",
+                        customer_code: "",
+                        full_name: "",
+                        father_name: "",
+                        gender: "",
+                        email: "",
+                        phone: "",
+                        address: "",
+                        member_type: "Nominal",
+                        date_of_birth: "",
+                        dob: "",
+                        id_type: "",
+                        id_number: "",
+                      })
+                      setFieldsReadOnly(true)
+                    }}
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleEnrollMember}
+                    disabled={isSubmitting || memberFieldsReadOnly || !newMember.full_name}
+                  >
+                    {isSubmitting ? "Creating..." : "Create Member"}
+                  </Button>
                   </DialogFooter>
                 </DialogContent>
+            </Dialog>
+
+            <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+              <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                  <DialogTitle>Member Details View</DialogTitle>
+                  <DialogDescription>View member information in read-only mode</DialogDescription>
+                </DialogHeader>
+                <div className="grid flex  gap-4">
+                <div className="h-32 w-32 border-2 border-dashed rounded-md flex items-center justify-center hover:bg-muted transition overflow-hidden">
+                  {memberPreview ? (
+                    <img
+                      src={memberPreview}
+                      alt="Member Photo Preview"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                      <Camera className="h-8 w-8" />
+                      <span className="text-sm">Member Photo</span>
+                    </div>
+                  )}
+                </div>
+                <div> 
+                  {/* Member details fields can go here in read-only mode */}
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>membership no</Label>
+                        <div className="rounded-md border border-input bg-muted/50 px-3 py-2 text-sm">{selectedMember?.membershipNo}</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Full Name</Label>
+                        <div className="rounded-md border border-input bg-muted/50 px-3 py-2 text-sm">{selectedMember?.fullName}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                </div>
+                <Tabs defaultValue="personal" className="w-full">
+                  <TabsList className="grid grid-cols-5">
+                    <TabsTrigger value="personal">Personal Details</TabsTrigger>
+                    <TabsTrigger value="address">Address</TabsTrigger>
+                    <TabsTrigger value="kycdetails">KYC Details</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="personal">
+                    {/* Personal Details tab content can go here if needed */}
+                    <div className="grid gap-4 py-4">
+                      {/* Name + Father */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Full Name</Label>
+                        </div>
+
+                      </div>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </DialogContent>
             </Dialog>
 
 

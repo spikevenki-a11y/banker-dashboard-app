@@ -126,15 +126,17 @@ export async function POST(req: Request) {
       INSERT INTO member_shares (
         branch_id,
         membership_id,
+        membership_no,
         share_balance,
         status,
         share_opened_date
       )
-      VALUES ($1,$2,0,'ACTIVE',now())
+      VALUES ($1,$2,$3,0,'ACTIVE',now())
       `,
       [
         u.branch,
-        membershipId
+        membershipId,
+        membershipNo
       ]
     )
 
