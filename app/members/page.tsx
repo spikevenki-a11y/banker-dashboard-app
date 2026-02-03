@@ -2022,7 +2022,33 @@ export default function MembersPage() {
                       </div> */}
                     </TabsContent>
                     <TabsContent value="kyc">
-                        
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <Label>ID Type</Label>
+                          <Input
+                            value={newMember.id_type}
+                            onChange={(e) =>
+                              setNewMember({ ...newMember, id_type: e.target.value })
+                            }
+                            readOnly={fieldsReadOnly}
+                            className={fieldsReadOnly ? "bg-muted" : ""}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>ID Number</Label>
+                          <Input
+                            value={newMember.id_number}
+                            onChange={(e) =>
+                              setNewMember({ ...newMember, id_number: e.target.value })
+                            }
+                            readOnly={fieldsReadOnly}
+                            className={fieldsReadOnly ? "bg-muted" : ""}
+                          />
+                        </div>
+                        <div className="space-y-2"></div>
+                        <div className="space-y-2"></div>
+                      </div>
+
                     </TabsContent>
                   </Tabs>
 
