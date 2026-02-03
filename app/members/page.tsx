@@ -102,6 +102,10 @@ type NewMemberForm = {
   driving_license_no?: string
   id_type: string
   id_number: string
+  spouseName?: string
+  boardResolutionNumber?: string
+  boardResolutionDate?: string
+  ledgerFolioNumber?: string
 }
 
 type NewCustomerForm = {
@@ -265,6 +269,8 @@ export default function MembersPage() {
     date_of_birth: "",
     id_type: "",
     id_number: "",
+    spouseName: "",
+    boardResolutionNumber: "",
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [currentShareBalance, setCurrentShareBalance] = useState<number | null>(null)
@@ -1840,9 +1846,10 @@ export default function MembersPage() {
                   </DialogHeader>
 
                   <Tabs defaultValue="personal" className="w-full">
-                    <TabsList className="grid grid-cols-2">
+                    <TabsList className="grid grid-cols-4">
                       <TabsTrigger value="personal">Personal Details</TabsTrigger>
                       <TabsTrigger value="address">Address</TabsTrigger>
+                      <TabsTrigger value="kyc">KYC Details</TabsTrigger>
                     </TabsList>
 
                     {/* PERSONAL DETAILS TAB */}
@@ -1881,53 +1888,57 @@ export default function MembersPage() {
                               </SelectContent>
                             </Select>
                           </div>
-                        </div>
-                        <div className="space-y-2"></div>
-
-                        {/* Email + Phone */}
-                        <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <Label>Email</Label>
+                              <Label>Spouse Name</Label>
+                              <Input
+                                value={newMember.spouseName}
+                                onChange={(e) =>
+                                  setNewMember({ ...newMember, spouseName: e.target.value })
+                                }
+                                readOnly={fieldsReadOnly}
+                                className={fieldsReadOnly ? "bg-muted" : ""}
+                              />
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-3 gap-4">
+                          <div className="space-y-2">
+                            <Label>Board Resolution Number</Label>
                             <Input
-                              type="email"
-                              value={newMember.email}
+                              value={newMember.boardResolutionNumber}
                               onChange={(e) =>
-                                setNewMember({ ...newMember, email: e.target.value })
+                                setNewMember({ ...newMember, boardResolutionNumber: e.target.value })
                               }
                               readOnly={fieldsReadOnly}
                               className={fieldsReadOnly ? "bg-muted" : ""}
                             />
                           </div>
-
                           <div className="space-y-2">
-                            <Label>Phone Number *</Label>
-                            <Input
-                              value={newMember.phone}
-                              onChange={(e) =>
-                                setNewMember({ ...newMember, phone: e.target.value })
-                              }
-                              readOnly={fieldsReadOnly}
-                              className={fieldsReadOnly ? "bg-muted" : ""}
-                            />
-                          </div>
-                        </div>
-
-                        {/* DOB + Member Type */}
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Date of Birth</Label>
+                            <Label>Board Resolution Date</Label>
                             <Input
                               type="date"
-                              value={newMember.dob}
+                              value={newMember.boardResolutionDate}
                               onChange={(e) =>
-                                setNewMember({ ...newMember, dob: e.target.value })
+                                setNewMember({ ...newMember, boardResolutionDate: e.target.value })
                               }
                               readOnly={fieldsReadOnly}
                               className={fieldsReadOnly ? "bg-muted" : ""}
                             />
                           </div>
-
+                          <div className="space-y-2">
+                            <Label>Ledger Folio Number</Label>
+                            <Input
+                              value={newMember.ledgerFolioNumber}
+                              onChange={(e) =>
+                                setNewMember({ ...newMember, ledgerFolioNumber: e.target.value })
+                              }
+                              readOnly={fieldsReadOnly}
+                              className={fieldsReadOnly ? "bg-muted" : ""}
+                            />
+                          </div>
                         </div>
+                        <div className="space-y-2"></div>
+                        
                       </div>
                     </TabsContent>
 
@@ -1946,6 +1957,72 @@ export default function MembersPage() {
                           className={fieldsReadOnly ? "bg-muted" : ""}
                         />
                       </div>
+                      {/* <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="house_no">House Number</Label>
+                            <Input
+                              id="house_no"
+                              placeholder="House Number"
+                              value={newMember.house_no}
+                              onChange={(e) =>
+                                setNewMember({ ...newMember, house_no: e.target.value })
+                              }
+                              readOnly={fieldsReadOnly}
+                              className={fieldsReadOnly ? "bg-muted" : ""}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="street">Street</Label>
+                            <Input
+                              id="street"
+                              placeholder="Street"
+                              value={newMember.street}
+                              onChange={(e) =>
+                                setNewMember({ ...newMember, street: e.target.value })
+                              }
+                              readOnly={fieldsReadOnly}
+                              className={fieldsReadOnly ? "bg-muted" : ""}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="village">Village *</Label>
+                          <Input
+                            id="village"
+                            placeholder="Village"
+                            value={newMember.village}
+                            onChange={(e) =>
+                              setNewMember({ ...newMember, village: e.target.value })
+                            }
+                            readOnly={fieldsReadOnly}
+                            className={fieldsReadOnly ? "bg-muted" : ""}
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="taluk">Taluk *</Label>
+                          <Input
+                            id="taluk"
+                            placeholder="Taluk"
+                            value={newMember.taluk}
+                            onChange={(e) =>
+                              setNewMember({ ...newMember, taluk: e.target.value })
+                            }
+                            readOnly={fieldsReadOnly}
+                            className={fieldsReadOnly ? "bg-muted" : ""}
+                          />
+                        </div>
+                        <div className="space-y-2"></div>
+                        <div className="space-y-2"></div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-2"></div>
+                        <div className="space-y-2"></div>
+                        <div className="space-y-2"></div>
+                      </div> */}
+                    </TabsContent>
+                    <TabsContent value="kyc">
+                        
                     </TabsContent>
                   </Tabs>
 
