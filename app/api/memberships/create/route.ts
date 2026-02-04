@@ -67,7 +67,7 @@ export async function POST(req: Request) {
     let prefix: string
     let seqColumn: string
 
-    if (member_type === "Associate") {
+    if (member_type === "member") {
       membershipClass = "A"
       prefix = "01"
       seqColumn = "a_last_number"

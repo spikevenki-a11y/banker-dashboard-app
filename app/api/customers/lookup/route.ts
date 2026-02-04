@@ -23,8 +23,11 @@ export async function POST(req: Request) {
           c.full_name,
           c.father_name,
           c.gender,
-          c.date_of_birth,
+          TO_CHAR(c.date_of_birth, 'YYYY-MM-DD') AS date_of_birth,
           c.customer_type,
+          c.spouse_name,
+          c.mobile_no,
+          c.email,
 
           -- Address
           ca.house_no,

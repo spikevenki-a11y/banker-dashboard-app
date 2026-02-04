@@ -78,29 +78,40 @@ export async function POST(req: Request) {
       batchId = batch.last_batch_id
     }
     /* ---------------- VOUCHER NO ---------------- */
-    const { rows: [voucher] } = await client.query(`
-      INSERT INTO voucher_sequences (branch_id, business_date, last_voucher_no)
-      VALUES ($1, $2, 1)
-      ON CONFLICT (branch_id, business_date)
-      DO UPDATE SET last_voucher_no = voucher_sequences.last_voucher_no + 1
-      RETURNING last_voucher_no
-    `, [u.branch, businessDate])
-    const voucherNo = voucher.last_voucher_no
+    let voucherNo = 0
+     if (selectedBatch && selectedBatch == 0) {
+      const { rows: [voucher] } = await client.query(`
+        INSERT INTO voucher_sequences (branch_id, business_date, last_voucher_no)
+        VALUES ($1, $2, 1)
+        ON CONFLICT (branch_id, business_date)
+        DO UPDATE SET last_voucher_no = voucher_sequences.last_voucher_no + 1
+        RETURNING last_voucher_no
+      `, [u.branch, businessDate])
+      voucherNo = voucher.last_voucher_no
+     } else {
+      const { rows: [lvo] } = await client.query(`
+          select voucher_id from gl_batches
+          where branch_id = $1 and batch_id = $2
+      `, [u.branch, batchId])
+        voucherNo = lvo.voucher_id
+     }
 
     /* ---------------- GL BATCH ---------------- */
-    await client.query(`
-      INSERT INTO gl_batches (
-        business_date,
-        branch_id,
-        batch_id,
-        voucher_id,
-        voucher_type,
-        maker_id,
-        status
-      ) VALUES (
-        $1,$2,$3,$4,$5,$6,'PENDING'
-      )
-    `, [businessDate,u.branch, batchId, voucherNo, voucher_type, u.userId])
+    if (selectedBatch && selectedBatch == 0) {
+      await client.query(`
+        INSERT INTO gl_batches (
+          business_date,
+          branch_id,
+          batch_id,
+          voucher_id,
+          voucher_type,
+          maker_id,
+          status
+        ) VALUES (
+          $1,$2,$3,$4,$5,$6,'PENDING'
+        )
+      `, [businessDate,u.branch, batchId, voucherNo, voucher_type, u.userId])
+    }
 
     /* ---------------- GL LINES ---------------- */
     // DR Cash / Bank

@@ -445,7 +445,7 @@ export default function CustomerPage() {
                                         onChange={(e) => setNewCustomer({ ...newCustomer, anual_income: e.target.value })}
                                     />
                                     </div>
-                                    <div className="space-y-2">
+                                    {/* <div className="space-y-2">
                                     <Label htmlFor="board_resolution_number">Board Resolution Number</Label>
                                     <Input
                                         id="board_resolution_number"
@@ -462,10 +462,10 @@ export default function CustomerPage() {
                                         value={newCustomer.board_resolution_date}
                                         onChange={(e) => setNewCustomer({ ...newCustomer, board_resolution_date: e.target.value })}
                                     />
-                                    </div>
+                                    </div> */}
                                 </div>
 
-                                <div className="grid grid-cols-5 gap-8 space-y-2">
+                                {/* <div className="grid grid-cols-5 gap-8 space-y-2">
                                     <div className="space-y-2">
                                         <Label htmlFor="ledger_folio_number">Ledger Folio Number</Label>
                                         <Input
@@ -475,7 +475,7 @@ export default function CustomerPage() {
                                             onChange={(e) => setNewCustomer({ ...newCustomer, ledger_folio_number: e.target.value })}
                                         />
                                     </div>
-                                </div>
+                                </div> */}
                         </div>
                       
                       
