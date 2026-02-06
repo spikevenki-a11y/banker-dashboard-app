@@ -23,6 +23,14 @@ export default function SavingsOpenAccountPage() {
                               className="border"
                             />
                     </div>
+                    <div className="space-y-2 px-5 ">
+                        <Label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Address</Label>
+                        <input
+                              id="MemberAddress"
+                              placeholder=""
+                              className="border"
+                            />
+                    </div>
                 </div>
                 {/* Form for opening a savings account */}
             </div>
