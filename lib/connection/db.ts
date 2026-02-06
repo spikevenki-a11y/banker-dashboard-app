@@ -3,7 +3,7 @@ import { Pool } from "pg";
 
 const pool = new Pool({
   host: process.env.POSTGRES_HOST, // *.supabase.com
-  port: 5432,               // ← hardcoded
+  port: 6543,               // ← hardcoded
   database: "postgres",
   user: process.env.POSTGRES_USER,
   password: process.env.POSTGRES_PASSWORD,
