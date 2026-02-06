@@ -63,15 +63,51 @@ import { useRouter } from "next/navigation";
 
 
 
-type Member = {
+type Member1 = {
   id: string
-  member_id: string
+  membership_no: string
   full_name: string
+  father_name: string
+  email: string
+  phone_no: string
+  address: string
+  member_type: string
+  account_balance: number
+  status: string
+  joined_date: string
+  branch_id: number
+}
+
+
+type Member = {
+  aadhaar_no: string
+  customer_code?: string
+  full_name: string
+  father_name?: string
+  gender : string
+  customer_type? : string 
+  house_no? : string 
+  street? : string 
+  village? : string 
+  thaluk? : string 
+  district? : string 
+  state? : string 
+  pincode? : string
   email: string
   phone: string
   address: string
   member_type: string
-  account_balance: number
+  date_of_birth: string
+  dob?: string
+  pan_no?: string
+  ration_no?: string
+  driving_license_no?: string
+  id_type: string
+  id_number: string
+  spouse_Name?: string
+  board_resolution_number?: string
+  boardResolutionDate?: string
+  ledger_folio_number?: string
   status: string
   joined_date: string
   branch_id: number
@@ -85,6 +121,10 @@ type searchMemberData = {
 }
 
 type NewMemberForm = {
+  spouse_name: string | number | readonly string[] | undefined
+  boardresolutiondate: string | number | readonly string[] | undefined
+  board_resolution_number: string | number | readonly string[] | undefined
+  ledger_folio_number: string | number | readonly string[] | undefined
   aadhaar_no: string
   customer_code?: string
   full_name: string
@@ -155,6 +195,10 @@ export default function MembersPage() {
     id_number: "",
     spouseName: "",
     boardResolutionNumber: "",
+    spouse_name: "",
+    boardresolutiondate: "",
+    board_resolution_number: "",
+    ledger_folio_number: "",
   })
   const [newSearchMember, setNewSearchMember] = useState<searchMemberData>({
     member_name: "",
@@ -306,6 +350,10 @@ export default function MembersPage() {
         dob: "",
         id_type: "",
         id_number: "",
+        spouse_name: "",
+        boardresolutiondate: "",
+        board_resolution_number: "",
+        ledger_folio_number: "",
       })
       setFieldsReadOnly(true)
       setMemberFieldsReadOnly(true)
@@ -541,11 +589,26 @@ export default function MembersPage() {
       if (!res.ok) throw new Error(data.error)
 
       console.log("Member search response:", data.memberData)
+      if (data.found && data.memberData) {
+        setMembers(data.memberData ?? [])
+        
+      } else {
+        setIsCustomerNotFoundOpen(true)
+      }
 
 
     }catch(err: any){
 
     }
+  }
+  const setFeildsNewSearchMember = (member: any) => {
+    setNewSearchMember({
+      ...newSearchMember,
+      member_name: member.full_name || "",
+      member_id: member.membershipno || "",
+      email: member.email || "",
+      phone: member.phone_no || "",
+    })
   }
 
   
@@ -702,7 +765,7 @@ export default function MembersPage() {
                 </CardContent>
               </Card>
 
-              <Card
+              {/* <Card
                 className="cursor-pointer transition-all hover:shadow-lg hover:border-red-500"
                 onClick={() => setActiveAction("membership-closure")}
               >
@@ -715,7 +778,7 @@ export default function MembersPage() {
                   <CardTitle className="text-lg">Membership Closure</CardTitle>
                   <CardDescription className="mt-1">Close member account</CardDescription>
                 </CardContent>
-              </Card>
+              </Card> */}
             </div>
 
             <Card>
@@ -1209,6 +1272,10 @@ export default function MembersPage() {
                         dob: "",
                         id_type: "",
                         id_number: "",
+                        spouse_name: "",
+                        boardresolutiondate: "",
+                        board_resolution_number: "",
+                        ledger_folio_number: "",
                       })
                       setFieldsReadOnly(true)
                     }}
@@ -1388,9 +1455,9 @@ export default function MembersPage() {
                           <div className="space-y-2">
                               <Label>Spouse Name</Label>
                               <Input
-                                value={newMember.spouseName}
+                                value={newMember.spouse_name}
                                 onChange={(e) =>
-                                  setNewMember({ ...newMember, spouseName: e.target.value })
+                                  setNewMember({ ...newMember, spouse_name: e.target.value })
                                 }
                                 readOnly={fieldsReadOnly}
                                 className={fieldsReadOnly ? "bg-muted" : ""}
@@ -1402,19 +1469,19 @@ export default function MembersPage() {
                           <div className="space-y-2">
                             <Label>Board Resolution Number</Label>
                             <Input
-                              value={newMember.boardResolutionNumber}
+                              value={newMember.board_resolution_number}
                               onChange={(e) =>
-                                setNewMember({ ...newMember, boardResolutionNumber: e.target.value })
+                                setNewMember({ ...newMember, board_resolution_number: e.target.value })
                               }
                               readOnly={fieldsReadOnly}
                               className={fieldsReadOnly ? "bg-muted" : ""}
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label>Board Resolution Date</Label>
+                            <Label>Board Resolution Date venki</Label>
                             <Input
+                              value={newMember.boardresolutiondate}
                               type="date"
-                              value={newMember.boardResolutionDate}
                               onChange={(e) =>
                                 setNewMember({ ...newMember, boardResolutionDate: e.target.value })
                               }
@@ -1423,11 +1490,23 @@ export default function MembersPage() {
                             />
                           </div>
                           <div className="space-y-2">
+                            <Label>Date of Birth</Label>
+                            <Input
+                              value={newMember.date_of_birth}
+                              type="date"
+                              onChange={(e) =>
+                                setNewMember({ ...newMember, dob: e.target.value })
+                              }
+                              readOnly={fieldsReadOnly}
+                              className={fieldsReadOnly ? "bg-muted" : ""}
+                            />
+                          </div>
+                          <div className="space-y-2">
                             <Label>Ledger Folio Number</Label>
                             <Input
-                              value={newMember.ledgerFolioNumber}
+                              value={newMember.ledger_folio_number}
                               onChange={(e) =>
-                                setNewMember({ ...newMember, ledgerFolioNumber: e.target.value })
+                                setNewMember({ ...newMember, ledger_folio_number: e.target.value })
                               }
                               readOnly={fieldsReadOnly}
                               className={fieldsReadOnly ? "bg-muted" : ""}
@@ -1446,7 +1525,7 @@ export default function MembersPage() {
                         <Input
                           id="address"
                           placeholder="123 Main St, City, State ZIP"
-                          value={newMember.address}
+                          value={newMember.house_no +","+newMember.street+","+newMember.village+","+newMember.thaluk+","+newMember.district+","+newMember.state+","+newMember.pincode}
                           onChange={(e) =>
                             setNewMember({ ...newMember, address: e.target.value })
                           }
@@ -1513,7 +1592,7 @@ export default function MembersPage() {
               </AlertDialogContent>
             </AlertDialog>
 
-            <Dialog open={!!selectedMember} onOpenChange={() => setSelectedMember(null)}>
+            {/* <Dialog open={!!selectedMember} onOpenChange={() => setSelectedMember(null)}>
               <DialogContent className="max-w-3xl">
                 <DialogHeader>
                   <DialogTitle>Member Details</DialogTitle>
@@ -1545,7 +1624,7 @@ export default function MembersPage() {
                           </div>
                           <div>
                             <Label className="text-muted-foreground">Phone</Label>
-                            <p className="font-medium">{selectedMember.phone}</p>
+                            <p className="font-medium">{selectedMember.phone_no}</p>
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
@@ -1595,7 +1674,7 @@ export default function MembersPage() {
                   </Tabs>
                 )}
               </DialogContent>
-            </Dialog>
+            </Dialog> */}
 
             <Dialog open={activeAction === "share-deposit"} onOpenChange={() => {
               resetShareTransactionForm()
@@ -1920,6 +1999,7 @@ export default function MembersPage() {
                         <TableRow>
                           <TableHead>Member ID</TableHead>
                           <TableHead>Name</TableHead>
+                          <TableHead>Father Name</TableHead>
                           <TableHead>Phone</TableHead>
                           <TableHead>Type</TableHead>
                           <TableHead className="text-right">Action</TableHead>
@@ -1932,15 +2012,17 @@ export default function MembersPage() {
                             return (
                               !query ||
                               member.full_name?.toLowerCase().includes(query) ||
-                              member.member_id?.toLowerCase().includes(query) ||
-                              member.phone?.toLowerCase().includes(query)
+                              member.membership_no?.toLowerCase().includes(query) ||
+                              member.phone_no?.toLowerCase().includes(query)
                             )
                           })
                           .map((member) => (
-                            <TableRow key={member.id} className="cursor-pointer hover:bg-muted/50">
-                              <TableCell className="font-medium">{member.member_id}</TableCell>
+                            
+                            <TableRow key={member.membership_no} className="cursor-pointer hover:bg-muted/50">
+                              <TableCell className="font-medium">{member.membership_no}</TableCell>
                               <TableCell>{member.full_name}</TableCell>
-                              <TableCell>{member.phone || "—"}</TableCell>
+                              <TableCell>{member.father_name}</TableCell>
+                              <TableCell>{member.phone_no || "—"}</TableCell>
                               <TableCell>
                                 <Badge variant="outline">{member.member_type}</Badge>
                               </TableCell>
@@ -1948,8 +2030,11 @@ export default function MembersPage() {
                                 <Button
                                   size="sm"
                                   onClick={() => {
-                                    setSelectedShareDepositMember(member)
-                                    setShareDepositMemberNo(member.member_id)
+                                    setNewMember(member)
+                                    console.log("Selected member for share deposit:", member)
+                                    // setSelectedMember(member),
+                                    // setSelectedShareDepositMember(member)
+                                    setShareDepositMemberNo(member.membership_no)
                                     setIsMemberSearchOpen(false)
                                     setMemberSearchQuery("")
                                   }}

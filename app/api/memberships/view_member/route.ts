@@ -20,7 +20,9 @@ export async function POST(req: Request) {
             m.member_type,
             m.membership_no,
             m.ledger_folio_number ,
-            m.join_date ,
+            m.board_resolution_number,
+            
+            TO_CHAR(m.join_date, 'YYYY-MM-DD') AS boardResolutionDate ,
             m.status,
 
             c.full_name ,

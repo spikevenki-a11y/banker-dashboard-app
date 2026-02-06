@@ -20,6 +20,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Search, ArrowUpRight, ArrowDownRight, Eye, TrendingUp, Wallet,LockKeyhole,UserX } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { DashboardWrapper } from "../_components/dashboard-wrapper"
+import { useRouter } from "next/navigation";
+import router from "next/router"
 
 type SavingsAccount = {
   id: string
@@ -158,6 +160,9 @@ export default function SavingsPage() {
     .filter((acc) => acc.status === "dormant")
     .reduce((sum, acc) => sum + Number.parseFloat(acc.balance.replace(/[₹,]/g, "")), 0)
 
+  
+  const router = useRouter();
+
   return (
     <DashboardWrapper>
     <div className="flex h-screen overflow-hidden">
@@ -170,8 +175,9 @@ export default function SavingsPage() {
               <h1 className="text-3xl font-bold tracking-tight text-foreground">Savings Accounts</h1>
               <p className="text-muted-foreground">Manage deposits, withdrawals, and account balances</p>
             </div>
-            <Button onClick={() => setIsOpenAccountOpen(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
+            <Button onClick={() => router.push("/savings/open_account")}
+                            className="gap-2">
+                            <Plus className="h-4 w-4" />
               Open Account
             </Button>
           </div>
