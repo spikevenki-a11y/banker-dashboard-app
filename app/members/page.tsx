@@ -253,14 +253,13 @@ export default function MembersPage() {
   }, [])
 
 
-  // useEffect(
-  //   ()=> {
-  // const resData = fetch("/api/configs")
-  // .then(res => res.json())
-  // .then(setMembers);
-  // console.log("Fetched members data:", resData);
-  //   }, []
-  // )
+    useEffect(
+      ()=> {
+    const resData = fetch("/api/debug-db")
+    .then(res => res.json());
+    console.log("Fetched /api/debug-db data:", resData);
+      }, []
+    )
   useEffect(() => {
     if (!user) return
 
