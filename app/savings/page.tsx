@@ -17,7 +17,8 @@ import {
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Search, ArrowUpRight, ArrowDownRight, Eye, TrendingUp, Wallet,LockKeyhole,UserX } from "lucide-react"
+import { Plus, Search, ArrowUpRight, ArrowDownRight, Eye, TrendingUp, Wallet, LockKeyhole, UserX } from "lucide-react"
+import Link from "next/link"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { DashboardWrapper } from "../_components/dashboard-wrapper"
 
@@ -170,10 +171,12 @@ export default function SavingsPage() {
               <h1 className="text-3xl font-bold tracking-tight text-foreground">Savings Accounts</h1>
               <p className="text-muted-foreground">Manage deposits, withdrawals, and account balances</p>
             </div>
-            <Button onClick={() => setIsOpenAccountOpen(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Open Account
-            </Button>
+            <Link href="/savings/open_account">
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                Open Account
+              </Button>
+            </Link>
           </div>
 
           <div className="mb-6 grid gap-4 md:grid-cols-3">
