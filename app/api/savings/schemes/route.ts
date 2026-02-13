@@ -8,7 +8,7 @@ export async function GET() {
 
   try {
     const session = JSON.parse(c.value)
-    const branchId = session.branch_id
+    const branchId = session.branch
 
     const { rows } = await pool.query(
       `SELECT scheme_id, scheme_name, scheme_description, interest_rate, min_balance, 
@@ -16,7 +16,7 @@ export async function GET() {
               interest_calculation_method, scheme_status, minimum_age, maximum_age,
               is_staff_only, savings_gl_account
        FROM savings_schemes 
-       WHERE branch_id = $1 AND scheme_status = 'Active'
+       WHERE branch_id = $1 AND scheme_status = 'ACTIVE'
        ORDER BY scheme_id`,
       [branchId]
     )
