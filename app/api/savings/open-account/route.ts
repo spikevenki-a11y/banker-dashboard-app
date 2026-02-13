@@ -10,7 +10,7 @@ export async function POST(req: Request) {
 
   try {
     const session = JSON.parse(c.value)
-    const branchId = session.branch_id
+    const branchId = session.branch
     const { membership_no, scheme_id, opening_date, initial_deposit, nominee_name, nominee_relation } = await req.json()
 
     if (!membership_no || !scheme_id || !opening_date) {
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     // Get scheme details
     const schemeResult = await client.query(
       `SELECT scheme_id, interest_rate, savings_gl_account, min_balance, minimum_deposit
-       FROM savings_schemes WHERE scheme_id = $1 AND branch_id = $2 AND scheme_status = 'Active'`,
+       FROM savings_schemes WHERE scheme_id = $1 AND branch_id = $2 AND scheme_status = 'ACTIVE'`,
       [scheme_id, branchId]
     )
 
@@ -35,25 +35,27 @@ export async function POST(req: Request) {
 
     // Generate account number (branch_id + scheme_id + sequence)
     const seqResult = await client.query(
-      `SELECT COALESCE(MAX(CAST(SUBSTRING(account_number FROM 8) AS INTEGER)), 0) + 1 as next_seq
+      `SELECT COALESCE(MAX(CAST(SUBSTRING(account_number FROM 11) AS INTEGER)), 0) + 1 as next_seq
        FROM savings_accounts WHERE branch_id = $1`,
       [branchId]
     )
     const nextSeq = seqResult.rows[0].next_seq
-    const accountNumber = `SB${String(branchId).padStart(3, '0')}${String(scheme_id).padStart(2, '0')}${String(nextSeq).padStart(5, '0')}`
-
+    console.log(nextSeq)
+    const accountNumber = `${String(branchId).padStart(3, '0')}${String(1).padStart(2, '0')}${String(nextSeq).padStart(6, '0')}`
+    console.log(accountNumber)
     // Insert savings account
     const insertResult = await client.query(
       `INSERT INTO savings_accounts (
         account_number, branch_id, membership_no, scheme_id, 
         opening_date, interest_rate, available_balance, clear_balance, unclear_balance,
         account_status, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, 0, 'Active', NOW(), NOW())
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, 0, 'ACTIVE', NOW(), NOW())
       RETURNING id, account_number`,
       [accountNumber, branchId, membership_no, scheme_id, opening_date, scheme.interest_rate, initial_deposit || 0]
     )
 
     await client.query("COMMIT")
+    console.log(insertResult.rows[0].account_number)
 
     return NextResponse.json({
       success: true,
