@@ -40,9 +40,7 @@ export async function POST(req: Request) {
       [branchId]
     )
     const nextSeq = seqResult.rows[0].next_seq
-    console.log(nextSeq)
     const accountNumber = `${String(branchId).padStart(3, '0')}${String(1).padStart(2, '0')}${String(nextSeq).padStart(6, '0')}`
-    console.log(accountNumber)
     // Insert savings account
     const insertResult = await client.query(
       `INSERT INTO savings_accounts (
@@ -55,7 +53,6 @@ export async function POST(req: Request) {
     )
 
     await client.query("COMMIT")
-    console.log(insertResult.rows[0].account_number)
 
     return NextResponse.json({
       success: true,
