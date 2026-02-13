@@ -287,7 +287,7 @@ export default function ViewModifyAccountPage() {
                                 <Label className="text-xs text-muted-foreground">Account Status</Label>
                                 {isEditing ? (
                                   <Select value={editStatus} onValueChange={setEditStatus}>
-                                    <SelectTrigger className="mt-1 h-8">
+                                    <SelectTrigger className="mt-1 h-8 w-50">
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
