@@ -45,7 +45,7 @@ create table savings_accounts (
   branch_id bigint not null references branchparameters(branch_id),
   scheme_id integer not null references savings_schemes(scheme_id),
   opening_date date not null,
-  membership_no integer not null references memberships(membership_no),
+  membership_no bigint not null references memberships(membership_no),
   account_number varchar(20) unique not null,
   available_balance numeric(12, 2) not null default 0.00,
   clear_balance numeric(12, 2) not null default 0.00,
