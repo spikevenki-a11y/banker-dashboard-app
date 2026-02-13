@@ -1,41 +1,35 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { Members } from '@/lib/types';
-import { useState, useEffect } from "react"
-import { useAuth } from "@/lib/auth-context"
-import { createClient } from "@/lib/supabase/client"
+import { NextRequest, NextResponse } from "next/server"
+import pool from "@/lib/connection/db"
+import { getSession } from "@/lib/auth/session"
 
 export async function GET(request: NextRequest) {
-    try {
-        // TODO: Replace with your actual data source (database, external API, etc.)
+  try {
+    const session = await getSession()
 
-        
-        const [members, setMembers] = useState<Members[]>([])
-        
-        const supabase = createClient()
-        const { user } = useAuth()
-        let query = supabase.from("members").select("*")
+    let query = "SELECT * FROM members"
+    const params: (string | number)[] = []
 
-        if (user?.role !== "admin" && user?.branch) {
-          const branchId = typeof user.branch === "string" ? Number.parseInt(user.branch) : user.branch
-          if (!isNaN(branchId)) {
-            query = query.eq("branch_id", branchId)
-          }
-        }
-
-        const { data, error } = await query
-
-        if (error) {
-          console.error("[v0] Error loading members:", error)
-        } else {
-          console.log("[v0] Fetched members:", data)
-          setMembers(data || [])
-        }
-
-        return NextResponse.json(members, { status: 200 });
-    } catch (error) {
-        return NextResponse.json(
-            { error: 'Failed to fetch members' },
-            { status: 500 }
-        );
+    if (session?.role !== "admin" && session?.branch) {
+      const branchId =
+        typeof session.branch === "string"
+          ? Number.parseInt(session.branch)
+          : session.branch
+      if (!isNaN(branchId)) {
+        query += " WHERE branch_id = $1"
+        params.push(branchId)
+      }
     }
+
+    query += " ORDER BY joined_date DESC"
+
+    const { rows } = await pool.query(query, params)
+
+    return NextResponse.json(rows, { status: 200 })
+  } catch (error) {
+    console.error("Failed to fetch members:", error)
+    return NextResponse.json(
+      { error: "Failed to fetch members" },
+      { status: 500 }
+    )
+  }
 }
