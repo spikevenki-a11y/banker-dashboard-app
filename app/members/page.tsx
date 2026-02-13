@@ -1,3 +1,4 @@
+
 "use client"
 
 import { Badge } from "@/components/ui/badge"
@@ -13,6 +14,9 @@ import { TableRow } from "@/components/ui/table"
 import { TableHeader } from "@/components/ui/table"
 
 import { Table } from "@/components/ui/table"
+
+import { Camera, PenTool } from "lucide-react"
+
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/auth-context"
@@ -53,13 +57,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Checkbox } from "@/components/ui/checkbox"
+import { useRouter } from "next/navigation";
+// import router, { useRouter } from "next/router"
 
-type Member = {
+
+
+
+type Member1 = {
   id: string
-  member_id: string
+  membership_no: string
   full_name: string
+  father_name: string
   email: string
-  phone: string
+  phone_no: string
   address: string
   member_type: string
   account_balance: number
@@ -68,54 +79,86 @@ type Member = {
   branch_id: number
 }
 
-type NewMemberForm = {
+
+type Member = {
   aadhaar_no: string
   customer_code?: string
   full_name: string
   father_name?: string
+  gender : string
+  customer_type? : string 
+  house_no? : string 
+  street? : string 
+  village? : string 
+  thaluk? : string 
+  district? : string 
+  state? : string 
+  pincode? : string
   email: string
   phone: string
   address: string
   member_type: string
-  dob: string
+  date_of_birth: string
+  dob?: string
+  pan_no?: string
+  ration_no?: string
+  driving_license_no?: string
   id_type: string
   id_number: string
+  spouse_Name?: string
+  board_resolution_number?: string
+  boardResolutionDate?: string
+  ledger_folio_number?: string
+  status: string
+  joined_date: string
+  branch_id: number
+}
+type searchMemberData = {
+  member_name : string
+  father_name : string
+  phone_number : string
+  aadhaar_number : string
+  ledger_folio_number : string
 }
 
-type NewCustomerForm = {
-  gender: string | undefined
-  state: string | number | readonly string[] | undefined
-  district: string | number | readonly string[] | undefined
-  taluk: string | number | readonly string[] | undefined
-  village: string | number | readonly string[] | undefined
-  address2: string | number | readonly string[] | undefined
-  address1: string | number | readonly string[] | undefined
-  aadhar_id: string | number | readonly string[] | undefined
-  pan_card_number: string | number | readonly string[] | undefined
+type NewMemberForm = {
+  spouse_name: string | number | readonly string[] | undefined
+  boardresolutiondate: string | number | readonly string[] | undefined
+  board_resolution_number: string | number | readonly string[] | undefined
+  ledger_folio_number: string | number | readonly string[] | undefined
+  aadhaar_no: string
+  customer_code?: string
   full_name: string
   father_name?: string
+  gender : string
+  customer_type? : string 
+  house_no? : string 
+  street? : string 
+  village? : string 
+  thaluk? : string 
+  district? : string 
+  state? : string 
+  pincode? : string
   email: string
   phone: string
-  dob: string
-}
-const emptyCustomer = {
-  full_name: "",
-  father_name: "",
-  gender: "M",
-  dob: "",
-  aadhar_id: "",
-  pan_card_number: "",
-  phone: "",
-  email: "",
-  address1: "",
-  address2: "",
-  village: "",
-  taluk: "",
-  district: "",
-  state: "Tamil Nadu",
+  address: string
+  member_type: string
+  date_of_birth: string
+  dob?: string
+  pan_no?: string
+  ration_no?: string
+  driving_license_no?: string
+  id_type: string
+  id_number: string
+  spouseName?: string
+  boardResolutionNumber?: string
+  boardResolutionDate?: string
+  ledgerFolioNumber?: string
 }
 
+
 export default function MembersPage() {
+  // const router = useRouter()
   const { user } = useAuth()
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
@@ -127,6 +170,7 @@ export default function MembersPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSearching, setIsSearching] = useState(false)
   const [isCustomerNotFoundOpen, setIsCustomerNotFoundOpen] = useState(false)
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [fieldsReadOnly, setFieldsReadOnly] = useState(true)
   const [memberFieldsReadOnly, setMemberFieldsReadOnly] = useState(true)
   const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false)
@@ -135,92 +179,134 @@ export default function MembersPage() {
   const [memberSearchQuery, setMemberSearchQuery] = useState("")
   const [selectedShareDepositMember, setSelectedShareDepositMember] = useState<Member | null>(null)
   const [shareDepositMemberNo, setShareDepositMemberNo] = useState("")
-  const [newCustomer, setNewCustomer] = useState<NewCustomerForm>({
-    full_name: "",
-    father_name: "",
-    email: "",
-    phone: "",
-    address1: "",
-    address2: "",
-    dob: "",
-    aadhar_id: "",
-    pan_card_number: "",
-    district: "",
-    state: "",
-    taluk: "",
-    village: "",
-    gender: "",
-  })
+  
 
   const [newMember, setNewMember] = useState<NewMemberForm>({
     aadhaar_no: "",
     customer_code: "",
     full_name: "",
     father_name: "",
+    gender : "",
     email: "",
     phone: "",
     address: "",
-    member_type: "Nominal",
-    dob: "",
+    member_type: "member",
+    date_of_birth: "",
     id_type: "",
     id_number: "",
+    spouseName: "",
+    boardResolutionNumber: "",
+    spouse_name: "",
+    boardresolutiondate: "",
+    board_resolution_number: "",
+    ledger_folio_number: "",
+  })
+  const [newSearchMember, setNewSearchMember] = useState<searchMemberData>({
+    member_name: "",
+    father_name: "",
+    phone_number: "",
+    aadhaar_number: "",
+    ledger_folio_number: ""
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
-  // useEffect(
-  //   ()=> {
-  // const resData = fetch("/api/configs")
-  // .then(res => res.json())
-  // .then(setMembers);
-  // console.log("Fetched members data:", resData);
-  //   }
-  // )
+  const [currentShareBalance, setCurrentShareBalance] = useState<number | null>(null)
+  const [isFetchingMember, setIsFetchingMember] = useState(false)
+  const [memberFetchError, setMemberFetchError] = useState<string | null>(null)
+  const [voucherType, setVoucherType] = useState<"CASH" | "TRANSFER" | "">("")
+  const [shareAmount, setShareAmount] = useState("")
+  const [particulars, setParticulars] = useState("")
+  const [isSaving, setIsSaving] = useState(false)
+  const [transactionType, setTransactionType] = useState("Share Deposit")
+  const [formError, setFormError] = useState<string | null>(null)
+  const [selectedBatch, setSelectedBatch] = useState< number | 0>(0)
+  const [isBatchPopupOpen, setIsBatchPopupOpen] = useState(false)
+  const [incompleteBatches, setIncompleteBatches] = useState<any[]>([])
+  const [identity, setIdentity] = useState<{ businessDate?: string } | null>(null)
+  const [photo, setPhoto] = useState<File | null>(null)
+  const [signature, setSignature] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [memberPreview, setMemberPreview] = useState<string | null>(null)
+  const [signaturePreview, setSignaturePreview] = useState<string | null>(null)
+  const [sameAsPermanent, setSameAsPermanent] = useState(false)
+  const router = useRouter();
+
+
   useEffect(() => {
+    if (!photo) return
+    const url = URL.createObjectURL(photo)
+    setPhotoPreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [photo])
+
+  useEffect(() => {
+    if (!signature) return
+    const url = URL.createObjectURL(signature)
+    setSignaturePreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [signature])
+
+
+
+  useEffect(() => {
+    fetch("/api/auth/identity", { credentials: "include" })
+      .then(r => r.json())
+      .then(setIdentity)
+  }, [])
+
+
+    useEffect(
+      ()=> {
+    const resData = fetch("/api/debug-db")
+    .then(res => res.json());
+    console.log("Fetched /api/debug-db data:", resData);
+      }, []
+    )
+  useEffect(() => {
+    if (!user) return
+
+    let isActive = true // prevent state update after unmount
+
     const loadMembers = async () => {
       setIsLoading(true)
-      const supabase = createClient()
-
-      const res = await fetch("/api/configs")
-
-      const resData = await res.json()
-      console.log("Pool Fetched members data:", resData[0])
-      // console.log("Pool Fetched members data:", resData[0].nextvalue);
 
       try {
-        // const response = await fetch("/api/banker/members", {
-        //           method: "POST",
-        //           headers: { "Content-Type": "application/json" },
-        //           body: JSON.stringify({ }),
-        //         })
-        // const data = await response.json()
-        // setMembers(data.data || [])
-        let query = supabase.from("members").select("*")
+        console.log("Loading members...")
+        const response = await fetch("/api/memberships/loadmember", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
 
-        if (user?.role !== "admin" && user?.branch) {
-          const branchId = typeof user.branch === "string" ? Number.parseInt(user.branch) : user.branch
-          if (!isNaN(branchId)) {
-            query = query.eq("branch_id", branchId)
-          }
+        const data = await response.json()
+
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || "Failed to load members")
         }
 
-        const { data, error } = await query
-        console.log("the data is ", data)
-        if (error) {
-          console.error("[v0] Error loading members:", error)
-        } else {
-          console.log("[v0] Fetched members:", data)
-          setMembers(data || [])
+        if (isActive) {
+          setMembers(data.data ?? [])
         }
       } catch (error) {
-        console.error("[v0] Failed to load members:", error)
+        console.error("[Members] Load failed:", error)
+        if (isActive) {
+          setMembers([])
+        }
       } finally {
-        setIsLoading(false)
+        if (isActive) {
+          setIsLoading(false)
+        }
       }
     }
 
-    if (user) {
-      loadMembers()
+    loadMembers()
+
+    return () => {
+      isActive = false
     }
   }, [user])
+
 
   const generateMemberId = () => {
     const maxId = members.reduce((max, member) => {
@@ -232,7 +318,7 @@ export default function MembersPage() {
 
   const handleEnrollMember = async () => {
     setIsSubmitting(true)
-    console.log(JSON.stringify(newCustomer))
+    console.log(JSON.stringify(newMember))
     try {
       const res = await fetch("/api/memberships/create", {
         method: "POST",
@@ -255,13 +341,19 @@ export default function MembersPage() {
         customer_code: "",
         full_name: "",
         father_name: "",
+        gender: "",
         email: "",
         phone: "",
         address: "",
-        member_type: "Nominal",
+        member_type: "member",
+        date_of_birth: "",
         dob: "",
         id_type: "",
         id_number: "",
+        spouse_name: "",
+        boardresolutiondate: "",
+        board_resolution_number: "",
+        ledger_folio_number: "",
       })
       setFieldsReadOnly(true)
       setMemberFieldsReadOnly(true)
@@ -272,30 +364,6 @@ export default function MembersPage() {
       setIsSubmitting(false)
     }
   }
-  const handleCreateCustomer = async () => {
-    setIsSubmitting(true)
-    console.log(JSON.stringify(newCustomer))
-    try {
-      const res = await fetch("/api/customers/create", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newCustomer),
-      })
-
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-
-      alert("Customer created : " + data.customer_code)
-      setNewCustomer(emptyCustomer)
-      setIsCustomerAddDialogOpen(false)
-    } catch (e: any) {
-      console.log(e.message)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
   const handleAadhaarSearch = async () => {
     if (!newMember.aadhaar_no || newMember.aadhaar_no.length < 12) {
       alert("Please enter a valid 12-digit Aadhaar number")
@@ -311,25 +379,39 @@ export default function MembersPage() {
       })
 
       const data = await response.json()
+      console.log("Aadhaar lookup response:", data)
 
       if (data.found && data.customer) {
         const customer = data.customer
         setNewMember({
           ...newMember,
           customer_code: customer.customer_code,
+          customer_type: customer.customer_type || "",
           full_name: customer.full_name || "",
           father_name: customer.father_name || "",
+          gender: customer.gender || "",
           email: customer.email || "",
           phone: customer.mobile_no || "",
-          dob: customer.date_of_birth || "",
-          address:
-            `${customer.address_line1 || ""} ${customer.address_line2 || ""}, ${customer.village || ""}, ${customer.taluk || ""}, ${customer.district || ""}, ${customer.state || ""}`.trim(),
+          date_of_birth: customer.date_of_birth|| "",
+          spouseName: customer.spouse_name || "",
+          house_no: customer.house_no || "",
+          street: customer.street || "",
+          village: customer.village || "",
+          thaluk: customer.taluk || "",
+          district: customer.district || "",
+          state: customer.state || "",
+          pincode: customer.pincode || "",
+          pan_no: customer.pan_no || "",
+          ration_no: customer.ration_no || "",
+          driving_license_no: customer.driving_license_no || "",
+          address: `${customer.house_no || ""}, ${customer.street || ""} ,${customer.village || ""} ,${customer.thaluk || ""} ,${customer.district || ""} ,${customer.state || ""} - ${customer.pincode || ""}`,
         })
         setFieldsReadOnly(true)
         setMemberFieldsReadOnly(false)
       } else {
         setIsCustomerNotFoundOpen(true)
       }
+      console.log("Aadhaar lookup completed.",newMember)
     } catch (error) {
       console.error("[v0] Aadhaar lookup error:", error)
       alert("Failed to lookup customer. Please try again.")
@@ -337,6 +419,237 @@ export default function MembersPage() {
       setIsSearching(false)
     }
   }
+  const handleMembershipBlur = async () => {
+    console.log("Fetching member details for membership no:", shareDepositMemberNo)
+    if (!shareDepositMemberNo) return
+
+    setIsFetchingMember(true)
+    setMemberFetchError(null)
+
+    try {
+      const res = await fetch(
+        `/api/memberships/share_details?membership_no=${shareDepositMemberNo}`,
+        { credentials: "include" }
+      )
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to fetch member details")
+      }
+
+      setSelectedShareDepositMember({
+        id: data.membership_id,
+        member_id: data.membership_no,
+        full_name: data.full_name,
+        email: data.email || "",
+        phone: data.phone || "",
+        address: data.address || "",
+        member_type: data.membership_class,
+        account_balance: data.account_balance || 0,
+        status: data.status || "active",
+        joined_date: data.joined_date || "",
+        branch_id: data.branch_id || 0
+      })
+
+      setCurrentShareBalance(data.share_balance)
+
+    } catch (err: any) {
+      setSelectedShareDepositMember(null)
+      setCurrentShareBalance(null)
+      setMemberFetchError(err.message)
+    } finally {
+      setIsFetchingMember(false)
+    }
+  }
+
+
+  const handleShareDepositSave = async () => {
+    console.log("Submitting share deposit...")
+    if(!shareDepositMemberNo || !voucherType || !shareAmount) {
+      setFormError("Please fill in all required fields")
+      alert("Please fill in all required fields")
+    }
+    if (!shareDepositMemberNo) {
+      setFormError("Membership number is required")
+      return
+    }
+
+    if (!voucherType) {
+      setFormError("Please select voucher type")
+      return
+    }
+
+    if (!shareAmount || Number(shareAmount) <= 0) {
+      setFormError("Enter a valid amount")
+      return
+    }
+
+    if (!selectedShareDepositMember) {
+      setFormError("Invalid membership")
+      return
+    }
+
+    setIsSaving(true)
+    setFormError(null)
+    
+    console.log("Processing share deposit...")
+    try {
+      if(transactionType=="Share Deposit"){
+        console.log("Calling share deposit API...")
+        console.log("Membership No:", shareDepositMemberNo, "Voucher Type:", voucherType, "Amount:", shareAmount, "Particulars:", particulars)
+        const res = await fetch("/api/share/deposit", {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            membership_no: shareDepositMemberNo,
+            voucher_type: voucherType,
+            amount: Number(shareAmount),
+            narration: particulars || "Share deposit",
+            selectedBatch: selectedBatch,
+          }), 
+        })
+
+        const data = await res.json()
+
+        if (!res.ok) {
+          console.error("Share deposit error:", data.error)
+          throw new Error(data.error || "Share deposit failed")
+        }
+
+        /* ---------- SUCCESS ---------- */
+        alert(
+          `Share deposit saved successfully.\nVoucher No: ${data.voucher_no}\nStatus: ${data.status}`
+        )
+      }else if(transactionType=="Share Withdrawal"){
+        console.log("Calling share withdrawal API...")
+        const res = await fetch("/api/share/withdraw", {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            membership_no: shareDepositMemberNo,
+            voucher_type: voucherType,
+            amount: Number(shareAmount),
+            narration: particulars || "Share deposit",
+            selectedBatch: selectedBatch,
+          }), 
+        })
+
+        const data = await res.json()
+
+        if (!res.ok) {
+          console.error("Share deposit error:", data.error)
+          throw new Error(data.error || "Share deposit failed")
+        }
+
+        /* ---------- SUCCESS ---------- */
+        alert(
+          `Share deposit saved successfully.\nVoucher No: ${data.voucher_no}\nStatus: ${data.status}`
+        )
+
+      }
+      // Reset form
+      resetShareTransactionForm()
+
+    } catch (err: any) {
+      setFormError(err.message)
+    } finally {
+      console.log("Share deposit process completed.")
+      setIsSaving(false)
+    }
+    console.log("Share deposit submission handled.")
+  }
+  const resetShareTransactionForm = () => {
+    setSelectedBatch(0)
+    setShareDepositMemberNo("")
+    setSelectedShareDepositMember(null)
+    setCurrentShareBalance(null)
+    setVoucherType("")
+    setShareAmount("")
+    setParticulars("")
+    setActiveAction(null)
+
+  }
+  const viewMemberSearch = async () => {
+    console.log("Opening member search dialog...",newSearchMember)
+    try{
+      const res = await fetch("/api/memberships/view_member", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newSearchMember),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+
+      console.log("Member search response:", data.memberData)
+      if (data.found && data.memberData) {
+        setMembers(data.memberData ?? [])
+        
+      } else {
+        setIsCustomerNotFoundOpen(true)
+      }
+
+
+    }catch(err: any){
+
+    }
+  }
+  const setFeildsNewSearchMember = (member: any) => {
+    setNewSearchMember({
+      ...newSearchMember,
+      member_name: member.full_name || "",
+      member_id: member.membershipno || "",
+      email: member.email || "",
+      phone: member.phone_no || "",
+    })
+  }
+
+  
+  const loadIncompleteBatches = async () => {
+    console.log("Loading incomplete batches...")
+    setIsBatchPopupOpen(true)
+    // setBatchLoading(true)
+    // setBatchError(null)
+    console.log("Loading incomplete batches...")
+    try {
+      const res = await fetch("/api/fas/incomplete-batches", {
+        method: "GET",
+        credentials: "include",
+      })
+
+      const data = await res.json()
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to load batches")
+      }
+
+      setIncompleteBatches(data.data || [])
+    } catch (err: any) {
+      console.error("Load incomplete batches error:", err)
+      setBatchError(err.message)
+      setIncompleteBatches([])
+    } finally {
+      // setBatchLoading(false)
+    }
+  }
+  const formatAadhar = (value: string | number | readonly string[] | undefined) => {
+    return String(value ?? "")
+      .replace(/\D/g, "")        // remove non-digits
+      .slice(0, 12)              // max 12 digits
+      .replace(/(.{4})/g, "$1 ") // add space every 4 digits
+      .trim();
+  };
+
+
+
+
 
   // const filteredMembers = members.filter((member) => {
   //   const matchesSearch =
@@ -361,7 +674,8 @@ export default function MembersPage() {
                     : `${user?.branch || "Your branch"} - Manage customer accounts and member operations`}
                 </p>
               </div>
-              <Button onClick={() => setIsCustomerAddDialogOpen(true)} className="gap-2">
+              <Button onClick={() => router.push("/customers")}
+                className="gap-2">
                 <Plus className="h-4 w-4" />
                 Create Customer
               </Button>
@@ -382,10 +696,29 @@ export default function MembersPage() {
                   <CardDescription className="mt-1">Register new customer</CardDescription>
                 </CardContent>
               </Card>
-
+              
+              <Card
+                className="cursor-pointer transition-all hover:shadow-lg hover:border-primary"
+                onClick={() => setIsViewDialogOpen(true)}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                    <UserPlus className="h-6 w-6 text-primary" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <CardTitle className="text-lg">View Member</CardTitle>
+                  <CardDescription className="mt-1">View Member details</CardDescription>
+                </CardContent>
+              </Card>
+              
               <Card
                 className="cursor-pointer transition-all hover:shadow-lg hover:border-teal-500"
-                onClick={() => setActiveAction("share-deposit")}
+                onClick={() => {
+                    setActiveAction("share-deposit")
+                    setTransactionType("Share Deposit")
+                  }
+                }
               >
                 <CardHeader className="pb-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-teal-50">
@@ -400,7 +733,11 @@ export default function MembersPage() {
 
               <Card
                 className="cursor-pointer transition-all hover:shadow-lg hover:border-orange-500"
-                onClick={() => setActiveAction("share-withdrawal")}
+                onClick={() => {
+                    setActiveAction("share-deposit")
+                    setTransactionType("Share Withdrawal")
+                  }
+                }
               >
                 <CardHeader className="pb-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-50">
@@ -414,7 +751,7 @@ export default function MembersPage() {
               </Card>
 
               <Card
-                className="cursor-pointer transition-all hover:shadow-lg hover:border-emerald-500"
+                className="cursor-pointer transition-all hover:shadow-lg hover:border-emerald-500 hidden"
                 onClick={() => setActiveAction("dividend")}
               >
                 <CardHeader className="pb-3">
@@ -428,7 +765,7 @@ export default function MembersPage() {
                 </CardContent>
               </Card>
 
-              <Card
+              {/* <Card
                 className="cursor-pointer transition-all hover:shadow-lg hover:border-red-500"
                 onClick={() => setActiveAction("membership-closure")}
               >
@@ -441,7 +778,7 @@ export default function MembersPage() {
                   <CardTitle className="text-lg">Membership Closure</CardTitle>
                   <CardDescription className="mt-1">Close member account</CardDescription>
                 </CardContent>
-              </Card>
+              </Card> */}
             </div>
 
             <Card>
@@ -536,290 +873,387 @@ export default function MembersPage() {
               </CardContent>
             </Card>
 
-            <Dialog open={isCustomerAddDialogOpen} onOpenChange={setIsCustomerAddDialogOpen}>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Add New Customer</DialogTitle>
-                  <DialogDescription>Enter customer details to create a new Customer</DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Full Name *</Label>
-                      <Input
-                        id="name"
-                        placeholder="John Doe"
-                        value={newCustomer.full_name}
-                        onChange={(e) => setNewCustomer({ ...newCustomer, full_name: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="father-name">Father Name *</Label>
-                      <Input
-                        id="father_name"
-                        placeholder="John Doe"
-                        value={newCustomer.father_name}
-                        onChange={(e) => setNewCustomer({ ...newCustomer, father_name: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="john.doe@email.com"
-                        value={newCustomer.email}
-                        onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">Phone Number *</Label>
-                      <Input
-                        id="phone"
-                        placeholder="+1 (555) 123-4567"
-                        value={newCustomer.phone}
-                        onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="dob">Date of Birth</Label>
-                      <Input
-                        id="dob"
-                        type="date"
-                        value={newCustomer.dob}
-                        onChange={(e) => setNewCustomer({ ...newCustomer, dob: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="address1">Address Line 1</Label>
-                    <Input
-                      id="address1"
-                      placeholder="123 Main St, City, State ZIP"
-                      value={newCustomer.address1}
-                      onChange={(e) => setNewCustomer({ ...newCustomer, address1: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="address2">Address Line 2</Label>
-                    <Input
-                      id="address2"
-                      placeholder="123 Main St, City, State ZIP"
-                      value={newCustomer.address2}
-                      onChange={(e) => setNewCustomer({ ...newCustomer, address2: e.target.value })}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="village">Village *</Label>
-                      <Input
-                        id="village"
-                        placeholder="John Doe"
-                        value={newCustomer.village}
-                        onChange={(e) => setNewCustomer({ ...newCustomer, village: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="taluk">Taluk *</Label>
-                      <Input
-                        id="taluk"
-                        placeholder="John Doe"
-                        value={newCustomer.taluk}
-                        onChange={(e) => setNewCustomer({ ...newCustomer, taluk: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="district">District *</Label>
-                      <Input
-                        id="district"
-                        placeholder="John Doe"
-                        value={newCustomer.district}
-                        onChange={(e) => setNewCustomer({ ...newCustomer, district: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="state">State *</Label>
-                      <Input
-                        id="state"
-                        placeholder="John Doe"
-                        value={newCustomer.state}
-                        onChange={(e) => setNewCustomer({ ...newCustomer, state: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="gender-type">Gender</Label>
-                      <Select
-                        value={newCustomer.gender}
-                        onValueChange={(value) => setNewCustomer({ ...newCustomer, gender: value })}
-                        defaultValue="Male"
-                      >
-                        <SelectTrigger id="gender">
-                          <SelectValue placeholder="Select gender" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="male">Male</SelectItem>
-                          <SelectItem value="female">Female</SelectItem>
-                          <SelectItem value="others">Others</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="pan-card-number">PAN Card No</Label>
-                      <Input
-                        id="pan-card-number"
-                        placeholder="ABCDE1234F"
-                        value={newCustomer.pan_card_number}
-                        onChange={(e) => setNewCustomer({ ...newCustomer, pan_card_number: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="aadhar-id">Aadhar ID</Label>
-                    <Input
-                      id="aadhar-id"
-                      placeholder="123456789"
-                      value={newCustomer.aadhar_id}
-                      onChange={(e) => setNewCustomer({ ...newCustomer, aadhar_id: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsCustomerAddDialogOpen(false)} disabled={isSubmitting}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleCreateCustomer} disabled={isSubmitting}>
-                    {isSubmitting ? "Creating..." : "Create Customer"}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            
 
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Add New Member</DialogTitle>
-                  <DialogDescription>Search by Aadhaar to enroll an existing customer</DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="aadhaar">Aadhaar Card Number *</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="aadhaar"
-                        placeholder="Enter 16-digit Aadhaar number"
-                        maxLength={16}
-                        value={newMember.aadhaar_no}
-                        onChange={(e) => {
-                          const value = e.target.value.replace(/\D/g, "")
-                          setNewMember({ ...newMember, aadhaar_no: value })
-                        }}
-                      />
-                      <Button
-                        onClick={handleAadhaarSearch}
-                        disabled={isSearching || newMember.aadhaar_no.length !== 16}
-                        className="shrink-0"
-                      >
-                        {isSearching ? "Searching..." : "Search"}
-                      </Button>
-                    </div>
-                  </div>
+              <DialogContent className="max-w-5xl max-w-[95vw] h-[90vh] flex flex-col">
+                  <DialogHeader>
+                    <DialogTitle>Add New Member</DialogTitle>
+                    <DialogDescription>
+                      Search by Aadhaar to enroll an existing customer
+                    </DialogDescription>
+                    <div className="grid grid-cols-5 gap-4">
+                      <div className="space-y-2 px-4 py-4 col-span-1">
+                        {/* <Label htmlFor="cus_type">Type</Label> */}
+                          <select
+                              id="customer_type"
+                              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            
+                            >
+                              <option value="">Select Category</option>
+                              <option value="individual">Individual</option>
+                              <option value="organization">Organization</option>
+                          </select>
+                      </div>
+                      <div className="space-y-2 px-4 py-4 col-span-4">
+                        {isSearching && (
+                          <Label htmlFor="aadhaar">Aadhaar Card Number *</Label>
+                        )}
+                        
+                        <div className="flex gap-2">
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Full Name *</Label>
-                      <Input
-                        id="name"
-                        placeholder="John Doe"
-                        value={newMember.full_name}
-                        onChange={(e) => setNewMember({ ...newMember, full_name: e.target.value })}
-                        readOnly={fieldsReadOnly}
-                        className={fieldsReadOnly ? "bg-muted" : ""}
-                      />
+                          <Input
+                            id="aadhaar"
+                            placeholder="Enter 12-digit Aadhaar number"
+                            maxLength={12}
+                            value={newMember.aadhaar_no}
+                            onChange={(e) => {
+                            const value = e.target.value.replace(/\D/g, "")
+                            setNewMember({ ...newMember, aadhaar_no: value })
+                            }}
+                          />
+                          <Button
+                            onClick={handleAadhaarSearch}
+                            disabled={isSearching || newMember.aadhaar_no.length !== 12}
+                            className="shrink-0"
+                            >
+                            {isSearching ? "Searching..." : "Search"}
+                          </Button>
+                        </div>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="father-name">Father Name</Label>
-                      <Input
-                        id="father-name"
-                        placeholder="Father's name"
-                        value={newMember.father_name}
-                        onChange={(e) => setNewMember({ ...newMember, father_name: e.target.value })}
-                        readOnly={fieldsReadOnly}
-                        className={fieldsReadOnly ? "bg-muted" : ""}
-                      />
+                    <div className="mt-4 border-t pt-4"></div>
+                    <div className="mt-2 text-sm text-muted-foreground">
+                      
+                      <div className="grid grid-cols-3 gap-4 border-b">
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-1 gap-4">
+                            <div className="space-y-2 px-5 ">
+                                
+                                <Label htmlFor="customer_type">Customer Type</Label>
+                                <select
+                                    id="customer_type"
+                                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    value={newMember.customer_type}
+                                    onChange={(e) => setNewMember({ ...newMember, customer_type: e.target.value })}
+                                  >
+                                    <option value="">Select Category</option>
+                                    <option value="individual">Individual</option>
+                                    <option value="organization">Organization</option>
+                                </select>
+                            </div>
+                            <div className="space-y-2 px-5">
+                              <Label>Account Type</Label>
+                              <Select
+                                value={newMember.member_type}
+                                onValueChange={(value) =>
+                                  setNewMember({ ...newMember, member_type: value })
+                                }
+                                // disabled={memberFieldsReadOnly}
+                              >
+                                <SelectTrigger
+                                  className={`${memberFieldsReadOnly ? "bg-muted" : ""} w-full`}
+                                >
+                                  <SelectValue placeholder="Select account type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="member">Member</SelectItem>
+                                  <SelectItem value="associate">Nominal Member</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          </div>
+                          
+                          <div className="space-y-2">
+                              <div className="grid grid-cols-1 gap-4">
+                                  <div className="space-y-2">
+                                  <Label htmlFor="name">Full Name *</Label>
+                                  <Input
+                                      id="name"
+                                      placeholder="John Doe"
+                                      value={newMember.full_name}
+                                      onChange={(e) => setNewMember({ ...newMember, full_name: e.target.value })}
+                                  />
+                                  </div>
+                                  <div className="space-y-2">
+                                      <Label htmlFor="father-name">Father Name *</Label>
+                                      <Input
+                                          id="father_name"
+                                          placeholder="Daddy's Name"
+                                          value={newMember.father_name}
+                                          onChange={(e) => setNewMember({ ...newMember, father_name: e.target.value })}
+                                  />
+                                  </div>
+                              </div> 
+                          </div>
+                          
+              
+                          <div className="flex gap-8 px-4 py-4 ">
+              
+                              {/* PHOTO */}
+                              <label className="cursor-pointer">
+                                  <input
+                                  type="file"
+                                  accept="image/*"
+                                  hidden
+                                  onChange={(e) => setPhoto(e.target.files?.[0] || null)}
+                                  />
+              
+                                  <div className="h-32 w-32 border-2 border-dashed rounded-md flex items-center justify-center hover:bg-muted transition overflow-hidden">
+                                  {photoPreview ? (
+                                      <img
+                                      src={photoPreview}
+                                      alt="Photo Preview"
+                                      className="h-full w-full object-cover"
+                                      />
+                                  ) : (
+                                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                      <Camera className="h-8 w-8" />
+                                      <span className="text-sm">Upload Photo</span>
+                                      </div>
+                                  )}
+                                  </div>
+                              </label>
+              
+                              {/* SIGNATURE */}
+                              <label className="cursor-pointer">
+                                  <input
+                                  type="file"
+                                  accept="image/*"
+                                  hidden
+                                  onChange={(e) => setSignature(e.target.files?.[0] || null)}
+                                  />
+              
+                                  <div className="h-32 w-32 border-2 border-dashed rounded-md flex items-center justify-center hover:bg-muted transition overflow-hidden bg-white">
+                                  {signaturePreview ? (
+                                      <img
+                                      src={signaturePreview}
+                                      alt="Signature Preview"
+                                      className="h-full w-full object-contain"
+                                      />
+                                  ) : (
+                                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                      <PenTool className="h-8 w-8" />
+                                      <span className="text-sm">Upload Signature</span>
+                                      </div>
+                                  )}
+                                  </div>
+                              </label>
+                          </div>
+                      </div>
                     </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="john.doe@email.com"
-                        value={newMember.email}
-                        onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
-                        readOnly={fieldsReadOnly}
-                        className={fieldsReadOnly ? "bg-muted" : ""}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">Phone Number *</Label>
-                      <Input
-                        id="phone"
-                        placeholder="+1 (555) 123-4567"
-                        value={newMember.phone}
-                        onChange={(e) => setNewMember({ ...newMember, phone: e.target.value })}
-                        readOnly={fieldsReadOnly}
-                        className={fieldsReadOnly ? "bg-muted" : ""}
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="dob">Date of Birth</Label>
-                      <Input
-                        id="dob"
-                        type="date"
-                        value={newMember.dob}
-                        onChange={(e) => setNewMember({ ...newMember, dob: e.target.value })}
-                        readOnly={fieldsReadOnly}
-                        className={fieldsReadOnly ? "bg-muted" : ""}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="account-type">Account Type</Label>
-                      <Select
-                        value={newMember.member_type}
-                        onValueChange={(value) => setNewMember({ ...newMember, member_type: value })}
-                        disabled={memberFieldsReadOnly}
-                      >
-                        <SelectTrigger id="account-type" className={memberFieldsReadOnly ? "bg-muted" : ""}>
-                          <SelectValue placeholder="Select account type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Nominal">Nominal</SelectItem>
-                          <SelectItem value="Associate">Associate</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="address">Address</Label>
-                    <Input
-                      id="address"
-                      placeholder="123 Main St, City, State ZIP"
-                      value={newMember.address}
-                      onChange={(e) => setNewMember({ ...newMember, address: e.target.value })}
-                      readOnly={fieldsReadOnly}
-                      className={fieldsReadOnly ? "bg-muted" : ""}
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
+                  </DialogHeader>
+
+                  <Tabs defaultValue="personal" className="w-full">
+                    <TabsList className="grid grid-cols-4">
+                      <TabsTrigger value="personal">Personal Details</TabsTrigger>
+                      <TabsTrigger value="address">Address</TabsTrigger>
+                      <TabsTrigger value="kyc">KYC Details</TabsTrigger>
+                    </TabsList>
+
+                    {/* PERSONAL DETAILS TAB */}
+                    <TabsContent value="personal">
+                      <div className="grid gap-4 py-4">
+
+                        {/* Name + Father */}
+                        <div className="grid grid-cols-3 gap-4">
+                          <div className="space-y-2">
+                            <Label>Date of Birth</Label>
+                            <Input
+                              value={newMember.date_of_birth}
+                              type="date"
+                              onChange={(e) =>
+                                setNewMember({ ...newMember, dob: e.target.value })
+                              }
+                              readOnly={fieldsReadOnly}
+                              className={fieldsReadOnly ? "bg-muted" : ""}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Gender</Label>
+                            <Select
+                              value={newMember.gender}
+                              onValueChange={(value) => setNewMember({ ...newMember, gender: value })}
+                              
+                              >
+                              <SelectTrigger id="gender" className={`w-full ${fieldsReadOnly ? "bg-muted" : ""}`}>
+                                  <SelectValue placeholder="Select gender" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                  <SelectItem value="male">Male</SelectItem>
+                                  <SelectItem value="female">Female</SelectItem>
+                                  <SelectItem value="others">Others</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                              <Label>Spouse Name</Label>
+                              <Input
+                                value={newMember.spouseName}
+                                onChange={(e) =>
+                                  setNewMember({ ...newMember, spouseName: e.target.value })
+                                }
+                                readOnly={fieldsReadOnly}
+                                className={fieldsReadOnly ? "bg-muted" : ""}
+                              />
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-3 gap-4">
+                          <div className="space-y-2">
+                            <Label>Board Resolution Number</Label>
+                            <Input
+                              value={newMember.boardResolutionNumber}
+                              onChange={(e) =>
+                                setNewMember({ ...newMember, boardResolutionNumber: e.target.value })
+                              }
+                              readOnly={fieldsReadOnly}
+                              className={fieldsReadOnly ? "bg-muted" : ""}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Board Resolution Date</Label>
+                            <Input
+                              type="date"
+                              value={newMember.boardResolutionDate}
+                              onChange={(e) =>
+                                setNewMember({ ...newMember, boardResolutionDate: e.target.value })
+                              }
+                              readOnly={fieldsReadOnly}
+                              className={fieldsReadOnly ? "bg-muted" : ""}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Ledger Folio Number</Label>
+                            <Input
+                              value={newMember.ledgerFolioNumber}
+                              onChange={(e) =>
+                                setNewMember({ ...newMember, ledgerFolioNumber: e.target.value })
+                              }
+                              readOnly={fieldsReadOnly}
+                              className={fieldsReadOnly ? "bg-muted" : ""}
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2"></div>
+                        
+                      </div>
+                    </TabsContent>
+
+                    {/* ADDRESS TAB */}
+                    <TabsContent value="address">
+                      <div className="py-4 space-y-2">
+                        <Label htmlFor="address">Address</Label>
+                        <Input
+                          id="address"
+                          placeholder="123 Main St, City, State ZIP"
+                          value={newMember.address}
+                          onChange={(e) =>
+                            setNewMember({ ...newMember, address: e.target.value })
+                          }
+                          readOnly={fieldsReadOnly}
+                          className={fieldsReadOnly ? "bg-muted" : ""}
+                        />
+                      </div>
+                      {/* <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="house_no">House Number</Label>
+                            <Input
+                              id="house_no"
+                              placeholder="House Number"
+                              value={newMember.house_no}
+                              onChange={(e) =>
+                                setNewMember({ ...newMember, house_no: e.target.value })
+                              }
+                              readOnly={fieldsReadOnly}
+                              className={fieldsReadOnly ? "bg-muted" : ""}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="street">Street</Label>
+                            <Input
+                              id="street"
+                              placeholder="Street"
+                              value={newMember.street}
+                              onChange={(e) =>
+                                setNewMember({ ...newMember, street: e.target.value })
+                              }
+                              readOnly={fieldsReadOnly}
+                              className={fieldsReadOnly ? "bg-muted" : ""}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="village">Village *</Label>
+                          <Input
+                            id="village"
+                            placeholder="Village"
+                            value={newMember.village}
+                            onChange={(e) =>
+                              setNewMember({ ...newMember, village: e.target.value })
+                            }
+                            readOnly={fieldsReadOnly}
+                            className={fieldsReadOnly ? "bg-muted" : ""}
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="taluk">Taluk *</Label>
+                          <Input
+                            id="taluk"
+                            placeholder="Taluk"
+                            value={newMember.taluk}
+                            onChange={(e) =>
+                              setNewMember({ ...newMember, taluk: e.target.value })
+                            }
+                            readOnly={fieldsReadOnly}
+                            className={fieldsReadOnly ? "bg-muted" : ""}
+                          />
+                        </div>
+                        <div className="space-y-2"></div>
+                        <div className="space-y-2"></div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-2"></div>
+                        <div className="space-y-2"></div>
+                        <div className="space-y-2"></div>
+                      </div> */}
+                    </TabsContent>
+                    <TabsContent value="kyc">
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <Label>ID Type</Label>
+                          <Input
+                            value={newMember.id_type}
+                            onChange={(e) =>
+                              setNewMember({ ...newMember, id_type: e.target.value })
+                            }
+                            readOnly={fieldsReadOnly}
+                            className={fieldsReadOnly ? "bg-muted" : ""}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>ID Number</Label>
+                          <Input
+                            value={newMember.id_number}
+                            onChange={(e) =>
+                              setNewMember({ ...newMember, id_number: e.target.value })
+                            }
+                            readOnly={fieldsReadOnly}
+                            className={fieldsReadOnly ? "bg-muted" : ""}
+                          />
+                        </div>
+                        <div className="space-y-2"></div>
+                        <div className="space-y-2"></div>
+                      </div>
+
+                    </TabsContent>
+                  </Tabs>
+
+                  <DialogFooter>
+                    
                   <Button
                     variant="outline"
                     onClick={() => {
@@ -829,13 +1263,19 @@ export default function MembersPage() {
                         customer_code: "",
                         full_name: "",
                         father_name: "",
+                        gender: "",
                         email: "",
                         phone: "",
                         address: "",
-                        member_type: "Nominal",
+                        member_type: "member",
+                        date_of_birth: "",
                         dob: "",
                         id_type: "",
                         id_number: "",
+                        spouse_name: "",
+                        boardresolutiondate: "",
+                        board_resolution_number: "",
+                        ledger_folio_number: "",
                       })
                       setFieldsReadOnly(true)
                     }}
@@ -849,9 +1289,284 @@ export default function MembersPage() {
                   >
                     {isSubmitting ? "Creating..." : "Create Member"}
                   </Button>
-                </DialogFooter>
+                  </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+              <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                  <DialogTitle>Member Details View</DialogTitle>
+                  <DialogDescription>View member information in read-only mode</DialogDescription>
+                </DialogHeader>
+                <div>
+                  {/* Membership Number with Search Button */}
+                  <div className="space-y-2">
+                    <Label htmlFor="membership-number" className="text-sm font-medium">
+                      Membership Number *
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="membership-number"
+                        placeholder="Enter membership number"
+                        value={shareDepositMemberNo || createdMemberNo || ""}
+                        onChange={(e) => setShareDepositMemberNo(e.target.value)}
+                        // onfocusout={handleMembershipBlur}
+                        onBlur={handleMembershipBlur}
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsMemberSearchOpen(true)}
+                        className="shrink-0"
+                      >
+                        <Search className="mr-2 h-4 w-4" />
+                        Search
+                      </Button>
+                    </div>
+                  </div>
+                  
+                </div>
+                <div className="grid flex grid-cols-4 gap-4">
+                  <div className="h-32 w-32 border-2 border-dashed rounded-md flex items-center justify-center hover:bg-muted transition overflow-hidden">
+                    {memberPreview ? (
+                      <img
+                        src={memberPreview}
+                        alt="Member Photo Preview"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                        <Camera className="h-8 w-8" />
+                        <span className="text-sm">Member Photo</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="h-32 w-32 border-2 border-dashed rounded-md flex items-center justify-center hover:bg-muted transition overflow-hidden">
+                    {signaturePreview ? (
+                        <img
+                        src={signaturePreview}
+                        alt="Signature Preview"
+                        className="h-full w-full object-contain"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                        <PenTool className="h-8 w-8" />
+                        <span className="text-sm text-center break-words">Uploaded Signature</span>
+                        </div>
+                    )}
+                  </div>
+                  <div> </div>
+                  <div>
+                    <div className="h-15 w-32 border-2 border-dashed rounded-md flex items-center justify-center hover:bg-muted transition overflow-hidden bg-green-100 opacity-0"></div>
+                    <div className="h-16 w-32 border-2 border-dashed rounded-md flex items-center justify-center hover:bg-blue-100 transition overflow-hidden bg-green-100"></div>
+                  </div>
+                  
+                </div>
+                <div className="grid grid-cols-2 gap-4 ">
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-1 gap-4">
+                      <div className="space-y-2 px-5 ">
+                          
+                        <Label htmlFor="customer_type">Customer Type</Label>
+                        <Input
+                            id="customer_type"
+                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            value={newMember.customer_type}
+                            readOnly
+                          />  
+                      </div>
+                      <div className="space-y-2 px-5">
+                        <Label>Account Type</Label>
+                        <Input
+                          value={newMember.member_type === "member" ? "Member" : "Nominal Member"}
+                          readOnly
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                    
+                  <div className="space-y-2">
+                      <div className="grid grid-cols-1 gap-4">
+                          <div className="space-y-2 px-5">
+                          <Label htmlFor="name">Full Name *</Label>
+                          <Input
+                              id="name"
+                              placeholder="John Doe"
+                              value={newMember.full_name}
+                              onChange={(e) => setNewMember({ ...newMember, full_name: e.target.value })}
+                          />
+                          </div>
+                          <div className="space-y-2 px-5">
+                              <Label htmlFor="father-name">Father Name *</Label>
+                              <Input
+                                  id="father_name"
+                                  placeholder="Daddy's Name"
+                                  value={newMember.father_name}
+                                  onChange={(e) => setNewMember({ ...newMember, father_name: e.target.value })}
+                          />
+                          </div>
+                      </div> 
+                  </div>
+                </div>
+                <Tabs defaultValue="personal" className="w-full">
+                  <TabsList className="grid grid-cols-5">
+                    <TabsTrigger value="personal">Personal Details</TabsTrigger>
+                    <TabsTrigger value="address">Address</TabsTrigger>
+                    <TabsTrigger value="kycdetails">KYC Details</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="personal">
+                      <div className="grid gap-4 py-4">
+
+                        {/* Name + Father */}
+                        <div className="grid grid-cols-3 gap-4">
+                          <div className="space-y-2">
+                            <Label>Date of Birth</Label>
+                            <Input
+                              value={newMember.date_of_birth}
+                              type="date"
+                              onChange={(e) =>
+                                setNewMember({ ...newMember, dob: e.target.value })
+                              }
+                              readOnly={fieldsReadOnly}
+                              className={fieldsReadOnly ? "bg-muted" : ""}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Gender</Label>
+                            <Select
+                              value={newMember.gender}
+                              onValueChange={(value) => setNewMember({ ...newMember, gender: value })}
+                              
+                              >
+                              <SelectTrigger id="gender" className={`w-full ${fieldsReadOnly ? "bg-muted" : ""}`}>
+                                  <SelectValue placeholder="Select gender" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                  <SelectItem value="male">Male</SelectItem>
+                                  <SelectItem value="female">Female</SelectItem>
+                                  <SelectItem value="others">Others</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                              <Label>Spouse Name</Label>
+                              <Input
+                                value={newMember.spouse_name}
+                                onChange={(e) =>
+                                  setNewMember({ ...newMember, spouse_name: e.target.value })
+                                }
+                                readOnly={fieldsReadOnly}
+                                className={fieldsReadOnly ? "bg-muted" : ""}
+                              />
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-3 gap-4">
+                          <div className="space-y-2">
+                            <Label>Board Resolution Number</Label>
+                            <Input
+                              value={newMember.board_resolution_number}
+                              onChange={(e) =>
+                                setNewMember({ ...newMember, board_resolution_number: e.target.value })
+                              }
+                              readOnly={fieldsReadOnly}
+                              className={fieldsReadOnly ? "bg-muted" : ""}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Board Resolution Date venki</Label>
+                            <Input
+                              value={newMember.boardresolutiondate}
+                              type="date"
+                              onChange={(e) =>
+                                setNewMember({ ...newMember, boardResolutionDate: e.target.value })
+                              }
+                              readOnly={fieldsReadOnly}
+                              className={fieldsReadOnly ? "bg-muted" : ""}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Date of Birth</Label>
+                            <Input
+                              value={newMember.date_of_birth}
+                              type="date"
+                              onChange={(e) =>
+                                setNewMember({ ...newMember, dob: e.target.value })
+                              }
+                              readOnly={fieldsReadOnly}
+                              className={fieldsReadOnly ? "bg-muted" : ""}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Ledger Folio Number</Label>
+                            <Input
+                              value={newMember.ledger_folio_number}
+                              onChange={(e) =>
+                                setNewMember({ ...newMember, ledger_folio_number: e.target.value })
+                              }
+                              readOnly={fieldsReadOnly}
+                              className={fieldsReadOnly ? "bg-muted" : ""}
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2"></div>
+                        
+                      </div>
+                  </TabsContent>
+
+                    {/* ADDRESS TAB */}
+                    <TabsContent value="address">
+                      <div className="py-4 space-y-2">
+                        <Label htmlFor="address">Address</Label>
+                        <Input
+                          id="address"
+                          placeholder="123 Main St, City, State ZIP"
+                          value={newMember.house_no +","+newMember.street+","+newMember.village+","+newMember.thaluk+","+newMember.district+","+newMember.state+","+newMember.pincode}
+                          onChange={(e) =>
+                            setNewMember({ ...newMember, address: e.target.value })
+                          }
+                          readOnly={fieldsReadOnly}
+                          className={fieldsReadOnly ? "bg-muted" : ""}
+                        />
+                      </div>
+                    </TabsContent>
+                    <TabsContent value="kycdetails">
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <Label>ID Type</Label>
+                          <Input
+                            value={newMember.id_type}
+                            onChange={(e) =>
+                              setNewMember({ ...newMember, id_type: e.target.value })
+                            }
+                            readOnly={fieldsReadOnly}
+                            className={fieldsReadOnly ? "bg-muted" : ""}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>ID Number</Label>
+                          <Input
+                            value={newMember.id_number}
+                            onChange={(e) =>
+                              setNewMember({ ...newMember, id_number: e.target.value })
+                            }
+                            readOnly={fieldsReadOnly}
+                            className={fieldsReadOnly ? "bg-muted" : ""}
+                          />
+                        </div>
+                        <div className="space-y-2"></div>
+                        <div className="space-y-2"></div>
+                      </div>
+
+                    </TabsContent>
+                </Tabs>
               </DialogContent>
             </Dialog>
+
 
             <AlertDialog open={isCustomerNotFoundOpen} onOpenChange={setIsCustomerNotFoundOpen}>
               <AlertDialogContent>
@@ -877,7 +1592,7 @@ export default function MembersPage() {
               </AlertDialogContent>
             </AlertDialog>
 
-            <Dialog open={!!selectedMember} onOpenChange={() => setSelectedMember(null)}>
+            {/* <Dialog open={!!selectedMember} onOpenChange={() => setSelectedMember(null)}>
               <DialogContent className="max-w-3xl">
                 <DialogHeader>
                   <DialogTitle>Member Details</DialogTitle>
@@ -909,7 +1624,7 @@ export default function MembersPage() {
                           </div>
                           <div>
                             <Label className="text-muted-foreground">Phone</Label>
-                            <p className="font-medium">{selectedMember.phone}</p>
+                            <p className="font-medium">{selectedMember.phone_no}</p>
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
@@ -959,19 +1674,47 @@ export default function MembersPage() {
                   </Tabs>
                 )}
               </DialogContent>
-            </Dialog>
+            </Dialog> */}
 
             <Dialog open={activeAction === "share-deposit"} onOpenChange={() => {
-              setActiveAction(null)
+              resetShareTransactionForm()
               setSelectedShareDepositMember(null)
               setShareDepositMemberNo("")
-            }}>
+              }}>
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
                   <DialogTitle className="text-xl">Share Deposit</DialogTitle>
                   <DialogDescription>Add shares for a member account</DialogDescription>
                 </DialogHeader>
+                {formError && (
+                  <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">
+                    {formError}
+                  </div>
+                )}
+
                 <div className="grid gap-6 py-6">
+
+                  {/* Member Name and Member Type - Display fields */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Transaction Type</Label>
+                      <div className="rounded-md border border-input bg-muted/50 px-3 py-2 text-sm">
+                          <input
+                            name="transactiontype"
+                            value={transactionType}
+                            onChange={(e) => setTransactionType(e.target.value)}
+                            placeholder="Share Deposit"
+                            disabled  
+                          />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Transaction Date</Label>
+                      <div className="rounded-md border border-input bg-muted/50 px-3 py-2 text-sm">
+                        {identity?.businessDate}
+                      </div>
+                    </div>
+                  </div>
                   {/* Membership Number with Search Button */}
                   <div className="space-y-2">
                     <Label htmlFor="membership-number" className="text-sm font-medium">
@@ -983,6 +1726,8 @@ export default function MembersPage() {
                         placeholder="Enter membership number"
                         value={shareDepositMemberNo || createdMemberNo || ""}
                         onChange={(e) => setShareDepositMemberNo(e.target.value)}
+                        // onfocusout={handleMembershipBlur}
+                        onBlur={handleMembershipBlur}
                         className="flex-1"
                       />
                       <Button
@@ -1016,26 +1761,60 @@ export default function MembersPage() {
                   {/* Voucher Type and Voucher Number */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
+                      <Label className="text-sm font-medium">Current Share Balance</Label>
+                      <div className="rounded-md border border-input bg-muted/50 px-3 py-2 text-sm">
+                        {isFetchingMember
+                          ? "Loading..."
+                          : currentShareBalance !== null
+                            ? `₹ ${currentShareBalance.toFixed(2)}`
+                            : "—"}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
                       <Label htmlFor="voucher-type" className="text-sm font-medium">
                         Voucher Type *
                       </Label>
-                      <Select>
-                        <SelectTrigger id="voucher-type">
-                          <SelectValue placeholder="Select voucher type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="receipt">Receipt</SelectItem>
-                          <SelectItem value="cash">Cash</SelectItem>
-                          <SelectItem value="transfer">Transfer</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        <Select
+                      
+                          value={voucherType || ""}
+                          onValueChange={(value) => setVoucherType(value === "CASH" ? "CASH" : value === "TRANSFER" ? "TRANSFER" : "")}
+                        >
+                          <SelectTrigger id="voucher-type" className="w-full">
+                            <SelectValue placeholder="Select voucher type" />
+                          </SelectTrigger>
+                          <SelectContent
+                          >
+                            <SelectItem value="CASH">Cash</SelectItem>
+                            <SelectItem value="TRANSFER">Transfer</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="voucher-number" className="text-sm font-medium">
-                        Voucher Number *
-                      </Label>
-                      <Input id="voucher-number" placeholder="Enter voucher number" />
-                    </div>
+                  </div>
+                  {/* Batch and Select batch */}
+                  <div className="grid gap-6 ">
+                          {voucherType === "TRANSFER" && (
+                            <div className="grid  gap-4">
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">GL Batch ID</Label>
+                                <div className="flex gap-2">
+                                  <Input
+                                    id="gl-batch-id"
+                                    value={selectedBatch && selectedBatch !== 0 ? selectedBatch : "New Batch"}
+                                    readOnly
+                                    placeholder="Select or create batch"
+                                  />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => loadIncompleteBatches()}
+                                >
+                                  Select Batch
+                                </Button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                   </div>
 
                   {/* Particulars and Amount */}
@@ -1044,48 +1823,175 @@ export default function MembersPage() {
                       <Label htmlFor="particulars" className="text-sm font-medium">
                         Particulars
                       </Label>
-                      <Input id="particulars" placeholder="Enter particulars" />
+                      <Input id="particulars" placeholder="Enter particulars" 
+
+                        value={particulars || ""}
+                        onChange={(e) => setParticulars(e.target.value)}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="amount" className="text-sm font-medium">
                         Amount *
                       </Label>
-                      <Input id="amount" type="number" placeholder="Enter amount" />
+                      <Input id="amount" type="number" placeholder="Enter amount" 
+
+                        value={shareAmount || ""}
+                        onChange={(e) => setShareAmount(e.target.value)}
+                      />
                     </div>
                   </div>
                 </div>
                 <DialogFooter className="gap-2 sm:gap-0">
-                  <Button variant="outline" onClick={() => setActiveAction(null)}>
+                  <Button variant="outline" onClick={() => resetShareTransactionForm()}>
                     Cancel
                   </Button>
-                  <Button onClick={() => setActiveAction(null)} className="bg-teal-600 hover:bg-teal-700">
-                    Save
+                  
+                  <Button
+                      onClick={handleShareDepositSave}
+                      disabled={isSaving || !selectedShareDepositMember}
+                      className="bg-teal-600 hover:bg-teal-700"
+                    >
+                    {isSaving ? "Saving..." : "Save"}
                   </Button>
+
                 </DialogFooter>
               </DialogContent>
             </Dialog>
 
+            <Dialog open={isBatchPopupOpen} onOpenChange={setIsBatchPopupOpen}>
+              <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                  <DialogTitle>Select GL Batch</DialogTitle>
+                  <DialogDescription>
+                    Choose an incomplete batch or create a new one
+                  </DialogDescription>
+                </DialogHeader>
+                
+                <div className="flex justify-between pt-4">
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setSelectedBatch(0)
+                      setIsBatchPopupOpen(false)
+                    }}
+                  >
+                    + Create New Batch
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsBatchPopupOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Batch ID</TableHead>
+                      <TableHead>Debit</TableHead>
+                      <TableHead>Credit</TableHead>
+                      <TableHead>Difference</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+
+                  <TableBody>
+                    {incompleteBatches.map((b) => (
+                      <TableRow key={b.batch_id}>
+                        <TableCell>{b.batch_id}</TableCell>
+                        <TableCell>{b.total_debit}</TableCell>
+                        <TableCell>{b.total_credit}</TableCell>
+                        <TableCell className="text-red-600">
+                          {b.difference}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setSelectedBatch(b.batch_id)
+                              setIsBatchPopupOpen(false)
+                            }}
+                          >
+                            Select
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+
+                </DialogContent>
+            </Dialog>
+
             {/* Member Search Popup */}
             <Dialog open={isMemberSearchOpen} onOpenChange={setIsMemberSearchOpen}>
-              <DialogContent className="max-w-2xl max-h-[80vh]">
+              <DialogContent className="w-[80vw] max-w-none max-h-[80vh]">
                 <DialogHeader>
                   <DialogTitle>Search Member</DialogTitle>
                   <DialogDescription>Search and select a member for share deposit</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   {/* Search Input */}
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Search by name, member ID, or phone..."
-                      value={memberSearchQuery}
-                      onChange={(e) => setMemberSearchQuery(e.target.value)}
-                      className="flex-1"
-                    />
-                    <Button variant="outline" onClick={() => setMemberSearchQuery("")}>
-                      Clear
-                    </Button>
-                  </div>
 
+                  <div className="grid grid-cols-6 gap-4">
+                    <div className="space-y-4 px-3">
+                      <Label htmlFor="particulars" className="text-sm font-medium">Member Name</Label>
+                      <Input
+                        placeholder="Search by Member Name"
+                        value={newSearchMember.member_name} 
+                        onChange={(e) => setNewSearchMember({ ...newSearchMember, member_name: e.target.value })  }
+                        className="flex-1"
+                      />
+                    </div>
+                    <div className="space-y-4 px-3">
+                      <Label htmlFor="particulars" className="text-sm font-medium">Father Name</Label>
+                      <Input
+                        placeholder="Search by Father Name"
+                        value={newSearchMember.father_name}
+                        onChange={(e) => setNewSearchMember({ ...newSearchMember, father_name: e.target.value })  }
+                        className="flex-1"
+                      />
+                    </div>
+                    <div className="space-y-4 px-3">
+                      <Label htmlFor="particulars" className="text-sm font-medium">Phone Number</Label>
+                      <Input
+                        placeholder="Search by Phone Number"
+                        value={newSearchMember.phone_number}
+                        onChange={(e) => setNewSearchMember({ ...newSearchMember, phone_number: e.target.value })  }
+                        className="flex-1"
+                      />
+                    </div>
+                    
+                    <div className="space-y-4 px-3">
+                      <Label htmlFor="particulars" className="text-sm font-medium">Aadhar Number</Label>
+                      <Input
+                        placeholder="Search by Aadhar Number"
+                        value={newSearchMember.aadhaar_number}
+                        onChange={(e) => setNewSearchMember({ ...newSearchMember, aadhaar_number: e.target.value })  }
+                        className="flex-1"
+                      />
+                    </div>
+                    
+                    <div className="space-y-4 px-3">
+                      <Label htmlFor="particulars" className="text-sm font-medium">Ledger Number</Label>
+                      <Input
+                        placeholder="Search by Ledger Number"
+                        value={newSearchMember.ledger_folio_number}
+                        onChange={(e) => setNewSearchMember({ ...newSearchMember, ledger_folio_number: e.target.value })  }
+                        className="flex-1 "
+                      />
+                    </div>
+                    
+
+                    <div className="space-y-4 px-3 flex items-end justify-end">
+                      <Button variant="outline" 
+                      onClick={() => viewMemberSearch()}
+                      className=" w-full">
+                        Search
+                      </Button>
+                    </div>
+                  </div>
                   {/* Members List */}
                   <div className="border rounded-md max-h-[400px] overflow-y-auto">
                     <Table>
@@ -1093,6 +1999,7 @@ export default function MembersPage() {
                         <TableRow>
                           <TableHead>Member ID</TableHead>
                           <TableHead>Name</TableHead>
+                          <TableHead>Father Name</TableHead>
                           <TableHead>Phone</TableHead>
                           <TableHead>Type</TableHead>
                           <TableHead className="text-right">Action</TableHead>
@@ -1105,15 +2012,17 @@ export default function MembersPage() {
                             return (
                               !query ||
                               member.full_name?.toLowerCase().includes(query) ||
-                              member.member_id?.toLowerCase().includes(query) ||
-                              member.phone?.toLowerCase().includes(query)
+                              member.membership_no?.toLowerCase().includes(query) ||
+                              member.phone_no?.toLowerCase().includes(query)
                             )
                           })
                           .map((member) => (
-                            <TableRow key={member.id} className="cursor-pointer hover:bg-muted/50">
-                              <TableCell className="font-medium">{member.member_id}</TableCell>
+                            
+                            <TableRow key={member.membership_no} className="cursor-pointer hover:bg-muted/50">
+                              <TableCell className="font-medium">{member.membership_no}</TableCell>
                               <TableCell>{member.full_name}</TableCell>
-                              <TableCell>{member.phone || "—"}</TableCell>
+                              <TableCell>{member.father_name}</TableCell>
+                              <TableCell>{member.phone_no || "—"}</TableCell>
                               <TableCell>
                                 <Badge variant="outline">{member.member_type}</Badge>
                               </TableCell>
@@ -1121,8 +2030,11 @@ export default function MembersPage() {
                                 <Button
                                   size="sm"
                                   onClick={() => {
-                                    setSelectedShareDepositMember(member)
-                                    setShareDepositMemberNo(member.member_id)
+                                    setNewMember(member)
+                                    console.log("Selected member for share deposit:", member)
+                                    // setSelectedMember(member),
+                                    // setSelectedShareDepositMember(member)
+                                    setShareDepositMemberNo(member.membership_no)
                                     setIsMemberSearchOpen(false)
                                     setMemberSearchQuery("")
                                   }}
@@ -1207,7 +2119,7 @@ export default function MembersPage() {
             </Dialog>
 
             <Dialog open={activeAction === "dividend"} onOpenChange={() => setActiveAction(null)}>
-              <DialogContent className="max-w-md">
+              <DialogContent className="w-[75vw] max-w-none h-[75vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Dividend Distribution</DialogTitle>
                   <DialogDescription>Process dividend payments for members</DialogDescription>
@@ -1382,4 +2294,11 @@ export default function MembersPage() {
       </div>
     </DashboardWrapper>
   )
+}
+function setBatchLoading(arg0: boolean) {
+  throw new Error("Function not implemented.")
+}
+
+function setBatchError(arg0: null) {
+  throw new Error("Function not implemented.")
 }
