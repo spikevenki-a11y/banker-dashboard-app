@@ -15,7 +15,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import { NavigationHeader } from "./navigation-hedder"
 
 export function DashboardHeader() {
   const { logout } = useAuth()
@@ -34,7 +33,7 @@ export function DashboardHeader() {
   }
 
   return (
-    <><header className="flex h-16 items-center justify-between border-b border-border bg-card px-6">
+    <header className="flex h-16 items-center justify-between border-b border-border bg-card px-6">
       <div className="flex flex-1 items-center gap-4">
         <div className="relative w-96">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -45,11 +44,6 @@ export function DashboardHeader() {
             <span className="text-xs font-medium text-primary">{identity.branch}</span>
           </div>
         )}
-
-        <div className="ml-4 flex items-center gap-2 rounded-md bg-red-100 px-3 py-1">
-          <span className="text-xs font-medium text-red-500 underline">{identity?.businessDate || "No Date"}</span>
-        </div>
-
       </div>
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" className="relative">
@@ -85,7 +79,5 @@ export function DashboardHeader() {
         </DropdownMenu>
       </div>
     </header>
-    {/* <NavigationHeader /> */}
-    </>
   )
 }

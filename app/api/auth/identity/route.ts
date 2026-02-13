@@ -9,7 +9,6 @@ export async function GET() {
     name: u.fullName,
     role: u.role,
     branch: u.branch,
-    initials: u.fullName.split(" ").map((n: any[]) => n[0]).join("").toUpperCase(),
-    businessDate: u.businessDate
+    initials: u.fullName.split(" ").map((n: any[]) => n[0]).join("").toUpperCase()
   })
 }
