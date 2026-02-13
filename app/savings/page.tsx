@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -131,11 +132,12 @@ const mockTransactions: Transaction[] = [
 ]
 
 export default function SavingsPage() {
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [isOpenAccountOpen, setIsOpenAccountOpen] = useState(false)
   const [isTransactionOpen, setIsTransactionOpen] = useState(false)
-  const [isViewAccountOpen, setIsViewAccountOpen] = useState(false)
+
   const [isAccountClosure, setIsAccountClosure] = useState(false)
   const [selectedAccount, setSelectedAccount] = useState<SavingsAccount | null>(null)
   const [transactionType, setTransactionType] = useState<"deposit" | "withdrawal">("deposit")
@@ -309,9 +311,9 @@ export default function SavingsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => {setSelectedAccount(account); setIsViewAccountOpen(true)}}>
+                            <DropdownMenuItem onClick={() => router.push(`/savings/view_account?account=${account.accountNumber}`)}>
                               <Eye className="mr-2 h-4 w-4" />
-                              View Details
+                              View / Modify
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => {
@@ -449,139 +451,7 @@ export default function SavingsPage() {
             </DialogContent>
           </Dialog>
 
-          {/* View Account Details Dialog */}
-          <Dialog open={!!selectedAccount && isViewAccountOpen} onOpenChange={() => setSelectedAccount(null)}>
-            <DialogContent className="max-w-3xl">
-              <DialogHeader>
-                <DialogTitle>Account Details</DialogTitle>
-                <DialogDescription>Savings account information and transaction history</DialogDescription>
-              </DialogHeader>
-              {selectedAccount && (
-                <Tabs defaultValue="overview" className="w-full">
-                  <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="overview">Overview</TabsTrigger>
-                    <TabsTrigger value="transactions">Transactions</TabsTrigger>
-                    <TabsTrigger value="interest">Interest</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="overview" className="space-y-4">
-                    <div className="grid gap-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label className="text-muted-foreground">Account Number</Label>
-                          <p className="font-mono font-medium">{selectedAccount.accountNumber}</p>
-                        </div>
-                        <div>
-                          <Label className="text-muted-foreground">Account Type</Label>
-                          <p className="font-medium">{selectedAccount.accountType}</p>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label className="text-muted-foreground">Member Name</Label>
-                          <p className="font-medium">{selectedAccount.memberName}</p>
-                        </div>
-                        <div>
-                          <Label className="text-muted-foreground">Member ID</Label>
-                          <p className="font-mono font-medium">{selectedAccount.memberId}</p>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label className="text-muted-foreground">Interest Rate</Label>
-                          <p className="font-medium">{selectedAccount.interestRate}% per annum</p>
-                        </div>
-                        <div>
-                          <Label className="text-muted-foreground">Status</Label>
-                          <div className="mt-1">
-                            <Badge variant="default" className="bg-teal-100 text-teal-700">
-                              {selectedAccount.status}
-                            </Badge>
-                          </div>
-                        </div>
-                      </div>
-                      <div>
-                        <Label className="text-muted-foreground">Current Balance</Label>
-                        <p className="text-3xl font-bold text-foreground">{selectedAccount.balance}</p>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label className="text-muted-foreground">Opened Date</Label>
-                          <p className="font-medium">{selectedAccount.openedDate}</p>
-                        </div>
-                        <div>
-                          <Label className="text-muted-foreground">Last Transaction</Label>
-                          <p className="font-medium">{selectedAccount.lastTransaction}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="transactions" className="space-y-4">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Description</TableHead>
-                          <TableHead>Amount</TableHead>
-                          <TableHead>Balance</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {mockTransactions.map((txn) => (
-                          <TableRow key={txn.id}>
-                            <TableCell>{txn.date}</TableCell>
-                            <TableCell>
-                              <Badge
-                                variant="secondary"
-                                className={
-                                  txn.type === "deposit" ? "bg-teal-100 text-teal-700" : "bg-orange-100 text-orange-700"
-                                }
-                              >
-                                {txn.type === "deposit" ? (
-                                  <ArrowDownRight className="mr-1 h-3 w-3" />
-                                ) : (
-                                  <ArrowUpRight className="mr-1 h-3 w-3" />
-                                )}
-                                {txn.type}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{txn.description}</TableCell>
-                            <TableCell className="font-semibold">{txn.amount}</TableCell>
-                            <TableCell className="font-mono">{txn.balance}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TabsContent>
-                  <TabsContent value="interest" className="space-y-4">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base">Interest Calculation Summary</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-muted-foreground">Annual Interest Rate</span>
-                          <span className="font-semibold">{selectedAccount.interestRate}%</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-muted-foreground">Interest Earned (YTD)</span>
-                          <span className="font-semibold text-teal-600">₹892.45</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-muted-foreground">Last Interest Credit</span>
-                          <span className="font-medium">2024-12-01</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-muted-foreground">Next Interest Credit</span>
-                          <span className="font-medium">2025-01-01</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
-                </Tabs>
-              )}
-            </DialogContent>
-          </Dialog>
+
         </main>
       </div>
     </div>
