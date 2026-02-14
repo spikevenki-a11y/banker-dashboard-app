@@ -19,6 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Textarea } from "@/components/ui/textarea"
 import {
   ArrowLeft,
   Search,
@@ -34,6 +35,9 @@ import {
   Save,
   X,
   CheckCircle2,
+  History,
+  Plus,
+  Minus,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 
@@ -77,12 +81,28 @@ type AccountDetails = {
   join_date: string
 }
 
+type Transaction = {
+  id: string
+  account_number: string
+  transaction_type: string
+  amount: number
+  balance_after: number
+  description: string
+  reference_number: string | null
+  performed_by: string
+  transaction_date: string
+  created_at: string
+}
+
 export default function ViewModifyAccountPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const accountFromParams = searchParams.get("account")
+  const tabFromParams = searchParams.get("tab")
+  const txnTypeFromParams = searchParams.get("txnType")
 
   const [accountNumber, setAccountNumber] = useState(accountFromParams || "")
+  const [activeTab, setActiveTab] = useState(tabFromParams || "overview")
   const [isSearching, setIsSearching] = useState(false)
   const [account, setAccount] = useState<AccountDetails | null>(null)
   const [searchError, setSearchError] = useState("")
@@ -90,6 +110,17 @@ export default function ViewModifyAccountPage() {
   const [editStatus, setEditStatus] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const [successOpen, setSuccessOpen] = useState(false)
+  const [successMessage, setSuccessMessage] = useState("")
+
+  // Transaction state
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [isLoadingTxns, setIsLoadingTxns] = useState(false)
+  const [txnType, setTxnType] = useState<"deposit" | "withdrawal">((txnTypeFromParams as "deposit" | "withdrawal") || "deposit")
+  const [txnAmount, setTxnAmount] = useState("")
+  const [txnDescription, setTxnDescription] = useState("")
+  const [txnReference, setTxnReference] = useState("")
+  const [isSubmittingTxn, setIsSubmittingTxn] = useState(false)
+  const [txnError, setTxnError] = useState("")
 
   useEffect(() => {
     if (accountFromParams) {
@@ -115,6 +146,7 @@ export default function ViewModifyAccountPage() {
       if (res.ok && data.account) {
         setAccount(data.account)
         setEditStatus(data.account.account_status)
+        fetchTransactions(data.account.account_number)
       } else {
         setSearchError(data.error || "Account not found.")
       }
@@ -145,11 +177,76 @@ export default function ViewModifyAccountPage() {
 
       setAccount({ ...account, account_status: editStatus })
       setIsEditing(false)
+      setSuccessMessage(`The account ${account.account_number} has been updated successfully.`)
       setSuccessOpen(true)
     } catch (e: any) {
       alert("Error: " + e.message)
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const fetchTransactions = async (accNo: string) => {
+    setIsLoadingTxns(true)
+    try {
+      const res = await fetch(`/api/savings/transactions?account=${encodeURIComponent(accNo)}`, {
+        credentials: "include",
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setTransactions(data.transactions || [])
+      }
+    } catch {
+      // silently fail; user can retry
+    } finally {
+      setIsLoadingTxns(false)
+    }
+  }
+
+  const handleSubmitTransaction = async () => {
+    if (!account) return
+    const amt = parseFloat(txnAmount)
+    if (isNaN(amt) || amt <= 0) {
+      setTxnError("Enter a valid positive amount.")
+      return
+    }
+
+    setIsSubmittingTxn(true)
+    setTxnError("")
+
+    try {
+      const res = await fetch("/api/savings/transactions", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accountNumber: account.account_number,
+          transactionType: txnType,
+          amount: amt,
+          description: txnDescription || undefined,
+          referenceNumber: txnReference || undefined,
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+
+      // Update local balance
+      setAccount({ ...account, available_balance: data.newBalance, clear_balance: data.newBalance })
+
+      // Reset form
+      setTxnAmount("")
+      setTxnDescription("")
+      setTxnReference("")
+      setSuccessMessage(data.message)
+      setSuccessOpen(true)
+
+      // Refresh transactions
+      fetchTransactions(account.account_number)
+    } catch (e: any) {
+      setTxnError(e.message || "Transaction failed. Please try again.")
+    } finally {
+      setIsSubmittingTxn(false)
     }
   }
 
@@ -227,9 +324,10 @@ export default function ViewModifyAccountPage() {
               <div className="grid gap-6 lg:grid-cols-3">
                 {/* Left Column - Main Content */}
                 <div className="space-y-6 lg:col-span-2">
-                  <Tabs defaultValue="overview" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3">
+                  <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                    <TabsList className="grid w-full grid-cols-4">
                       <TabsTrigger value="overview">Account Overview</TabsTrigger>
+                      <TabsTrigger value="transactions">Transactions</TabsTrigger>
                       <TabsTrigger value="member">Member Details</TabsTrigger>
                       <TabsTrigger value="scheme">Scheme Details</TabsTrigger>
                     </TabsList>
@@ -345,6 +443,184 @@ export default function ViewModifyAccountPage() {
                               </div>
                             )}
                           </div>
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+
+                    {/* Transactions Tab */}
+                    <TabsContent value="transactions" className="space-y-4 pt-4">
+                      {/* Transaction Form */}
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-lg">New Transaction</CardTitle>
+                          <CardDescription>Process a deposit or withdrawal on this account</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          {account.account_status?.toLowerCase() !== "active" ? (
+                            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+                              Transactions are only allowed on active accounts. Current status: <strong>{account.account_status}</strong>
+                            </div>
+                          ) : (
+                            <div className="space-y-4">
+                              <div className="flex gap-2">
+                                <Button
+                                  variant={txnType === "deposit" ? "default" : "outline"}
+                                  onClick={() => setTxnType("deposit")}
+                                  className={txnType === "deposit" ? "bg-teal-600 hover:bg-teal-700 text-white" : "bg-transparent"}
+                                >
+                                  <Plus className="mr-2 h-4 w-4" />
+                                  Deposit
+                                </Button>
+                                <Button
+                                  variant={txnType === "withdrawal" ? "default" : "outline"}
+                                  onClick={() => setTxnType("withdrawal")}
+                                  className={txnType === "withdrawal" ? "bg-orange-600 hover:bg-orange-700 text-white" : "bg-transparent"}
+                                >
+                                  <Minus className="mr-2 h-4 w-4" />
+                                  Withdrawal
+                                </Button>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label htmlFor="txn-amount">Amount (INR)</Label>
+                                  <Input
+                                    id="txn-amount"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    placeholder="Enter amount"
+                                    value={txnAmount}
+                                    onChange={(e) => setTxnAmount(e.target.value)}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label htmlFor="txn-ref">Reference Number (Optional)</Label>
+                                  <Input
+                                    id="txn-ref"
+                                    placeholder="e.g. Receipt No."
+                                    value={txnReference}
+                                    onChange={(e) => setTxnReference(e.target.value)}
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label htmlFor="txn-desc">Description (Optional)</Label>
+                                <Textarea
+                                  id="txn-desc"
+                                  placeholder="Transaction description"
+                                  rows={2}
+                                  value={txnDescription}
+                                  onChange={(e) => setTxnDescription(e.target.value)}
+                                />
+                              </div>
+
+                              {txnError && <p className="text-sm text-red-500">{txnError}</p>}
+
+                              <Button
+                                onClick={handleSubmitTransaction}
+                                disabled={isSubmittingTxn || !txnAmount}
+                                className={txnType === "deposit" ? "bg-teal-600 hover:bg-teal-700 text-white" : "bg-orange-600 hover:bg-orange-700 text-white"}
+                              >
+                                {isSubmittingTxn ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : txnType === "deposit" ? (
+                                  <ArrowDownRight className="mr-2 h-4 w-4" />
+                                ) : (
+                                  <ArrowUpRight className="mr-2 h-4 w-4" />
+                                )}
+                                {txnType === "deposit" ? "Process Deposit" : "Process Withdrawal"}
+                              </Button>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+
+                      {/* Transaction History */}
+                      <Card>
+                        <CardHeader className="flex flex-row items-center justify-between">
+                          <div>
+                            <CardTitle className="text-lg">Transaction History</CardTitle>
+                            <CardDescription>Recent transactions on this account</CardDescription>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => fetchTransactions(account.account_number)}
+                            disabled={isLoadingTxns}
+                            className="bg-transparent"
+                          >
+                            {isLoadingTxns ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <History className="mr-2 h-4 w-4" />}
+                            Refresh
+                          </Button>
+                        </CardHeader>
+                        <CardContent>
+                          {isLoadingTxns ? (
+                            <div className="flex items-center justify-center py-8">
+                              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                            </div>
+                          ) : transactions.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-10 text-center">
+                              <History className="h-10 w-10 text-muted-foreground" />
+                              <p className="mt-3 text-sm text-muted-foreground">No transactions found for this account.</p>
+                            </div>
+                          ) : (
+                            <div className="overflow-x-auto">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead>Type</TableHead>
+                                    <TableHead>Description</TableHead>
+                                    <TableHead className="text-right">Amount</TableHead>
+                                    <TableHead className="text-right">Balance</TableHead>
+                                    <TableHead>By</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {transactions.map((txn) => (
+                                    <TableRow key={txn.id}>
+                                      <TableCell className="whitespace-nowrap text-sm">
+                                        {formatDate(txn.transaction_date)}
+                                      </TableCell>
+                                      <TableCell>
+                                        <Badge
+                                          className={
+                                            txn.transaction_type === "deposit"
+                                              ? "bg-teal-100 text-teal-700"
+                                              : txn.transaction_type === "withdrawal"
+                                                ? "bg-orange-100 text-orange-700"
+                                                : "bg-blue-100 text-blue-700"
+                                          }
+                                        >
+                                          {txn.transaction_type === "deposit" ? (
+                                            <ArrowDownRight className="mr-1 h-3 w-3" />
+                                          ) : (
+                                            <ArrowUpRight className="mr-1 h-3 w-3" />
+                                          )}
+                                          {txn.transaction_type}
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell className="max-w-[200px] truncate text-sm">
+                                        {txn.description || "---"}
+                                      </TableCell>
+                                      <TableCell className="text-right font-semibold">
+                                        <span className={txn.transaction_type === "deposit" ? "text-teal-600" : "text-orange-600"}>
+                                          {txn.transaction_type === "deposit" ? "+" : "-"}
+                                          {formatCurrency(txn.amount)}
+                                        </span>
+                                      </TableCell>
+                                      <TableCell className="text-right font-mono text-sm">
+                                        {formatCurrency(txn.balance_after)}
+                                      </TableCell>
+                                      <TableCell className="text-sm text-muted-foreground">{txn.performed_by}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          )}
                         </CardContent>
                       </Card>
                     </TabsContent>
@@ -583,7 +859,7 @@ export default function ViewModifyAccountPage() {
                     Account Updated Successfully
                   </AlertDialogTitle>
                   <AlertDialogDescription>
-                    The account {account?.account_number} has been updated successfully.
+                    {successMessage || `The account ${account?.account_number} has been updated successfully.`}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
