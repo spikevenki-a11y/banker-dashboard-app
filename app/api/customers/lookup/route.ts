@@ -1,3 +1,4 @@
+
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import pool from "@/lib/connection/db"
@@ -17,25 +18,43 @@ export async function POST(req: Request) {
     // Lookup customer by Aadhaar
     const { rows } = await pool.query(
       `
-      SELECT 
-        customer_code,
-        full_name,
-        father_name,
-        gender,
-        date_of_birth,
-        aadhaar_no,
-        pan_no,
-        mobile_no,
-        email,
-        address_line1,
-        address_line2,
-        village,
-        taluk,
-        district,
-        state,
-        pincode
-      FROM customers
-      WHERE aadhaar_no = $1 AND is_active = true
+      SELECT
+          c.id AS customer_id,
+          c.customer_code,
+          c.full_name,
+          c.father_name,
+          c.gender,
+          TO_CHAR(c.date_of_birth, 'YYYY-MM-DD') AS date_of_birth,
+          c.customer_type,
+          c.spouse_name,
+          c.mobile_no,
+          c.email,
+
+          -- Address
+          ca.house_no,
+          ca.street,
+          ca.village,
+          ca.thaluk,
+          ca.district,
+          ca.state,
+          ca.pincode,
+          ca.email,
+          ca.phone_no,
+
+          -- KYC
+          ck.aadhaar_no,
+          ck.pan_no,
+          ck.ration_no,
+          ck.driving_license_no
+
+      FROM customers c
+      LEFT JOIN customer_address ca
+          ON ca.customer_code = c.customer_code
+      LEFT JOIN customer_kycdetails ck
+          ON ck.customer_code = c.customer_code
+      WHERE ck.aadhaar_no LIKE '%' || $1 || '%'
+          and c.is_active = true
+
     `,
       [aadhaar_no],
     )

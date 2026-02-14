@@ -1109,7 +1109,7 @@ export default function MembersPage() {
                               onChange={(e) =>
                                 setNewMember({ ...newMember, boardResolutionNumber: e.target.value })
                               }
-                              readOnly={fieldsReadOnly}
+                              // readOnly={fieldsReadOnly}
                               className={fieldsReadOnly ? "bg-muted" : ""}
                             />
                           </div>
@@ -1121,7 +1121,7 @@ export default function MembersPage() {
                               onChange={(e) =>
                                 setNewMember({ ...newMember, boardResolutionDate: e.target.value })
                               }
-                              readOnly={fieldsReadOnly}
+                              // readOnly={fieldsReadOnly}
                               className={fieldsReadOnly ? "bg-muted" : ""}
                             />
                           </div>
@@ -1132,7 +1132,7 @@ export default function MembersPage() {
                               onChange={(e) =>
                                 setNewMember({ ...newMember, ledgerFolioNumber: e.target.value })
                               }
-                              readOnly={fieldsReadOnly}
+                              // readOnly={fieldsReadOnly}
                               className={fieldsReadOnly ? "bg-muted" : ""}
                             />
                           </div>
