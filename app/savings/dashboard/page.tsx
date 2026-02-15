@@ -194,7 +194,7 @@ export default function SavingsPage() {
               </Card>
               <Card
                 className="cursor-pointer transition-all hover:shadow-lg hover:border-teal-500 flex flex-row"
-                onClick={() => router.push("/savings/view_account?tab=transactions&txnType=deposit")}
+                onClick={() => router.push("/savings/deposit")}
               >
                 <CardHeader className="pb-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-teal-500/10">
@@ -208,7 +208,7 @@ export default function SavingsPage() {
               </Card>
               <Card
                 className="cursor-pointer transition-all hover:shadow-lg hover:border-orange-500 flex flex-row"
-                onClick={() => router.push("/savings/view_account?tab=transactions&txnType=withdrawal")}
+                onClick={() => router.push("/savings/withdraw")}
               >
                 <CardHeader className="pb-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-500/10">

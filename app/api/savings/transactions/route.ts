@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
+import { cookies } from "next/headers"
 import pool from "@/lib/connection/db"
-import { getSession } from "@/lib/auth/session"
 
 export async function GET(request: NextRequest) {
+  const c = (await cookies()).get("banker_session")
+  if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   try {
-    const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const session = JSON.parse(c.value)
+    const branchId = session.branch
 
     const { searchParams } = new URL(request.url)
     const accountNumber = searchParams.get("account")
@@ -42,12 +43,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  try {
-    const session = await getSession()
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+  const c = (await cookies()).get("banker_session")
+  if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+  try {
+    const session = JSON.parse(c.value)
     const body = await request.json()
     const { accountNumber, transactionType, amount, description, referenceNumber } = body
 
@@ -66,9 +66,9 @@ export async function POST(request: NextRequest) {
     try {
       await client.query("BEGIN")
 
-      // Get current account details
+      // Get current account details with row lock
       const { rows: accounts } = await client.query(
-        `SELECT * FROM savings_accounts WHERE account_number = $1`,
+        `SELECT * FROM savings_accounts WHERE account_number = $1 FOR UPDATE`,
         [accountNumber]
       )
 
@@ -79,13 +79,13 @@ export async function POST(request: NextRequest) {
 
       const account = accounts[0]
 
-      if (account.status !== "active") {
+      if (account.account_status?.toUpperCase() !== "ACTIVE") {
         await client.query("ROLLBACK")
         return NextResponse.json({ error: "Account is not active" }, { status: 400 })
       }
 
       let newBalance: number
-      const currentBalance = parseFloat(account.current_balance)
+      const currentBalance = parseFloat(account.available_balance)
 
       if (transactionType === "deposit") {
         newBalance = currentBalance + parseFloat(amount)
@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
       // Update the account balance
       await client.query(
         `UPDATE savings_accounts 
-         SET current_balance = $1, last_transaction_date = NOW(), updated_at = NOW()
+         SET available_balance = $1, clear_balance = $1, updated_at = NOW()
          WHERE account_number = $2`,
         [newBalance, accountNumber]
       )
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         transaction: txn[0],
         newBalance,
-        message: `${transactionType === "deposit" ? "Deposit" : "Withdrawal"} of ${amount} successful`,
+        message: `${transactionType === "deposit" ? "Deposit" : "Withdrawal"} of ₹${Number(amount).toLocaleString("en-IN")} successful. New balance: ₹${newBalance.toLocaleString("en-IN")}`,
       })
     } catch (err) {
       await client.query("ROLLBACK")
