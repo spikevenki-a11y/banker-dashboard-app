@@ -9,6 +9,19 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogContent,
@@ -61,10 +74,15 @@ type AccountInfo = {
 type Transaction = {
   id: string
   transaction_type: string
-  amount: number
-  balance_after: number
-  description: string
-  performed_by: string
+  voucher_type: string
+  debit_amount: number
+  credit_amount: number
+  running_balance: number
+  narration: string
+  voucher_no: number
+  gl_batch_id: number
+  batch_status: string
+  created_by: string
   transaction_date: string
 }
 
@@ -88,8 +106,11 @@ export default function DepositPage() {
 
   // Transaction form
   const [amount, setAmount] = useState("")
-  const [description, setDescription] = useState("")
-  const [referenceNumber, setReferenceNumber] = useState("")
+  const [narration, setNarration] = useState("")
+  const [voucherType, setVoucherType] = useState<"CASH" | "TRANSFER" | "">("")
+  const [selectedBatch, setSelectedBatch] = useState<number>(0)
+  const [isBatchPopupOpen, setIsBatchPopupOpen] = useState(false)
+  const [incompleteBatches, setIncompleteBatches] = useState<any[]>([])
 
   // Transaction history
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -113,6 +134,18 @@ export default function DepositPage() {
       // silent
     } finally {
       setIsLoadingTxns(false)
+    }
+  }
+
+  const fetchIncompleteBatches = async () => {
+    try {
+      const res = await fetch("/api/fas/incomplete-batches", { credentials: "include" })
+      const data = await res.json()
+      if (res.ok && data.data) {
+        setIncompleteBatches(data.data)
+      }
+    } catch {
+      // silent
     }
   }
 
@@ -145,6 +178,11 @@ export default function DepositPage() {
   const handleSubmit = async () => {
     if (!accountInfo) return
 
+    if (!voucherType) {
+      setFormError("Please select a voucher type.")
+      return
+    }
+
     const amt = parseFloat(amount)
     if (isNaN(amt) || amt <= 0) {
       setFormError("Enter a valid positive amount.")
@@ -171,10 +209,11 @@ export default function DepositPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           accountNumber: accountInfo.account_number,
-          transactionType: "deposit",
+          transactionType: "DEPOSIT",
           amount: amt,
-          description: description || undefined,
-          referenceNumber: referenceNumber || undefined,
+          narration: narration || "Savings Deposit",
+          voucherType,
+          selectedBatch,
         }),
       })
 
@@ -193,8 +232,9 @@ export default function DepositPage() {
 
       // Reset form
       setAmount("")
-      setDescription("")
-      setReferenceNumber("")
+      setNarration("")
+      setVoucherType("")
+      setSelectedBatch(0)
 
       // Refresh transactions
       fetchTransactions(accountInfo.account_number)
@@ -210,8 +250,9 @@ export default function DepositPage() {
     setAccountInfo(null)
     setSearchError("")
     setAmount("")
-    setDescription("")
-    setReferenceNumber("")
+    setNarration("")
+    setVoucherType("")
+    setSelectedBatch(0)
     setFormError("")
     setTransactions([])
   }
@@ -340,6 +381,26 @@ export default function DepositPage() {
                     )}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
+                        <Label htmlFor="voucher-type">Transaction Type *</Label>
+                        <Select
+                          value={voucherType || ""}
+                          onValueChange={(value) => {
+                            setVoucherType(value === "CASH" ? "CASH" : value === "TRANSFER" ? "TRANSFER" : "")
+                            if (value !== "TRANSFER") {
+                              setSelectedBatch(0)
+                            }
+                          }}
+                        >
+                          <SelectTrigger id="voucher-type" className="w-full">
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="CASH">Cash</SelectItem>
+                            <SelectItem value="TRANSFER">Transfer</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
                         <Label htmlFor="deposit-amount">Deposit Amount (INR) *</Label>
                         <Input
                           id="deposit-amount"
@@ -359,25 +420,44 @@ export default function DepositPage() {
                           </p>
                         ) : null}
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="ref-no">Reference / Receipt No.</Label>
-                        <Input
-                          id="ref-no"
-                          placeholder="e.g. REC-001234"
-                          value={referenceNumber}
-                          onChange={(e) => setReferenceNumber(e.target.value)}
-                        />
-                      </div>
                     </div>
 
+                    {/* GL Batch Selection - only for TRANSFER */}
+                    {voucherType === "TRANSFER" && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium">GL Batch ID</Label>
+                          <div className="flex gap-2">
+                            <Input
+                              id="gl-batch-id"
+                              value={selectedBatch && selectedBatch !== 0 ? selectedBatch : "New Batch"}
+                              readOnly
+                              placeholder="Select or create batch"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="bg-transparent"
+                              onClick={() => {
+                                fetchIncompleteBatches()
+                                setIsBatchPopupOpen(true)
+                              }}
+                            >
+                              Select
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="space-y-2">
-                      <Label htmlFor="txn-desc">Description</Label>
+                      <Label htmlFor="txn-narration">Narration</Label>
                       <Textarea
-                        id="txn-desc"
-                        placeholder="e.g. Cash Deposit, Cheque Deposit, Transfer"
+                        id="txn-narration"
+                        placeholder="e.g. Cash Deposit, Transfer from other account"
                         rows={2}
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
+                        value={narration}
+                        onChange={(e) => setNarration(e.target.value)}
                       />
                     </div>
 
@@ -428,9 +508,13 @@ export default function DepositPage() {
                               <TableRow>
                                 <TableHead>Date</TableHead>
                                 <TableHead>Type</TableHead>
-                                <TableHead>Description</TableHead>
-                                <TableHead className="text-right">Amount</TableHead>
+                                <TableHead>Voucher</TableHead>
+                                <TableHead>Batch</TableHead>
+                                <TableHead>Narration</TableHead>
+                                <TableHead className="text-right">Debit</TableHead>
+                                <TableHead className="text-right">Credit</TableHead>
                                 <TableHead className="text-right">Balance</TableHead>
+                                <TableHead>Status</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -438,18 +522,33 @@ export default function DepositPage() {
                                 <TableRow key={txn.id}>
                                   <TableCell className="whitespace-nowrap text-sm">{formatDate(txn.transaction_date)}</TableCell>
                                   <TableCell>
-                                    <Badge className={txn.transaction_type === "deposit" ? "bg-teal-100 text-teal-700" : "bg-orange-100 text-orange-700"}>
-                                      {txn.transaction_type === "deposit" ? <ArrowDownRight className="mr-1 h-3 w-3" /> : <ArrowUpRight className="mr-1 h-3 w-3" />}
+                                    <Badge className={txn.transaction_type === "DEPOSIT" ? "bg-teal-100 text-teal-700" : "bg-orange-100 text-orange-700"}>
+                                      {txn.transaction_type === "DEPOSIT" ? <ArrowDownRight className="mr-1 h-3 w-3" /> : <ArrowUpRight className="mr-1 h-3 w-3" />}
                                       {txn.transaction_type}
                                     </Badge>
                                   </TableCell>
-                                  <TableCell className="max-w-[180px] truncate text-sm">{txn.description || "---"}</TableCell>
-                                  <TableCell className="text-right font-semibold">
-                                    <span className={txn.transaction_type === "deposit" ? "text-teal-600" : "text-orange-600"}>
-                                      {txn.transaction_type === "deposit" ? "+" : "-"}{formatCurrency(txn.amount)}
-                                    </span>
+                                  <TableCell className="text-sm">
+                                    <Badge variant="outline">{txn.voucher_type || "---"}</Badge>
+                                    {txn.voucher_no ? <span className="ml-1 text-xs text-muted-foreground">#{txn.voucher_no}</span> : null}
                                   </TableCell>
-                                  <TableCell className="text-right font-mono text-sm">{formatCurrency(txn.balance_after)}</TableCell>
+                                  <TableCell className="font-mono text-sm">{txn.gl_batch_id || "---"}</TableCell>
+                                  <TableCell className="max-w-[150px] truncate text-sm">{txn.narration || "---"}</TableCell>
+                                  <TableCell className="text-right font-semibold text-orange-600">
+                                    {Number(txn.debit_amount) > 0 ? formatCurrency(txn.debit_amount) : "---"}
+                                  </TableCell>
+                                  <TableCell className="text-right font-semibold text-teal-600">
+                                    {Number(txn.credit_amount) > 0 ? formatCurrency(txn.credit_amount) : "---"}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono text-sm">{formatCurrency(txn.running_balance)}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className={
+                                      txn.batch_status === "APPROVED" ? "border-teal-300 text-teal-700" :
+                                      txn.batch_status === "REJECTED" ? "border-red-300 text-red-700" :
+                                      "border-amber-300 text-amber-700"
+                                    }>
+                                      {txn.batch_status || txn.status || "---"}
+                                    </Badge>
+                                  </TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>
@@ -636,6 +735,70 @@ export default function DepositPage() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+
+            {/* GL Batch Selection Dialog */}
+            <Dialog open={isBatchPopupOpen} onOpenChange={setIsBatchPopupOpen}>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Select Incomplete GL Batch</DialogTitle>
+                </DialogHeader>
+                <div className="max-h-[400px] overflow-y-auto">
+                  {incompleteBatches.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-muted-foreground">No incomplete batches found. A new batch will be created.</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Batch ID</TableHead>
+                          <TableHead>Total Debit</TableHead>
+                          <TableHead>Total Credit</TableHead>
+                          <TableHead>Difference</TableHead>
+                          <TableHead className="text-right">Action</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {incompleteBatches.map((b) => (
+                          <TableRow key={b.batch_id}>
+                            <TableCell>{b.batch_id}</TableCell>
+                            <TableCell>{formatCurrency(b.total_debit)}</TableCell>
+                            <TableCell>{formatCurrency(b.total_credit)}</TableCell>
+                            <TableCell className="text-red-600">{formatCurrency(b.difference)}</TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="bg-transparent"
+                                onClick={() => {
+                                  setSelectedBatch(b.batch_id)
+                                  setIsBatchPopupOpen(false)
+                                }}
+                              >
+                                Select
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </div>
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button
+                    variant="outline"
+                    className="bg-transparent"
+                    onClick={() => {
+                      setSelectedBatch(0)
+                      setIsBatchPopupOpen(false)
+                    }}
+                  >
+                    New Batch
+                  </Button>
+                  <Button variant="outline" className="bg-transparent" onClick={() => setIsBatchPopupOpen(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </main>
         </div>
       </div>
