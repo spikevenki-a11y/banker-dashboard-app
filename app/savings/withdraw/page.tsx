@@ -1,0 +1,826 @@
+"use client"
+
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  ArrowLeft,
+  Search,
+  Loader2,
+  CheckCircle2,
+  User,
+  CreditCard,
+  Banknote,
+  ArrowDownRight,
+  ArrowUpRight,
+  History,
+  AlertTriangle,
+} from "lucide-react"
+import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
+
+type AccountInfo = {
+  account_number: string
+  membership_no: string
+  scheme_name: string
+  interest_rate: number
+  available_balance: number
+  clear_balance: number
+  account_status: string
+  opening_date: string
+  full_name: string
+  father_name: string
+  mobile_no: string
+  member_type: string
+  customer_code: string
+  min_balance: number
+  minimum_deposit: number
+  maximum_deposit: number
+}
+
+type Transaction = {
+  id: string
+  transaction_type: string
+  voucher_type: string
+  debit_amount: number
+  credit_amount: number
+  running_balance: number
+  narration: string
+  voucher_no: number
+  gl_batch_id: number
+  batch_status: string
+  created_by: string
+  transaction_date: string
+}
+
+function formatCurrency(val: number | string) {
+  return `₹${Number(val).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
+function formatDate(d: string) {
+  if (!d) return "---"
+  return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+}
+
+export default function WithdrawPage() {
+  const router = useRouter()
+
+  // Account lookup
+  const [accountNumber, setAccountNumber] = useState("")
+  const [isSearching, setIsSearching] = useState(false)
+  const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null)
+  const [searchError, setSearchError] = useState("")
+
+  // Transaction form
+  const [amount, setAmount] = useState("")
+  const [narration, setNarration] = useState("")
+  const [voucherType, setVoucherType] = useState<"CASH" | "TRANSFER" | "">("")
+  const [selectedBatch, setSelectedBatch] = useState<number>(0)
+  const [isBatchPopupOpen, setIsBatchPopupOpen] = useState(false)
+  const [incompleteBatches, setIncompleteBatches] = useState<any[]>([])
+
+  // Transaction history
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [isLoadingTxns, setIsLoadingTxns] = useState(false)
+
+  // Submit
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [successOpen, setSuccessOpen] = useState(false)
+  const [successMessage, setSuccessMessage] = useState("")
+  const [formError, setFormError] = useState("")
+
+  const fetchTransactions = async (accNo: string) => {
+    setIsLoadingTxns(true)
+    try {
+      const res = await fetch(`/api/savings/transactions?account=${encodeURIComponent(accNo)}&limit=10`, {
+        credentials: "include",
+      })
+      const data = await res.json()
+      if (res.ok) setTransactions(data.transactions || [])
+    } catch {
+      // silent
+    } finally {
+      setIsLoadingTxns(false)
+    }
+  }
+
+  const fetchIncompleteBatches = async () => {
+    try {
+      const res = await fetch("/api/fas/incomplete-batches", { credentials: "include" })
+      const data = await res.json()
+      if (res.ok && data.data) {
+        setIncompleteBatches(data.data)
+      }
+    } catch {
+      // silent
+    }
+  }
+
+  const handleAccountSearch = async () => {
+    if (!accountNumber.trim()) return
+
+    setIsSearching(true)
+    setSearchError("")
+    setAccountInfo(null)
+    setTransactions([])
+
+    try {
+      const res = await fetch(`/api/savings/account-details?account_number=${encodeURIComponent(accountNumber.trim())}`, {
+        credentials: "include",
+      })
+      const data = await res.json()
+      if (res.ok && data.account) {
+        setAccountInfo(data.account)
+        fetchTransactions(data.account.account_number)
+      } else {
+        setSearchError(data.error || "Account not found.")
+      }
+    } catch {
+      setSearchError("Failed to search account. Please try again.")
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  const availableBalance = accountInfo ? Number(accountInfo.available_balance) : 0
+  const minBalance = accountInfo?.min_balance ? Number(accountInfo.min_balance) : 0
+  const maxWithdrawable = Math.max(0, availableBalance - minBalance)
+
+  const handleSubmit = async () => {
+    if (!accountInfo) return
+
+    if (!voucherType) {
+      setFormError("Please select a voucher type.")
+      return
+    }
+
+    const amt = parseFloat(amount)
+    if (isNaN(amt) || amt <= 0) {
+      setFormError("Enter a valid positive amount.")
+      return
+    }
+
+    if (amt > availableBalance) {
+      setFormError(`Insufficient balance. Available: ${formatCurrency(availableBalance)}`)
+      return
+    }
+
+    if (amt > maxWithdrawable) {
+      setFormError(`Cannot withdraw below minimum balance of ${formatCurrency(minBalance)}. Maximum withdrawable: ${formatCurrency(maxWithdrawable)}`)
+      return
+    }
+
+    setIsSubmitting(true)
+    setFormError("")
+
+    try {
+      const res = await fetch("/api/savings/transactions", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accountNumber: accountInfo.account_number,
+          transactionType: "WITHDRAWAL",
+          amount: amt,
+          narration: narration || "Savings Withdrawal",
+          voucherType,
+          selectedBatch,
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+
+      // Update local balance
+      setAccountInfo({
+        ...accountInfo,
+        available_balance: data.newBalance,
+        clear_balance: data.newBalance,
+      })
+
+      setSuccessMessage(data.message)
+      setSuccessOpen(true)
+
+      // Reset form
+      setAmount("")
+      setNarration("")
+      setVoucherType("")
+      setSelectedBatch(0)
+
+      // Refresh transactions
+      fetchTransactions(accountInfo.account_number)
+    } catch (e: any) {
+      setFormError(e.message || "Withdrawal failed. Please try again.")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleReset = () => {
+    setAccountNumber("")
+    setAccountInfo(null)
+    setSearchError("")
+    setAmount("")
+    setNarration("")
+    setVoucherType("")
+    setSelectedBatch(0)
+    setFormError("")
+    setTransactions([])
+  }
+
+  const isActive = accountInfo?.account_status?.toUpperCase() === "ACTIVE"
+  const balanceAfter = accountInfo && amount ? availableBalance - Number(amount || 0) : null
+  const isBelowMinBalance = balanceAfter !== null && balanceAfter < minBalance
+
+  return (
+    <DashboardWrapper>
+      <div className="flex h-screen overflow-hidden">
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <main className="flex-1 overflow-y-auto bg-background p-6">
+            {/* Header */}
+            <div className="mb-6 flex items-center gap-4">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => router.push("/savings")}
+                className="h-10 w-10 bg-transparent"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight text-foreground">Savings Withdrawal</h1>
+                <p className="text-muted-foreground">Withdraw funds from a savings account</p>
+              </div>
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-3">
+              {/* Left Column - Form */}
+              <div className="space-y-6 lg:col-span-2">
+                {/* Step 1: Account Lookup */}
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100 text-sm font-bold text-orange-700">
+                        1
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">Account Information</CardTitle>
+                        <CardDescription>Search for the savings account by account number</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="account-no">Account Number *</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="account-no"
+                          placeholder="Enter savings account number"
+                          value={accountNumber}
+                          onChange={(e) => setAccountNumber(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && handleAccountSearch()}
+                          className="flex-1"
+                        />
+                        <Button onClick={handleAccountSearch} disabled={isSearching || !accountNumber.trim()}>
+                          {isSearching ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Search className="mr-2 h-4 w-4" />
+                          )}
+                          Search
+                        </Button>
+                      </div>
+                      {searchError && <p className="text-sm text-red-500">{searchError}</p>}
+                    </div>
+
+                    {accountInfo && (
+                      <div className={`rounded-lg border p-4 ${isActive ? "border-teal-200 bg-teal-50/50" : "border-amber-200 bg-amber-50/50"}`}>
+                        <div className="mb-3 flex items-center gap-2">
+                          <CheckCircle2 className={`h-5 w-5 ${isActive ? "text-teal-600" : "text-amber-600"}`} />
+                          <span className={`font-medium ${isActive ? "text-teal-700" : "text-amber-700"}`}>Account Found</span>
+                          <Badge variant="outline" className={`ml-auto ${isActive ? "border-teal-300 text-teal-700" : "border-amber-300 text-amber-700"}`}>
+                            {accountInfo.account_status}
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Account Holder</p>
+                            <p className="text-sm font-medium">{accountInfo.full_name}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Membership No</p>
+                            <p className="text-sm font-mono font-medium">{accountInfo.membership_no}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Scheme</p>
+                            <p className="text-sm font-medium">{accountInfo.scheme_name}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Available Balance</p>
+                            <p className="text-sm font-semibold text-teal-600">{formatCurrency(accountInfo.available_balance)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Mobile</p>
+                            <p className="text-sm font-medium">{accountInfo.mobile_no || "---"}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Member Type</p>
+                            <p className="text-sm font-medium">{accountInfo.member_type || "---"}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Step 2: Withdrawal Details */}
+                <Card className={!accountInfo || !isActive ? "pointer-events-none opacity-50" : ""}>
+                  <CardHeader>
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100 text-sm font-bold text-orange-700">
+                        2
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">Withdrawal Details</CardTitle>
+                        <CardDescription>Enter the withdrawal amount and transaction details</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {!isActive && accountInfo && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+                        Transactions are only allowed on active accounts. Current status: <strong>{accountInfo.account_status}</strong>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="voucher-type">Transaction Type *</Label>
+                        <Select
+                          value={voucherType || ""}
+                          onValueChange={(value) => {
+                            setVoucherType(value === "CASH" ? "CASH" : value === "TRANSFER" ? "TRANSFER" : "")
+                            if (value !== "TRANSFER") {
+                              setSelectedBatch(0)
+                            }
+                          }}
+                        >
+                          <SelectTrigger id="voucher-type" className="w-full">
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="CASH">Cash</SelectItem>
+                            <SelectItem value="TRANSFER">Transfer</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="withdraw-amount">Withdrawal Amount (INR) *</Label>
+                        <Input
+                          id="withdraw-amount"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="Enter withdrawal amount"
+                          value={amount}
+                          onChange={(e) => setAmount(e.target.value)}
+                        />
+                        {accountInfo && (
+                          <p className="text-xs text-muted-foreground">
+                            Max withdrawable: {formatCurrency(maxWithdrawable)}
+                            {minBalance > 0 ? ` (Min bal: ${formatCurrency(minBalance)})` : ""}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* GL Batch Selection - only for TRANSFER */}
+                    {voucherType === "TRANSFER" && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium">GL Batch ID</Label>
+                          <div className="flex gap-2">
+                            <Input
+                              id="gl-batch-id"
+                              value={selectedBatch && selectedBatch !== 0 ? selectedBatch : "New Batch"}
+                              readOnly
+                              placeholder="Select or create batch"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="bg-transparent"
+                              onClick={() => {
+                                fetchIncompleteBatches()
+                                setIsBatchPopupOpen(true)
+                              }}
+                            >
+                              Select
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <Label htmlFor="txn-narration">Narration</Label>
+                      <Textarea
+                        id="txn-narration"
+                        placeholder="e.g. Cash Withdrawal, Transfer to other account"
+                        rows={2}
+                        value={narration}
+                        onChange={(e) => setNarration(e.target.value)}
+                      />
+                    </div>
+
+                    {isBelowMinBalance && (
+                      <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>This withdrawal will bring the balance below the minimum required balance of {formatCurrency(minBalance)}.</span>
+                      </div>
+                    )}
+
+                    {formError && <p className="text-sm text-red-500">{formError}</p>}
+                  </CardContent>
+                </Card>
+
+                {/* Step 3: Recent Transactions */}
+                {accountInfo && (
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100 text-sm font-bold text-orange-700">
+                            3
+                          </div>
+                          <div>
+                            <CardTitle className="text-lg">Recent Transactions</CardTitle>
+                            <CardDescription>Last 10 transactions on this account</CardDescription>
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fetchTransactions(accountInfo.account_number)}
+                          disabled={isLoadingTxns}
+                          className="bg-transparent"
+                        >
+                          {isLoadingTxns ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <History className="mr-2 h-4 w-4" />}
+                          Refresh
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {isLoadingTxns ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : transactions.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-8 text-center">
+                          <History className="h-8 w-8 text-muted-foreground" />
+                          <p className="mt-2 text-sm text-muted-foreground">No transactions found.</p>
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Date</TableHead>
+                                <TableHead>Type</TableHead>
+                                <TableHead>Voucher</TableHead>
+                                <TableHead>Batch</TableHead>
+                                <TableHead>Narration</TableHead>
+                                <TableHead className="text-right">Debit</TableHead>
+                                <TableHead className="text-right">Credit</TableHead>
+                                <TableHead className="text-right">Balance</TableHead>
+                                <TableHead>Status</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {transactions.map((txn) => (
+                                <TableRow key={txn.id}>
+                                  <TableCell className="whitespace-nowrap text-sm">{formatDate(txn.transaction_date)}</TableCell>
+                                  <TableCell>
+                                    <Badge className={txn.transaction_type === "DEPOSIT" ? "bg-teal-100 text-teal-700" : "bg-orange-100 text-orange-700"}>
+                                      {txn.transaction_type === "DEPOSIT" ? <ArrowDownRight className="mr-1 h-3 w-3" /> : <ArrowUpRight className="mr-1 h-3 w-3" />}
+                                      {txn.transaction_type}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-sm">
+                                    <Badge variant="outline">{txn.voucher_type || "---"}</Badge>
+                                    {txn.voucher_no ? <span className="ml-1 text-xs text-muted-foreground">#{txn.voucher_no}</span> : null}
+                                  </TableCell>
+                                  <TableCell className="font-mono text-sm">{txn.gl_batch_id || "---"}</TableCell>
+                                  <TableCell className="max-w-[150px] truncate text-sm">{txn.narration || "---"}</TableCell>
+                                  <TableCell className="text-right font-semibold text-orange-600">
+                                    {Number(txn.debit_amount) > 0 ? formatCurrency(txn.debit_amount) : "---"}
+                                  </TableCell>
+                                  <TableCell className="text-right font-semibold text-teal-600">
+                                    {Number(txn.credit_amount) > 0 ? formatCurrency(txn.credit_amount) : "---"}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono text-sm">{formatCurrency(txn.running_balance)}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className={
+                                      txn.batch_status === "APPROVED" ? "border-teal-300 text-teal-700" :
+                                      txn.batch_status === "REJECTED" ? "border-red-300 text-red-700" :
+                                      "border-amber-300 text-amber-700"
+                                    }>
+                                      {txn.batch_status || txn.status || "---"}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex justify-end gap-3">
+                  <Button variant="outline" onClick={handleReset} className="bg-transparent">
+                    Reset
+                  </Button>
+                  <Button variant="outline" onClick={() => router.push("/savings")} className="bg-transparent">
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={!accountInfo || !isActive || !amount || isSubmitting || isBelowMinBalance}
+                    className="bg-orange-600 hover:bg-orange-700 text-white"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <ArrowUpRight className="mr-2 h-4 w-4" />
+                        Process Withdrawal
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Right Column - Summary Sidebar */}
+              <div className="space-y-6">
+                {/* Account Summary */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      <CardTitle className="text-sm font-medium">Account Summary</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {accountInfo ? (
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Account Holder</p>
+                          <p className="text-sm font-semibold">{accountInfo.full_name}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Account No</p>
+                          <p className="text-sm font-mono font-semibold">{accountInfo.account_number}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Status</p>
+                          <Badge variant="outline" className={isActive ? "border-teal-300 text-teal-700" : "border-amber-300 text-amber-700"}>
+                            {accountInfo.account_status}
+                          </Badge>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Type</p>
+                          <Badge variant="outline">{accountInfo.member_type}</Badge>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Search an account to see details</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Scheme Info */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="h-4 w-4 text-muted-foreground" />
+                      <CardTitle className="text-sm font-medium">Scheme Details</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {accountInfo ? (
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Scheme</p>
+                          <p className="text-sm font-semibold">{accountInfo.scheme_name}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Interest Rate</p>
+                          <p className="text-sm font-semibold text-teal-600">{accountInfo.interest_rate}% p.a.</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Min Balance</p>
+                          <p className="text-sm font-semibold">
+                            {minBalance > 0 ? formatCurrency(minBalance) : "---"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Opening Date</p>
+                          <p className="text-sm font-semibold">{formatDate(accountInfo.opening_date)}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Select an account to see scheme</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Withdrawal Summary */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2">
+                      <Banknote className="h-4 w-4 text-muted-foreground" />
+                      <CardTitle className="text-sm font-medium">Withdrawal Summary</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Current Balance</p>
+                        <p className="text-sm font-semibold">
+                          {accountInfo ? formatCurrency(accountInfo.available_balance) : "---"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Withdrawal Amount</p>
+                        <p className="text-sm font-semibold text-orange-600">
+                          {amount ? formatCurrency(Number(amount)) : "₹0.00"}
+                        </p>
+                      </div>
+                      <div className="border-t pt-3">
+                        <p className="text-xs text-muted-foreground">Balance After Withdrawal</p>
+                        <p className={`text-lg font-bold ${isBelowMinBalance ? "text-red-600" : "text-orange-600"}`}>
+                          {balanceAfter !== null ? formatCurrency(balanceAfter) : "---"}
+                        </p>
+                        {isBelowMinBalance && (
+                          <p className="mt-1 text-xs text-red-500">Below minimum balance</p>
+                        )}
+                      </div>
+                      {accountInfo && (
+                        <div className="border-t pt-3">
+                          <p className="text-xs text-muted-foreground">Max Withdrawable</p>
+                          <p className="text-sm font-semibold">{formatCurrency(maxWithdrawable)}</p>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+
+            {/* Success Dialog */}
+            <AlertDialog open={successOpen} onOpenChange={setSuccessOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2 text-orange-600">
+                    <CheckCircle2 className="h-6 w-6" />
+                    Withdrawal Successful!
+                  </AlertDialogTitle>
+                  <AlertDialogDescription asChild>
+                    <div className="text-base">
+                      <div className="mt-4 rounded-lg border border-orange-200 bg-orange-50 p-4">
+                        <p className="text-sm text-orange-700">{successMessage}</p>
+                        {accountInfo && (
+                          <p className="mt-2 text-sm text-orange-700">
+                            Account: <span className="font-mono font-semibold">{accountInfo.account_number}</span> | 
+                            Member: {accountInfo.full_name}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="gap-2 sm:justify-end">
+                  <AlertDialogAction
+                    onClick={() => setSuccessOpen(false)}
+                    className="bg-transparent border border-input hover:bg-accent text-foreground"
+                  >
+                    Continue Withdrawing
+                  </AlertDialogAction>
+                  <AlertDialogAction
+                    onClick={() => router.push("/savings")}
+                    className="bg-orange-600 hover:bg-orange-700 text-white"
+                  >
+                    Go to Savings
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            {/* GL Batch Selection Dialog */}
+            <Dialog open={isBatchPopupOpen} onOpenChange={setIsBatchPopupOpen}>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Select Incomplete GL Batch</DialogTitle>
+                </DialogHeader>
+                <div className="max-h-[400px] overflow-y-auto">
+                  {incompleteBatches.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-muted-foreground">No incomplete batches found. A new batch will be created.</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Batch ID</TableHead>
+                          <TableHead>Total Debit</TableHead>
+                          <TableHead>Total Credit</TableHead>
+                          <TableHead>Difference</TableHead>
+                          <TableHead className="text-right">Action</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {incompleteBatches.map((b) => (
+                          <TableRow key={b.batch_id}>
+                            <TableCell>{b.batch_id}</TableCell>
+                            <TableCell>{formatCurrency(b.total_debit)}</TableCell>
+                            <TableCell>{formatCurrency(b.total_credit)}</TableCell>
+                            <TableCell className="text-red-600">{formatCurrency(b.difference)}</TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="bg-transparent"
+                                onClick={() => {
+                                  setSelectedBatch(b.batch_id)
+                                  setIsBatchPopupOpen(false)
+                                }}
+                              >
+                                Select
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </div>
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button
+                    variant="outline"
+                    className="bg-transparent"
+                    onClick={() => {
+                      setSelectedBatch(0)
+                      setIsBatchPopupOpen(false)
+                    }}
+                  >
+                    New Batch
+                  </Button>
+                  <Button variant="outline" className="bg-transparent" onClick={() => setIsBatchPopupOpen(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </main>
+        </div>
+      </div>
+    </DashboardWrapper>
+  )
+}
