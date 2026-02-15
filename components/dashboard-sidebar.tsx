@@ -38,7 +38,7 @@ const routes = [
   {
     label: "Savings",
     icon: Wallet,
-    href: "/savings/dashboard",
+    href: "/savings",
   },
   {
     label: "Fixed Deposits",
