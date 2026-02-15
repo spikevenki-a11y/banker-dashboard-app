@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const session = JSON.parse(c.value)
-    const branchId = session.branch_id
+    const branchId = session.branch
 
     const { searchParams } = new URL(req.url)
     const accountNumber = searchParams.get("account_number")
@@ -81,7 +81,7 @@ export async function PUT(req: NextRequest) {
 
   try {
     const session = JSON.parse(c.value)
-    const branchId = session.branch_id
+    const branchId = session.branch
     const body = await req.json()
 
     const { account_number, account_status } = body

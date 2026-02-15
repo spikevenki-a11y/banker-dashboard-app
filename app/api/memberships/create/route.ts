@@ -67,7 +67,7 @@ export async function POST(req: Request) {
     let prefix: string
     let seqColumn: string
 
-    if (member_type === "Associate") {
+    if (member_type === "member") {
       membershipClass = "A"
       prefix = "01"
       seqColumn = "a_last_number"
@@ -94,6 +94,7 @@ export async function POST(req: Request) {
 
     const runningNo = String(seq[seqColumn]).padStart(5, "0")
     const membershipNo = `${u.branch}${prefix}${runningNo}`
+    console.log(membershipNo)
 
     /* -------------------- INSERT MEMBERSHIP -------------------- */
     const { rows: [membership] } = await client.query(
@@ -126,15 +127,17 @@ export async function POST(req: Request) {
       INSERT INTO member_shares (
         branch_id,
         membership_id,
+        membership_no,
         share_balance,
         status,
         share_opened_date
       )
-      VALUES ($1,$2,0,'ACTIVE',now())
+      VALUES ($1,$2,$3,0,'ACTIVE',now())
       `,
       [
         u.branch,
-        membershipId
+        membershipId,
+        membershipNo
       ]
     )
 
