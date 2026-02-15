@@ -94,6 +94,7 @@ export async function POST(req: Request) {
 
     const runningNo = String(seq[seqColumn]).padStart(5, "0")
     const membershipNo = `${u.branch}${prefix}${runningNo}`
+    console.log(membershipNo)
 
     /* -------------------- INSERT MEMBERSHIP -------------------- */
     const { rows: [membership] } = await client.query(
