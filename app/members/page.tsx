@@ -161,6 +161,9 @@ export default function MembersPage() {
   const { user } = useAuth()
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [isSearchingMembers, setIsSearchingMembers] = useState(false)
+  const [hasSearched, setHasSearched] = useState(false)
   const [isCustomerAddDialogOpen, setIsCustomerAddDialogOpen] = useState(false)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [selectedMember, setSelectedMember] = useState<Member | null>(null)
@@ -313,6 +316,30 @@ export default function MembersPage() {
       return numPart > max ? numPart : max
     }, 0)
     return `MEM${String(maxId + 1).padStart(3, "0")}`
+  }
+
+  const handleMemberSearch = async () => {
+    if (!searchQuery.trim()) return
+
+    setIsSearchingMembers(true)
+    setHasSearched(true)
+
+    try {
+      const res = await fetch(
+        `/api/memberships/search?q=${encodeURIComponent(searchQuery.trim())}&status=${statusFilter}`,
+        { credentials: "include" }
+      )
+      const data = await res.json()
+      if (res.ok && data.success) {
+        setSearchResults(data.data || [])
+      } else {
+        setSearchResults([])
+      }
+    } catch {
+      setSearchResults([])
+    } finally {
+      setIsSearchingMembers(false)
+    }
   }
 
   const handleEnrollMember = async () => {
@@ -790,6 +817,9 @@ export default function MembersPage() {
                       className="pl-10"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleMemberSearch()
+                      }}
                     />
                   </div>
                   <div className="flex gap-2">
@@ -804,71 +834,101 @@ export default function MembersPage() {
                         <SelectItem value="inactive">Inactive</SelectItem>
                       </SelectContent>
                     </Select>
+                    <Button
+                      onClick={handleMemberSearch}
+                      disabled={isSearchingMembers || !searchQuery.trim()}
+                      className="gap-2"
+                    >
+                      <Search className="h-4 w-4" />
+                      {isSearchingMembers ? "Searching..." : "Search"}
+                    </Button>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
-                {/* {isLoading ? (
-                <p>Loading members...</p>
-              ) : (
-              //   <Table>
-              //     <TableHeader>
-              //       <TableRow>
-              //         <TableHead>Member</TableHead>
-              //         <TableHead>Account Number</TableHead>
-              //         <TableHead>KYC Status</TableHead>
-              //         <TableHead>Status</TableHead>
-              //         <TableHead>Total Balance</TableHead>
-              //         <TableHead>Actions</TableHead>
-              //       </TableRow>
-              //     </TableHeader>
-              //     <TableBody>
-              //       {filteredMembers.map((member) => (
-              //         <TableRow key={member.id}>
-              //           <TableCell>
-              //             <div>
-              //               <div className="font-medium">{member.full_name}</div>
-              //               <div className="text-sm text-muted-foreground">{member.email}</div>
-              //             </div>
-              //           </TableCell>
-              //           <TableCell className="font-mono text-sm">{member.member_id}</TableCell>
-              //           <TableCell>
-              //             <Badge variant={member.kyc_completed === "Yes" ? "default" : "secondary"}>
-              //               {member.kyc_completed === "Yes" ? "Completed" : "Pending"}
-              //             </Badge>
-              //           </TableCell>
-              //           <TableCell>
-              //             <Badge variant={member.status === "active" ? "default" : "secondary"}>{member.status}</Badge>
-              //           </TableCell>
-              //           <TableCell className="font-semibold">{member.account_balance}</TableCell>
-              //           <TableCell>
-              //             <DropdownMenu>
-              //               <DropdownMenuTrigger asChild>
-              //                 <Button variant="ghost" size="sm">
-              //                   Actions
-              //                 </Button>
-              //               </DropdownMenuTrigger>
-              //               <DropdownMenuContent align="end">
-              //                 <DropdownMenuItem onClick={() => setSelectedMember(member)}>
-              //                   <Eye className="mr-2 h-4 w-4" />
-              //                   View Details
-              //                 </DropdownMenuItem>
-              //                 <DropdownMenuItem>
-              //                   <Edit className="mr-2 h-4 w-4" />
-              //                   Edit
-              //                 </DropdownMenuItem>
-              //                 <DropdownMenuItem className="text-destructive">
-              //                   <Ban className="mr-2 h-4 w-4" />
-              //                   Deactivate
-              //                 </DropdownMenuItem>
-              //               </DropdownMenuContent>
-              //             </DropdownMenu>
-              //           </TableCell>
-              //         </TableRow>
-              //       ))}
-              //     </TableBody>
-              //   </Table>
-              )} */}
+                {isSearchingMembers ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="text-center">
+                      <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                      <p className="text-sm text-muted-foreground">Searching members...</p>
+                    </div>
+                  </div>
+                ) : hasSearched && searchResults.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Search className="mb-3 h-10 w-10 text-muted-foreground/40" />
+                    <p className="text-base font-medium text-muted-foreground">No members found</p>
+                    <p className="mt-1 text-sm text-muted-foreground/70">
+                      Try a different search term or filter
+                    </p>
+                  </div>
+                ) : hasSearched && searchResults.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Membership No</TableHead>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Father Name</TableHead>
+                          <TableHead>Phone</TableHead>
+                          <TableHead>Aadhaar</TableHead>
+                          <TableHead>Class</TableHead>
+                          <TableHead>Join Date</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {searchResults.map((member) => (
+                          <TableRow key={member.id} className="cursor-pointer hover:bg-muted/50">
+                            <TableCell className="font-mono text-sm font-medium">{member.membership_no}</TableCell>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">{member.full_name}</div>
+                                {member.email && (
+                                  <div className="text-xs text-muted-foreground">{member.email}</div>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-sm">{member.father_name || "---"}</TableCell>
+                            <TableCell className="text-sm">{member.mobile_no || member.phone_no || "---"}</TableCell>
+                            <TableCell className="font-mono text-sm">
+                              {member.aadhaar_no
+                                ? `${member.aadhaar_no.slice(0, 4)} ${member.aadhaar_no.slice(4, 8)} ${member.aadhaar_no.slice(8)}`
+                                : "---"}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">
+                                {member.membership_class === "A" ? "Class A" : member.membership_class === "B" ? "Class B" : member.membership_class || "---"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap text-sm">{member.join_date || "---"}</TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={member.status?.toUpperCase() === "ACTIVE" ? "default" : "secondary"}
+                                className={
+                                  member.status?.toUpperCase() === "ACTIVE"
+                                    ? "bg-teal-100 text-teal-700"
+                                    : "bg-gray-100 text-gray-600"
+                                }
+                              >
+                                {member.status || "---"}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      Showing {searchResults.length} result{searchResults.length !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Search className="mb-3 h-10 w-10 text-muted-foreground/20" />
+                    <p className="text-sm text-muted-foreground">
+                      Enter a name, email, phone, membership number, or Aadhaar to search
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
