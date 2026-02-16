@@ -65,7 +65,7 @@ export default function SavingsDashboardPage() {
               </Card>
               <Card
                 className="cursor-pointer transition-all hover:shadow-lg hover:border-primary flex flex-row"
-                // onClick={() => router.push("/savings/open_account")}
+                onClick={() => router.push("/savings/deposit")}
               >
                 <CardHeader className="pb-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
@@ -79,7 +79,7 @@ export default function SavingsDashboardPage() {
               </Card>
               <Card
                 className="cursor-pointer transition-all hover:shadow-lg hover:border-primary flex flex-row"
-                // onClick={() => router.push("/savings/open_account")}
+                onClick={() => router.push("/savings/withdraw")}
               >
                 <CardHeader className="pb-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">

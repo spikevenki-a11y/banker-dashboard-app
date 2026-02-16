@@ -266,12 +266,12 @@ export async function POST(request: NextRequest) {
       ])
 
       // Update the account balance
-      await client.query(
-        `UPDATE savings_accounts 
-         SET available_balance = $1, clear_balance = $1, updated_at = NOW()
-         WHERE account_number = $2`,
-        [newBalance, accountNumber]
-      )
+      // await client.query(
+      //   `UPDATE savings_accounts 
+      //    SET available_balance = $1, clear_balance = $1, updated_at = NOW()
+      //    WHERE account_number = $2`,
+      //   [newBalance, accountNumber]
+      // )
 
       await client.query("COMMIT")
 
