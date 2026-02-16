@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Search, Eye, FileText, TrendingUp, Calendar, RefreshCw } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { DashboardWrapper } from "../_components/dashboard-wrapper"
+import { useRouter } from "next/navigation"
 
 type FixedDeposit = {
   id: string
@@ -96,6 +97,7 @@ const mockFDs: FixedDeposit[] = [
 ]
 
 export default function FixedDepositsPage() {
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [isCreateFDOpen, setIsCreateFDOpen] = useState(false)
@@ -126,9 +128,9 @@ export default function FixedDepositsPage() {
               <h1 className="text-3xl font-bold tracking-tight text-foreground">Fixed Deposits</h1>
               <p className="text-muted-foreground">Manage fixed deposit accounts and maturity tracking</p>
             </div>
-            <Button onClick={() => setIsCreateFDOpen(true)} className="gap-2">
+            <Button onClick={() => router.push("/fixed-deposits/create-deposit")} className="gap-2">
               <Plus className="h-4 w-4" />
-              Create FD
+              Create Deposit
             </Button>
           </div>
 
