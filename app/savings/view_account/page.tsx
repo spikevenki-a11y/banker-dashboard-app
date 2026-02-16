@@ -142,6 +142,7 @@ export default function ViewModifyAccountPage() {
         credentials: "include",
       })
       const data = await res.json()
+      console.log("account details ",data)
 
       if (res.ok && data.account) {
         setAccount(data.account)
@@ -193,6 +194,7 @@ export default function ViewModifyAccountPage() {
         credentials: "include",
       })
       const data = await res.json()
+      console.log("account transaction data",data)
       if (res.ok) {
         setTransactions(data.transactions || [])
       }
@@ -587,14 +589,14 @@ export default function ViewModifyAccountPage() {
                                       <TableCell>
                                         <Badge
                                           className={
-                                            txn.transaction_type === "deposit"
+                                            txn.transaction_type === "DEPOSIT"
                                               ? "bg-teal-100 text-teal-700"
                                               : txn.transaction_type === "withdrawal"
                                                 ? "bg-orange-100 text-orange-700"
                                                 : "bg-blue-100 text-blue-700"
                                           }
                                         >
-                                          {txn.transaction_type === "deposit" ? (
+                                          {txn.transaction_type === "DEPOSIT" ? (
                                             <ArrowDownRight className="mr-1 h-3 w-3" />
                                           ) : (
                                             <ArrowUpRight className="mr-1 h-3 w-3" />
@@ -606,13 +608,13 @@ export default function ViewModifyAccountPage() {
                                         {txn.description || "---"}
                                       </TableCell>
                                       <TableCell className="text-right font-semibold">
-                                        <span className={txn.transaction_type === "deposit" ? "text-teal-600" : "text-orange-600"}>
-                                          {txn.transaction_type === "deposit" ? "+" : "-"}
-                                          {formatCurrency(txn.amount)}
+                                        <span className={txn.transaction_type === "DEPOSIT" ? "text-teal-600" : "text-orange-600"}>
+                                          {txn.transaction_type === "DEPOSIT" ? "+" : "-"}
+                                          {formatCurrency(txn.credit_amount || txn.debit_amount)}
                                         </span>
                                       </TableCell>
                                       <TableCell className="text-right font-mono text-sm">
-                                        {formatCurrency(txn.balance_after)}
+                                        {formatCurrency(txn.running_balance)}
                                       </TableCell>
                                       <TableCell className="text-sm text-muted-foreground">{txn.performed_by}</TableCell>
                                     </TableRow>
