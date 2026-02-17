@@ -226,4 +226,3 @@ INSERT INTO "public"."chart_of_accounts" ("branch_id", "accountcode", "accountna
 INSERT INTO "public"."chart_of_accounts" ("branch_id", "accountcode", "accountname", "accounttypecode", "isledger", "parentaccountcode", "accountbalance", "isactive") VALUES ('2310801', '41300000', 'Interest paid on Recurring Deposits', '1', '1', '41000000', '0.00', '1');
 INSERT INTO "public"."chart_of_accounts" ("branch_id", "accountcode", "accountname", "accounttypecode", "isledger", "parentaccountcode", "accountbalance", "isactive") VALUES ('2310801', '41301000', 'Interest paid on Recurring Deposit Non Cummulative', '1', '1', '41300000', '0.00', '1');
 INSERT INTO "public"."chart_of_accounts" ("branch_id", "accountcode", "accountname", "accounttypecode", "isledger", "parentaccountcode", "accountbalance", "isactive") VALUES ('2310801', '41302000', 'Interest paid on Recurring Deposit Cummulative', '1', '1', '41300000', '0.00', '1');
-
