@@ -20,7 +20,7 @@ import {
   Search,
   ArrowLeft,
 } from "lucide-react"
-import { DashboardWrapper } from "../_components/dashboard-wrapper"
+import { DashboardWrapper } from "../../_components/dashboard-wrapper"
 import { iconMap } from "@/lib/iconMap"
 
 export default function ConfigurationsPage() {
