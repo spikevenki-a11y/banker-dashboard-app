@@ -23,10 +23,20 @@ export async function POST(req: Request) {
       account_open_date,
       rate_of_interest,
       auto_renewal,
+      renewal_period_months,
+      renewal_period_days,
+      renewal_with_interest,
+      interest_payout_frequency,
+      interest_calc_method,
+      premature_penal_rate,
+      tds_applicable,
+      nominee_name,
+      nominee_relation,
       // RD specific
       installment_amount,
       installment_frequency,
       number_of_installments,
+      penal_rate,
     } = await req.json()
 
     if (!membership_no || !scheme_id || !deposit_type || !account_open_date) {
@@ -105,7 +115,7 @@ export async function POST(req: Request) {
         account_open_date,
         amt,
         interest,
-        scheme.tds_applicable ? "Y" : "N",
+        tds_applicable === true ? "Y" : (scheme.tds_applicable ? "Y" : "N"),
         userId,
       ]
     )
@@ -118,8 +128,10 @@ export async function POST(req: Request) {
       await client.query(
         `INSERT INTO term_deposit_details (
           id, accountnumber, depositamount, periodmonths, perioddays,
-          maturitydate, maturityamount, autorenewalflag
-        ) VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7)`,
+          maturitydate, maturityamount, autorenewalflag,
+          periodmonthsforautorenewal, perioddaysforautorenewal,
+          renewalwithinterest, penalrate
+        ) VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
         [
           acctNum,
           amt,
@@ -128,6 +140,10 @@ export async function POST(req: Request) {
           maturityDate,
           maturityAmount,
           auto_renewal === true ? "Y" : "N",
+          Number(renewal_period_months) || 0,
+          Number(renewal_period_days) || 0,
+          renewal_with_interest === true ? "Y" : "N",
+          Number(premature_penal_rate) || 0,
         ]
       )
     } else if (deposit_type === "R") {
@@ -143,8 +159,8 @@ export async function POST(req: Request) {
         `INSERT INTO recurring_deposit_details (
           id, accountnumber, installment_amount, installment_frequency,
           numberofinstallments, numberofinstalmentspaid,
-          nextinstalmentdate, maturitydate
-        ) VALUES (gen_random_uuid(), $1, $2, $3, $4, 0, $5, $6)`,
+          nextinstalmentdate, maturitydate, penalrate
+        ) VALUES (gen_random_uuid(), $1, $2, $3, $4, 0, $5, $6, $7)`,
         [
           acctNum,
           rdInstAmt,
@@ -152,6 +168,7 @@ export async function POST(req: Request) {
           rdInstNum,
           account_open_date,
           maturityDate,
+          Number(penal_rate) || 0,
         ]
       )
     } else if (deposit_type === "P") {
