@@ -108,10 +108,15 @@ export default function CreateDepositPage() {
     setMemberInfo(null)
 
     try {
-      const res = await fetch(`/api/memberships/loadmember?membership_no=${encodeURIComponent(memberSearch.trim())}`, {
+      const res = await fetch("/api/savings/member-lookup", {
+        method: "POST",
         credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ membership_no: memberSearch.trim() }),
       })
+
       const data = await res.json()
+      console.log("the member ",data)
       if (res.ok && data.member) {
         setMemberInfo(data.member)
       } else {

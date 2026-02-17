@@ -204,3 +204,26 @@ CREATE TABLE deposit_schemes (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+
+INSERT INTO "public"."chart_of_accounts" ("branch_id", "accountcode", "accountname", "accounttypecode", "isledger", "parentaccountcode", "accountbalance", "isactive") VALUES ('2310801', '12200000', 'Term Deposits', '1', '1', '12000000', '0.00', '1');
+INSERT INTO "public"."chart_of_accounts" ("branch_id", "accountcode", "accountname", "accounttypecode", "isledger", "parentaccountcode", "accountbalance", "isactive") VALUES ('2310801', '12201000', 'Term Deposit Non Cummulative', '1', '1', '12200000', '0.00', '1');
+INSERT INTO "public"."chart_of_accounts" ("branch_id", "accountcode", "accountname", "accounttypecode", "isledger", "parentaccountcode", "accountbalance", "isactive") VALUES ('2310801', '12202000', 'Term Deposit Cummulative', '1', '1', '12200000', '0.00', '1');
+INSERT INTO "public"."chart_of_accounts" ("branch_id", "accountcode", "accountname", "accounttypecode", "isledger", "parentaccountcode", "accountbalance", "isactive") VALUES ('2310801', '12203000', 'Locker Deposit', '1', '1', '12200000', '0.00', '1');
+
+
+INSERT INTO "public"."chart_of_accounts" ("branch_id", "accountcode", "accountname", "accounttypecode", "isledger", "parentaccountcode", "accountbalance", "isactive") VALUES ('2310801', '12300000', 'Recurring Deposits', '1', '1', '12000000', '0.00', '1');
+INSERT INTO "public"."chart_of_accounts" ("branch_id", "accountcode", "accountname", "accounttypecode", "isledger", "parentaccountcode", "accountbalance", "isactive") VALUES ('2310801', '12301000', 'Recurring Deposit Non Cummulative', '1', '1', '12300000', '0.00', '1');
+INSERT INTO "public"."chart_of_accounts" ("branch_id", "accountcode", "accountname", "accounttypecode", "isledger", "parentaccountcode", "accountbalance", "isactive") VALUES ('2310801', '12302000', 'Recurring Deposit Cummulative', '1', '1', '12300000', '0.00', '1');
+
+
+INSERT INTO "public"."chart_of_accounts" ("branch_id", "accountcode", "accountname", "accounttypecode", "isledger", "parentaccountcode", "accountbalance", "isactive") VALUES ('2310801', '41200000', 'Interest paid on Term Deposits', '1', '1', '41000000', '0.00', '1');
+INSERT INTO "public"."chart_of_accounts" ("branch_id", "accountcode", "accountname", "accounttypecode", "isledger", "parentaccountcode", "accountbalance", "isactive") VALUES ('2310801', '41201000', 'Interest paid on Term Deposit Non Cummulative', '1', '1', '41200000', '0.00', '1');
+INSERT INTO "public"."chart_of_accounts" ("branch_id", "accountcode", "accountname", "accounttypecode", "isledger", "parentaccountcode", "accountbalance", "isactive") VALUES ('2310801', '41202000', 'Interest paid on Term Deposit Cummulative', '1', '1', '41200000', '0.00', '1');
+INSERT INTO "public"."chart_of_accounts" ("branch_id", "accountcode", "accountname", "accounttypecode", "isledger", "parentaccountcode", "accountbalance", "isactive") VALUES ('2310801', '41203000', 'Interest paid on JLG Locker Deposit', '1', '1', '41200000', '0.00', '1');
+
+
+INSERT INTO "public"."chart_of_accounts" ("branch_id", "accountcode", "accountname", "accounttypecode", "isledger", "parentaccountcode", "accountbalance", "isactive") VALUES ('2310801', '41300000', 'Interest paid on Recurring Deposits', '1', '1', '41000000', '0.00', '1');
+INSERT INTO "public"."chart_of_accounts" ("branch_id", "accountcode", "accountname", "accounttypecode", "isledger", "parentaccountcode", "accountbalance", "isactive") VALUES ('2310801', '41301000', 'Interest paid on Recurring Deposit Non Cummulative', '1', '1', '41300000', '0.00', '1');
+INSERT INTO "public"."chart_of_accounts" ("branch_id", "accountcode", "accountname", "accounttypecode", "isledger", "parentaccountcode", "accountbalance", "isactive") VALUES ('2310801', '41302000', 'Interest paid on Recurring Deposit Cummulative', '1', '1', '41300000', '0.00', '1');
+
