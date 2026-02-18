@@ -5,7 +5,7 @@ export async function GET() {
   const c = (await cookies()).get("banker_session")
   if (!c) return NextResponse.json(null)
   const u = JSON.parse(c.value)
-  console.log("the cookie",u)
+  // console.log("the cookie",u)
   return NextResponse.json({
     name: u.fullName,
     role: u.role,
