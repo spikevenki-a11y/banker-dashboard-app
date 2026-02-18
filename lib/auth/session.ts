@@ -20,6 +20,7 @@ export function createSession(res: NextResponse, data: any) {
     path: "/",
     secure: process.env.NODE_ENV === "production",
   })
+  return "success";
 }
 
 // export async function createSession(data: any) {

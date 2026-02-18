@@ -75,7 +75,7 @@ export default function CreateDepositPage() {
   const [periodMonths, setPeriodMonths] = useState("")
   const [periodDays, setPeriodDays] = useState("")
   const [rateOfInterest, setRateOfInterest] = useState("")
-  const [openingDate, setOpeningDate] = useState(new Date().toISOString().split("T")[0])
+  const [openingDate, setOpeningDate] = useState("")
   const [autoRenewal, setAutoRenewal] = useState(false)
   const [renewalPeriodMonths, setRenewalPeriodMonths] = useState("")
   const [renewalPeriodDays, setRenewalPeriodDays] = useState("")
@@ -97,9 +97,29 @@ export default function CreateDepositPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [successInfo, setSuccessInfo] = useState<{ account_number: string; maturity_date?: string; maturity_amount?: number } | null>(null)
 
+
   useEffect(() => {
-    fetchSchemes()
-  }, [])
+  fetchSchemes()
+  getLogindate()
+}, [])
+
+const getLogindate = async () => {
+  try {
+    const res = await fetch("/api/fas/get-login-date", { credentials: "include" })
+    const data = await res.json()
+
+    console.log("logindate =", data)
+
+    if (data.businessDate) {
+      setOpeningDate(data.businessDate)
+      console.log("Updated openingDate-----:", openingDate)
+    }
+    console.log("Updated openingDate:", openingDate)
+
+  } catch (err) {
+    console.error("Failed to fetch date", err)
+  }
+}
 
   const fetchSchemes = async () => {
     try {
@@ -114,6 +134,8 @@ export default function CreateDepositPage() {
   }
 
   const searchMember = async () => {
+    
+  console.log("member openingDate========:", openingDate)
     if (!memberSearch.trim()) return
     setIsSearching(true)
     setMemberError("")
@@ -142,6 +164,7 @@ export default function CreateDepositPage() {
 
   const handleSchemeSelect = (schemeId: string) => {
     const scheme = schemes.find((s) => String(s.scheme_id) === schemeId)
+    console.log("the scheme",scheme)
     if (scheme) {
       setSelectedScheme(scheme)
       setDepositType(scheme.deposit_type)
@@ -186,21 +209,21 @@ export default function CreateDepositPage() {
     }
   }
 
-  const maturityCalc = depositType === "T" ? calculateMaturity() : null
+  const maturityCalc = depositType === "TERM" ? calculateMaturity() : null
 
   // Compute total days for display
   const totalDays = (Number(periodMonths) || 0) * 30 + (Number(periodDays) || 0)
 
   // Compute maturity date for RD too
   const rdMaturityDate = (() => {
-    if (depositType !== "R") return null
+    if (depositType !== "RECURRING") return null
     const months = Number(periodMonths) || 0
     const days = Number(periodDays) || 0
     if (months <= 0 && days <= 0) return null
     const d = new Date(openingDate)
     d.setMonth(d.getMonth() + months)
     d.setDate(d.getDate() + days)
-    return d.toISOString().split("T")[0]
+    return d.toISOString().split("TERM")[0]
   })()
 
   const handleSubmit = async () => {
@@ -229,7 +252,7 @@ export default function CreateDepositPage() {
         nominee_relation: nomineeRelation,
       }
 
-      if (depositType === "R") {
+      if (depositType === "RECURRING") {
         body.installment_amount = Number(installmentAmount) || 0
         body.installment_frequency = installmentFrequency
         body.number_of_installments = Number(numberOfInstallments) || 0
@@ -460,7 +483,7 @@ export default function CreateDepositPage() {
                     </div>
 
                     {/* ========= TERM DEPOSIT (FD) ========= */}
-                    {depositType === "T" && (
+                    {depositType === "TERM" && (
                       <>
                         {/* Amount */}
                         <div>
@@ -706,7 +729,7 @@ export default function CreateDepositPage() {
                     )}
 
                     {/* ========= RECURRING DEPOSIT (RD) ========= */}
-                    {depositType === "R" && (
+                    {depositType === "RECURRING" && (
                       <>
                         <div>
                           <h4 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wide">Installment Details</h4>
@@ -863,7 +886,7 @@ export default function CreateDepositPage() {
                     )}
 
                     {/* ========= PIGMY DEPOSIT ========= */}
-                    {depositType === "P" && (
+                    {depositType === "PIGMY" && (
                       <>
                         <div>
                           <h4 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wide">Collection Details</h4>
@@ -936,16 +959,16 @@ export default function CreateDepositPage() {
               {/* Right Column - Summary */}
               <div className="space-y-6">
                 {/* Maturity Calculator (Term Deposit only) */}
-                {(depositType === "T" || depositType === "R") && (
+                {(depositType === "TERM" || depositType === "RECURRING") && (
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-lg">
                         <TrendingUp className="h-5 w-5" />
-                        {depositType === "T" ? "Maturity Calculation" : "RD Summary"}
+                        {depositType === "TERM" ? "Maturity Calculation" : "RD Summary"}
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                      {depositType === "T" && (
+                      {depositType === "TERM" && (
                         <>
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Deposit Amount:</span>
@@ -1006,7 +1029,7 @@ export default function CreateDepositPage() {
                           )}
                         </>
                       )}
-                      {depositType === "R" && (
+                      {depositType === "RECURRING" && (
                         <>
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Installment:</span>

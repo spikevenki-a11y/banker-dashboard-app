@@ -72,6 +72,7 @@ export async function POST(req: Request) {
     const branchStr = String(branchId).padStart(3, "0")
     const seqNum = seqResult.rows[0].next_num > 0 ? seqResult.rows[0].next_num : 1
     const accountNumber = Number(`${branchStr}${typeCode}${String(seqNum).padStart(9, "0")}`)
+    console.log("accountnumber is : ",accountNumber)
 
     // Calculate maturity
     let maturityDate = null
@@ -96,16 +97,16 @@ export async function POST(req: Request) {
     // Insert deposit_account
     const accountResult = await client.query(
       `INSERT INTO deposit_account (
-        id, branch_id, schemeid, deposittype, accountnumber, membership_no,
+        branch_id, schemeid, deposittype, accountnumber, membership_no,
         valuedate, accountopendate, clearbalance, unclearbalance,
         rateofinterest, tdsapplicable, accountstatus,
         createdby, createddate
       ) VALUES (
-        gen_random_uuid(), $1, $2, $3, $4, $5,
+        $1, $2, $3, $4, $5,
         $6, $6, $7, 0,
         $8, $9, 1,
         $10, CURRENT_DATE
-      ) RETURNING id, accountnumber`,
+      ) RETURNING accountnumber`,
       [
         branchId,
         scheme_id,
@@ -120,11 +121,11 @@ export async function POST(req: Request) {
       ]
     )
 
-    const accountId = accountResult.rows[0].id
+    // const accountId = accountResult.rows[0].id
     const acctNum = accountResult.rows[0].accountnumber
 
     // Insert type-specific details
-    if (deposit_type === "T") {
+    if (deposit_type === "TERM") {
       await client.query(
         `INSERT INTO term_deposit_details (
           id, accountnumber, depositamount, periodmonths, perioddays,
@@ -146,7 +147,7 @@ export async function POST(req: Request) {
           Number(premature_penal_rate) || 0,
         ]
       )
-    } else if (deposit_type === "R") {
+    } else if (deposit_type === "RECURING") {
       const rdInstAmt = Number(installment_amount) || 0
       const rdInstNum = Number(number_of_installments) || months
 
