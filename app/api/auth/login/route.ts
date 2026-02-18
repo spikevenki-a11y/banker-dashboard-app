@@ -123,7 +123,7 @@ export async function POST(request: Request) {
         businessDate: day!.business_date, 
         // businessDate: new Date().toISOString().split("T")[0], // Placeholder for business date,
       })
-    if(s == "success"){
+    if(s){
       return res
     }
   } catch (err) {
