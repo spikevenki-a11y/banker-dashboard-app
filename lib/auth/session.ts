@@ -33,7 +33,8 @@ export function createSession(
       httpOnly: true,
       sameSite: "lax",
       path: "/",
-      secure: process.env.NODE_ENV === "production",
+      secure: false, // Set to true in production with HTTPS
+      //secure: process.env.NODE_ENV === "production",
       maxAge,
     })
 
