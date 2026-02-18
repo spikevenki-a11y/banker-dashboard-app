@@ -82,7 +82,7 @@ export async function POST(req: Request) {
     if (rows.length === 0) {
       return NextResponse.json({ found: false }, { status: 404 })
     }
-    console.log("Customer found:", rows[0])
+    console.log("Customer found venki:", rows[0])
     return NextResponse.json({ found: true, memberData: rows })
   } catch (error: any) {
     console.error("[v0] Customer lookup error:", error)
