@@ -25,6 +25,13 @@ import {
   Users,
   Hash,
   Eye,
+  Wallet,
+  Loader2,
+  PiggyBank,
+  Landmark,
+  TrendingUp,
+  TrendingDown,
+  Banknote,
 } from "lucide-react"
 
 type MemberData = {
@@ -58,6 +65,25 @@ type MemberData = {
   driving_license_no: string
 }
 
+type AccountItem = {
+  account_type: string
+  account_number: string
+  scheme_name: string
+  balance: number
+  status: string
+  opening_date: string
+  interest_rate: number
+  close_date?: string
+  extra?: Record<string, any> | null
+}
+
+type AccountSummary = {
+  total_assets: number
+  total_liabilities: number
+  net_worth: number
+  total_accounts: number
+}
+
 type SearchFields = {
   member_name: string
   father_name: string
@@ -80,7 +106,12 @@ export default function ViewMemberPage() {
   const [selectedMember, setSelectedMember] = useState<MemberData | null>(null)
   const [isSearching, setIsSearching] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
-  const [activeTab, setActiveTab] = useState<"personal" | "address" | "kyc">("personal")
+  const [activeTab, setActiveTab] = useState<"personal" | "address" | "kyc" | "accounts">("personal")
+  const [assets, setAssets] = useState<AccountItem[]>([])
+  const [liabilities, setLiabilities] = useState<AccountItem[]>([])
+  const [accountSummary, setAccountSummary] = useState<AccountSummary | null>(null)
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(false)
+  const [accountsLoaded, setAccountsLoaded] = useState(false)
 
   const handleSearch = async () => {
     setIsSearching(true)
@@ -108,7 +139,38 @@ export default function ViewMemberPage() {
 
   const handleSelectMember = (member: MemberData) => {
     setSelectedMember(member)
+    setAccountsLoaded(false)
+    setAssets([])
+    setLiabilities([])
+    setAccountSummary(null)
   }
+
+  const fetchMemberAccounts = async (membershipNo: string) => {
+    setIsLoadingAccounts(true)
+    try {
+      const res = await fetch(`/api/members/accounts?membership_no=${encodeURIComponent(membershipNo)}`, {
+        credentials: "include",
+      })
+      const data = await res.json()
+      if (data.success) {
+        setAssets(data.assets || [])
+        setLiabilities(data.liabilities || [])
+        setAccountSummary(data.summary || null)
+      }
+    } catch {
+      setAssets([])
+      setLiabilities([])
+    } finally {
+      setIsLoadingAccounts(false)
+      setAccountsLoaded(true)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === "accounts" && selectedMember && !accountsLoaded) {
+      fetchMemberAccounts(selectedMember.membership_no)
+    }
+  }, [activeTab, selectedMember, accountsLoaded])
 
   const formatAadhaar = (val: string) => {
     if (!val) return "---"
@@ -304,6 +366,7 @@ export default function ViewMemberPage() {
                       { key: "personal", label: "Personal Details", icon: User },
                       { key: "address", label: "Address", icon: MapPin },
                       { key: "kyc", label: "KYC Details", icon: Shield },
+                      { key: "accounts", label: "Assets & Liabilities", icon: Wallet },
                     ] as const
                   ).map((tab) => (
                     <button
@@ -360,6 +423,195 @@ export default function ViewMemberPage() {
                     <DetailField icon={CreditCard} label="PAN No." value={selectedMember.pan_no} mono />
                     <DetailField icon={FileText} label="Ration No." value={selectedMember.ration_no} />
                     <DetailField icon={CreditCard} label="Driving License No." value={selectedMember.driving_license_no} />
+                  </div>
+                )}
+
+                {activeTab === "accounts" && (
+                  <div className="space-y-6">
+                    {isLoadingAccounts ? (
+                      <div className="flex items-center justify-center py-12">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        <span className="ml-2 text-sm text-muted-foreground">Loading accounts...</span>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Summary Cards */}
+                        {accountSummary && (
+                          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                            <div className="rounded-lg border bg-emerald-50 p-4">
+                              <div className="flex items-center gap-2">
+                                <TrendingUp className="h-4 w-4 text-emerald-600" />
+                                <p className="text-xs font-medium text-emerald-700">Total Assets</p>
+                              </div>
+                              <p className="mt-2 text-lg font-bold text-emerald-800">
+                                {accountSummary.total_assets.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                              </p>
+                            </div>
+                            <div className="rounded-lg border bg-red-50 p-4">
+                              <div className="flex items-center gap-2">
+                                <TrendingDown className="h-4 w-4 text-red-600" />
+                                <p className="text-xs font-medium text-red-700">Total Liabilities</p>
+                              </div>
+                              <p className="mt-2 text-lg font-bold text-red-800">
+                                {accountSummary.total_liabilities.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                              </p>
+                            </div>
+                            <div className="rounded-lg border bg-blue-50 p-4">
+                              <div className="flex items-center gap-2">
+                                <Landmark className="h-4 w-4 text-blue-600" />
+                                <p className="text-xs font-medium text-blue-700">Net Worth</p>
+                              </div>
+                              <p className="mt-2 text-lg font-bold text-blue-800">
+                                {accountSummary.net_worth.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                              </p>
+                            </div>
+                            <div className="rounded-lg border bg-muted/50 p-4">
+                              <div className="flex items-center gap-2">
+                                <Wallet className="h-4 w-4 text-muted-foreground" />
+                                <p className="text-xs font-medium text-muted-foreground">Total Accounts</p>
+                              </div>
+                              <p className="mt-2 text-lg font-bold text-foreground">
+                                {accountSummary.total_accounts}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Assets Section */}
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2">
+                            <PiggyBank className="h-5 w-5 text-emerald-600" />
+                            <h3 className="text-base font-semibold text-foreground">Assets</h3>
+                            <Badge variant="outline" className="text-xs">
+                              {assets.length} account{assets.length !== 1 ? "s" : ""}
+                            </Badge>
+                          </div>
+
+                          {assets.length === 0 ? (
+                            <div className="rounded-lg border border-dashed p-6 text-center">
+                              <PiggyBank className="mx-auto h-8 w-8 text-muted-foreground/30" />
+                              <p className="mt-2 text-sm text-muted-foreground">No asset accounts found</p>
+                            </div>
+                          ) : (
+                            <div className="overflow-x-auto rounded-md border">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow className="bg-emerald-50/50">
+                                    <TableHead className="font-semibold">Account Type</TableHead>
+                                    <TableHead className="font-semibold">Account No.</TableHead>
+                                    <TableHead className="font-semibold">Scheme</TableHead>
+                                    <TableHead className="font-semibold">Opening Date</TableHead>
+                                    <TableHead className="text-right font-semibold">Balance</TableHead>
+                                    <TableHead className="font-semibold">Status</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {assets.map((acc, idx) => (
+                                    <TableRow key={`asset-${idx}`}>
+                                      <TableCell>
+                                        <div className="flex items-center gap-2">
+                                          <AccountTypeIcon type={acc.account_type} />
+                                          <span className="text-sm font-medium">{acc.account_type}</span>
+                                        </div>
+                                      </TableCell>
+                                      <TableCell className="font-mono text-sm">{acc.account_number}</TableCell>
+                                      <TableCell className="text-sm text-muted-foreground">{acc.scheme_name}</TableCell>
+                                      <TableCell className="text-sm">
+                                        {acc.opening_date
+                                          ? new Date(acc.opening_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                                          : "---"}
+                                      </TableCell>
+                                      <TableCell className="text-right font-mono text-sm font-semibold text-emerald-700">
+                                        {acc.balance.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                                      </TableCell>
+                                      <TableCell>
+                                        <Badge
+                                          variant={acc.status === "ACTIVE" ? "default" : "secondary"}
+                                          className={
+                                            acc.status === "ACTIVE"
+                                              ? "bg-emerald-100 text-emerald-700 border-emerald-200 text-[10px]"
+                                              : "text-[10px]"
+                                          }
+                                        >
+                                          {acc.status}
+                                        </Badge>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Liabilities Section */}
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2">
+                            <Banknote className="h-5 w-5 text-red-600" />
+                            <h3 className="text-base font-semibold text-foreground">Liabilities</h3>
+                            <Badge variant="outline" className="text-xs">
+                              {liabilities.length} account{liabilities.length !== 1 ? "s" : ""}
+                            </Badge>
+                          </div>
+
+                          {liabilities.length === 0 ? (
+                            <div className="rounded-lg border border-dashed p-6 text-center">
+                              <Banknote className="mx-auto h-8 w-8 text-muted-foreground/30" />
+                              <p className="mt-2 text-sm text-muted-foreground">No liability accounts found</p>
+                            </div>
+                          ) : (
+                            <div className="overflow-x-auto rounded-md border">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow className="bg-red-50/50">
+                                    <TableHead className="font-semibold">Account Type</TableHead>
+                                    <TableHead className="font-semibold">Account No.</TableHead>
+                                    <TableHead className="font-semibold">Scheme</TableHead>
+                                    <TableHead className="font-semibold">Opening Date</TableHead>
+                                    <TableHead className="text-right font-semibold">Outstanding</TableHead>
+                                    <TableHead className="font-semibold">Status</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {liabilities.map((acc, idx) => (
+                                    <TableRow key={`liability-${idx}`}>
+                                      <TableCell>
+                                        <div className="flex items-center gap-2">
+                                          <AccountTypeIcon type={acc.account_type} />
+                                          <span className="text-sm font-medium">{acc.account_type}</span>
+                                        </div>
+                                      </TableCell>
+                                      <TableCell className="font-mono text-sm">{acc.account_number}</TableCell>
+                                      <TableCell className="text-sm text-muted-foreground">{acc.scheme_name}</TableCell>
+                                      <TableCell className="text-sm">
+                                        {acc.opening_date
+                                          ? new Date(acc.opening_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                                          : "---"}
+                                      </TableCell>
+                                      <TableCell className="text-right font-mono text-sm font-semibold text-red-700">
+                                        {acc.balance.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                                      </TableCell>
+                                      <TableCell>
+                                        <Badge
+                                          variant={acc.status === "ACTIVE" ? "default" : "secondary"}
+                                          className={
+                                            acc.status === "ACTIVE"
+                                              ? "bg-red-100 text-red-700 border-red-200 text-[10px]"
+                                              : "text-[10px]"
+                                          }
+                                        >
+                                          {acc.status}
+                                        </Badge>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -514,4 +766,22 @@ function DetailField({
       </p>
     </div>
   )
+}
+
+/* Icon for each account type */
+function AccountTypeIcon({ type }: { type: string }) {
+  switch (type) {
+    case "Savings":
+      return <PiggyBank className="h-4 w-4 text-emerald-500" />
+    case "Term Deposit":
+      return <Landmark className="h-4 w-4 text-blue-500" />
+    case "Recurring Deposit":
+      return <Calendar className="h-4 w-4 text-violet-500" />
+    case "Pigmy Deposit":
+      return <Wallet className="h-4 w-4 text-amber-500" />
+    case "Share Capital":
+      return <Building2 className="h-4 w-4 text-teal-500" />
+    default:
+      return <Banknote className="h-4 w-4 text-muted-foreground" />
+  }
 }
