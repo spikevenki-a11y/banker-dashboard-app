@@ -18,7 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Switch } from "@/components/ui/switch"
-import { ArrowLeft, Search, Loader2, CheckCircle2, User, Banknote, Calendar, TrendingUp, Shield, RefreshCw, Info } from "lucide-react"
+import { ArrowLeft, Search, Loader2, CheckCircle2, User, Banknote, Calendar,Wallet, TrendingUp, Shield, RefreshCw, Info } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 
 type MemberInfo = {
@@ -958,8 +958,46 @@ const getLogindate = async () => {
 
               {/* Right Column - Summary */}
               <div className="space-y-6">
+                
+                {/* Quick Info */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Deposit Types</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <div className="rounded-lg border border-border p-3">
+                      <p className="font-medium">Term Deposit (FD)</p>
+                      <p className="text-muted-foreground">Lump sum deposit for a fixed period with guaranteed returns.</p>
+                    </div>
+                    <div className="rounded-lg border border-border p-3">
+                      <p className="font-medium">Recurring Deposit (RD)</p>
+                      <p className="text-muted-foreground">Regular monthly installments for a fixed period.</p>
+                    </div>
+                    <div className="rounded-lg border border-border p-3">
+                      <p className="font-medium">Pigmy Deposit</p>
+                      <p className="text-muted-foreground">Daily collection based deposit scheme.</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+
+                {(memberInfo) &&(
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-lg ">
+                        <Wallet className="h-5 w-5" />
+                        Account Summery
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3 max-h-1500">
+
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Maturity Calculator (Term Deposit only) */}
                 {(depositType === "TERM" || depositType === "RECURRING") && (
+                  
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-lg">
@@ -1066,27 +1104,6 @@ const getLogindate = async () => {
                     </CardContent>
                   </Card>
                 )}
-
-                {/* Quick Info */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Deposit Types</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3 text-sm">
-                    <div className="rounded-lg border border-border p-3">
-                      <p className="font-medium">Term Deposit (FD)</p>
-                      <p className="text-muted-foreground">Lump sum deposit for a fixed period with guaranteed returns.</p>
-                    </div>
-                    <div className="rounded-lg border border-border p-3">
-                      <p className="font-medium">Recurring Deposit (RD)</p>
-                      <p className="text-muted-foreground">Regular monthly installments for a fixed period.</p>
-                    </div>
-                    <div className="rounded-lg border border-border p-3">
-                      <p className="font-medium">Pigmy Deposit</p>
-                      <p className="text-muted-foreground">Daily collection based deposit scheme.</p>
-                    </div>
-                  </CardContent>
-                </Card>
               </div>
             </div>
 
