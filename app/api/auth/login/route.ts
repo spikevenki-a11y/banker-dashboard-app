@@ -3,7 +3,6 @@ import { createClient } from "@supabase/supabase-js"
 import { createSession } from "@/lib/auth/session"
 import { NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
-import { cookies } from "next/headers"
 
 export async function POST(request: Request) {
   const supabase = createClient(
@@ -115,17 +114,18 @@ export async function POST(request: Request) {
       redirectUrl: user.role === "admin" ? "/admin" : "/dashboard",
     })
 
-    createSession(res, {
-      userId: user.id,
-      fullName: user.full_name,
-      role: user.role,
-      branch: user.branch,
-      branch_name: user.branch,
-      businessDate: day!.business_date, 
-      // businessDate: new Date().toISOString().split("T")[0], // Placeholder for business date,
-    })
-
-    return res
+    const s = createSession(res, {
+        userId: user.id,
+        fullName: user.full_name,
+        role: user.role,
+        branch: user.branch,
+        branch_name: user.branch,
+        businessDate: day!.business_date, 
+        // businessDate: new Date().toISOString().split("T")[0], // Placeholder for business date,
+      })
+    if(s){
+      return res
+    }
   } catch (err) {
     console.error("LOGIN ERROR:", err)
     return NextResponse.json({ error: "Login failed" }, { status: 500 })

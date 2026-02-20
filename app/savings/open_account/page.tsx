@@ -66,7 +66,7 @@ export default function OpenSavingsAccountPage() {
   const [loadingSchemes, setLoadingSchemes] = useState(true)
 
   // Form fields
-  const [openingDate, setOpeningDate] = useState(new Date().toISOString().split("T")[0])
+  const [openingDate, setOpeningDate] = useState("")
   const [initialDeposit, setInitialDeposit] = useState("")
   const [nomineeName, setNomineeName] = useState("")
   const [nomineeRelation, setNomineeRelation] = useState("")
@@ -92,6 +92,7 @@ export default function OpenSavingsAccountPage() {
       }
     }
     fetchSchemes()
+    getLogindate()
   }, [])
 
   const selectedScheme = schemes.find((s) => String(s.scheme_id) === selectedSchemeId)
@@ -160,11 +161,29 @@ export default function OpenSavingsAccountPage() {
     setMemberInfo(null)
     setMemberError("")
     setSelectedSchemeId("")
-    setOpeningDate(new Date().toISOString().split("T")[0])
+    // setOpeningDate(new Date().toISOString().split("T")[0])
     setInitialDeposit("")
     setNomineeName("")
     setNomineeRelation("")
   }
+  
+const getLogindate = async () => {
+  try {
+    const res = await fetch("/api/fas/get-login-date", { credentials: "include" })
+    const data = await res.json()
+
+    console.log("logindate =", data)
+
+    if (data.businessDate) {
+      setOpeningDate(data.businessDate)
+      console.log("Updated openingDate-----:", openingDate)
+    }
+    console.log("Updated openingDate:", openingDate)
+
+  } catch (err) {
+    console.error("Failed to fetch date", err)
+  }
+}
 
   return (
     <DashboardWrapper>
@@ -298,12 +317,13 @@ export default function OpenSavingsAccountPage() {
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="opening-date">Opening Date *</Label>
+                        <Label htmlFor="opening-date">Opening Date</Label>
                         <Input
                           id="opening-date"
                           type="date"
                           value={openingDate}
-                          onChange={(e) => setOpeningDate(e.target.value)}
+                          // onChange={(e) => setOpeningDate(e.target.value)}
+                          disabled
                         />
                       </div>
                     </div>
@@ -316,7 +336,8 @@ export default function OpenSavingsAccountPage() {
                           type="number"
                           placeholder="0.00"
                           value={initialDeposit}
-                          onChange={(e) => setInitialDeposit(e.target.value)}
+                          // onChange={(e) => setInitialDeposit(e.target.value)}
+                          disabled
                         />
                       </div>
                       <div className="space-y-2">

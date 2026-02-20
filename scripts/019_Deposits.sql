@@ -1,10 +1,10 @@
 CREATE TABLE deposit_account (
-    id uuid PRIMARY KEY,
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     branch_id bigint NOT NULL,
     schemeid numeric(5) NOT NULL,
     deposittype char(1) NOT NULL CHECK (deposittype IN ('T','R','P')),
 
-    accountnumber numeric(14) NOT NULL UNIQUE,
+    accountnumber verchar NOT NULL UNIQUE,
     membership_no numeric(12) NOT NULL,
 
     valuedate date,
@@ -24,14 +24,14 @@ CREATE TABLE deposit_account (
     accountstatus integer,
     accountclosedate date,
 
-    createdby numeric(10),
+    createdby uuid,
     createddate date,
-    authorisedby numeric(10),
+    authorisedby uuid,
     authoriseddate date
 );
 
 CREATE TABLE term_deposit_details (
-    id uuid PRIMARY KEY,
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     accountnumber numeric(14) NOT NULL UNIQUE,
 
     depositamount numeric(14,2) NOT NULL,
@@ -55,7 +55,7 @@ CREATE TABLE term_deposit_details (
 );
 
 CREATE TABLE recurring_deposit_details (
-    id uuid PRIMARY KEY,
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     accountnumber numeric(14) NOT NULL UNIQUE,
 
     installment_amount numeric(14,2) NOT NULL,
@@ -78,7 +78,7 @@ CREATE TABLE recurring_deposit_details (
 );
 
 CREATE TABLE pigmy_deposit_details (
-    id uuid PRIMARY KEY,
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     accountnumber numeric(14) NOT NULL UNIQUE,
 
     collection_frequency varchar(10),  -- DAILY
