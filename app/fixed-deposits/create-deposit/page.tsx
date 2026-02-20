@@ -59,6 +59,17 @@ type Scheme = {
   scheme_status: string
 }
 
+type SavingsAccount = {
+  account_number: string
+  available_balance: number
+  clear_balance: number
+  unclear_balance: number
+  account_status: string
+  opening_date: string
+  interest_rate: number
+  scheme_name: string
+}
+
 export default function CreateDepositPage() {
   const router = useRouter()
 
@@ -66,6 +77,8 @@ export default function CreateDepositPage() {
   const [isSearching, setIsSearching] = useState(false)
   const [memberInfo, setMemberInfo] = useState<MemberInfo | null>(null)
   const [memberError, setMemberError] = useState("")
+  const [savingsAccounts, setSavingsAccounts] = useState<SavingsAccount[]>([])
+  const [isFetchingSavings, setIsFetchingSavings] = useState(false)
 
   const [schemes, setSchemes] = useState<Scheme[]>([])
   const [selectedScheme, setSelectedScheme] = useState<Scheme | null>(null)
@@ -133,13 +146,31 @@ const getLogindate = async () => {
     }
   }
 
+  const fetchSavingsAccounts = async (membershipNo: string) => {
+    setIsFetchingSavings(true)
+    try {
+      const res = await fetch(`/api/savings/by-member?membership_no=${encodeURIComponent(membershipNo)}`, {
+        credentials: "include",
+      })
+      const data = await res.json()
+      if (data.success) {
+        setSavingsAccounts(data.accounts || [])
+      } else {
+        setSavingsAccounts([])
+      }
+    } catch {
+      setSavingsAccounts([])
+    } finally {
+      setIsFetchingSavings(false)
+    }
+  }
+
   const searchMember = async () => {
-    
-  console.log("member openingDate========:", openingDate)
     if (!memberSearch.trim()) return
     setIsSearching(true)
     setMemberError("")
     setMemberInfo(null)
+    setSavingsAccounts([])
 
     try {
       const res = await fetch("/api/savings/member-lookup", {
@@ -152,6 +183,7 @@ const getLogindate = async () => {
       const data = await res.json()
       if (res.ok && data.member) {
         setMemberInfo(data.member)
+        fetchSavingsAccounts(data.member.membership_no)
       } else {
         setMemberError(data.error || "Member not found")
       }
@@ -981,16 +1013,76 @@ const getLogindate = async () => {
                 </Card>
                 
 
-                {(memberInfo) &&(
+                {memberInfo && (
                   <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-lg ">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-lg">
                         <Wallet className="h-5 w-5" />
-                        Account Summery
+                        Savings Accounts
                       </CardTitle>
+                      <CardDescription>
+                        {memberInfo.full_name} ({memberInfo.membership_no})
+                      </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-3 max-h-1500">
+                    <CardContent className="space-y-3 max-h-[400px] overflow-y-auto">
+                      {isFetchingSavings && (
+                        <div className="flex items-center justify-center py-6">
+                          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                          <span className="ml-2 text-sm text-muted-foreground">Loading accounts...</span>
+                        </div>
+                      )}
 
+                      {!isFetchingSavings && savingsAccounts.length === 0 && (
+                        <div className="rounded-lg border border-dashed border-border p-4 text-center">
+                          <Wallet className="mx-auto h-8 w-8 text-muted-foreground/50" />
+                          <p className="mt-2 text-sm text-muted-foreground">No savings accounts found</p>
+                        </div>
+                      )}
+
+                      {!isFetchingSavings && savingsAccounts.length > 0 && (
+                        <>
+                          {/* Total Balance Summary */}
+                          <div className="rounded-lg bg-muted/50 border border-border p-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Balance</span>
+                              <span className="text-sm font-semibold text-teal-600">
+                                {savingsAccounts
+                                  .filter((a) => a.account_status === "ACTIVE")
+                                  .reduce((sum, a) => sum + (Number(a.available_balance) || 0), 0)
+                                  .toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {savingsAccounts.filter((a) => a.account_status === "ACTIVE").length} active account(s)
+                            </p>
+                          </div>
+
+                          {/* Individual Accounts */}
+                          {savingsAccounts.map((acc) => (
+                            <div
+                              key={acc.account_number}
+                              className="rounded-lg border border-border p-3 space-y-2"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-mono text-muted-foreground">{acc.account_number}</span>
+                                <Badge
+                                  variant={acc.account_status === "ACTIVE" ? "default" : "secondary"}
+                                  className={acc.account_status === "ACTIVE" ? "bg-teal-100 text-teal-700 text-[10px] px-1.5 py-0" : "text-[10px] px-1.5 py-0"}
+                                >
+                                  {acc.account_status}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground truncate">{acc.scheme_name}</p>
+                              <div className="flex items-baseline justify-between">
+                                <span className="text-xs text-muted-foreground">Balance</span>
+                                <span className="text-sm font-semibold text-foreground">
+                                  {Number(acc.available_balance || 0).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </>
+                      )}
                     </CardContent>
                   </Card>
                 )}
