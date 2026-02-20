@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Plus, Search, Eye, FileText, TrendingUp, Calendar, RefreshCw, Loader2, AlertCircle } from "lucide-react"
+import { Plus, Search, Eye, FileText, TrendingUp, Calendar, RefreshCw, Loader2, AlertCircle, Banknote } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { DashboardWrapper } from "../_components/dashboard-wrapper"
 import { useRouter } from "next/navigation"
@@ -377,14 +377,14 @@ export default function FixedDepositsPage() {
                                     Renew
                                   </DropdownMenuItem>
                                 )}
-                                {dep.balance === 0 && (
-                                  <DropdownMenuItem
-                                    onClick={() => {}}
-                                  >
-                                    <RefreshCw className="mr-2 h-4 w-4" />
-                                    Transactions
-                                  </DropdownMenuItem>
-                                )}
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    router.push(`/fixed-deposits/transactions?account=${dep.accountNumber}`)
+                                  }}
+                                >
+                                  <Banknote className="mr-2 h-4 w-4" />
+                                  Transactions
+                                </DropdownMenuItem>
                                 {dep.status === "matured" && (
                                   <DropdownMenuItem
                                     onClick={() => {
