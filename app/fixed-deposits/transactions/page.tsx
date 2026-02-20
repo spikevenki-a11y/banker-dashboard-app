@@ -107,7 +107,7 @@ function DepositTransactionsContent() {
   // Transaction form
   const [amount, setAmount] = useState("")
   const [narration, setNarration] = useState("")
-  const [voucherType, setVoucherType] = useState<"CASH" | "TRANSFER" | "">("")
+  const [voucherType, setVoucherType] = useState<"CASH" | "TRANSFER">("TRANSFER")
   const [selectedBatch, setSelectedBatch] = useState<number>(0)
   const [isBatchPopupOpen, setIsBatchPopupOpen] = useState(false)
   const [incompleteBatches, setIncompleteBatches] = useState<any[]>([])
@@ -125,6 +125,7 @@ function DepositTransactionsContent() {
         credentials: "include",
       })
       const data = await res.json()
+      console.log(data)
       if (res.ok) {
         setAccount(data.account)
         setTransactions(data.transactions || [])
@@ -218,7 +219,7 @@ function DepositTransactionsContent() {
       // Reset form
       setAmount("")
       setNarration("")
-      setVoucherType("")
+      // setVoucherType("")
       setSelectedBatch(0)
 
       refreshTransactions()
@@ -341,7 +342,7 @@ function DepositTransactionsContent() {
                       </div>
 
                       {/* Type-specific fields */}
-                      {account.depositType === "T" && account.depositAmount && (
+                      {account.depositType === "TERM" && account.depositAmount && (
                         <>
                           <div>
                             <p className="text-xs text-muted-foreground">Deposit Amount</p>
@@ -362,7 +363,7 @@ function DepositTransactionsContent() {
                         </>
                       )}
 
-                      {account.depositType === "R" && (
+                      {account.depositType === "RECURRING" && (
                         <>
                           <div>
                             <p className="text-xs text-muted-foreground">Installment</p>
@@ -385,7 +386,7 @@ function DepositTransactionsContent() {
                         </>
                       )}
 
-                      {account.depositType === "P" && (
+                      {account.depositType === "PIGMY" && (
                         <div>
                           <p className="text-xs text-muted-foreground">Daily Amount</p>
                           <p className="text-sm font-semibold">
@@ -422,11 +423,12 @@ function DepositTransactionsContent() {
                       <div className="space-y-2">
                         <Label htmlFor="voucher-type">Voucher Type *</Label>
                         <Select
-                          value={voucherType || ""}
+                          value={voucherType || "TRANSFER"}
                           onValueChange={(value) => {
-                            setVoucherType(value === "CASH" ? "CASH" : value === "TRANSFER" ? "TRANSFER" : "")
+                            setVoucherType("TRANSFER")
                             if (value !== "TRANSFER") setSelectedBatch(0)
                           }}
+                        disabled
                         >
                           <SelectTrigger id="voucher-type" className="w-full">
                             <SelectValue placeholder="Select voucher type" />
@@ -445,21 +447,23 @@ function DepositTransactionsContent() {
                           min="0"
                           step="0.01"
                           placeholder={
-                            account.depositType === "R" && account.installmentAmount
+                            account.depositType === "RECURRING" && account.installmentAmount
                               ? String(account.installmentAmount)
-                              : account.depositType === "P" && account.dailyAmount
+                              : account.depositType === "PIGMY" && account.dailyAmount
                                 ? String(account.dailyAmount)
                                 : "Enter amount"
                           }
-                          value={amount}
-                          onChange={(e) => setAmount(e.target.value)}
+                          // value={amount}
+                          value={account.depositAmount}
+                          disabled
+                          // onChange={(e) => setAmount(e.target.value)}
                         />
-                        {account.depositType === "R" && account.installmentAmount && (
+                        {account.depositType === "RECURRING" && account.installmentAmount && (
                           <p className="text-xs text-muted-foreground">
                             Installment: {formatCurrency(account.installmentAmount)}
                           </p>
                         )}
-                        {account.depositType === "P" && account.dailyAmount && (
+                        {account.depositType === "PIGMY" && account.dailyAmount && (
                           <p className="text-xs text-muted-foreground">
                             Min daily: {formatCurrency(account.dailyAmount)}
                           </p>
@@ -476,6 +480,7 @@ function DepositTransactionsContent() {
                             <Input
                               value={selectedBatch && selectedBatch !== 0 ? selectedBatch : "New Batch"}
                               readOnly
+                              disabled
                             />
                             <Button
                               type="button"
@@ -485,6 +490,8 @@ function DepositTransactionsContent() {
                                 fetchIncompleteBatches()
                                 setIsBatchPopupOpen(true)
                               }}
+                              disabled
+                              hidden
                             >
                               Select
                             </Button>
@@ -498,9 +505,9 @@ function DepositTransactionsContent() {
                       <Textarea
                         id="txn-narration"
                         placeholder={
-                          account.depositType === "R"
+                          account.depositType === "RECURRING"
                             ? "RD Installment Payment"
-                            : account.depositType === "P"
+                            : account.depositType === "PIGMY"
                               ? "Pigmy Collection"
                               : "Deposit Credit"
                         }
@@ -515,7 +522,7 @@ function DepositTransactionsContent() {
                     <div className="flex gap-3 pt-2">
                       <Button
                         onClick={handleSubmit}
-                        disabled={isSubmitting || !voucherType || !amount}
+                        disabled={isSubmitting || !voucherType || !account.depositAmount}
                         className="gap-2"
                       >
                         {isSubmitting ? (
@@ -530,7 +537,7 @@ function DepositTransactionsContent() {
                         onClick={() => {
                           setAmount("")
                           setNarration("")
-                          setVoucherType("")
+                          // setVoucherType("")
                           setSelectedBatch(0)
                           setFormError("")
                         }}
@@ -666,8 +673,8 @@ function DepositTransactionsContent() {
                       <Badge variant="outline">{typeLabel}</Badge>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Interest Rate</span>
-                      <span className="text-sm font-semibold">{account.interestRate}%</span>
+                      <span className="text-sm text-muted-foreground">Deposit Amount</span>
+                      <span className="text-sm font-semibold">{account.depositAmount}</span>
                     </div>
                     {account.maturityDate && (
                       <div className="flex items-center justify-between">
@@ -681,7 +688,7 @@ function DepositTransactionsContent() {
                         <span className="text-sm font-semibold text-teal-600">{formatCurrency(account.maturityAmount)}</span>
                       </div>
                     )}
-                    {account.depositType === "R" && (
+                    {account.depositType === "RECURRING" && (
                       <>
                         <div className="border-t border-border pt-3">
                           <div className="flex items-center justify-between">

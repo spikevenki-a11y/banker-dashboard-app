@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Account number is required" }, { status: 400 })
     }
 
-    // Get deposit account info with member/scheme details
+    // Get deposit account info with member/scheme details vengatesh
     const { rows: accountRows } = await pool.query(
       `SELECT
         da.id, da.accountnumber, da.deposittype, da.membership_no,
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
         schemeName: account.scheme_name || "N/A",
         depositGlAccount: depositGl,
         // Type-specific
-        depositAmount: account.depositamount ? Number(account.depositamount) : null,
+        depositAmount: account.depositamount ,
         periodMonths: account.periodmonths,
         periodDays: account.perioddays,
         maturityDate: account.td_maturity_date || account.rd_maturity_date || null,
