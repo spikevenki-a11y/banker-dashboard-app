@@ -63,15 +63,19 @@ export async function POST(req: Request) {
 
     // Generate account number: branch(3) + scheme(2) + seq(6) = 14 digits padded
     // Map deposit type to a code: T=10, R=20, P=30
-    const typeCode = deposit_type === "T" ? "10" : deposit_type === "R" ? "20" : "30"
+    const typeCode = deposit_type === "T" ? "02" : deposit_type === "R" ? "02" : "02"
     const seqResult = await client.query(
       `SELECT COALESCE(MAX(accountnumber), 0) + 1 as next_num
        FROM deposit_account WHERE branch_id = $1`,
       [branchId]
     )
     const branchStr = String(branchId).padStart(3, "0")
-    const seqNum = seqResult.rows[0].next_num > 0 ? seqResult.rows[0].next_num : 1
-    const accountNumber = Number(`${branchStr}${typeCode}${String(seqNum).padStart(9, "0")}`)
+    let seqNum = 1
+    if(seqResult){
+       seqNum = seqResult.rows[0].next_num > 0 ? seqResult.rows[0].next_num : 1
+    }
+   
+    const accountNumber = Number(`${branchStr}${typeCode}${String(seqNum).padStart(6, "0")}`)
     console.log("accountnumber is : ",accountNumber)
 
     // Calculate maturity
@@ -82,7 +86,7 @@ export async function POST(req: Request) {
     const days = Number(period_days) || 0
     const interest = Number(rate_of_interest) || Number(scheme.interest_rate) || 0
 
-    if (deposit_type === "T" && amt > 0) {
+    if (deposit_type === "TERM" && amt > 0) {
       // Simple interest maturity calculation
       const totalDays = months * 30 + days
       const interestEarned = (amt * interest * totalDays) / (365 * 100)
@@ -93,6 +97,16 @@ export async function POST(req: Request) {
       openDate.setDate(openDate.getDate() + days)
       maturityDate = openDate.toISOString().split("T")[0]
     }
+    console.log("the data is : ",branchId,
+        scheme_id,
+        deposit_type,
+        accountNumber,
+        membership_no,
+        account_open_date,
+        amt,
+        interest,
+        tds_applicable === true ? "Y" : (scheme.tds_applicable ? "Y" : "N"),
+        userId,)
 
     // Insert deposit_account
     const accountResult = await client.query(
@@ -122,7 +136,8 @@ export async function POST(req: Request) {
     )
 
     // const accountId = accountResult.rows[0].id
-    const acctNum = accountResult.rows[0].accountnumber
+    const acctNum  = accountResult.rows[0].accountnumber
+    console.log("acctNum is ,",acctNum)
 
     // Insert type-specific details
     if (deposit_type === "TERM") {
@@ -182,22 +197,22 @@ export async function POST(req: Request) {
     }
 
     // Insert opening transaction
-    await client.query(
-      `INSERT INTO deposit_transactions (
-        account_id, transaction_date, value_date, branch_id,
-        transaction_type, narration,
-        credit_amount, debit_amount, running_balance,
-        status, created_by
-      ) VALUES ($1, $2, $2, $3, 'OPENING', 'Deposit account opened', $4, 0, $4, 'ACTIVE', $5)`,
-      [accountId, account_open_date, branchId, amt, userId]
-    )
+    // await client.query(
+    //   `INSERT INTO deposit_transactions (
+    //     account_id, transaction_date, value_date, branch_id,
+    //     transaction_type, narration,
+    //     credit_amount, debit_amount, running_balance,
+    //     status, created_by
+    //   ) VALUES ($1, $2, $2, $3, 'OPENING', 'Deposit account opened', $4, 0, $4, 'ACTIVE', $5)`,
+    //   [accountId, account_open_date, branchId, amt, userId]
+    // )
 
     await client.query("COMMIT")
 
     return NextResponse.json({
       success: true,
       account_number: acctNum,
-      account_id: accountId,
+      account_id: acctNum,
       maturity_date: maturityDate,
       maturity_amount: maturityAmount,
     })

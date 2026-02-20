@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
         c.full_name ILIKE $1
         OR c.email ILIKE $1
         OR c.mobile_no ILIKE $1
-        OR m.membership_no ILIKE $1
+        --OR m.membership_no ILIKE $1
         OR ck.aadhaar_no ILIKE $1
         OR c.father_name ILIKE $1
         OR m.ledger_folio_number ILIKE $1

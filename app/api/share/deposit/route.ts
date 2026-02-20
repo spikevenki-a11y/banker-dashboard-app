@@ -37,6 +37,7 @@ export async function POST(req: Request) {
         AND m.status = 'ACTIVE'
         AND s.status = 'ACTIVE'
     `, [membership_no, u.branch])
+    console.log("the row is",row)
 
     if (!row) {
       throw new Error("Invalid membership or share account")
@@ -51,6 +52,9 @@ export async function POST(req: Request) {
       FROM config_share
       WHERE branch_id = $1
     `, [u.branch])
+
+    console.log("the u.branch is  ",u.branch)
+    console.log("the cfg is  ",cfg)
 
     if (!cfg) throw new Error("Share config not found")
 
