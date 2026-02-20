@@ -299,7 +299,7 @@ export default function FixedDepositsPage() {
                           <TableCell className="font-mono font-medium text-sm">{dep.accountNumber}</TableCell>
                           <TableCell>
                             <Badge variant="outline" className="text-xs">
-                              {dep.depositType === "T" ? "FD" : dep.depositType === "R" ? "RD" : "Pigmy"}
+                              {dep.depositType === "TERM" ? "FD" : dep.depositType === "R" ? "RD" : "Pigmy"}
                             </Badge>
                           </TableCell>
                           <TableCell>
@@ -309,12 +309,12 @@ export default function FixedDepositsPage() {
                             </div>
                           </TableCell>
                           <TableCell className="font-semibold">
-                            {dep.depositType === "T"
+                            {dep.depositType === "TERN"
                               ? formatCurrency(dep.depositAmount)
-                              : dep.depositType === "R"
+                              : dep.depositType === "RECURRING"
                                 ? formatCurrency(dep.installmentAmount)
                                 : formatCurrency(dep.balance)}
-                            {dep.depositType === "R" && (
+                            {dep.depositType === "RECURRING" && (
                               <div className="text-xs font-normal text-muted-foreground">
                                 {dep.paidInstallments}/{dep.totalInstallments} paid
                               </div>
@@ -331,7 +331,7 @@ export default function FixedDepositsPage() {
                             )}
                           </TableCell>
                           <TableCell>{formatDate(dep.maturityDate)}</TableCell>
-                          <TableCell className="font-semibold text-teal-600">{formatCurrency(dep.maturityAmount)}</TableCell>
+                          <TableCell className="font-semibold text-teal-600">{dep.balance != 0 && (formatCurrency(dep.maturityAmount)) || 0}</TableCell>
                           <TableCell>
                             <Badge
                               variant={dep.status === "active" ? "default" : "secondary"}
@@ -375,6 +375,14 @@ export default function FixedDepositsPage() {
                                   >
                                     <RefreshCw className="mr-2 h-4 w-4" />
                                     Renew
+                                  </DropdownMenuItem>
+                                )}
+                                {dep.balance === 0 && (
+                                  <DropdownMenuItem
+                                    onClick={() => {}}
+                                  >
+                                    <RefreshCw className="mr-2 h-4 w-4" />
+                                    Transactions
                                   </DropdownMenuItem>
                                 )}
                                 {dep.status === "matured" && (
@@ -505,7 +513,10 @@ export default function FixedDepositsPage() {
                           {selectedDeposit.maturityAmount && (
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Maturity Amount:</span>
-                              <span className="font-medium">{formatCurrency(selectedDeposit.maturityAmount)}</span>
+                              <span className="font-medium">
+                                {selectedDeposit.depositAmount != 0 &&
+                                  formatCurrency(selectedDeposit.maturityAmount)}
+                              </span>
                             </div>
                           )}
                           <div className="flex justify-between">
