@@ -23,9 +23,29 @@ import {
 } from "@/components/ui/dialog"
 import {
   ArrowLeft, Loader2, CheckCircle2, Banknote, History, IndianRupee, Calendar, TrendingUp,
-  CreditCard, Landmark,
+  CreditCard, Landmark, PiggyBank, AlertCircle,
 } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
+
+type SavingsAccount = {
+  account_number: string
+  available_balance: number
+  clear_balance: number
+  unclear_balance: number
+  account_status: string
+  opening_date: string
+  interest_rate: number
+  scheme_name: string
+}
+
+type DebitEntry = {
+  accountNumber: string
+  selected: boolean
+  debitAmount: string
+  availableBalance: number
+  schemeName: string
+}
 
 type DepositAccount = {
   accountNumber: string
@@ -112,6 +132,11 @@ function DepositTransactionsContent() {
   const [isBatchPopupOpen, setIsBatchPopupOpen] = useState(false)
   const [incompleteBatches, setIncompleteBatches] = useState<any[]>([])
 
+  // Debit account (savings accounts)
+  const [savingsAccounts, setSavingsAccounts] = useState<SavingsAccount[]>([])
+  const [debitEntries, setDebitEntries] = useState<DebitEntry[]>([])
+  const [isLoadingSavings, setIsLoadingSavings] = useState(false)
+
   // Submit state
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [successOpen, setSuccessOpen] = useState(false)
@@ -170,6 +195,35 @@ function DepositTransactionsContent() {
     }
   }
 
+  const fetchSavingsAccounts = async (membershipNo: string) => {
+    setIsLoadingSavings(true)
+    try {
+      const res = await fetch(`/api/savings/by-member?membership_no=${encodeURIComponent(membershipNo)}`, {
+        credentials: "include",
+      })
+      const data = await res.json()
+      if (data.success && data.accounts) {
+        const activeAccounts = data.accounts.filter(
+          (a: SavingsAccount) => a.account_status?.toUpperCase() === "ACTIVE"
+        )
+        setSavingsAccounts(activeAccounts)
+        setDebitEntries(
+          activeAccounts.map((a: SavingsAccount) => ({
+            accountNumber: a.account_number,
+            selected: false,
+            debitAmount: "",
+            availableBalance: Number(a.available_balance),
+            schemeName: a.scheme_name,
+          }))
+        )
+      }
+    } catch {
+      // silent
+    } finally {
+      setIsLoadingSavings(false)
+    }
+  }
+
   useEffect(() => {
     if (accountParam) {
       fetchAccountData(accountParam)
@@ -177,6 +231,49 @@ function DepositTransactionsContent() {
       setIsLoading(false)
     }
   }, [accountParam])
+
+  // Fetch savings accounts when deposit account is loaded
+  useEffect(() => {
+    if (account?.membershipNo) {
+      fetchSavingsAccounts(account.membershipNo)
+    }
+  }, [account?.membershipNo])
+
+  // Debit entry helpers
+  const toggleDebitEntry = (accountNumber: string, checked: boolean) => {
+    setDebitEntries((prev) =>
+      prev.map((e) =>
+        e.accountNumber === accountNumber
+          ? { ...e, selected: checked, debitAmount: checked ? e.debitAmount : "" }
+          : e
+      )
+    )
+  }
+
+  const updateDebitAmount = (accountNumber: string, value: string) => {
+    setDebitEntries((prev) =>
+      prev.map((e) =>
+        e.accountNumber === accountNumber ? { ...e, debitAmount: value } : e
+      )
+    )
+  }
+
+  const totalDebit = debitEntries.reduce((sum, e) => {
+    if (e.selected && e.debitAmount) {
+      return sum + (parseFloat(e.debitAmount) || 0)
+    }
+    return sum
+  }, 0)
+
+  const creditAmount = account?.depositAmount ? Number(account.depositAmount) : 0
+  const debitMatchesCredit = Math.abs(totalDebit - creditAmount) < 0.01
+
+  const hasDebitValidationError = debitEntries.some(
+    (e) =>
+      e.selected &&
+      e.debitAmount &&
+      parseFloat(e.debitAmount) > e.availableBalance
+  )
 
   const handleSubmit = async () => {
     if (!account) return
@@ -186,9 +283,34 @@ function DepositTransactionsContent() {
       return
     }
 
-    const amt = parseFloat(amount)
+    const amt = account.depositAmount ? Number(account.depositAmount) : 0
     if (isNaN(amt) || amt <= 0) {
-      setFormError("Enter a valid positive amount.")
+      setFormError("Credit amount is not valid.")
+      return
+    }
+
+    // Validate debit entries
+    const selectedDebits = debitEntries.filter((e) => e.selected && e.debitAmount)
+    if (selectedDebits.length === 0) {
+      setFormError("Please select at least one savings account and enter debit amount.")
+      return
+    }
+
+    for (const entry of selectedDebits) {
+      const debitAmt = parseFloat(entry.debitAmount)
+      if (isNaN(debitAmt) || debitAmt <= 0) {
+        setFormError(`Invalid debit amount for account ${entry.accountNumber}.`)
+        return
+      }
+      if (debitAmt > entry.availableBalance) {
+        setFormError(`Debit amount exceeds available balance for account ${entry.accountNumber}.`)
+        return
+      }
+    }
+
+    const debitTotal = selectedDebits.reduce((s, e) => s + parseFloat(e.debitAmount), 0)
+    if (Math.abs(debitTotal - amt) >= 0.01) {
+      setFormError(`Total debit (${formatCurrency(debitTotal)}) must equal credit amount (${formatCurrency(amt)}).`)
       return
     }
 
@@ -206,6 +328,10 @@ function DepositTransactionsContent() {
           narration: narration || "Deposit Credit",
           voucherType,
           selectedBatch,
+          debitAccounts: selectedDebits.map((e) => ({
+            accountNumber: e.accountNumber,
+            amount: parseFloat(e.debitAmount),
+          })),
         }),
       })
 
@@ -219,10 +345,16 @@ function DepositTransactionsContent() {
       // Reset form
       setAmount("")
       setNarration("")
-      // setVoucherType("")
       setSelectedBatch(0)
+      setDebitEntries((prev) =>
+        prev.map((e) => ({ ...e, selected: false, debitAmount: "" }))
+      )
 
       refreshTransactions()
+      // Refresh savings account balances
+      if (account.membershipNo) {
+        fetchSavingsAccounts(account.membershipNo)
+      }
     } catch (e: any) {
       setFormError(e.message || "Transaction failed. Please try again.")
     } finally {
@@ -522,7 +654,7 @@ function DepositTransactionsContent() {
                     <div className="flex gap-3 pt-2">
                       <Button
                         onClick={handleSubmit}
-                        disabled={isSubmitting || !voucherType || !account.depositAmount}
+                        disabled={isSubmitting || !voucherType || !account.depositAmount || !debitMatchesCredit || hasDebitValidationError}
                         className="gap-2"
                       >
                         {isSubmitting ? (
@@ -537,9 +669,11 @@ function DepositTransactionsContent() {
                         onClick={() => {
                           setAmount("")
                           setNarration("")
-                          // setVoucherType("")
                           setSelectedBatch(0)
                           setFormError("")
+                          setDebitEntries((prev) =>
+                            prev.map((e) => ({ ...e, selected: false, debitAmount: "" }))
+                          )
                         }}
                         className="bg-transparent"
                       >
@@ -660,60 +794,133 @@ function DepositTransactionsContent() {
                   </CardContent>
                 </Card>
 
-                {/* Quick Info */}
-                <Card>
+                {/* Debit Account Card */}
+                <Card className={!isActive ? "pointer-events-none opacity-50" : ""}>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                      Account Details
-                    </CardTitle>
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-sm font-bold text-amber-700">
+                        <PiggyBank className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-base">Debit Account</CardTitle>
+                        <CardDescription className="text-xs">
+                          Select savings account(s) to debit
+                        </CardDescription>
+                      </div>
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Type</span>
-                      <Badge variant="outline">{typeLabel}</Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Deposit Amount</span>
-                      <span className="text-sm font-semibold">{account.depositAmount}</span>
-                    </div>
-                    {account.maturityDate && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Maturity</span>
-                        <span className="text-sm font-medium">{formatDate(account.maturityDate)}</span>
+                    {isLoadingSavings ? (
+                      <div className="flex items-center justify-center py-6">
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                        <span className="ml-2 text-xs text-muted-foreground">Loading savings accounts...</span>
                       </div>
-                    )}
-                    {account.maturityAmount && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Maturity Amt</span>
-                        <span className="text-sm font-semibold text-teal-600">{formatCurrency(account.maturityAmount)}</span>
+                    ) : debitEntries.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-6 text-center">
+                        <PiggyBank className="h-6 w-6 text-muted-foreground/40" />
+                        <p className="mt-2 text-xs text-muted-foreground">No active savings accounts found for this member.</p>
                       </div>
-                    )}
-                    {account.depositType === "RECURRING" && (
+                    ) : (
                       <>
+                        <div className="space-y-2">
+                          {debitEntries.map((entry) => {
+                            const debitAmt = parseFloat(entry.debitAmount) || 0
+                            const exceedsBalance = entry.selected && debitAmt > entry.availableBalance
+                            return (
+                              <div
+                                key={entry.accountNumber}
+                                className={`rounded-lg border p-3 transition-colors ${
+                                  entry.selected
+                                    ? "border-amber-300 bg-amber-50/50 dark:border-amber-700 dark:bg-amber-950/30"
+                                    : "border-border"
+                                }`}
+                              >
+                                <div className="flex items-start gap-3">
+                                  <Checkbox
+                                    checked={entry.selected}
+                                    onCheckedChange={(checked) =>
+                                      toggleDebitEntry(entry.accountNumber, checked === true)
+                                    }
+                                    className="mt-0.5"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between">
+                                      <p className="text-xs font-mono font-medium truncate">{entry.accountNumber}</p>
+                                    </div>
+                                    <p className="text-[10px] text-muted-foreground truncate">{entry.schemeName}</p>
+                                    <div className="mt-1 flex items-center justify-between">
+                                      <span className="text-[10px] text-muted-foreground">Available:</span>
+                                      <span className="text-xs font-semibold text-teal-600">
+                                        {formatCurrency(entry.availableBalance)}
+                                      </span>
+                                    </div>
+                                    {entry.selected && (
+                                      <div className="mt-2">
+                                        <Label className="text-[10px] text-muted-foreground">Debit Amount</Label>
+                                        <Input
+                                          type="number"
+                                          min="0"
+                                          step="0.01"
+                                          max={entry.availableBalance}
+                                          placeholder="0.00"
+                                          value={entry.debitAmount}
+                                          onChange={(e) =>
+                                            updateDebitAmount(entry.accountNumber, e.target.value)
+                                          }
+                                          className={`mt-1 h-8 text-sm ${
+                                            exceedsBalance ? "border-red-400 focus-visible:ring-red-400" : ""
+                                          }`}
+                                        />
+                                        {exceedsBalance && (
+                                          <p className="mt-1 flex items-center gap-1 text-[10px] text-red-500">
+                                            <AlertCircle className="h-3 w-3" />
+                                            Exceeds available balance
+                                          </p>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+
+                        {/* Total Debit */}
                         <div className="border-t border-border pt-3">
                           <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">Paid</span>
-                            <span className="text-sm font-medium">
-                              {account.paidInstallments || 0} / {account.totalInstallments || 0}
+                            <span className="text-sm font-medium text-muted-foreground">Total Debit</span>
+                            <span
+                              className={`text-base font-bold ${
+                                debitMatchesCredit
+                                  ? "text-teal-600"
+                                  : totalDebit > 0
+                                    ? "text-red-600"
+                                    : "text-muted-foreground"
+                              }`}
+                            >
+                              {formatCurrency(totalDebit)}
                             </span>
                           </div>
-                          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
-                            <div
-                              className="h-full rounded-full bg-teal-500 transition-all"
-                              style={{
-                                width: `${account.totalInstallments ? ((account.paidInstallments || 0) / account.totalInstallments) * 100 : 0}%`,
-                              }}
-                            />
+                          <div className="mt-1 flex items-center justify-between">
+                            <span className="text-[10px] text-muted-foreground">Credit Amount</span>
+                            <span className="text-xs font-semibold">{formatCurrency(creditAmount)}</span>
                           </div>
+                          {totalDebit > 0 && !debitMatchesCredit && (
+                            <p className="mt-2 flex items-center gap-1 text-[10px] text-red-500">
+                              <AlertCircle className="h-3 w-3" />
+                              Total debit must equal credit amount
+                            </p>
+                          )}
+                          {debitMatchesCredit && totalDebit > 0 && (
+                            <p className="mt-2 flex items-center gap-1 text-[10px] text-teal-600">
+                              <CheckCircle2 className="h-3 w-3" />
+                              Debit and credit amounts match
+                            </p>
+                          )}
                         </div>
                       </>
                     )}
-                    <div className="border-t border-border pt-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Opened</span>
-                        <span className="text-sm font-medium">{formatDate(account.openDate)}</span>
-                      </div>
-                    </div>
                   </CardContent>
                 </Card>
               </div>

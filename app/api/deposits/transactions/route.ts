@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
     const businessDate = session.businessDate
 
     const body = await request.json()
-    const { accountNumber, amount, narration, voucherType, selectedBatch } = body
+    const { accountNumber, amount, narration, voucherType, selectedBatch, debitAccounts } = body
 
     if (!accountNumber || !amount) {
       return NextResponse.json({ error: "Account number and amount are required" }, { status: 400 })
@@ -224,8 +224,93 @@ export async function POST(request: NextRequest) {
 
     const txnNarration = narration || "Deposit Credit"
 
-    // DR Cash/Bank (if CASH)
-    if (voucherType === "CASH") {
+    // DR Savings Account(s) - Transfer from savings to deposit
+    if (debitAccounts && Array.isArray(debitAccounts) && debitAccounts.length > 0) {
+      for (const debit of debitAccounts) {
+        const debitAmt = parseFloat(debit.amount)
+        if (isNaN(debitAmt) || debitAmt <= 0) continue
+
+        // Get savings account details
+        const { rows: savingsRows } = await client.query(
+          `SELECT sa.*, ss.savings_gl_account
+           FROM savings_accounts sa
+           JOIN savings_schemes ss ON ss.scheme_id = sa.scheme_id AND ss.branch_id = sa.branch_id
+           WHERE sa.account_number = $1 AND sa.branch_id = $2
+           FOR UPDATE`,
+          [debit.accountNumber, branchId]
+        )
+
+        if (savingsRows.length === 0) {
+          await client.query("ROLLBACK")
+          return NextResponse.json({ error: `Savings account ${debit.accountNumber} not found` }, { status: 404 })
+        }
+
+        const savingsAccount = savingsRows[0]
+        const savingsBalance = parseFloat(savingsAccount.available_balance)
+
+        if (debitAmt > savingsBalance) {
+          await client.query("ROLLBACK")
+          return NextResponse.json({
+            error: `Insufficient balance in savings account ${debit.accountNumber}. Available: ${savingsBalance}, Required: ${debitAmt}`
+          }, { status: 400 })
+        }
+
+        const savingsGl = savingsAccount.savings_gl_account
+
+        // DR Savings GL (debit from savings - liability decreases)
+        await client.query(`
+          INSERT INTO gl_batch_lines (
+            branch_id, batch_id, business_date,
+            accountcode, ref_account_id,
+            debit_amount, credit_amount,
+            voucher_id, narration, created_by
+          ) VALUES ($1,$2,$3,$4,$5,$6,0,$7,$8,$9)
+        `, [
+          branchId, batchId, businessDate,
+          savingsGl, String(debit.accountNumber),
+          debitAmt,
+          voucherNo,
+          `Transfer to Deposit A/c ${accountNumber}`,
+          session.userId
+        ])
+
+        // Record savings transaction
+        const newSavingsBalance = savingsBalance - debitAmt
+        await client.query(`
+          INSERT INTO savings_transactions (
+            branch_id, account_number,
+            transaction_date, value_date,
+            transaction_type, voucher_type,
+            debit_amount, credit_amount, running_balance,
+            narration, voucher_no, gl_batch_id,
+            status, created_by
+          ) VALUES (
+            $1,$2,
+            $3,$3,
+            'WITHDRAWAL','TRANSFER',
+            $4,0,$5,
+            $6,$7,$8,
+            'PENDING',$9
+          )
+        `, [
+          branchId, debit.accountNumber,
+          businessDate,
+          debitAmt, newSavingsBalance,
+          `Transfer to Deposit A/c ${accountNumber}`,
+          voucherNo, batchId,
+          session.userId
+        ])
+
+        // Update savings account balance
+        await client.query(
+          `UPDATE savings_accounts
+           SET available_balance = $1, clear_balance = $1, updated_at = NOW()
+           WHERE account_number = $2 AND branch_id = $3`,
+          [newSavingsBalance, debit.accountNumber, branchId]
+        )
+      }
+    } else if (voucherType === "CASH") {
+      // DR Cash/Bank (if CASH and no debit accounts)
       await client.query(`
         INSERT INTO gl_batch_lines (
           branch_id, batch_id, business_date,
