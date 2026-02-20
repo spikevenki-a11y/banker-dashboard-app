@@ -16,7 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Plus, Search, Eye, FileText, TrendingUp, Calendar, RefreshCw, Loader2, AlertCircle, Banknote } from "lucide-react"
@@ -358,8 +358,7 @@ export default function FixedDepositsPage() {
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem
                                   onClick={() => {
-                                    setSelectedDeposit(dep)
-                                    setIsActionDialogOpen(false)
+                                    router.push(`/fixed-deposits/view?account=${dep.accountNumber}`)
                                   }}
                                 >
                                   <Eye className="mr-2 h-4 w-4" />
@@ -542,153 +541,7 @@ export default function FixedDepositsPage() {
               </DialogContent>
             </Dialog>
 
-            {/* View Deposit Details Dialog */}
-            <Dialog open={!!selectedDeposit && !isActionDialogOpen} onOpenChange={() => setSelectedDeposit(null)}>
-              <DialogContent className="max-w-3xl">
-                <DialogHeader>
-                  <DialogTitle>Deposit Account Details</DialogTitle>
-                  <DialogDescription>Complete information about the deposit account</DialogDescription>
-                </DialogHeader>
-                {selectedDeposit && (
-                  <Tabs defaultValue="overview" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger value="overview">Overview</TabsTrigger>
-                      <TabsTrigger value="calculation">Details</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="overview" className="space-y-4">
-                      <div className="grid gap-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label className="text-muted-foreground">Account Number</Label>
-                            <p className="font-mono font-medium">{selectedDeposit.accountNumber}</p>
-                          </div>
-                          <div>
-                            <Label className="text-muted-foreground">Status</Label>
-                            <div className="mt-1">
-                              <Badge
-                                variant="default"
-                                className={
-                                  selectedDeposit.status === "active"
-                                    ? "bg-teal-100 text-teal-700"
-                                    : selectedDeposit.status === "matured"
-                                      ? "bg-orange-100 text-orange-700"
-                                      : "bg-gray-100 text-gray-700"
-                                }
-                              >
-                                {selectedDeposit.status}
-                              </Badge>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label className="text-muted-foreground">Member Name</Label>
-                            <p className="font-medium">{selectedDeposit.memberName}</p>
-                          </div>
-                          <div>
-                            <Label className="text-muted-foreground">Membership No</Label>
-                            <p className="font-mono font-medium">{selectedDeposit.membershipNo}</p>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label className="text-muted-foreground">Deposit Type</Label>
-                            <p className="font-medium">{selectedDeposit.depositTypeLabel}</p>
-                          </div>
-                          <div>
-                            <Label className="text-muted-foreground">Scheme</Label>
-                            <p className="font-medium">{selectedDeposit.schemeName}</p>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label className="text-muted-foreground">
-                              {selectedDeposit.depositType === "T" ? "Deposit Amount" : "Balance"}
-                            </Label>
-                            <p className="text-2xl font-bold text-foreground">
-                              {formatCurrency(selectedDeposit.depositAmount || selectedDeposit.balance)}
-                            </p>
-                          </div>
-                          {selectedDeposit.maturityAmount && (
-                            <div>
-                              <Label className="text-muted-foreground">Maturity Amount</Label>
-                              <p className="text-2xl font-bold text-teal-600">
-                                {formatCurrency(selectedDeposit.maturityAmount)}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label className="text-muted-foreground">Opening Date</Label>
-                            <p className="font-medium">{formatDate(selectedDeposit.openDate)}</p>
-                          </div>
-                          <div>
-                            <Label className="text-muted-foreground">Maturity Date</Label>
-                            <p className="font-medium">{formatDate(selectedDeposit.maturityDate)}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </TabsContent>
-                    <TabsContent value="calculation" className="space-y-4">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-base">Account Configuration</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-muted-foreground">Interest Rate (Annual)</span>
-                            <span className="font-semibold">{selectedDeposit.interestRate}%</span>
-                          </div>
-                          {selectedDeposit.periodMonths != null && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">Tenure</span>
-                              <span className="font-semibold">
-                                {selectedDeposit.periodMonths}m {selectedDeposit.periodDays ? `${selectedDeposit.periodDays}d` : ""}
-                              </span>
-                            </div>
-                          )}
-                          {selectedDeposit.depositType === "T" && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">Auto Renewal</span>
-                              <Badge variant={selectedDeposit.autoRenewal ? "default" : "secondary"}>
-                                {selectedDeposit.autoRenewal ? "Yes" : "No"}
-                              </Badge>
-                            </div>
-                          )}
-                          {selectedDeposit.depositType === "R" && (
-                            <>
-                              <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground">Installment Amount</span>
-                                <span className="font-semibold">{formatCurrency(selectedDeposit.installmentAmount)}</span>
-                              </div>
-                              <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground">Frequency</span>
-                                <span className="font-semibold">{selectedDeposit.installmentFrequency}</span>
-                              </div>
-                              <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground">Installments Paid</span>
-                                <span className="font-semibold">
-                                  {selectedDeposit.paidInstallments} / {selectedDeposit.totalInstallments}
-                                </span>
-                              </div>
-                            </>
-                          )}
-                          {selectedDeposit.maturityAmount && (
-                            <div className="flex items-center justify-between border-t border-border pt-3">
-                              <span className="text-lg font-semibold">Maturity Amount</span>
-                              <span className="text-lg font-bold text-teal-600">
-                                {formatCurrency(selectedDeposit.maturityAmount)}
-                              </span>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    </TabsContent>
-                  </Tabs>
-                )}
-              </DialogContent>
-            </Dialog>
+
           </main>
         </div>
       </div>
