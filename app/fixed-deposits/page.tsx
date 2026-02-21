@@ -376,14 +376,16 @@ export default function FixedDepositsPage() {
                                     Renew
                                   </DropdownMenuItem>
                                 )}
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    router.push(`/fixed-deposits/transactions?account=${dep.accountNumber}`)
-                                  }}
-                                >
-                                  <Banknote className="mr-2 h-4 w-4" />
-                                  Transactions
-                                </DropdownMenuItem>
+                                {( //dep.depositAmount != dep.balance && 
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      router.push(`/fixed-deposits/transactions?account=${dep.accountNumber}`)
+                                    }}
+                                  >
+                                    <Banknote className="mr-2 h-4 w-4" />
+                                    Transactions
+                                  </DropdownMenuItem>
+                                )}
                                 {dep.status === "matured" && (
                                   <DropdownMenuItem
                                     onClick={() => {
