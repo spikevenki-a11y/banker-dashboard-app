@@ -1426,11 +1426,20 @@ const getLogindate = async () => {
                     </div>
                   </AlertDialogDescription>
                 </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogAction onClick={() => router.push("/fixed-deposits")}>
-                    Back to Deposits
-                  </AlertDialogAction>
-                </AlertDialogFooter>
+  <AlertDialogFooter className="flex-row gap-2 sm:justify-end">
+  <AlertDialogAction
+    onClick={() => router.push("/fixed-deposits")}
+    className="bg-secondary text-secondary-foreground hover:bg-secondary/80"
+  >
+    Back to Deposits
+  </AlertDialogAction>
+  <AlertDialogAction
+    onClick={() => router.push(`/fixed-deposits/transactions?account=${successInfo?.account_number}`)}
+    className="bg-teal-600 text-white hover:bg-teal-700"
+  >
+    Go to Transactions
+  </AlertDialogAction>
+  </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
           </main>
