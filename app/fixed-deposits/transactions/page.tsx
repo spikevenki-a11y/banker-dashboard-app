@@ -531,157 +531,159 @@ function DepositTransactionsContent() {
                 </Card>
 
                 {/* Credit Transaction Form */}
-                <Card className={!isActive ? "pointer-events-none opacity-50" : ""}>
-                  <CardHeader>
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-100 text-sm font-bold text-teal-700">
-                        <CreditCard className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-lg">Credit Transaction</CardTitle>
-                        <CardDescription>Deposit funds into the {typeLabel.toLowerCase()} account</CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {!isActive && (
-                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
-                        Transactions are only allowed on active accounts. Current status:{" "}
-                        <strong>{statusLabels[account.accountStatus] || "Unknown"}</strong>
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="voucher-type">Voucher Type *</Label>
-                        <Select
-                          value={voucherType || "TRANSFER"}
-                          onValueChange={(value) => {
-                            setVoucherType("TRANSFER")
-                            if (value !== "TRANSFER") setSelectedBatch(0)
-                          }}
-                        disabled
-                        >
-                          <SelectTrigger id="voucher-type" className="w-full">
-                            <SelectValue placeholder="Select voucher type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="CASH">Cash</SelectItem>
-                            <SelectItem value="TRANSFER">Transfer</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="credit-amount">Credit Amount (INR) *</Label>
-                        <Input
-                          id="credit-amount"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder={
-                            account.depositType === "RECURRING" && account.installmentAmount
-                              ? String(account.installmentAmount)
-                              : account.depositType === "PIGMY" && account.dailyAmount
-                                ? String(account.dailyAmount)
-                                : "Enter amount"
-                          }
-                          // value={amount}
-                          value={account.depositAmount}
-                          disabled
-                          // onChange={(e) => setAmount(e.target.value)}
-                        />
-                        {account.depositType === "RECURRING" && account.installmentAmount && (
-                          <p className="text-xs text-muted-foreground">
-                            Installment: {formatCurrency(account.installmentAmount)}
-                          </p>
-                        )}
-                        {account.depositType === "PIGMY" && account.dailyAmount && (
-                          <p className="text-xs text-muted-foreground">
-                            Min daily: {formatCurrency(account.dailyAmount)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* GL Batch Selection for TRANSFER */}
-                    {voucherType === "TRANSFER" && (
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>GL Batch ID</Label>
-                          <div className="flex gap-2">
-                            <Input
-                              value={selectedBatch && selectedBatch !== 0 ? selectedBatch : "New Batch"}
-                              readOnly
-                              disabled
-                            />
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="bg-transparent"
-                              onClick={() => {
-                                fetchIncompleteBatches()
-                                setIsBatchPopupOpen(true)
-                              }}
-                              disabled
-                              hidden
-                            >
-                              Select
-                            </Button>
-                          </div>
+                {account.depositAmount != account.balance && (
+                  <Card className={!isActive ? "pointer-events-none opacity-50" : ""}>
+                    <CardHeader>
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-100 text-sm font-bold text-teal-700">
+                          <CreditCard className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg">Credit Transaction</CardTitle>
+                          <CardDescription>Deposit funds into the {typeLabel.toLowerCase()} account</CardDescription>
                         </div>
                       </div>
-                    )}
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {!isActive && (
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                          Transactions are only allowed on active accounts. Current status:{" "}
+                          <strong>{statusLabels[account.accountStatus] || "Unknown"}</strong>
+                        </div>
+                      )}
 
-                    <div className="space-y-2">
-                      <Label htmlFor="txn-narration">Narration</Label>
-                      <Textarea
-                        id="txn-narration"
-                        placeholder={
-                          account.depositType === "RECURRING"
-                            ? "RD Installment Payment"
-                            : account.depositType === "PIGMY"
-                              ? "Pigmy Collection"
-                              : "Deposit Credit"
-                        }
-                        rows={2}
-                        value={narration}
-                        onChange={(e) => setNarration(e.target.value)}
-                      />
-                    </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="voucher-type">Voucher Type *</Label>
+                          <Select
+                            value={voucherType || "TRANSFER"}
+                            onValueChange={(value) => {
+                              setVoucherType("TRANSFER")
+                              if (value !== "TRANSFER") setSelectedBatch(0)
+                            }}
+                          disabled
+                          >
+                            <SelectTrigger id="voucher-type" className="w-full">
+                              <SelectValue placeholder="Select voucher type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="CASH">Cash</SelectItem>
+                              <SelectItem value="TRANSFER">Transfer</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="credit-amount">Credit Amount (INR) *</Label>
+                          <Input
+                            id="credit-amount"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder={
+                              account.depositType === "RECURRING" && account.installmentAmount
+                                ? String(account.installmentAmount)
+                                : account.depositType === "PIGMY" && account.dailyAmount
+                                  ? String(account.dailyAmount)
+                                  : "Enter amount"
+                            }
+                            // value={amount}
+                            value={account.depositAmount}
+                            disabled
+                            // onChange={(e) => setAmount(e.target.value)}
+                          />
+                          {account.depositType === "RECURRING" && account.installmentAmount && (
+                            <p className="text-xs text-muted-foreground">
+                              Installment: {formatCurrency(account.installmentAmount)}
+                            </p>
+                          )}
+                          {account.depositType === "PIGMY" && account.dailyAmount && (
+                            <p className="text-xs text-muted-foreground">
+                              Min daily: {formatCurrency(account.dailyAmount)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
 
-                    {formError && <p className="text-sm text-red-500">{formError}</p>}
+                      {/* GL Batch Selection for TRANSFER */}
+                      {voucherType === "TRANSFER" && (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>GL Batch ID</Label>
+                            <div className="flex gap-2">
+                              <Input
+                                value={selectedBatch && selectedBatch !== 0 ? selectedBatch : "New Batch"}
+                                readOnly
+                                disabled
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="bg-transparent"
+                                onClick={() => {
+                                  fetchIncompleteBatches()
+                                  setIsBatchPopupOpen(true)
+                                }}
+                                disabled
+                                hidden
+                              >
+                                Select
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
-                    <div className="flex gap-3 pt-2">
-                      <Button
-                        onClick={handleSubmit}
-                        disabled={isSubmitting || !voucherType || !account.depositAmount || !debitMatchesCredit || hasDebitValidationError}
-                        className="gap-2"
-                      >
-                        {isSubmitting ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Banknote className="h-4 w-4" />
-                        )}
-                        {isSubmitting ? "Processing..." : "Submit Credit"}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setAmount("")
-                          setNarration("")
-                          setSelectedBatch(0)
-                          setFormError("")
-                          setDebitEntries((prev) =>
-                            prev.map((e) => ({ ...e, selected: false, debitAmount: "" }))
-                          )
-                        }}
-                        className="bg-transparent"
-                      >
-                        Clear
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                      <div className="space-y-2">
+                        <Label htmlFor="txn-narration">Narration</Label>
+                        <Textarea
+                          id="txn-narration"
+                          placeholder={
+                            account.depositType === "RECURRING"
+                              ? "RD Installment Payment"
+                              : account.depositType === "PIGMY"
+                                ? "Pigmy Collection"
+                                : "Deposit Credit"
+                          }
+                          rows={2}
+                          value={narration}
+                          onChange={(e) => setNarration(e.target.value)}
+                        />
+                      </div>
+
+                      {formError && <p className="text-sm text-red-500">{formError}</p>}
+
+                      <div className="flex gap-3 pt-2">
+                        <Button
+                          onClick={handleSubmit}
+                          disabled={isSubmitting || !voucherType || !account.depositAmount || !debitMatchesCredit || hasDebitValidationError}
+                          className="gap-2"
+                        >
+                          {isSubmitting ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Banknote className="h-4 w-4" />
+                          )}
+                          {isSubmitting ? "Processing..." : "Submit Credit"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setAmount("")
+                            setNarration("")
+                            setSelectedBatch(0)
+                            setFormError("")
+                            setDebitEntries((prev) =>
+                              prev.map((e) => ({ ...e, selected: false, debitAmount: "" }))
+                            )
+                          }}
+                          className="bg-transparent"
+                        >
+                          Clear
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Transaction History */}
                 <Card>
@@ -795,134 +797,136 @@ function DepositTransactionsContent() {
                 </Card>
 
                 {/* Debit Account Card */}
-                <Card className={!isActive ? "pointer-events-none opacity-50" : ""}>
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-sm font-bold text-amber-700">
-                        <PiggyBank className="h-4 w-4" />
+                {account.depositAmount != account.balance && (
+                  <Card className={!isActive ? "pointer-events-none opacity-50" : ""}>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-sm font-bold text-amber-700">
+                          <PiggyBank className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-base">Debit Account</CardTitle>
+                          <CardDescription className="text-xs">
+                            Select savings account(s) to debit
+                          </CardDescription>
+                        </div>
                       </div>
-                      <div>
-                        <CardTitle className="text-base">Debit Account</CardTitle>
-                        <CardDescription className="text-xs">
-                          Select savings account(s) to debit
-                        </CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {isLoadingSavings ? (
-                      <div className="flex items-center justify-center py-6">
-                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                        <span className="ml-2 text-xs text-muted-foreground">Loading savings accounts...</span>
-                      </div>
-                    ) : debitEntries.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-6 text-center">
-                        <PiggyBank className="h-6 w-6 text-muted-foreground/40" />
-                        <p className="mt-2 text-xs text-muted-foreground">No active savings accounts found for this member.</p>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="space-y-2">
-                          {debitEntries.map((entry) => {
-                            const debitAmt = parseFloat(entry.debitAmount) || 0
-                            const exceedsBalance = entry.selected && debitAmt > entry.availableBalance
-                            return (
-                              <div
-                                key={entry.accountNumber}
-                                className={`rounded-lg border p-3 transition-colors ${
-                                  entry.selected
-                                    ? "border-amber-300 bg-amber-50/50 dark:border-amber-700 dark:bg-amber-950/30"
-                                    : "border-border"
-                                }`}
-                              >
-                                <div className="flex items-start gap-3">
-                                  <Checkbox
-                                    checked={entry.selected}
-                                    onCheckedChange={(checked) =>
-                                      toggleDebitEntry(entry.accountNumber, checked === true)
-                                    }
-                                    className="mt-0.5"
-                                  />
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between">
-                                      <p className="text-xs font-mono font-medium truncate">{entry.accountNumber}</p>
-                                    </div>
-                                    <p className="text-[10px] text-muted-foreground truncate">{entry.schemeName}</p>
-                                    <div className="mt-1 flex items-center justify-between">
-                                      <span className="text-[10px] text-muted-foreground">Available:</span>
-                                      <span className="text-xs font-semibold text-teal-600">
-                                        {formatCurrency(entry.availableBalance)}
-                                      </span>
-                                    </div>
-                                    {entry.selected && (
-                                      <div className="mt-2">
-                                        <Label className="text-[10px] text-muted-foreground">Debit Amount</Label>
-                                        <Input
-                                          type="number"
-                                          min="0"
-                                          step="0.01"
-                                          max={entry.availableBalance}
-                                          placeholder="0.00"
-                                          value={entry.debitAmount}
-                                          onChange={(e) =>
-                                            updateDebitAmount(entry.accountNumber, e.target.value)
-                                          }
-                                          className={`mt-1 h-8 text-sm ${
-                                            exceedsBalance ? "border-red-400 focus-visible:ring-red-400" : ""
-                                          }`}
-                                        />
-                                        {exceedsBalance && (
-                                          <p className="mt-1 flex items-center gap-1 text-[10px] text-red-500">
-                                            <AlertCircle className="h-3 w-3" />
-                                            Exceeds available balance
-                                          </p>
-                                        )}
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {isLoadingSavings ? (
+                        <div className="flex items-center justify-center py-6">
+                          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                          <span className="ml-2 text-xs text-muted-foreground">Loading savings accounts...</span>
+                        </div>
+                      ) : debitEntries.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-6 text-center">
+                          <PiggyBank className="h-6 w-6 text-muted-foreground/40" />
+                          <p className="mt-2 text-xs text-muted-foreground">No active savings accounts found for this member.</p>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="space-y-2">
+                            {debitEntries.map((entry) => {
+                              const debitAmt = parseFloat(entry.debitAmount) || 0
+                              const exceedsBalance = entry.selected && debitAmt > entry.availableBalance
+                              return (
+                                <div
+                                  key={entry.accountNumber}
+                                  className={`rounded-lg border p-3 transition-colors ${
+                                    entry.selected
+                                      ? "border-amber-300 bg-amber-50/50 dark:border-amber-700 dark:bg-amber-950/30"
+                                      : "border-border"
+                                  }`}
+                                >
+                                  <div className="flex items-start gap-3">
+                                    <Checkbox
+                                      checked={entry.selected}
+                                      onCheckedChange={(checked) =>
+                                        toggleDebitEntry(entry.accountNumber, checked === true)
+                                      }
+                                      className="mt-0.5"
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center justify-between">
+                                        <p className="text-xs font-mono font-medium truncate">{entry.accountNumber}</p>
                                       </div>
-                                    )}
+                                      <p className="text-[10px] text-muted-foreground truncate">{entry.schemeName}</p>
+                                      <div className="mt-1 flex items-center justify-between">
+                                        <span className="text-[10px] text-muted-foreground">Available:</span>
+                                        <span className="text-xs font-semibold text-teal-600">
+                                          {formatCurrency(entry.availableBalance)}
+                                        </span>
+                                      </div>
+                                      {entry.selected && (
+                                        <div className="mt-2">
+                                          <Label className="text-[10px] text-muted-foreground">Debit Amount</Label>
+                                          <Input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            max={entry.availableBalance}
+                                            placeholder="0.00"
+                                            value={entry.debitAmount}
+                                            onChange={(e) =>
+                                              updateDebitAmount(entry.accountNumber, e.target.value)
+                                            }
+                                            className={`mt-1 h-8 text-sm ${
+                                              exceedsBalance ? "border-red-400 focus-visible:ring-red-400" : ""
+                                            }`}
+                                          />
+                                          {exceedsBalance && (
+                                            <p className="mt-1 flex items-center gap-1 text-[10px] text-red-500">
+                                              <AlertCircle className="h-3 w-3" />
+                                              Exceeds available balance
+                                            </p>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            )
-                          })}
-                        </div>
+                              )
+                            })}
+                          </div>
 
-                        {/* Total Debit */}
-                        <div className="border-t border-border pt-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-muted-foreground">Total Debit</span>
-                            <span
-                              className={`text-base font-bold ${
-                                debitMatchesCredit
-                                  ? "text-teal-600"
-                                  : totalDebit > 0
-                                    ? "text-red-600"
-                                    : "text-muted-foreground"
-                              }`}
-                            >
-                              {formatCurrency(totalDebit)}
-                            </span>
+                          {/* Total Debit */}
+                          <div className="border-t border-border pt-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium text-muted-foreground">Total Debit</span>
+                              <span
+                                className={`text-base font-bold ${
+                                  debitMatchesCredit
+                                    ? "text-teal-600"
+                                    : totalDebit > 0
+                                      ? "text-red-600"
+                                      : "text-muted-foreground"
+                                }`}
+                              >
+                                {formatCurrency(totalDebit)}
+                              </span>
+                            </div>
+                            <div className="mt-1 flex items-center justify-between">
+                              <span className="text-[10px] text-muted-foreground">Credit Amount</span>
+                              <span className="text-xs font-semibold">{formatCurrency(creditAmount)}</span>
+                            </div>
+                            {totalDebit > 0 && !debitMatchesCredit && (
+                              <p className="mt-2 flex items-center gap-1 text-[10px] text-red-500">
+                                <AlertCircle className="h-3 w-3" />
+                                Total debit must equal credit amount
+                              </p>
+                            )}
+                            {debitMatchesCredit && totalDebit > 0 && (
+                              <p className="mt-2 flex items-center gap-1 text-[10px] text-teal-600">
+                                <CheckCircle2 className="h-3 w-3" />
+                                Debit and credit amounts match
+                              </p>
+                            )}
                           </div>
-                          <div className="mt-1 flex items-center justify-between">
-                            <span className="text-[10px] text-muted-foreground">Credit Amount</span>
-                            <span className="text-xs font-semibold">{formatCurrency(creditAmount)}</span>
-                          </div>
-                          {totalDebit > 0 && !debitMatchesCredit && (
-                            <p className="mt-2 flex items-center gap-1 text-[10px] text-red-500">
-                              <AlertCircle className="h-3 w-3" />
-                              Total debit must equal credit amount
-                            </p>
-                          )}
-                          {debitMatchesCredit && totalDebit > 0 && (
-                            <p className="mt-2 flex items-center gap-1 text-[10px] text-teal-600">
-                              <CheckCircle2 className="h-3 w-3" />
-                              Debit and credit amounts match
-                            </p>
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             </div>
 
