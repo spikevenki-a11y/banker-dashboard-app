@@ -171,6 +171,14 @@ export async function POST(req: Request) {
       openDate.setDate(openDate.getDate() + days)
       maturityDate = openDate.toISOString().split("T")[0]
 
+      // Calculate next installment date (1 month from opening for MONTHLY)
+      const firstInstDate = new Date(account_open_date)
+      if ((installment_frequency || "MONTHLY") === "MONTHLY") {
+        firstInstDate.setMonth(firstInstDate.getMonth() + 1)
+      } else {
+        firstInstDate.setDate(firstInstDate.getDate() + 7)
+      }
+
       await client.query(
         `INSERT INTO recurring_deposit_details (
           id, accountnumber, installment_amount, installment_frequency,
@@ -182,11 +190,30 @@ export async function POST(req: Request) {
           rdInstAmt,
           installment_frequency || "MONTHLY",
           rdInstNum,
-          account_open_date,
+          firstInstDate.toISOString().split("T")[0],
           maturityDate,
           Number(penal_rate) || 0,
         ]
       )
+
+      // Generate rd_installment_details for each installment
+      const freq = installment_frequency || "MONTHLY"
+      for (let i = 1; i <= rdInstNum; i++) {
+        const dueDate = new Date(account_open_date)
+        if (freq === "MONTHLY") {
+          dueDate.setMonth(dueDate.getMonth() + i)
+        } else if (freq === "WEEKLY") {
+          dueDate.setDate(dueDate.getDate() + i * 7)
+        }
+
+        await client.query(
+          `INSERT INTO rd_installment_details (
+            branch_id, accountnumber, installment_number, installment_amount,
+            installment_due_date, created_by
+          ) VALUES ($1, $2, $3, $4, $5, $6)`,
+          [branchId, acctNum, i, rdInstAmt, dueDate.toISOString().split("T")[0], userId]
+        )
+      }
     } else if (deposit_type === "P") {
       await client.query(
         `INSERT INTO pigmy_deposit_details (

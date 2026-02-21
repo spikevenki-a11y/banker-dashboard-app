@@ -74,6 +74,16 @@ type DepositAccount = {
   collectionFrequency: string | null
 }
 
+type RdInstallment = {
+  id: string
+  installment_number: number
+  installment_amount: number
+  installment_due_date: string | null
+  installment_paid_date: string | null
+  installment_voucher_no: number | null
+  penalty_collected: number
+}
+
 type Transaction = {
   id: string
   transaction_date: string
@@ -120,6 +130,7 @@ function DepositTransactionsContent() {
 
   const [account, setAccount] = useState<DepositAccount | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [rdInstallments, setRdInstallments] = useState<RdInstallment[]>([])
   const [totalTxns, setTotalTxns] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingTxns, setIsLoadingTxns] = useState(false)
@@ -155,6 +166,7 @@ function DepositTransactionsContent() {
         setAccount(data.account)
         setTransactions(data.transactions || [])
         setTotalTxns(data.total || 0)
+        setRdInstallments(data.rdInstallments || [])
       }
     } catch {
       // silent
@@ -175,6 +187,7 @@ function DepositTransactionsContent() {
         setAccount(data.account)
         setTransactions(data.transactions || [])
         setTotalTxns(data.total || 0)
+        setRdInstallments(data.rdInstallments || [])
       }
     } catch {
       // silent
@@ -529,6 +542,78 @@ function DepositTransactionsContent() {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* RD Installment Details */}
+                {(account.depositType === "RECURRING" || account.depositType === "R" || account.depositType === "RECURING") && rdInstallments.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-100 text-sm font-bold text-teal-700">
+                          <Calendar className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg">Installment Schedule</CardTitle>
+                          <CardDescription>
+                            {rdInstallments.filter(i => i.installment_paid_date).length} of {rdInstallments.length} installments paid
+                          </CardDescription>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-[60px]">No.</TableHead>
+                              <TableHead>Installment Amount</TableHead>
+                              <TableHead>Due Date</TableHead>
+                              <TableHead>Paid Date</TableHead>
+                              <TableHead>Voucher No</TableHead>
+                              <TableHead>Penalty</TableHead>
+                              <TableHead>Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {rdInstallments.map((inst) => {
+                              const isPaid = !!inst.installment_paid_date
+                              const isOverdue = !isPaid && inst.installment_due_date && new Date(inst.installment_due_date) < new Date()
+                              return (
+                                <TableRow key={inst.id}>
+                                  <TableCell className="font-mono text-sm">{inst.installment_number}</TableCell>
+                                  <TableCell className="text-sm font-medium">{formatCurrency(inst.installment_amount)}</TableCell>
+                                  <TableCell className="text-sm">{formatDate(inst.installment_due_date)}</TableCell>
+                                  <TableCell className="text-sm">
+                                    {isPaid ? formatDate(inst.installment_paid_date) : "--"}
+                                  </TableCell>
+                                  <TableCell className="font-mono text-xs">
+                                    {inst.installment_voucher_no ? `V${inst.installment_voucher_no}` : "--"}
+                                  </TableCell>
+                                  <TableCell className="text-sm">
+                                    {Number(inst.penalty_collected) > 0 ? formatCurrency(inst.penalty_collected) : "--"}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge
+                                      variant="outline"
+                                      className={
+                                        isPaid
+                                          ? "border-teal-300 text-teal-700"
+                                          : isOverdue
+                                            ? "border-red-300 text-red-700"
+                                            : "border-amber-300 text-amber-700"
+                                      }
+                                    >
+                                      {isPaid ? "Paid" : isOverdue ? "Overdue" : "Pending"}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              )
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Credit Transaction Form */}
                 {account.depositAmount != account.balance && (

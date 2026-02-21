@@ -84,6 +84,21 @@ export async function GET(request: NextRequest) {
       [String(accountNumber), branchId, depositGl]
     )
 
+    // Fetch RD installment details if it's a recurring deposit
+    let rdInstallments: any[] = []
+    if (account.deposittype === "RECURING" || account.deposittype === "R" || account.deposittype === "RECURRING") {
+      const { rows: installmentRows } = await pool.query(
+        `SELECT
+          id, installment_number, installment_amount, installment_due_date,
+          installment_paid_date, installment_voucher_no, penalty_collected
+        FROM rd_installment_details
+        WHERE accountnumber = $1 AND branch_id = $2
+        ORDER BY installment_number ASC`,
+        [accountNumber, branchId]
+      )
+      rdInstallments = installmentRows
+    }
+
     return NextResponse.json({
       account: {
         accountNumber: String(account.accountnumber),
@@ -118,6 +133,7 @@ export async function GET(request: NextRequest) {
       },
       transactions,
       total: parseInt(countResult[0]?.total || "0"),
+      rdInstallments,
     })
   } catch (error: any) {
     console.error("Failed to fetch deposit transactions:", error)
@@ -353,14 +369,35 @@ export async function POST(request: NextRequest) {
       [newBalance, accountNumber, branchId]
     )
 
-    // If RD, update paid installments count
-    if (account.deposittype === "R") {
+    // If RD, update paid installments count and mark installment detail as paid
+    if (account.deposittype === "R" || account.deposittype === "RECURING" || account.deposittype === "RECURRING") {
       await client.query(
         `UPDATE recurring_deposit_details
-         SET numberofinstalmentspaid = COALESCE(numberofinstalmentspaid, 0) + 1
+         SET numberofinstalmentspaid = COALESCE(numberofinstalmentspaid, 0) + 1,
+             nextinstalmentdate = nextinstalmentdate + INTERVAL '1 month'
          WHERE accountnumber = $1`,
         [accountNumber]
       )
+
+      // Mark the next unpaid installment as paid
+      const { rows: unpaidRows } = await client.query(
+        `SELECT id, installment_number FROM rd_installment_details
+         WHERE accountnumber = $1 AND branch_id = $2 AND installment_paid_date IS NULL
+         ORDER BY installment_number ASC
+         LIMIT 1`,
+        [accountNumber, branchId]
+      )
+
+      if (unpaidRows.length > 0) {
+        await client.query(
+          `UPDATE rd_installment_details
+           SET installment_paid_date = $1,
+               installment_voucher_no = $2,
+               updated_at = NOW()
+           WHERE id = $3`,
+          [businessDate, voucherNo, unpaidRows[0].id]
+        )
+      }
     }
 
     await client.query("COMMIT")
