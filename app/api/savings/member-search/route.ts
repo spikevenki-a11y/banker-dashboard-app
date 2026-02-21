@@ -12,7 +12,7 @@ export async function POST(req: Request) {
     const session = JSON.parse(c.value)
     const branchId = session.branch
     const body = await req.json()
-    const { memberNumber, memberName, fatherName, aadhaarNumber } = body
+    const { memberNumber, memberName, fatherName, aadhaarNumber, contactNo } = body
 
     // Build dynamic query conditions
     const conditions: string[] = ["m.branch_id = $1", "m.status = 'ACTIVE'"]
@@ -40,6 +40,12 @@ export async function POST(req: Request) {
     if (aadhaarNumber?.trim()) {
       conditions.push(`ck.aadhaar_no ILIKE $${paramIndex}`)
       values.push(`%${aadhaarNumber.trim()}%`)
+      paramIndex++
+    }
+
+    if (contactNo?.trim()) {
+      conditions.push(`c.mobile_no ILIKE $${paramIndex}`)
+      values.push(`%${contactNo.trim()}%`)
       paramIndex++
     }
 
