@@ -75,8 +75,10 @@ export async function POST(req: Request) {
        seqNum = seqResult.rows[0].next_num > 0 ? seqResult.rows[0].next_num : 1
     }
    
-    const accountNumber = Number(`${branchStr}${typeCode}${String(seqNum).padStart(6, "0")}`)
+    const accountNumber = Number(String(seqNum))
+    // const accountNumber = Number(`${branchStr}${typeCode}${String(seqNum).padStart(6, "0")}`)
     console.log("accountnumber is : ",accountNumber)
+    console.log("THE deposit_type is : ",deposit_type)
 
     // Calculate maturity
     let maturityDate = null
@@ -187,7 +189,7 @@ export async function POST(req: Request) {
           Number(penal_rate) || 0,
         ]
       )
-    } else if (deposit_type === "P") {
+    } else if (deposit_type === "PIGMY") {
       await client.query(
         `INSERT INTO pigmy_deposit_details (
           id, accountnumber, collection_frequency, minimum_daily_amount
