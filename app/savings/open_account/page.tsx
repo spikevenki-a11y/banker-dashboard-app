@@ -17,7 +17,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { ArrowLeft, Search, Loader2, CheckCircle2, User, CreditCard, Banknote } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { ArrowLeft, Search, Loader2, CheckCircle2, User, CreditCard, Banknote, Users, X } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 
 type MemberInfo = {
@@ -59,6 +61,15 @@ export default function OpenSavingsAccountPage() {
   const [isSearching, setIsSearching] = useState(false)
   const [memberInfo, setMemberInfo] = useState<MemberInfo | null>(null)
   const [memberError, setMemberError] = useState("")
+
+  // Member search popup
+  const [searchDialogOpen, setSearchDialogOpen] = useState(false)
+  const [searchMemberNo, setSearchMemberNo] = useState("")
+  const [searchMemberName, setSearchMemberName] = useState("")
+  const [searchFatherName, setSearchFatherName] = useState("")
+  const [searchAadhaar, setSearchAadhaar] = useState("")
+  const [searchResults, setSearchResults] = useState<MemberInfo[]>([])
+  const [isPopupSearching, setIsPopupSearching] = useState(false)
 
   // Schemes
   const [schemes, setSchemes] = useState<Scheme[]>([])
@@ -123,6 +134,57 @@ export default function OpenSavingsAccountPage() {
     } finally {
       setIsSearching(false)
     }
+  }
+
+  // Auto-load member on blur (when user types membership no directly)
+  const handleMemberBlur = () => {
+    if (membershipNo.trim() && !memberInfo && !isSearching) {
+      handleMemberSearch()
+    }
+  }
+
+  // Popup advanced search
+  const handlePopupSearch = async () => {
+    if (!searchMemberNo.trim() && !searchMemberName.trim() && !searchFatherName.trim() && !searchAadhaar.trim()) return
+
+    setIsPopupSearching(true)
+    setSearchResults([])
+
+    try {
+      const res = await fetch("/api/savings/member-search", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          memberNumber: searchMemberNo.trim(),
+          memberName: searchMemberName.trim(),
+          fatherName: searchFatherName.trim(),
+          aadhaarNumber: searchAadhaar.trim(),
+        }),
+      })
+
+      const data = await res.json()
+      if (data.success) {
+        setSearchResults(data.results || [])
+      }
+    } catch {
+      // silent
+    } finally {
+      setIsPopupSearching(false)
+    }
+  }
+
+  const handleSelectMember = (member: MemberInfo) => {
+    setMemberInfo(member)
+    setMembershipNo(member.membership_no)
+    setMemberError("")
+    setSearchDialogOpen(false)
+    // Reset popup fields
+    setSearchMemberNo("")
+    setSearchMemberName("")
+    setSearchFatherName("")
+    setSearchAadhaar("")
+    setSearchResults([])
   }
 
   const handleSubmit = async () => {
@@ -230,19 +292,32 @@ const getLogindate = async () => {
                           id="membership-no"
                           placeholder="Enter membership number"
                           value={membershipNo}
-                          onChange={(e) => setMembershipNo(e.target.value)}
+                          onChange={(e) => {
+                            setMembershipNo(e.target.value)
+                            if (memberInfo) {
+                              setMemberInfo(null)
+                              setMemberError("")
+                            }
+                          }}
+                          onBlur={handleMemberBlur}
                           onKeyDown={(e) => e.key === "Enter" && handleMemberSearch()}
                           className="flex-1"
                         />
-                        <Button onClick={handleMemberSearch} disabled={isSearching || !membershipNo.trim()}>
-                          {isSearching ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <Search className="mr-2 h-4 w-4" />
-                          )}
+                        <Button
+                          variant="outline"
+                          onClick={() => setSearchDialogOpen(true)}
+                          className="gap-2 bg-transparent"
+                        >
+                          <Search className="h-4 w-4" />
                           Search
                         </Button>
                       </div>
+                      {isSearching && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Loading member details...
+                        </div>
+                      )}
                       {memberError && <p className="text-sm text-red-500">{memberError}</p>}
                     </div>
 
@@ -526,6 +601,162 @@ const getLogindate = async () => {
                 </Card>
               </div>
             </div>
+
+            {/* Member Search Dialog */}
+            <Dialog open={searchDialogOpen} onOpenChange={setSearchDialogOpen}>
+              <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-teal-600" />
+                    Search Member
+                  </DialogTitle>
+                  <DialogDescription>
+                    Search for a member using one or more criteria below
+                  </DialogDescription>
+                </DialogHeader>
+
+                {/* Search Criteria */}
+                <div className="grid grid-cols-2 gap-4 py-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="search-member-no" className="text-xs">Member Number</Label>
+                    <Input
+                      id="search-member-no"
+                      placeholder="Enter member number"
+                      value={searchMemberNo}
+                      onChange={(e) => setSearchMemberNo(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handlePopupSearch()}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="search-member-name" className="text-xs">Member Name</Label>
+                    <Input
+                      id="search-member-name"
+                      placeholder="Enter member name"
+                      value={searchMemberName}
+                      onChange={(e) => setSearchMemberName(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handlePopupSearch()}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="search-father-name" className="text-xs">Father{"'"}s Name</Label>
+                    <Input
+                      id="search-father-name"
+                      placeholder="Enter father's name"
+                      value={searchFatherName}
+                      onChange={(e) => setSearchFatherName(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handlePopupSearch()}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="search-aadhaar" className="text-xs">Aadhaar Number</Label>
+                    <Input
+                      id="search-aadhaar"
+                      placeholder="Enter Aadhaar number"
+                      value={searchAadhaar}
+                      onChange={(e) => setSearchAadhaar(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handlePopupSearch()}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSearchMemberNo("")
+                      setSearchMemberName("")
+                      setSearchFatherName("")
+                      setSearchAadhaar("")
+                      setSearchResults([])
+                    }}
+                    className="gap-1.5 bg-transparent text-xs"
+                  >
+                    <X className="h-3 w-3" />
+                    Clear
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handlePopupSearch}
+                    disabled={isPopupSearching || (!searchMemberNo.trim() && !searchMemberName.trim() && !searchFatherName.trim() && !searchAadhaar.trim())}
+                    className="gap-2 bg-teal-600 hover:bg-teal-700 text-white"
+                  >
+                    {isPopupSearching ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Search className="h-3.5 w-3.5" />
+                    )}
+                    Search
+                  </Button>
+                </div>
+
+                {/* Results */}
+                <div className="flex-1 overflow-auto border rounded-lg min-h-0">
+                  {isPopupSearching ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      <span className="ml-2 text-sm text-muted-foreground">Searching members...</span>
+                    </div>
+                  ) : searchResults.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-xs">Member No</TableHead>
+                          <TableHead className="text-xs">Full Name</TableHead>
+                          <TableHead className="text-xs">Father Name</TableHead>
+                          <TableHead className="text-xs">Aadhaar</TableHead>
+                          <TableHead className="text-xs">Mobile</TableHead>
+                          <TableHead className="text-xs w-20">Action</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {searchResults.map((member) => (
+                          <TableRow
+                            key={member.membership_no}
+                            className="cursor-pointer hover:bg-teal-50/50 dark:hover:bg-teal-950/20"
+                            onClick={() => handleSelectMember(member)}
+                          >
+                            <TableCell className="font-mono text-xs font-medium">{member.membership_no}</TableCell>
+                            <TableCell className="text-xs font-medium">{member.full_name}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{member.father_name || "---"}</TableCell>
+                            <TableCell className="font-mono text-xs text-muted-foreground">{member.aadhaar_no || "---"}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{member.mobile_no || "---"}</TableCell>
+                            <TableCell>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 text-xs text-teal-600 hover:text-teal-700 hover:bg-teal-50"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleSelectMember(member)
+                                }}
+                              >
+                                Select
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <Users className="h-8 w-8 text-muted-foreground/30" />
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        {searchMemberNo || searchMemberName || searchFatherName || searchAadhaar
+                          ? "No members found. Try different search criteria."
+                          : "Enter search criteria and click Search to find members."}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {searchResults.length > 0 && (
+                  <p className="text-xs text-muted-foreground text-right">
+                    {searchResults.length} result{searchResults.length !== 1 ? "s" : ""} found
+                  </p>
+                )}
+              </DialogContent>
+            </Dialog>
 
             {/* Success Dialog */}
             <AlertDialog open={successOpen} onOpenChange={setSuccessOpen}>
