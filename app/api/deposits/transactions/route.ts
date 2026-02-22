@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
         rd.installment_amount, rd.installment_frequency,
         rd.numberofinstallments, rd.numberofinstalmentspaid,
         rd.maturitydate AS rd_maturity_date, rd.maturityamount AS rd_maturity_amount,
-        rd.nextinstalmentdate,
+        rd.nextinstalmentdate, rd.penalrate,
         pd.minimum_daily_amount, pd.collection_frequency
       FROM deposit_account da
       LEFT JOIN memberships m ON m.membership_no = da.membership_no AND m.branch_id = da.branch_id
@@ -128,6 +128,7 @@ export async function GET(request: NextRequest) {
         totalInstallments: account.numberofinstallments,
         paidInstallments: account.numberofinstalmentspaid,
         nextInstallmentDate: account.nextinstalmentdate,
+        penalRate: account.penalrate ? Number(account.penalrate) : 0,
         dailyAmount: account.minimum_daily_amount ? Number(account.minimum_daily_amount) : null,
         collectionFrequency: account.collection_frequency,
       },
@@ -153,7 +154,7 @@ export async function POST(request: NextRequest) {
     const businessDate = session.businessDate
 
     const body = await request.json()
-    const { accountNumber, amount, narration, voucherType, selectedBatch, debitAccounts } = body
+    const { accountNumber, amount, narration, voucherType, selectedBatch, debitAccounts, selectedInstallments } = body
 
     if (!accountNumber || !amount) {
       return NextResponse.json({ error: "Account number and amount are required" }, { status: 400 })
@@ -369,34 +370,53 @@ export async function POST(request: NextRequest) {
       [newBalance, accountNumber, branchId]
     )
 
-    // If RD, update paid installments count and mark installment detail as paid
+    // If RD, update paid installments count and mark selected installments as paid
     if (account.deposittype === "R" || account.deposittype === "RECURING" || account.deposittype === "RECURRING") {
+      const installmentCount = selectedInstallments && selectedInstallments.length > 0
+        ? selectedInstallments.length
+        : 1
+
       await client.query(
         `UPDATE recurring_deposit_details
-         SET numberofinstalmentspaid = COALESCE(numberofinstalmentspaid, 0) + 1,
-             nextinstalmentdate = nextinstalmentdate + INTERVAL '1 month'
-         WHERE accountnumber = $1`,
-        [accountNumber]
+         SET numberofinstalmentspaid = COALESCE(numberofinstalmentspaid, 0) + $1,
+             nextinstalmentdate = nextinstalmentdate + ($2 || ' months')::INTERVAL
+         WHERE accountnumber = $3`,
+        [installmentCount, String(installmentCount), accountNumber]
       )
 
-      // Mark the next unpaid installment as paid
-      const { rows: unpaidRows } = await client.query(
-        `SELECT id, installment_number FROM rd_installment_details
-         WHERE accountnumber = $1 AND branch_id = $2 AND installment_paid_date IS NULL
-         ORDER BY installment_number ASC
-         LIMIT 1`,
-        [accountNumber, branchId]
-      )
-
-      if (unpaidRows.length > 0) {
-        await client.query(
-          `UPDATE rd_installment_details
-           SET installment_paid_date = $1,
-               installment_voucher_no = $2,
-               updated_at = NOW()
-           WHERE id = $3`,
-          [businessDate, voucherNo, unpaidRows[0].id]
+      if (selectedInstallments && selectedInstallments.length > 0) {
+        // Mark specific selected installments as paid with their penalties
+        for (const inst of selectedInstallments) {
+          await client.query(
+            `UPDATE rd_installment_details
+             SET installment_paid_date = $1,
+                 installment_voucher_no = $2,
+                 penalty_collected = $3,
+                 updated_at = NOW()
+             WHERE id = $4 AND branch_id = $5`,
+            [businessDate, voucherNo, Number(inst.penalty) || 0, inst.id, branchId]
+          )
+        }
+      } else {
+        // Fallback: mark the next unpaid installment as paid
+        const { rows: unpaidRows } = await client.query(
+          `SELECT id, installment_number FROM rd_installment_details
+           WHERE accountnumber = $1 AND branch_id = $2 AND installment_paid_date IS NULL
+           ORDER BY installment_number ASC
+           LIMIT 1`,
+          [accountNumber, branchId]
         )
+
+        if (unpaidRows.length > 0) {
+          await client.query(
+            `UPDATE rd_installment_details
+             SET installment_paid_date = $1,
+                 installment_voucher_no = $2,
+                 updated_at = NOW()
+             WHERE id = $3`,
+            [businessDate, voucherNo, unpaidRows[0].id]
+          )
+        }
       }
     }
 

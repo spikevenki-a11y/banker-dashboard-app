@@ -72,6 +72,7 @@ type DepositAccount = {
   nextInstallmentDate: string | null
   dailyAmount: number | null
   collectionFrequency: string | null
+  penalRate: number | null
 }
 
 type RdInstallment = {
@@ -131,6 +132,8 @@ function DepositTransactionsContent() {
   const [account, setAccount] = useState<DepositAccount | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [rdInstallments, setRdInstallments] = useState<RdInstallment[]>([])
+  const [selectedInstallmentIds, setSelectedInstallmentIds] = useState<Set<string>>(new Set())
+  const [penaltyOverrides, setPenaltyOverrides] = useState<Record<string, string>>({})
   const [totalTxns, setTotalTxns] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingTxns, setIsLoadingTxns] = useState(false)
@@ -278,7 +281,10 @@ function DepositTransactionsContent() {
     return sum
   }, 0)
 
-  const creditAmount = account?.depositAmount ? Number(account.depositAmount) : 0
+  const isRd = account?.depositType === "RECURRING" || account?.depositType === "R" || account?.depositType === "RECURING"
+  const creditAmount = isRd && selectedInstallmentsList.length > 0
+    ? totalPayable
+    : account?.depositAmount ? Number(account.depositAmount) : 0
   const debitMatchesCredit = Math.abs(totalDebit - creditAmount) < 0.01
 
   const hasDebitValidationError = debitEntries.some(
@@ -288,6 +294,64 @@ function DepositTransactionsContent() {
       parseFloat(e.debitAmount) > e.availableBalance
   )
 
+  // --- Installment selection helpers ---
+  const calculatePenalty = (inst: RdInstallment): number => {
+    if (!inst.installment_due_date || inst.installment_paid_date) return 0
+    const dueDate = new Date(inst.installment_due_date)
+    const today = new Date()
+    if (today <= dueDate) return 0
+    const diffTime = today.getTime() - dueDate.getTime()
+    const overdueDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    const penalRate = account?.penalRate || 0
+    // Penalty = (installment_amount * penal_rate% * overdue_days) / 365
+    return Math.round(((inst.installment_amount * penalRate * overdueDays) / 36500) * 100) / 100
+  }
+
+  const getPenaltyForInstallment = (inst: RdInstallment): number => {
+    if (penaltyOverrides[inst.id] !== undefined && penaltyOverrides[inst.id] !== "") {
+      return parseFloat(penaltyOverrides[inst.id]) || 0
+    }
+    return calculatePenalty(inst)
+  }
+
+  const toggleInstallment = (instId: string, checked: boolean) => {
+    setSelectedInstallmentIds((prev) => {
+      const next = new Set(prev)
+      if (checked) {
+        next.add(instId)
+      } else {
+        next.delete(instId)
+        // Clear penalty override when deselected
+        setPenaltyOverrides((po) => {
+          const updated = { ...po }
+          delete updated[instId]
+          return updated
+        })
+      }
+      return next
+    })
+  }
+
+  const toggleAllUnpaidInstallments = (checked: boolean) => {
+    const unpaidIds = rdInstallments
+      .filter((i) => !i.installment_paid_date)
+      .map((i) => i.id)
+    if (checked) {
+      setSelectedInstallmentIds(new Set(unpaidIds))
+    } else {
+      setSelectedInstallmentIds(new Set())
+      setPenaltyOverrides({})
+    }
+  }
+
+  const unpaidInstallments = rdInstallments.filter((i) => !i.installment_paid_date)
+  const allUnpaidSelected = unpaidInstallments.length > 0 && unpaidInstallments.every((i) => selectedInstallmentIds.has(i.id))
+
+  const selectedInstallmentsList = rdInstallments.filter((i) => selectedInstallmentIds.has(i.id))
+  const totalInstallmentAmount = selectedInstallmentsList.reduce((s, i) => s + Number(i.installment_amount), 0)
+  const totalPenalty = selectedInstallmentsList.reduce((s, i) => s + getPenaltyForInstallment(i), 0)
+  const totalPayable = totalInstallmentAmount + totalPenalty
+
   const handleSubmit = async () => {
     if (!account) return
 
@@ -296,9 +360,14 @@ function DepositTransactionsContent() {
       return
     }
 
-    const amt = account.depositAmount ? Number(account.depositAmount) : 0
+    const isRdAccount = account.depositType === "RECURRING" || account.depositType === "R" || account.depositType === "RECURING"
+    const amt = isRdAccount && selectedInstallmentsList.length > 0
+      ? totalPayable
+      : account.depositAmount ? Number(account.depositAmount) : 0
     if (isNaN(amt) || amt <= 0) {
-      setFormError("Credit amount is not valid.")
+      setFormError(isRdAccount && selectedInstallmentsList.length === 0
+        ? "Please select at least one installment to pay."
+        : "Credit amount is not valid.")
       return
     }
 
@@ -345,6 +414,11 @@ function DepositTransactionsContent() {
             accountNumber: e.accountNumber,
             amount: parseFloat(e.debitAmount),
           })),
+          selectedInstallments: selectedInstallmentsList.map((i) => ({
+            id: i.id,
+            installment_number: i.installment_number,
+            penalty: getPenaltyForInstallment(i),
+          })),
         }),
       })
 
@@ -362,6 +436,8 @@ function DepositTransactionsContent() {
       setDebitEntries((prev) =>
         prev.map((e) => ({ ...e, selected: false, debitAmount: "" }))
       )
+      setSelectedInstallmentIds(new Set())
+      setPenaltyOverrides({})
 
       refreshTransactions()
       // Refresh savings account balances
@@ -547,16 +623,32 @@ function DepositTransactionsContent() {
                 {(account.depositType === "RECURRING" || account.depositType === "R" || account.depositType === "RECURING") && rdInstallments.length > 0 && (
                   <Card>
                     <CardHeader>
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-100 text-sm font-bold text-teal-700">
-                          <Calendar className="h-4 w-4" />
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-100 text-sm font-bold text-teal-700">
+                            <Calendar className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-lg">Installment Schedule</CardTitle>
+                            <CardDescription>
+                              {rdInstallments.filter(i => i.installment_paid_date).length} of {rdInstallments.length} installments paid
+                              {account.penalRate ? ` | Penal Rate: ${account.penalRate}% p.a.` : ""}
+                            </CardDescription>
+                          </div>
                         </div>
-                        <div>
-                          <CardTitle className="text-lg">Installment Schedule</CardTitle>
-                          <CardDescription>
-                            {rdInstallments.filter(i => i.installment_paid_date).length} of {rdInstallments.length} installments paid
-                          </CardDescription>
-                        </div>
+                        {selectedInstallmentsList.length > 0 && (
+                          <div className="text-right">
+                            <p className="text-xs text-muted-foreground">{selectedInstallmentsList.length} installment(s) selected</p>
+                            <p className="text-sm font-bold text-teal-700">
+                              Total: {formatCurrency(totalPayable)}
+                            </p>
+                            {totalPenalty > 0 && (
+                              <p className="text-[10px] text-red-600">
+                                incl. penalty {formatCurrency(totalPenalty)}
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </CardHeader>
                     <CardContent>
@@ -564,11 +656,20 @@ function DepositTransactionsContent() {
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead className="w-[60px]">No.</TableHead>
-                              <TableHead>Installment Amount</TableHead>
+                              <TableHead className="w-[40px]">
+                                {unpaidInstallments.length > 0 && (
+                                  <Checkbox
+                                    checked={allUnpaidSelected}
+                                    onCheckedChange={(checked) => toggleAllUnpaidInstallments(checked === true)}
+                                    aria-label="Select all unpaid installments"
+                                  />
+                                )}
+                              </TableHead>
+                              <TableHead className="w-[50px]">No.</TableHead>
+                              <TableHead>Amount</TableHead>
                               <TableHead>Due Date</TableHead>
                               <TableHead>Paid Date</TableHead>
-                              <TableHead>Voucher No</TableHead>
+                              <TableHead>Voucher</TableHead>
                               <TableHead>Penalty</TableHead>
                               <TableHead>Status</TableHead>
                             </TableRow>
@@ -577,8 +678,26 @@ function DepositTransactionsContent() {
                             {rdInstallments.map((inst) => {
                               const isPaid = !!inst.installment_paid_date
                               const isOverdue = !isPaid && inst.installment_due_date && new Date(inst.installment_due_date) < new Date()
+                              const isSelected = selectedInstallmentIds.has(inst.id)
+                              const autoPenalty = calculatePenalty(inst)
+                              const currentPenalty = getPenaltyForInstallment(inst)
+
                               return (
-                                <TableRow key={inst.id}>
+                                <TableRow
+                                  key={inst.id}
+                                  className={isSelected ? "bg-teal-50/50 dark:bg-teal-950/20" : ""}
+                                >
+                                  <TableCell>
+                                    {!isPaid ? (
+                                      <Checkbox
+                                        checked={isSelected}
+                                        onCheckedChange={(checked) => toggleInstallment(inst.id, checked === true)}
+                                        aria-label={`Select installment ${inst.installment_number}`}
+                                      />
+                                    ) : (
+                                      <CheckCircle2 className="h-4 w-4 text-teal-500" />
+                                    )}
+                                  </TableCell>
                                   <TableCell className="font-mono text-sm">{inst.installment_number}</TableCell>
                                   <TableCell className="text-sm font-medium">{formatCurrency(inst.installment_amount)}</TableCell>
                                   <TableCell className="text-sm">{formatDate(inst.installment_due_date)}</TableCell>
@@ -588,8 +707,32 @@ function DepositTransactionsContent() {
                                   <TableCell className="font-mono text-xs">
                                     {inst.installment_voucher_no ? `V${inst.installment_voucher_no}` : "--"}
                                   </TableCell>
-                                  <TableCell className="text-sm">
-                                    {Number(inst.penalty_collected) > 0 ? formatCurrency(inst.penalty_collected) : "--"}
+                                  <TableCell>
+                                    {isPaid ? (
+                                      <span className="text-sm">
+                                        {Number(inst.penalty_collected) > 0 ? formatCurrency(inst.penalty_collected) : "--"}
+                                      </span>
+                                    ) : isSelected && isOverdue ? (
+                                      <div className="flex items-center gap-1">
+                                        <Input
+                                          type="number"
+                                          min="0"
+                                          step="0.01"
+                                          value={penaltyOverrides[inst.id] !== undefined ? penaltyOverrides[inst.id] : String(autoPenalty)}
+                                          onChange={(e) =>
+                                            setPenaltyOverrides((prev) => ({
+                                              ...prev,
+                                              [inst.id]: e.target.value,
+                                            }))
+                                          }
+                                          className="h-7 w-24 text-xs"
+                                        />
+                                      </div>
+                                    ) : isOverdue ? (
+                                      <span className="text-xs text-red-600">{formatCurrency(autoPenalty)}</span>
+                                    ) : (
+                                      <span className="text-sm text-muted-foreground">--</span>
+                                    )}
                                   </TableCell>
                                   <TableCell>
                                     <Badge
@@ -611,12 +754,34 @@ function DepositTransactionsContent() {
                           </TableBody>
                         </Table>
                       </div>
+
+                      {/* Selection Summary */}
+                      {selectedInstallmentsList.length > 0 && (
+                        <div className="mt-4 rounded-lg border border-teal-200 bg-teal-50/50 p-3 dark:border-teal-800 dark:bg-teal-950/30">
+                          <div className="grid grid-cols-3 gap-4 text-sm">
+                            <div>
+                              <p className="text-xs text-muted-foreground">Installment Total</p>
+                              <p className="font-semibold">{formatCurrency(totalInstallmentAmount)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Penalty Total</p>
+                              <p className={`font-semibold ${totalPenalty > 0 ? "text-red-600" : ""}`}>
+                                {formatCurrency(totalPenalty)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Total Payable</p>
+                              <p className="font-bold text-teal-700">{formatCurrency(totalPayable)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 )}
 
                 {/* Credit Transaction Form */}
-                {account.depositAmount != account.balance && (
+                {(isRd || account.depositAmount != account.balance) && (
                   <Card className={!isActive ? "pointer-events-none opacity-50" : ""}>
                     <CardHeader>
                       <div className="flex items-center gap-3">
@@ -671,14 +836,16 @@ function DepositTransactionsContent() {
                                   ? String(account.dailyAmount)
                                   : "Enter amount"
                             }
-                            // value={amount}
-                            value={account.depositAmount}
+                            value={isRd && selectedInstallmentsList.length > 0 ? totalPayable : (account.depositAmount || "")}
                             disabled
                             // onChange={(e) => setAmount(e.target.value)}
                           />
                           {account.depositType === "RECURRING" && account.installmentAmount && (
                             <p className="text-xs text-muted-foreground">
-                              Installment: {formatCurrency(account.installmentAmount)}
+                              {selectedInstallmentsList.length > 0
+                                ? `${selectedInstallmentsList.length} installment(s): ${formatCurrency(totalInstallmentAmount)}${totalPenalty > 0 ? ` + penalty ${formatCurrency(totalPenalty)}` : ""}`
+                                : `Installment: ${formatCurrency(account.installmentAmount)} - Select installments above`
+                              }
                             </p>
                           )}
                           {account.depositType === "PIGMY" && account.dailyAmount && (
@@ -740,7 +907,7 @@ function DepositTransactionsContent() {
                       <div className="flex gap-3 pt-2">
                         <Button
                           onClick={handleSubmit}
-                          disabled={isSubmitting || !voucherType || !account.depositAmount || !debitMatchesCredit || hasDebitValidationError}
+                          disabled={isSubmitting || !voucherType || (isRd ? selectedInstallmentsList.length === 0 : !account.depositAmount) || !debitMatchesCredit || hasDebitValidationError}
                           className="gap-2"
                         >
                           {isSubmitting ? (
@@ -882,7 +1049,7 @@ function DepositTransactionsContent() {
                 </Card>
 
                 {/* Debit Account Card */}
-                {account.depositAmount != account.balance && (
+                {(isRd || account.depositAmount != account.balance) && (
                   <Card className={!isActive ? "pointer-events-none opacity-50" : ""}>
                     <CardHeader className="pb-3">
                       <div className="flex items-center gap-3">
