@@ -18,6 +18,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   Table,
   TableBody,
   TableCell,
@@ -25,7 +34,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { ArrowLeft, Search } from "lucide-react"
+import { ArrowLeft, Search, CheckCircle2 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 
 type Member = {
@@ -93,6 +102,8 @@ export default function ShareDepositPage() {
   const [isBatchPopupOpen, setIsBatchPopupOpen] = useState(false)
   const [incompleteBatches, setIncompleteBatches] = useState<any[]>([])
   const [identity, setIdentity] = useState<{ businessDate?: string } | null>(null)
+  const [successOpen, setSuccessOpen] = useState(false)
+  const [successMessage, setSuccessMessage] = useState("")
   const [isMemberSearchOpen, setIsMemberSearchOpen] = useState(false)
   const [members, setMembers] = useState<Member[]>([])
   const [memberSearchQuery, setMemberSearchQuery] = useState("")
@@ -217,7 +228,8 @@ export default function ShareDepositPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Share deposit failed")
 
-      alert(`Share deposit saved successfully.\nVoucher No: ${data.voucher_no}\nStatus: ${data.status}`)
+      setSuccessMessage(`Voucher No: ${data.voucher_no}\nAmount: Rs. ${Number(shareAmount).toFixed(2)}\nStatus: ${data.status}`)
+      setSuccessOpen(true)
       resetForm()
     } catch (err: any) {
       setFormError(err.message)
@@ -634,6 +646,42 @@ export default function ShareDepositPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Success Dialog */}
+      <AlertDialog open={successOpen} onOpenChange={setSuccessOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-teal-600">
+              <CheckCircle2 className="h-6 w-6" />
+              Share Deposit Successful!
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="text-base">
+                <div className="mt-4 rounded-lg border border-teal-200 bg-teal-50 p-4">
+                  {successMessage.split("\n").map((line, i) => (
+                    <p key={i} className="text-sm text-teal-800">
+                      {line}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:justify-end">
+            <AlertDialogAction
+              onClick={() => setSuccessOpen(false)}
+              className="bg-transparent border border-input hover:bg-accent text-foreground"
+            >
+              New Deposit
+            </AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => router.push("/members")}
+              className="bg-teal-600 hover:bg-teal-700 text-white"
+            >
+              Go to Members
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardWrapper>
   )
 }
