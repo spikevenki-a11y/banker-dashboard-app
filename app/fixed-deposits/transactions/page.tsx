@@ -141,7 +141,7 @@ function DepositTransactionsContent() {
   // Transaction form
   const [amount, setAmount] = useState("")
   const [narration, setNarration] = useState("")
-  const [voucherType, setVoucherType] = useState<"CASH" | "TRANSFER">("TRANSFER")
+  const [voucherType, setVoucherType] = useState<"CASH" | "TRANSFER">()
   const [selectedBatch, setSelectedBatch] = useState<number>(0)
   const [isBatchPopupOpen, setIsBatchPopupOpen] = useState(false)
   const [incompleteBatches, setIncompleteBatches] = useState<any[]>([])
@@ -273,27 +273,7 @@ function DepositTransactionsContent() {
       )
     )
   }
-
-  const totalDebit = debitEntries.reduce((sum, e) => {
-    if (e.selected && e.debitAmount) {
-      return sum + (parseFloat(e.debitAmount) || 0)
-    }
-    return sum
-  }, 0)
-
-  const isRd = account?.depositType === "RECURRING" || account?.depositType === "R" || account?.depositType === "RECURING"
-  const creditAmount = isRd && selectedInstallmentsList.length > 0
-    ? totalPayable
-    : account?.depositAmount ? Number(account.depositAmount) : 0
-  const debitMatchesCredit = Math.abs(totalDebit - creditAmount) < 0.01
-
-  const hasDebitValidationError = debitEntries.some(
-    (e) =>
-      e.selected &&
-      e.debitAmount &&
-      parseFloat(e.debitAmount) > e.availableBalance
-  )
-
+  
   // --- Installment selection helpers ---
   const calculatePenalty = (inst: RdInstallment): number => {
     if (!inst.installment_due_date || inst.installment_paid_date) return 0
@@ -307,12 +287,41 @@ function DepositTransactionsContent() {
     return Math.round(((inst.installment_amount * penalRate * overdueDays) / 36500) * 100) / 100
   }
 
+  const totalDebit = debitEntries.reduce((sum, e) => {
+    if (e.selected && e.debitAmount) {
+      return sum + (parseFloat(e.debitAmount) || 0)
+    }
+    return sum
+  }, 0)
+  const selectedInstallmentsList = rdInstallments.filter((i) => selectedInstallmentIds.has(i.id))
+  
+  const unpaidInstallments = rdInstallments.filter((i) => !i.installment_paid_date)
+  const allUnpaidSelected = unpaidInstallments.length > 0 && unpaidInstallments.every((i) => selectedInstallmentIds.has(i.id))
   const getPenaltyForInstallment = (inst: RdInstallment): number => {
     if (penaltyOverrides[inst.id] !== undefined && penaltyOverrides[inst.id] !== "") {
       return parseFloat(penaltyOverrides[inst.id]) || 0
     }
     return calculatePenalty(inst)
   }
+
+  
+  const totalInstallmentAmount = selectedInstallmentsList.reduce((s, i) => s + Number(i.installment_amount), 0)
+  const totalPenalty = selectedInstallmentsList.reduce((s, i) => s + getPenaltyForInstallment(i), 0)
+  const totalPayable = totalInstallmentAmount + totalPenalty
+  const isRd = account?.depositType === "RECURRING" || account?.depositType === "R" || account?.depositType === "RECURING"
+  const creditAmount = isRd && selectedInstallmentsList.length > 0
+    ? totalPayable
+    : account?.depositAmount ? Number(account.depositAmount) : 0
+  const debitMatchesCredit = Math.abs(totalDebit - creditAmount) < 0.01
+
+  const hasDebitValidationError = debitEntries.some(
+    (e) =>
+      e.selected &&
+      e.debitAmount &&
+      parseFloat(e.debitAmount) > e.availableBalance
+  )
+
+
 
   const toggleInstallment = (instId: string, checked: boolean) => {
     setSelectedInstallmentIds((prev) => {
@@ -344,13 +353,6 @@ function DepositTransactionsContent() {
     }
   }
 
-  const unpaidInstallments = rdInstallments.filter((i) => !i.installment_paid_date)
-  const allUnpaidSelected = unpaidInstallments.length > 0 && unpaidInstallments.every((i) => selectedInstallmentIds.has(i.id))
-
-  const selectedInstallmentsList = rdInstallments.filter((i) => selectedInstallmentIds.has(i.id))
-  const totalInstallmentAmount = selectedInstallmentsList.reduce((s, i) => s + Number(i.installment_amount), 0)
-  const totalPenalty = selectedInstallmentsList.reduce((s, i) => s + getPenaltyForInstallment(i), 0)
-  const totalPayable = totalInstallmentAmount + totalPenalty
 
   const handleSubmit = async () => {
     if (!account) return
@@ -806,15 +808,23 @@ function DepositTransactionsContent() {
                         <div className="space-y-2">
                           <Label htmlFor="voucher-type">Voucher Type *</Label>
                           <Select
-                            value={voucherType || "TRANSFER"}
+                            value={voucherType || ""}
+                            // onValueChange={(value) => {
+                            //   setVoucherType("TRANSFER")
+                            //   if (value !== "TRANSFER") setSelectedBatch(0)
+                            // }}
+                            
                             onValueChange={(value) => {
-                              setVoucherType("TRANSFER")
-                              if (value !== "TRANSFER") setSelectedBatch(0)
+                              setVoucherType(value)
+                              if (value !== "TRANSFER") {
+                                setSelectedBatch(0)
+                              }
                             }}
-                          disabled
+
+                          // disabled
                           >
                             <SelectTrigger id="voucher-type" className="w-full">
-                              <SelectValue placeholder="Select voucher type" />
+                              <SelectValue placeholder="Select type" />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="CASH">Cash</SelectItem>
