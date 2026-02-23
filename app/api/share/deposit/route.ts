@@ -83,7 +83,7 @@ export async function POST(req: Request) {
     }
     /* ---------------- VOUCHER NO ---------------- */
     let voucherNo = 0
-     if (selectedBatch && selectedBatch == 0) {
+     if (!selectedBatch || selectedBatch === 0) {
       const { rows: [voucher] } = await client.query(`
         INSERT INTO voucher_sequences (branch_id, business_date, last_voucher_no)
         VALUES ($1, $2, 1)
