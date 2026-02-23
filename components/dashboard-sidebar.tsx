@@ -36,12 +36,12 @@ const routes = [
     href: "/members",
   },
   {
-    label: "Savings",
+    label: "SB / CA / TD",
     icon: Wallet,
     href: "/savings",
   },
   {
-    label: "Fixed Deposits",
+    label: "Term Deposits",
     icon: FileText,
     href: "/fixed-deposits",
   },
