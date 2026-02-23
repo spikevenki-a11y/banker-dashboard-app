@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Settings, Users, BookOpen, Percent } from "lucide-react"
+import { Settings, Users, BookOpen, Percent, FileSpreadsheet } from "lucide-react"
 import { DashboardWrapper } from "../_components/dashboard-wrapper"
 
 const settingsCards = [
@@ -42,6 +42,15 @@ const settingsCards = [
     color: "text-rose-600",
     bgColor: "bg-rose-50",
     href: "/settings/interest-maintenance",
+  },
+  {
+    id: "chart-of-accounts",
+    title: "Chart of Accounts",
+    description: "View and manage your general ledger chart of accounts hierarchy",
+    icon: FileSpreadsheet,
+    color: "text-indigo-600",
+    bgColor: "bg-indigo-50",
+    href: "/settings/chart-of-accounts",
   },
 ]
 
