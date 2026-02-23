@@ -164,7 +164,7 @@ export async function POST(req: Request) {
           Number(premature_penal_rate) || 0,
         ]
       )
-    } else if (deposit_type === "RECURING") {
+    } else if (deposit_type === "RECURRING") {
       const rdInstAmt = Number(installment_amount) || 0
       const rdInstNum = Number(number_of_installments) || months
 
@@ -216,7 +216,7 @@ export async function POST(req: Request) {
           [branchId, acctNum, i, rdInstAmt, dueDate.toISOString().split("T")[0], userId]
         )
       }
-    } else if (deposit_type === "P") {
+    } else if (deposit_type === "PIGMY") {
       await client.query(
         `INSERT INTO pigmy_deposit_details (
           id, accountnumber, collection_frequency, minimum_daily_amount

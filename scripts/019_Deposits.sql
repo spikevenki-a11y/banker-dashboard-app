@@ -205,6 +205,10 @@ CREATE TABLE deposit_schemes (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+ALTER TABLE public.deposit_schemes
+ADD COLUMN penalty_allowed boolean NOT NULL DEFAULT false,
+ADD COLUMN penalty_gl_account_no character varying(20) NULL;
+
 
 INSERT INTO "public"."chart_of_accounts" ("branch_id", "accountcode", "accountname", "accounttypecode", "isledger", "parentaccountcode", "accountbalance", "isactive") VALUES ('2310801', '12200000', 'Term Deposits', '1', '1', '12000000', '0.00', '1');
 INSERT INTO "public"."chart_of_accounts" ("branch_id", "accountcode", "accountname", "accounttypecode", "isledger", "parentaccountcode", "accountbalance", "isactive") VALUES ('2310801', '12201000', 'Term Deposit Non Cummulative', '1', '1', '12200000', '0.00', '1');
