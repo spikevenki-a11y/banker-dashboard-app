@@ -66,11 +66,11 @@ export async function GET(req: Request) {
       if (status === "active") {
         query += ` AND da.accountstatus = 1`
       } else if (status === "matured") {
-        query += ` AND da.accountstatus = 2`
+        query += ` AND da.accountstatus = 6`
       } else if (status === "closed") {
-        query += ` AND da.accountstatus = 3`
+        query += ` AND da.accountstatus = 9`
       } else if (status === "premature") {
-        query += ` AND da.accountstatus = 4`
+        query += ` AND da.accountstatus = 10`
       }
     }
 
@@ -101,9 +101,9 @@ export async function GET(req: Request) {
     const deposits = result.rows.map((row) => {
       const statusMap: Record<number, string> = {
         1: "active",
-        2: "matured",
-        3: "closed",
-        4: "premature",
+        6: "matured",
+        9: "closed",
+        10: "premature",
       }
 
       const typeMap: Record<string, string> = {

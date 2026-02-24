@@ -106,6 +106,7 @@ export default function FixedDepositsPage() {
   )
 
   const deposits = data?.deposits || []
+  console.log(deposits)
   const stats = data?.stats || { total: 0, activeCount: 0, maturedCount: 0, totalBalance: 0 }
 
   return (
@@ -299,7 +300,7 @@ export default function FixedDepositsPage() {
                           <TableCell className="font-mono font-medium text-sm">{dep.accountNumber}</TableCell>
                           <TableCell>
                             <Badge variant="outline" className="text-xs">
-                              {dep.depositType === "TERM" ? "FD" : dep.depositType === "R" ? "RD" : "Pigmy"}
+                              {dep.depositType === "TERM" ? "FD" : dep.depositType === "RECURRING" ? "RD" : "Pigmy"}
                             </Badge>
                           </TableCell>
                           <TableCell>
@@ -309,7 +310,7 @@ export default function FixedDepositsPage() {
                             </div>
                           </TableCell>
                           <TableCell className="font-semibold">
-                            {dep.depositType === "TERN"
+                            {dep.depositType === "TERM"
                               ? formatCurrency(dep.depositAmount)
                               : dep.depositType === "RECURRING"
                                 ? formatCurrency(dep.installmentAmount)
