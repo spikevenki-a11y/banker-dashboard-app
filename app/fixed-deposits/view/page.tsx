@@ -281,6 +281,16 @@ export default function ViewDepositDetailsPage() {
                   <Banknote className="mr-2 h-4 w-4" />
                   Transactions
                 </Button>
+                {(account.accountStatus === 1 || account.accountStatus === 2) && (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => router.push(`/fixed-deposits/closure?account=${account.accountNumber}`)}
+                  >
+                    <FileText className="mr-2 h-4 w-4" />
+                    {account.accountStatus === 2 ? "Close Account" : "Premature Closure"}
+                  </Button>
+                )}
               </div>
             </div>
 
