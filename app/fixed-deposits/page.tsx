@@ -390,9 +390,7 @@ export default function FixedDepositsPage() {
                                 {dep.status === "matured" && (
                                   <DropdownMenuItem
                                     onClick={() => {
-                                      setSelectedDeposit(dep)
-                                      setActionType("close")
-                                      setIsActionDialogOpen(true)
+                                      router.push(`/fixed-deposits/closure?account=${dep.accountNumber}`)
                                     }}
                                     className="text-red-600"
                                   >
@@ -416,14 +414,12 @@ export default function FixedDepositsPage() {
                                 {dep.status === "active" && (
                                   <DropdownMenuItem
                                     onClick={() => {
-                                      setSelectedDeposit(dep)
-                                      setActionType("premature")
-                                      setIsActionDialogOpen(true)
+                                      router.push(`/fixed-deposits/closure?account=${dep.accountNumber}`)
                                     }}
                                     className="text-orange-600"
                                   >
                                     <FileText className="mr-2 h-4 w-4" />
-                                    Premature Withdrawal
+                                    Premature Closure
                                   </DropdownMenuItem>
                                 )}
                               </DropdownMenuContent>
