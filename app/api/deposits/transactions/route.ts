@@ -363,12 +363,12 @@ export async function POST(request: NextRequest) {
     ])
 
     // Update deposit account balance
-    await client.query(
-      `UPDATE deposit_account
-       SET clearbalance = $1
-       WHERE accountnumber = $2 AND branch_id = $3`,
-      [newBalance, accountNumber, branchId]
-    )
+    // await client.query(
+    //   `UPDATE deposit_account
+    //    SET clearbalance = $1
+    //    WHERE accountnumber = $2 AND branch_id = $3`,
+    //   [newBalance, accountNumber, branchId]
+    // )
 
     // If RD, update paid installments count and mark selected installments as paid
     if (account.deposittype === "R" || account.deposittype === "RECURING" || account.deposittype === "RECURRING") {

@@ -27,6 +27,7 @@ export async function GET(req: Request) {
         da.rateofinterest,
         da.clearbalance,
         da.accountstatus,
+        ras.account_status_name,
         da.accountclosedate,
         da.schemeid,
         ds.scheme_name,
@@ -49,6 +50,7 @@ export async function GET(req: Request) {
         pd.minimum_daily_amount AS pd_daily_amount,
         pd.collection_frequency AS pd_frequency
       FROM deposit_account da
+      LEFT JOIN ref_account_status ras ON ras.account_status_id = da.accountstatus 
       LEFT JOIN memberships m ON m.membership_no = da.membership_no AND m.branch_id = da.branch_id
       LEFT JOIN customers c ON c.customer_code = m.customer_code
       LEFT JOIN deposit_schemes ds ON ds.scheme_id = da.schemeid AND ds.branch_id = da.branch_id
@@ -122,7 +124,8 @@ export async function GET(req: Request) {
         openDate: row.accountopendate,
         interestRate: Number(row.rateofinterest),
         balance: Number(row.clearbalance),
-        status: statusMap[row.accountstatus] || "active",
+        status: row.account_status_name ,
+        // status: statusMap[row.accountstatus] || "active",
         accountStatus: row.accountstatus,
         closeDate: row.accountclosedate,
         schemeId: row.schemeid,
