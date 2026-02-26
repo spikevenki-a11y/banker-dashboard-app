@@ -283,11 +283,12 @@ export default function FixedDepositsPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Account No</TableHead>
-                        <TableHead>Type</TableHead>
+                        {/* <TableHead>Type</TableHead> */}
                         <TableHead>Member</TableHead>
                         <TableHead>Amount / Balance</TableHead>
-                        <TableHead>Interest Rate</TableHead>
+                        <TableHead>Opened Date</TableHead>
                         <TableHead>Tenure</TableHead>
+                        <TableHead>Interest Rate</TableHead>
                         <TableHead>Maturity Date</TableHead>
                         <TableHead>Maturity Amount</TableHead>
                         <TableHead>Status</TableHead>
@@ -297,12 +298,18 @@ export default function FixedDepositsPage() {
                     <TableBody>
                       {deposits.map((dep) => (
                         <TableRow key={dep.id}>
-                          <TableCell className="font-mono font-medium text-sm">{dep.accountNumber}</TableCell>
-                          <TableCell>
+                          <TableCell className="font-mono font-medium text-sm">
+                            {dep.accountNumber}
+                            <div className="text-[10px] text-muted-foreground"> 
+                              <Badge variant="outline" className="text-[10px] px-1 py-0">{dep.depositType}</Badge>
+                              
+                            </div>
+                          </TableCell>
+                          {/* <TableCell>
                             <Badge variant="outline" className="text-xs">
                               {dep.depositType === "TERM" ? "FD" : dep.depositType === "RECURRING" ? "RD" : "Pigmy"}
                             </Badge>
-                          </TableCell>
+                          </TableCell> */}
                           <TableCell>
                             <div>
                               <div className="font-medium">{dep.memberName}</div>
@@ -313,15 +320,15 @@ export default function FixedDepositsPage() {
                             {dep.depositType === "TERM"
                               ? formatCurrency(dep.depositAmount)
                               : dep.depositType === "RECURRING"
-                                ? formatCurrency(dep.installmentAmount)
+                                ? formatCurrency(dep.balance)
                                 : formatCurrency(dep.balance)}
                             {dep.depositType === "RECURRING" && (
                               <div className="text-xs font-normal text-muted-foreground">
-                                {dep.paidInstallments}/{dep.totalInstallments} paid
+                                {dep.paidInstallments}/{dep.totalInstallments} paid - ({dep.installmentAmount})
                               </div>
                             )}
                           </TableCell>
-                          <TableCell>{dep.interestRate}%</TableCell>
+                          <TableCell>{formatDate(dep.openDate)}</TableCell>
                           <TableCell>
                             {dep.periodMonths != null ? (
                               <span>
@@ -331,15 +338,16 @@ export default function FixedDepositsPage() {
                               "--"
                             )}
                           </TableCell>
+                          <TableCell>{dep.interestRate}%</TableCell>
                           <TableCell>{formatDate(dep.maturityDate)}</TableCell>
                           <TableCell className="font-semibold text-teal-600">{dep.balance != 0 && (formatCurrency(dep.maturityAmount)) || 0}</TableCell>
                           <TableCell>
                             <Badge
-                              variant={dep.status === "active" ? "default" : "secondary"}
+                              variant={dep.status === "Active" ? "default" : "secondary"}
                               className={
-                                dep.status === "active"
+                                dep.status === "Active"
                                   ? "bg-teal-100 text-teal-700"
-                                  : dep.status === "matured"
+                                  : dep.status === "Matured"
                                     ? "bg-orange-100 text-orange-700"
                                     : dep.status === "closed"
                                       ? "bg-gray-100 text-gray-700"
@@ -365,7 +373,7 @@ export default function FixedDepositsPage() {
                                   <Eye className="mr-2 h-4 w-4" />
                                   View Details
                                 </DropdownMenuItem>
-                                {dep.status === "matured" && (
+                                {dep.status === "Matured" && (
                                   <DropdownMenuItem
                                     onClick={() => {
                                       setSelectedDeposit(dep)
@@ -387,7 +395,7 @@ export default function FixedDepositsPage() {
                                     Transactions
                                   </DropdownMenuItem>
                                 )}
-                                {dep.status === "matured" && (
+                                {dep.status === "Matured" && (
                                   <DropdownMenuItem
                                     onClick={() => {
                                       router.push(`/fixed-deposits/closure?account=${dep.accountNumber}`)
@@ -398,7 +406,7 @@ export default function FixedDepositsPage() {
                                     Closure
                                   </DropdownMenuItem>
                                 )}
-                                {dep.status === "active" && (
+                                {dep.status === "Active" && (
                                   <DropdownMenuItem
                                     onClick={() => {
                                       setSelectedDeposit(dep)
@@ -411,7 +419,7 @@ export default function FixedDepositsPage() {
                                     Interest Withdrawal
                                   </DropdownMenuItem>
                                 )}
-                                {dep.status === "active" && (
+                                {dep.status === "Active" && (
                                   <DropdownMenuItem
                                     onClick={() => {
                                       router.push(`/fixed-deposits/closure?account=${dep.accountNumber}`)

@@ -53,6 +53,7 @@ type ClosureAccount = {
   penaltyAmount: number
   payoutAmount: number
   prematureClosureAllowed: boolean
+  interestdueforpayment : number
 }
 
 type SavingsAccount = {
@@ -126,6 +127,7 @@ function DepositClosureContent() {
         credentials: "include",
       })
       const data = await res.json()
+      console.log(data)
       if (res.ok) {
         setAccount(data.account)
         setSavingsAccounts(data.savingsAccounts || [])
@@ -181,9 +183,9 @@ function DepositClosureContent() {
     ? (penaltyOverride !== "" ? parseFloat(penaltyOverride) || 0 : account.penaltyAmount)
     : 0
   const effectivePayout = account
-    ? account.balance - effectivePenalty
+    ? Number(account.balance) - Number(effectivePenalty) + Number(account.interestdueforpayment)
     : 0
-
+  
   const totalCredit = creditEntries.reduce((sum, e) => {
     if (e.selected && e.creditAmount) return sum + (parseFloat(e.creditAmount) || 0)
     return sum
@@ -291,7 +293,7 @@ function DepositClosureContent() {
 
   const typeLabel = depositTypeLabels[account.depositType] || account.depositType
   const isActive = account.accountStatus === 1
-  const isMatured = account.accountStatus === 2
+  const isMatured = account.accountStatus === 6
   const closureAllowed = isActive || isMatured
 
   return (
@@ -440,7 +442,7 @@ function DepositClosureContent() {
                       )}
                       <div className="flex items-center justify-between border-b border-border pb-2">
                         <span className="text-sm text-muted-foreground">Interest Earned</span>
-                        <span className="text-sm font-semibold text-teal-600">{formatCurrency(account.interestEarned)}</span>
+                        <span className="text-sm font-semibold text-teal-600">{formatCurrency(account.interestdueforpayment)}</span>
                       </div>
 
                       {account.isPremature && (
@@ -743,6 +745,10 @@ function DepositClosureContent() {
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">Current Balance:</span>
                           <span className="font-semibold">{formatCurrency(account?.balance)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Interest Earned:</span>
+                          <span className="font-semibold">{formatCurrency(account?.interestdueforpayment)}</span>
                         </div>
                         {effectivePenalty > 0 && (
                           <div className="flex justify-between text-sm">

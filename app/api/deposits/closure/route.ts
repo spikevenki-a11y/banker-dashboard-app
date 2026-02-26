@@ -83,6 +83,12 @@ export async function GET(request: NextRequest) {
        ORDER BY sa.account_number`,
       [account.membership_no, branchId]
     )
+    const statusMap: Record<number, string> = {
+        1: "active",
+        6: "matured",
+        9: "closed",
+        10: "premature",
+      }
 
     return NextResponse.json({
       account: {
@@ -95,6 +101,7 @@ export async function GET(request: NextRequest) {
         balance: currentBalance,
         unclearBalance: Number(account.unclearbalance),
         accountStatus: account.accountstatus,
+        status: statusMap[account.accountstatus] || "active",
         schemeId: account.schemeid,
         schemeName: account.scheme_name || "N/A",
         depositGlAccount: account.deposit_gl_account,
@@ -116,6 +123,7 @@ export async function GET(request: NextRequest) {
         penaltyAmount,
         payoutAmount,
         prematureClosureAllowed: account.premature_closure_allowed,
+        interestdueforpayment : account.interestdueforpayment
       },
       savingsAccounts: savingsRows.map((s: any) => ({
         accountNumber: s.account_number,
@@ -349,15 +357,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Update deposit account: set balance to 0, status to Closed (3), set close date
-    await client.query(
-      `UPDATE deposit_account
-       SET clearbalance = 0,
-           unclearbalance = 0,
-           accountstatus = 3,
-           accountclosedate = $1
-       WHERE accountnumber = $2 AND branch_id = $3`,
-      [businessDate, accountNumber, branchId]
-    )
+    // await client.query(
+    //   `UPDATE deposit_account
+    //    SET clearbalance = 0,
+    //        unclearbalance = 0,
+    //        accountstatus = 3,
+    //        accountclosedate = $1
+    //    WHERE accountnumber = $2 AND branch_id = $3`,
+    //   [businessDate, accountNumber, branchId]
+    // )
 
     await client.query("COMMIT")
 
