@@ -241,6 +241,8 @@ function DepositClosureContent() {
           accountNumber: account.accountNumber,
           payoutAmount: effectivePayout,
           penaltyAmount: effectivePenalty,
+          interestdueforpayment : account.interestdueforpayment,
+          cccc : account.interestdueforpayment,
           narration: narration || `Deposit Closure - A/c ${account.accountNumber}`,
           voucherType,
           creditAccounts: voucherType === "TRANSFER" ? selectedCredits : [],
@@ -293,7 +295,7 @@ function DepositClosureContent() {
 
   const typeLabel = depositTypeLabels[account.depositType] || account.depositType
   const isActive = account.accountStatus === 1
-  const isMatured = account.accountStatus === 6
+  const isMatured = account.accountStatus === 5
   const closureAllowed = isActive || isMatured
 
   return (
