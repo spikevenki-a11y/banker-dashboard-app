@@ -224,7 +224,7 @@ export default function FixedDepositsPage() {
                       <SelectContent>
                         <SelectItem value="all">All Status</SelectItem>
                         <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="matured">Matured</SelectItem>
+                        <SelectItem value="Maturity">Matured</SelectItem>
                         <SelectItem value="closed">Closed</SelectItem>
                         <SelectItem value="premature">Premature</SelectItem>
                       </SelectContent>
@@ -347,7 +347,7 @@ export default function FixedDepositsPage() {
                               className={
                                 dep.status === "Active"
                                   ? "bg-teal-100 text-teal-700"
-                                  : dep.status === "Matured"
+                                  : dep.status === "Maturity"
                                     ? "bg-orange-100 text-orange-700"
                                     : dep.status === "closed"
                                       ? "bg-gray-100 text-gray-700"
@@ -373,7 +373,7 @@ export default function FixedDepositsPage() {
                                   <Eye className="mr-2 h-4 w-4" />
                                   View Details
                                 </DropdownMenuItem>
-                                {dep.status === "Matured" && (
+                                {dep.status === "Maturity" && (
                                   <DropdownMenuItem
                                     onClick={() => {
                                       setSelectedDeposit(dep)
@@ -395,7 +395,7 @@ export default function FixedDepositsPage() {
                                     Transactions
                                   </DropdownMenuItem>
                                 )}
-                                {dep.status === "Matured" && (
+                                {dep.status === "Maturity" && (
                                   <DropdownMenuItem
                                     onClick={() => {
                                       router.push(`/fixed-deposits/closure?account=${dep.accountNumber}`)

@@ -106,7 +106,7 @@ INSERT INTO deposit_schemes (
     maximum_installment_amount,
     penal_rate,
     interest_rate,
-    interest_code,
+    interest_policy_id,
     interest_frequency,
     interest_calculation_method,
     premature_closure_allowed,

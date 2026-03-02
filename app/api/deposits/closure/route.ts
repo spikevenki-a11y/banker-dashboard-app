@@ -170,7 +170,8 @@ export async function POST(request: NextRequest) {
     // Get account info with lock
     const { rows: accounts } = await client.query(
       `SELECT da.*, ds.deposit_gl_account, ds.scheme_name,
-              ds.interest_expense_gl_account, ds.interest_payable_gl_account
+              ds.interest_expense_gl_account, ds.interest_payable_gl_account,
+              da.interestdueforpayment
        FROM deposit_account da
        JOIN deposit_schemes ds ON ds.scheme_id = da.schemeid AND ds.branch_id = da.branch_id
        WHERE da.accountnumber = $1 AND da.branch_id = $2
@@ -192,7 +193,9 @@ export async function POST(request: NextRequest) {
     }
 
     const currentBalance = parseFloat(account.clearbalance)
+    const interestDue = parseFloat(account.interestdueforpayment) || 0
     const depositGlAccount = account.deposit_gl_account
+    const interest_expense_gl_account = account.interest_expense_gl_account
     const penalty = parseFloat(penaltyAmount) || 0
 
     // Get batch ID
@@ -241,6 +244,25 @@ export async function POST(request: NextRequest) {
       session.userId
     ])
 
+    if (interestDue > 0) {
+      // DR Interest Expense (if there's interest due, debit the expense account)
+      await client.query(`
+        INSERT INTO gl_batch_lines (
+          branch_id, batch_id, business_date,
+          accountcode, ref_account_id,
+          debit_amount, credit_amount,
+          voucher_id, narration, created_by
+        ) VALUES ($1,$2,$3,$4,$5,$6,0,$7,$8,$9)
+      `, [
+        branchId, batchId, businessDate,
+        interest_expense_gl_account, String(accountNumber),
+        interestDue,
+        voucherNo,
+        `Interest due for closure - A/c ${accountNumber}`,
+        session.userId
+      ])
+    }
+
     // If there's a penalty, record it
     if (penalty > 0) {
       // CR Penalty (income for the bank)
@@ -253,7 +275,7 @@ export async function POST(request: NextRequest) {
         ) VALUES ($1,$2,$3,$4,$5,0,$6,$7,$8,$9)
       `, [
         branchId, batchId, businessDate,
-        depositGlAccount, String(accountNumber),
+        interest_expense_gl_account, String(accountNumber),
         penalty,
         voucherNo,
         `Premature closure penalty - A/c ${accountNumber}`,
@@ -366,7 +388,7 @@ export async function POST(request: NextRequest) {
     //    WHERE accountnumber = $2 AND branch_id = $3`,
     //   [businessDate, accountNumber, branchId]
     // )
-
+    
     await client.query("COMMIT")
 
     const fmt = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" })

@@ -56,15 +56,15 @@ export async function GET(request: NextRequest) {
 
     const batch = batchRows[0]
 
-    if (batch.status !== "COMPLETED" && batch.status !== "APPROVED") {
-      return NextResponse.json(
-        {
-          error: `Transaction is not completed. Current status: ${batch.status}`,
-          status: batch.status,
-        },
-        { status: 400 }
-      )
-    }
+    // if (batch.status !== "COMPLETED" && batch.status !== "APPROVED") {
+    //   return NextResponse.json(
+    //     {
+    //       error: `Transaction is not completed. Current status: ${batch.status}`,
+    //       status: batch.status,
+    //     },
+    //     { status: 400 }
+    //   )
+    // }
 
     // Fetch all GL batch lines for this voucher
     const { rows: lineRows } = await pool.query(
