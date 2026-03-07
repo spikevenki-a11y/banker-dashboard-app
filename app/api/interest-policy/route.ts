@@ -1,19 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getConnection } from "@/lib/connection/db";
-import { getSession } from "@/lib/auth/session";
+import pool from "@/lib/connection/db"
+import { cookies } from "next/headers"
 
 // GET - List all interest policies with their conditions
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    
+  const c = (await cookies()).get("banker_session")
+  if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { searchParams } = new URL(request.url);
     const productCode = searchParams.get("product_code");
-
-    const pool = await getConnection();
 
     let query = `
       SELECT 
@@ -65,10 +62,10 @@ export async function GET(request: NextRequest) {
 // POST - Create a new interest policy with conditions
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    
+  const c = (await cookies()).get("banker_session")
+  if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
 
     const body = await request.json();
     const {
@@ -87,20 +84,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const pool = await getConnection();
+    const client = await pool.connect()
 
     // Start transaction
-    await pool.query("BEGIN");
+    await client.query("BEGIN");
 
     try {
       // Get next policy_id
-      const seqResult = await pool.query(
+      let policyId = 0;
+      const seqResult = await client.query(
         `SELECT COALESCE(MAX(policy_id), 0) + 1 as next_id FROM interest_policy`
       );
-      const policyId = seqResult.rows[0].next_id;
+      if (seqResult.rows.length > 0) {
+        policyId = seqResult.rows[0].next_id;
+      }
 
       // Insert the policy
-      await pool.query(
+      await client.query(
         `INSERT INTO interest_policy (policy_id, product_code, base_rate, effective_from, effective_to, status)
          VALUES ($1, $2, $3, $4, $5, 'ACTIVE')`,
         [policyId, product_code, base_rate, effective_from, effective_to || null]
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
           const cond = conditions[i];
           const conditionId = i + 1;
 
-          await pool.query(
+          await client.query(
             `INSERT INTO interest_condition 
              (condition_id, policy_id, field_name, operator, value_from, value_to, interest_rate, penal_rate, parent_condition_id)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
