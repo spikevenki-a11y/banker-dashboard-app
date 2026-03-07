@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -112,6 +113,7 @@ function formatDate(d: string) {
 }
 
 export default function LoansPage() {
+  const router = useRouter()
   const { user } = useAuth()
   
   // Main list state
@@ -586,10 +588,10 @@ export default function LoansPage() {
                     : `${user?.branch?.name || 'Branch'} - Process applications, track EMIs, and manage repayments`}
                 </p>
               </div>
-              <Button onClick={() => setIsNewLoanOpen(true)} className="gap-2">
-                <Plus className="h-4 w-4" />
-                New Application
-              </Button>
+<Button onClick={() => router.push("/loans/apply")} className="gap-2">
+  <Plus className="h-4 w-4" />
+  New Application
+  </Button>
             </div>
 
             {/* Stats Cards */}
