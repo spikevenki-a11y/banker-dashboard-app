@@ -100,12 +100,12 @@ export default function LoginPage() {
               <Label htmlFor="username">User Name</Label>
               <Input
                 id="username"
-                //type="email"
                 placeholder="emp00001"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
                 className="bg-slate-50/50"
+                suppressHydrationWarning
               />
             </div>
             <div className="space-y-2">
@@ -120,6 +120,7 @@ export default function LoginPage() {
                 required
                 className="bg-slate-50/50"
                 placeholder="password123"
+                suppressHydrationWarning
               />
             </div>
             <div className="pt-2">

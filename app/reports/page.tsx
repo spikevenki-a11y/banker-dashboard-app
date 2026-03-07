@@ -245,6 +245,9 @@ export default function ReportsPage() {
       setPvVoucherNo("")
       setPvError("")
       setPvData(null)
+    } else if (report.name === "Daily Transaction Report") {
+      // Navigate to the dedicated daily transactions page
+      window.location.href = "/reports/daily-transactions"
     } else {
       setSelectedReport({ category, name: report.name, description: report.description })
     }
