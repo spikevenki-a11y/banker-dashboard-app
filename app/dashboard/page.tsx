@@ -1,27 +1,37 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Users, Wallet, FileText, CreditCard, ArrowUpRight, ArrowDownRight } from "lucide-react"
+import { Users, Wallet, FileText, CreditCard, ArrowUpRight, ArrowDownRight, Clock, RefreshCw, Banknote, PiggyBank } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Bar, BarChart, Line, LineChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
-import { createClient } from "@/lib/supabase/client"
 import { DashboardWrapper } from "../_components/dashboard-wrapper"
+import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 
-interface Member {
+interface Activity {
   id: string
-  member_id: string
-  full_name: string
-  email: string | null
-  phone: string | null
-  account_type: string
-  account_balance: number
+  member: string
+  action: string
+  amount: string
+  time: string
   status: string
-  joined_date: string
+  module: string
+}
+
+interface DashboardStats {
+  totalMembers: number
+  activeMembers: number
+  activeLoans: number
+  totalDeposits: number
+  fdCount: number
+  totalShares: number
+  todayTransactions: number
+  pendingVouchers: number
 }
 
 const depositData = [
@@ -42,159 +52,177 @@ const loanData = [
   { month: "Jun", approved: 75, disbursed: 72 },
 ]
 
-const recentActivities = [
-  {
-    id: "1",
-    member: "Vengatesh",
-    action: "Opened Savings Account",
-    amount: "₹5,000",
-    time: "2 minutes ago",
-    status: "completed",
-  },
-  {
-    id: "2",
-    member: "Priya",
-    action: "Loan Application",
-    amount: "₹50,000",
-    time: "15 minutes ago",
-    status: "pending",
-  },
-  {
-    id: "3",
-    member: "Surya",
-    action: "FD Matured",
-    amount: "₹25,000",
-    time: "1 hour ago",
-    status: "completed",
-  },
-  {
-    id: "4",
-    member: "Sudharsan",
-    action: "Withdrawal",
-    amount: "₹2,500",
-    time: "2 hours ago",
-    status: "completed",
-  },
-  {
-    id: "5",
-    member: "Muniyandi",
-    action: "EMI Payment",
-    amount: "₹1,250",
-    time: "3 hours ago",
-    status: "completed",
-  },
-]
-
 export default function DashboardPage() {
-  console.log("[v0] Rendering DashboardPage")
   const router = useRouter()
-  const [members, setMembers] = useState<Member[]>([])
-  const [membersLoading, setMembersLoading] = useState(true)
+  const [activities, setActivities] = useState<Activity[]>([])
+  const [activitiesLoading, setActivitiesLoading] = useState(true)
+  const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [statsLoading, setStatsLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
 
   const { user, isAuthenticated, isLoading } = useAuth()
-  console.log("[v0] DashboardPage - isAuthenticated:", isAuthenticated, "isLoading:", isLoading)
 
+  const fetchActivities = useCallback(async () => {
+    try {
+      const res = await fetch("/api/dashboard/activities?branchId=1&limit=10", { credentials: "include" })
+      if (res.ok) {
+        const data = await res.json()
+        setActivities(data)
+      }
+    } catch (error) {
+      console.error("Error fetching activities:", error)
+    } finally {
+      setActivitiesLoading(false)
+    }
+  }, [])
 
-  // useEffect(() => {
-  //   if (isAuthenticated) {
-  //     fetch("/api/dashboard/members", { credentials: "include" })
-  //       .then(res => res.json())
-  //       .then(setMembers)
-  //       .finally(() => setMembersLoading(false))
-  //   }
-  // }, [isAuthenticated])
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await fetch("/api/dashboard/stats?branchId=1", { credentials: "include" })
+      if (res.ok) {
+        const data = await res.json()
+        setStats(data)
+      }
+    } catch (error) {
+      console.error("Error fetching stats:", error)
+    } finally {
+      setStatsLoading(false)
+    }
+  }, [])
 
-  // useEffect(() => {
-  //   if (!isLoading && !isAuthenticated) {
-  //     console.log("[v0] User not authenticated, redirecting to login...")
-  //      router.push("/")
-  //   }
-  // }, [isAuthenticated, isLoading, router])
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    await Promise.all([fetchActivities(), fetchStats()])
+    setRefreshing(false)
+  }
 
-  // if (isLoading || !isAuthenticated) {
-  //   return null
-  // }
+  useEffect(() => {
+    fetchActivities()
+    fetchStats()
+  }, [fetchActivities, fetchStats])
 
-  const totalMembers = members.length
-  const activeMembers = members.filter((m) => m.status === "Active").length
-  const totalBalance = members.reduce((sum, m) => sum + Number(m.account_balance), 0)
-  const savingsMembers = members.filter((m) => m.account_type === "Savings")
-  const fdMembers = members.filter((m) => m.account_type === "Fixed Deposit")
+  const formatAmount = (amount: number) => {
+    if (amount >= 10000000) {
+      return `₹${(amount / 10000000).toFixed(2)} Cr`
+    } else if (amount >= 100000) {
+      return `₹${(amount / 100000).toFixed(2)} L`
+    } else if (amount >= 1000) {
+      return `₹${(amount / 1000).toFixed(1)} K`
+    }
+    return `₹${amount.toLocaleString("en-IN")}`
+  }
 
-  const stats = [
+  const statsCards = [
     {
       title: "Total Members",
-      value: totalMembers.toString(),
-      change: "+12.5%",
-      trend: "up" as const,
+      value: stats?.totalMembers?.toString() || "0",
+      subtitle: `${stats?.activeMembers || 0} active`,
       icon: Users,
       color: "text-blue-600",
       bgColor: "bg-blue-50",
     },
     {
       title: "Active Loans",
-      value: "458",
-      change: "+8.2%",
-      trend: "up" as const,
+      value: stats?.activeLoans?.toString() || "0",
+      subtitle: "Applications",
       icon: CreditCard,
       color: "text-purple-600",
       bgColor: "bg-purple-50",
     },
     {
       title: "Total Deposits",
-      value: `₹${(totalBalance / 1000).toFixed(1)}K`,
-      change: "+15.3%",
-      trend: "up" as const,
+      value: formatAmount(stats?.totalDeposits || 0),
+      subtitle: "Savings + FD",
       icon: Wallet,
       color: "text-teal-600",
       bgColor: "bg-teal-50",
     },
     {
       title: "Fixed Deposits",
-      value: fdMembers.length.toString(),
-      change: "-2.4%",
-      trend: "down" as const,
+      value: stats?.fdCount?.toString() || "0",
+      subtitle: "Active FDs",
       icon: FileText,
       color: "text-orange-600",
       bgColor: "bg-orange-50",
+    },
+    {
+      title: "Share Capital",
+      value: formatAmount(stats?.totalShares || 0),
+      subtitle: "Member shares",
+      icon: PiggyBank,
+      color: "text-green-600",
+      bgColor: "bg-green-50",
+    },
+    {
+      title: "Today's Transactions",
+      value: stats?.todayTransactions?.toString() || "0",
+      subtitle: "All modules",
+      icon: Banknote,
+      color: "text-indigo-600",
+      bgColor: "bg-indigo-50",
+    },
+    {
+      title: "Pending Vouchers",
+      value: stats?.pendingVouchers?.toString() || "0",
+      subtitle: "Awaiting approval",
+      icon: Clock,
+      color: "text-amber-600",
+      bgColor: "bg-amber-50",
     },
   ]
 
   return (
     <>
     <DashboardWrapper>
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Welcome back, {user?.name}!</h1>
-        <p className="text-muted-foreground">
-          Monitoring banking operations for <span className="font-semibold text-primary">{user?.branch}</span>.
-        </p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Welcome back, {user?.name}!</h1>
+          <p className="text-muted-foreground">
+            Monitoring banking operations for <span className="font-semibold text-primary">{user?.branch}</span>.
+          </p>
+        </div>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="gap-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
       </div>
 
       {/* Stats Cards */}
-      <div className="mb-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
-          <Card key={stat.title}>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className={`rounded-lg p-3 ${stat.bgColor}`}>
-                  <stat.icon className={`h-6 w-6 ${stat.color}`} />
+      <div className="mb-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+        {statsLoading ? (
+          Array.from({ length: 7 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-6">
+                <Skeleton className="h-12 w-12 rounded-lg" />
+                <Skeleton className="mt-4 h-4 w-24" />
+                <Skeleton className="mt-2 h-8 w-16" />
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          statsCards.map((stat) => (
+            <Card key={stat.title} className="hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className={`rounded-lg p-2 ${stat.bgColor}`}>
+                    <stat.icon className={`h-5 w-5 ${stat.color}`} />
+                  </div>
                 </div>
-                <Badge variant="secondary" className={stat.trend === "up" ? "text-teal-600" : "text-orange-600"}>
-                  {stat.trend === "up" ? (
-                    <ArrowUpRight className="mr-1 h-3 w-3" />
-                  ) : (
-                    <ArrowDownRight className="mr-1 h-3 w-3" />
-                  )}
-                  {stat.change}
-                </Badge>
-              </div>
-              <div className="mt-4">
-                <h3 className="text-sm font-medium text-muted-foreground">{stat.title}</h3>
-                <p className="mt-1 text-2xl font-bold text-foreground">{stat.value}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                <div className="mt-3">
+                  <h3 className="text-xs font-medium text-muted-foreground">{stat.title}</h3>
+                  <p className="mt-1 text-xl font-bold text-foreground">{stat.value}</p>
+                  <p className="text-xs text-muted-foreground">{stat.subtitle}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
 
       {/* Charts */}
@@ -265,46 +293,70 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Recent Members */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Recent Members</CardTitle>
+      {/* Recent Activities */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Recent Activities</CardTitle>
+          <Badge variant="outline" className="text-xs">
+            Last 10 transactions
+          </Badge>
         </CardHeader>
         <CardContent>
-          {membersLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <p className="text-muted-foreground">Loading members...</p>
+          {activitiesLoading ? (
+            <div className="space-y-4">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4">
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                  <Skeleton className="h-6 w-20" />
+                </div>
+              ))}
             </div>
-          ) : members.length === 0 ? (
-            <div className="flex items-center justify-center py-8">
-              <p className="text-muted-foreground">No members found</p>
+          ) : activities.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Clock className="h-12 w-12 text-muted-foreground/50 mb-4" />
+              <p className="text-muted-foreground">No recent activities found</p>
+              <p className="text-sm text-muted-foreground/70">Transactions will appear here once recorded</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Member ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Account Type</TableHead>
-                  <TableHead>Balance</TableHead>
+                  <TableHead>Member</TableHead>
+                  <TableHead>Action</TableHead>
+                  <TableHead>Module</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead>Time</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {members.map((member) => (
-                  <TableRow key={member.id}>
-                    <TableCell className="font-medium">{member.member_id}</TableCell>
-                    <TableCell>{member.full_name}</TableCell>
-                    <TableCell>{member.account_type}</TableCell>
-                    <TableCell>₹{Number(member.account_balance).toLocaleString()}</TableCell>
+                {activities.map((activity) => (
+                  <TableRow key={activity.id}>
+                    <TableCell className="font-medium">{activity.member}</TableCell>
+                    <TableCell>{activity.action}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs capitalize">
+                        {activity.module}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-mono">{activity.amount}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{activity.time}</TableCell>
                     <TableCell>
                       <Badge
-                        variant={member.status === "Active" ? "default" : "secondary"}
+                        variant={activity.status === "completed" || activity.status === "active" ? "default" : "secondary"}
                         className={
-                          member.status === "Active" ? "bg-teal-100 text-teal-700" : "bg-orange-100 text-orange-700"
+                          activity.status === "completed" || activity.status === "active"
+                            ? "bg-teal-100 text-teal-700"
+                            : activity.status === "pending"
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-orange-100 text-orange-700"
                         }
                       >
-                        {member.status}
+                        {activity.status}
                       </Badge>
                     </TableCell>
                   </TableRow>
@@ -312,46 +364,6 @@ export default function DashboardPage() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Recent Activities */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Activities</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Member</TableHead>
-                <TableHead>Action</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Time</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {recentActivities.map((activity) => (
-                <TableRow key={activity.id}>
-                  <TableCell className="font-medium">{activity.member}</TableCell>
-                  <TableCell>{activity.action}</TableCell>
-                  <TableCell>{activity.amount}</TableCell>
-                  <TableCell className="text-muted-foreground">{activity.time}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={activity.status === "completed" ? "default" : "secondary"}
-                      className={
-                        activity.status === "completed" ? "bg-teal-100 text-teal-700" : "bg-orange-100 text-orange-700"
-                      }
-                    >
-                      {activity.status}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
         </CardContent>
       </Card>
       </DashboardWrapper>
