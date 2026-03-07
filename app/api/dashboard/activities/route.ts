@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { query } from "@/lib/connection/db"
+import pool from "@/lib/connection/db"
 
 export async function GET(request: Request) {
   try {
@@ -104,8 +104,10 @@ export async function GET(request: Request) {
       ORDER BY created_at DESC
       LIMIT $2
     `
+    
+    const client = await pool.connect()
 
-    const activities = await query(activitiesQuery, [branchId, parseInt(limit)])
+    const activities = await client.query(activitiesQuery, [branchId, parseInt(limit)])
 
     // Format the activities with relative time
     const formattedActivities = activities.rows.map((activity: any) => {
