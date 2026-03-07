@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { query } from "@/lib/connection/db"
+import pool from "@/lib/connection/db"
 
 export async function GET(request: Request) {
   try {
@@ -7,7 +7,8 @@ export async function GET(request: Request) {
     const branchId = searchParams.get("branchId") || "1"
 
     // Get total members count
-    const membersResult = await query(
+      const client = await pool.connect()
+    const membersResult = await client.query(
       `SELECT 
         COUNT(*) as total_members,
         COUNT(CASE WHEN status = 'Active' THEN 1 END) as active_members
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
     )
 
     // Get active loans count
-    const loansResult = await query(
+    const loansResult = await client.query(
       `SELECT COUNT(*) as active_loans 
       FROM loan_applications 
       WHERE branch_id = $1 AND application_status IN ('APPROVED', 'DISBURSED', 'ACTIVE')`,
@@ -24,14 +25,14 @@ export async function GET(request: Request) {
     )
 
     // Get total deposits (savings + fixed deposits)
-    const savingsResult = await query(
+    const savingsResult = await client.query(
       `SELECT COALESCE(SUM(clear_balance), 0) as total_savings 
       FROM savings_accounts 
       WHERE branch_id = $1 AND account_status = 'Active'`,
       [branchId]
     )
 
-    const depositsResult = await query(
+    const depositsResult = await client.query(
       `SELECT COALESCE(SUM(clearbalance), 0) as total_deposits 
       FROM deposit_account 
       WHERE branch_id = $1 AND accountstatus = 1`,
@@ -39,7 +40,7 @@ export async function GET(request: Request) {
     )
 
     // Get fixed deposits count
-    const fdResult = await query(
+    const fdResult = await client.query(
       `SELECT COUNT(*) as fd_count 
       FROM deposit_account 
       WHERE branch_id = $1 AND accountstatus = 1 AND deposittype = 'FD'`,
@@ -47,7 +48,7 @@ export async function GET(request: Request) {
     )
 
     // Get share capital
-    const shareResult = await query(
+    const shareResult = await client.query(
       `SELECT COALESCE(SUM(share_balance), 0) as total_shares 
       FROM member_shares 
       WHERE branch_id = $1 AND status = 'Active'`,
@@ -55,7 +56,7 @@ export async function GET(request: Request) {
     )
 
     // Get today's transactions count
-    const todayTransactionsResult = await query(
+    const todayTransactionsResult = await client.query(
       `SELECT 
         (SELECT COUNT(*) FROM savings_transactions WHERE branch_id = $1 AND transaction_date = CURRENT_DATE) +
         (SELECT COUNT(*) FROM member_share_transactions WHERE branch_id = $1 AND business_date = CURRENT_DATE) +
@@ -64,7 +65,7 @@ export async function GET(request: Request) {
     )
 
     // Get pending vouchers count
-    const pendingVouchersResult = await query(
+    const pendingVouchersResult = await client.query(
       `SELECT COUNT(*) as pending_vouchers 
       FROM gl_batches 
       WHERE branch_id = $1 AND status = 'pending'`,
