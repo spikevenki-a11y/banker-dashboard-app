@@ -130,6 +130,7 @@ export default function InterestMaintenancePage() {
       if (data.products) {
         setProducts(data.products)
       }
+      console.log("Fetched products:", data.products)
     } catch (err) {
       console.error("Failed to fetch products:", err)
     }
