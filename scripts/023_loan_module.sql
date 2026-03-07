@@ -85,4 +85,3 @@ CREATE TABLE loan_transaction_details (
 
     created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now()
 );
-
