@@ -1,16 +1,14 @@
 import { NextResponse } from "next/server";
-import { getConnection } from "@/lib/connection/db";
-import { getSession } from "@/lib/auth/session";
+import pool from "@/lib/connection/db"
+import { cookies } from "next/headers"
 
 // GET - List all product codes from savings and deposit schemes
 export async function GET() {
   try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const pool = await getConnection();
+    
+      const c = (await cookies()).get("banker_session")
+      if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    
 
     // Get savings schemes
     const savingsResult = await pool.query(`
