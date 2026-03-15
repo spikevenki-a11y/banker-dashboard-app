@@ -188,6 +188,7 @@ export default function LoansPage() {
       const params = new URLSearchParams()
       if (statusFilter !== "all") params.append("status", statusFilter)
       
+      console.log("Fetching loans with params:", params.toString())
       const res = await fetch(`/api/loans/applications?${params}`)
       const data = await res.json()
       
