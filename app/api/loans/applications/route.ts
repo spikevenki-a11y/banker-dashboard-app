@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
         c.aadhaar_no
       FROM loan_applications la
       LEFT JOIN loan_sanction_details ls ON la.loan_application_id = ls.loan_application_id
-      LEFT JOIN loan_schemes lscheme ON la.loan_product_id = lscheme.scheme_id
+      LEFT JOIN loan_schemes lscheme ON la.scheme_id = lscheme.scheme_id
       LEFT JOIN memberships m ON la.membership_no = CAST(m.membership_no AS VARCHAR)
       LEFT JOIN customers c ON m.customer_code = c.customer_code
       WHERE la.branch_id = $1
@@ -95,16 +95,17 @@ export async function POST(request: NextRequest) {
     const session = JSON.parse(c.value)
     const branchId = session.branch
     const body = await request.json()
+    console.log("Received loan application data:", body)
 
     const {
       membership_no,
-      loan_product_id,
-      applied_loan_amount,
+      scheme_id,
+      loan_amount,
       loan_purpose,
       application_date,
     } = body
 
-    if (!membership_no || !loan_product_id || !applied_loan_amount) {
+    if (!membership_no || !scheme_id || !loan_amount) {
       return NextResponse.json(
         { error: "Membership number, loan product, and amount are required" },
         { status: 400 }
@@ -131,7 +132,7 @@ export async function POST(request: NextRequest) {
     const { rows: schemes } = await client.query(
       `SELECT * FROM loan_schemes 
        WHERE scheme_id = $1 AND (branch_id = $2 OR branch_id = 23108001) AND scheme_status = 'ACTIVE'`,
-      [loan_product_id, branchId]
+      [scheme_id, branchId]
     )
 
     if (schemes.length === 0) {
@@ -142,8 +143,8 @@ export async function POST(request: NextRequest) {
     const scheme = schemes[0]
 
     // Validate loan amount against scheme limits
-    if (applied_loan_amount < parseFloat(scheme.minimum_loan_amount) || 
-        applied_loan_amount > parseFloat(scheme.maximum_loan_amount)) {
+    if (loan_amount < parseFloat(scheme.minimum_loan_amount) || 
+        loan_amount > parseFloat(scheme.maximum_loan_amount)) {
       await client.query("ROLLBACK")
       return NextResponse.json({ 
         error: `Loan amount must be between ₹${scheme.minimum_loan_amount} and ₹${scheme.maximum_loan_amount}` 
@@ -164,13 +165,13 @@ export async function POST(request: NextRequest) {
     const { rows: inserted } = await client.query(
       `INSERT INTO loan_applications (
         loan_application_id, branch_id, application_date, membership_no,
-        loan_product_id, loan_purpose, applied_loan_amount, reference_no,
+        scheme_id, loan_purpose, applied_loan_amount, reference_no,
         application_status, created_by, created_at
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING', $9, NOW())
       RETURNING *`,
       [
         loanApplicationId, branchId, application_date || new Date().toISOString().split('T')[0],
-        membership_no, loan_product_id, loan_purpose || '', applied_loan_amount,
+        membership_no, scheme_id, loan_purpose || '', loan_amount,
         referenceNo, session.userId
       ]
     )
