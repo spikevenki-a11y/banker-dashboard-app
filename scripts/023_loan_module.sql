@@ -46,6 +46,10 @@ DROP COLUMN approved_by;
 
 ALTER TABLE loan_sanction_details
 ADD COLUMN approved_by UUID;
+ALTER TABLE public.loan_sanction_details
+ADD COLUMN repayment_type VARCHAR(30),
+ADD COLUMN number_of_installments INTEGER,
+ADD COLUMN installment_start_date DATE;
 
 CREATE TABLE loan_security_details (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
