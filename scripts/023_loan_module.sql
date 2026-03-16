@@ -36,6 +36,11 @@ CREATE TABLE loan_sanction_details (
     FOREIGN KEY (loan_application_id) 
     REFERENCES loan_applications(loan_application_id)
 );
+ALTER TABLE loan_sanction_details
+DROP COLUMN approved_by;
+
+ALTER TABLE loan_sanction_details
+ADD COLUMN approved_by UUID;
 
 CREATE TABLE loan_security_details (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
