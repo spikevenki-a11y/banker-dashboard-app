@@ -14,6 +14,11 @@ CREATE TABLE loan_applications (
     created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(),
     updated_at TIMESTAMP NULL
 );
+ALTER TABLE public.loan_applications
+DROP COLUMN created_by;
+
+ALTER TABLE public.loan_applications
+ADD COLUMN created_by UUID;
 
 CREATE TABLE loan_sanction_details (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
