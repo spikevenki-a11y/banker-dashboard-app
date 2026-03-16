@@ -4,7 +4,7 @@ CREATE TABLE loan_applications (
     branch_id INT NOT NULL,
     application_date DATE NOT NULL,
     membership_no VARCHAR(20) NOT NULL,
-    loan_product_id INT NOT NULL,
+    scheme_id INT NOT NULL,
     loan_purpose VARCHAR(255),
     applied_loan_amount DECIMAL(15,2) NOT NULL,
     reference_no VARCHAR(50) UNIQUE,

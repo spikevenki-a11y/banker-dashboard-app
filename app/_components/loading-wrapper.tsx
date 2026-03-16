@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth-context"
 import { Analytics } from "@vercel/analytics/next"
 import { Loader2 } from "lucide-react"
 
-export function DashboardWrapper({ children }: { children: React.ReactNode }) {
+export function LoadingWrapper({ children }: { children: React.ReactNode }) {
   // const { isAuthenticated, isLoading } = useAuth()
 
   // During loading or if not authenticated, just show the children (which will be the login page)
