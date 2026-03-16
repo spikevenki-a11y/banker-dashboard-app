@@ -1,259 +1,339 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
+import DashboardWrapper from "@/app/_components/dashboard-wrapper"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
-import { Progress } from "@/components/ui/progress"
-import { ArrowLeft, Search, CheckCircle, XCircle, AlertCircle, Clock, Loader2, Calculator, User, FileText, IndianRupee, Calendar, Percent, Building2, Phone, CreditCard, RefreshCw, TrendingUp, TrendingDown, Ban, Info } from "lucide-react"
-import { DashboardWrapper } from "../../_components/dashboard-wrapper"
+import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  ArrowLeft,
+  Search,
+  CheckCircle,
+  XCircle,
+  FileText,
+  User,
+  IndianRupee,
+  Calendar,
+  Clock,
+  AlertCircle,
+  Loader2,
+  Calculator,
+  Shield,
+  Percent,
+  TrendingUp,
+  Eye,
+  RefreshCw,
+} from "lucide-react"
 
-type LoanApplication = {
+interface LoanApplication {
   loan_application_id: number
   reference_no: string
   membership_no: string
-  application_date: string
-  applied_loan_amount: number
-  loan_purpose: string
-  application_status: string
-  scheme_name: string
-  loan_type: string
-  scheme_interest_rate: number
-  minimum_period_months: number
-  maximum_period_months: number
   member_name: string
-  mobile_no: string
-  customer_code: string
-  aadhaar_no: string
-  sanction_id?: number
-  sanctioned_amount?: number
-  sanction_date?: string
-  sanctioned_interest_rate?: number
-  sanctioned_tenure?: number
-  emi_amount?: number
-  sanction_status?: string
-  sanction_remarks?: string
+  scheme_id: number
+  scheme_name: string
+  loan_purpose: string
+  applied_loan_amount: number
+  application_date: string
+  application_status: string
+  scheme_interest_rate: number
+  scheme_min_period: number
+  scheme_max_period: number
+  scheme_max_amount: number
+  collateral_required: boolean
 }
 
-type EMICalculation = {
-  emi_amount: number
-  total_amount: number
-  total_interest: number
-  schedule: Array<{
-    installment_no: number
-    principal: number
-    interest: number
-    total: number
-    balance: number
-  }>
+interface SecurityDetail {
+  security_id: number
+  security_type: string
+  security_description: string
+  security_value: number
+  document_reference: string
 }
 
-function formatCurrency(val: number | string | undefined) {
-  if (!val) return "---"
-  return `₹${Number(val).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-}
-
-function formatDate(d: string | undefined) {
-  if (!d) return "---"
-  return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+interface EMIScheduleItem {
+  installment_no: number
+  due_date: string
+  principal: number
+  interest: number
+  total: number
+  balance: number
 }
 
 export default function LoanSanctionPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { user } = useAuth()
-  const applicationIdParam = searchParams.get("id")
 
-  // Search state
+  // Search and list state
   const [searchQuery, setSearchQuery] = useState("")
-  const [pendingLoans, setPendingLoans] = useState<LoanApplication[]>([])
-  const [isSearching, setIsSearching] = useState(false)
-  const [isLoadingList, setIsLoadingList] = useState(true)
+  const [applications, setApplications] = useState<LoanApplication[]>([])
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
 
-  // Selected loan
-  const [selectedLoan, setSelectedLoan] = useState<LoanApplication | null>(null)
-  const [isLoadingDetails, setIsLoadingDetails] = useState(false)
+  // Selected application
+  const [selectedApp, setSelectedApp] = useState<LoanApplication | null>(null)
+  const [securities, setSecurities] = useState<SecurityDetail[]>([])
+  const [loadingDetails, setLoadingDetails] = useState(false)
 
-  // Sanction form state
-  const [sanctionAction, setSanctionAction] = useState<"APPROVE" | "REJECT">("APPROVE")
-  const [sanctionAmount, setSanctionAmount] = useState("")
-  const [sanctionInterestRate, setSanctionInterestRate] = useState("")
-  const [sanctionTenure, setSanctionTenure] = useState("")
+  // Sanction form
+  const [sanctionedAmount, setSanctionedAmount] = useState("")
+  const [interestRate, setInterestRate] = useState("")
+  const [tenureMonths, setTenureMonths] = useState("")
   const [moratoriumPeriod, setMoratoriumPeriod] = useState("0")
-  const [sanctionRemarks, setSanctionRemarks] = useState("")
+  const [remarks, setRemarks] = useState("")
+
+  // EMI calculation
+  const [calculatedEMI, setCalculatedEMI] = useState<number | null>(null)
+  const [totalInterest, setTotalInterest] = useState<number | null>(null)
+  const [totalPayment, setTotalPayment] = useState<number | null>(null)
+  const [emiSchedule, setEmiSchedule] = useState<EMIScheduleItem[]>([])
+  const [showSchedule, setShowSchedule] = useState(false)
+
+  // Dialog states
+  const [showRejectDialog, setShowRejectDialog] = useState(false)
+  const [rejectRemarks, setRejectRemarks] = useState("")
+
+  // Processing state
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formError, setFormError] = useState("")
-
-  // EMI Calculation
-  const [emiCalculation, setEmiCalculation] = useState<EMICalculation | null>(null)
-  const [isCalculatingEMI, setIsCalculatingEMI] = useState(false)
-
-  // Success dialog
-  const [successOpen, setSuccessOpen] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
 
-  // Fetch pending loans
-  const fetchPendingLoans = useCallback(async () => {
-    try {
-      setIsLoadingList(true)
-      const res = await fetch("/api/loans/applications?status=PENDING")
-      const data = await res.json()
-      if (data.error) throw new Error(data.error)
-      setPendingLoans(data.applications || [])
-    } catch (error) {
-      console.error("Failed to fetch pending loans:", error)
-    } finally {
-      setIsLoadingList(false)
-    }
-  }, [])
+  // Format currency
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    }).format(amount)
+  }
 
-  // Fetch specific loan by ID
-  const fetchLoanById = useCallback(async (applicationId: string) => {
+  // Fetch pending applications
+  const fetchApplications = useCallback(async () => {
     try {
-      setIsLoadingDetails(true)
-      const res = await fetch(`/api/loans/applications?membershipNo=&status=all`)
-      const data = await res.json()
-      if (data.error) throw new Error(data.error)
-      
-      const loan = data.applications?.find((l: LoanApplication) => 
-        l.loan_application_id.toString() === applicationId
-      )
-      
-      if (loan) {
-        selectLoan(loan)
+      const res = await fetch("/api/loans/applications?status=PENDING")
+      if (res.ok) {
+        const data = await res.json()
+        setApplications(data.applications || [])
       }
     } catch (error) {
-      console.error("Failed to fetch loan:", error)
+      console.error("Failed to fetch applications:", error)
     } finally {
-      setIsLoadingDetails(false)
+      setLoading(false)
+      setRefreshing(false)
     }
   }, [])
 
   useEffect(() => {
-    fetchPendingLoans()
-  }, [fetchPendingLoans])
+    fetchApplications()
+  }, [fetchApplications])
 
-  useEffect(() => {
-    if (applicationIdParam) {
-      fetchLoanById(applicationIdParam)
+  // Fetch security details for selected application
+  const fetchSecurityDetails = async (appId: number) => {
+    try {
+      const res = await fetch(`/api/loans/applications?id=${appId}&include_security=true`)
+      if (res.ok) {
+        const data = await res.json()
+        setSecurities(data.securities || [])
+      }
+    } catch (error) {
+      console.error("Failed to fetch security details:", error)
     }
-  }, [applicationIdParam, fetchLoanById])
+  }
 
-  // Select a loan and prefill form
-  const selectLoan = (loan: LoanApplication) => {
-    setSelectedLoan(loan)
-    setSanctionAmount(loan.applied_loan_amount.toString())
-    setSanctionInterestRate(loan.scheme_interest_rate?.toString() || "12")
-    setSanctionTenure(loan.minimum_period_months?.toString() || "12")
-    setMoratoriumPeriod("0")
-    setSanctionRemarks("")
-    setSanctionAction("APPROVE")
+  // Select application
+  const selectApplication = async (app: LoanApplication) => {
+    setSelectedApp(app)
+    setLoadingDetails(true)
     setFormError("")
-    setEmiCalculation(null)
+    setSuccessMessage("")
+
+    // Pre-fill form with applied values
+    setSanctionedAmount(app.applied_loan_amount.toString())
+    setInterestRate(app.scheme_interest_rate.toString())
+    setTenureMonths(app.scheme_min_period.toString())
+    setMoratoriumPeriod("0")
+    setRemarks("")
+    setCalculatedEMI(null)
+    setTotalInterest(null)
+    setTotalPayment(null)
+    setEmiSchedule([])
+
+    await fetchSecurityDetails(app.loan_application_id)
+    setLoadingDetails(false)
   }
 
   // Calculate EMI
-  const calculateEMI = useCallback(async () => {
-    if (!sanctionAmount || !sanctionInterestRate || !sanctionTenure) return
+  const calculateEMI = useCallback(() => {
+    const P = parseFloat(sanctionedAmount)
+    const annualRate = parseFloat(interestRate)
+    const N = parseInt(tenureMonths)
 
-    const amount = parseFloat(sanctionAmount)
-    const rate = parseFloat(sanctionInterestRate)
-    const tenure = parseInt(sanctionTenure)
+    if (isNaN(P) || isNaN(annualRate) || isNaN(N) || P <= 0 || N <= 0) {
+      setCalculatedEMI(null)
+      setTotalInterest(null)
+      setTotalPayment(null)
+      setEmiSchedule([])
+      return
+    }
 
-    if (amount <= 0 || rate < 0 || tenure <= 0) return
+    const R = annualRate / 12 / 100 // Monthly interest rate
 
-    setIsCalculatingEMI(true)
+    let emi: number
+    if (R > 0) {
+      emi = (P * R * Math.pow(1 + R, N)) / (Math.pow(1 + R, N) - 1)
+    } else {
+      emi = P / N
+    }
+
+    emi = Math.round(emi * 100) / 100
+    const totalPay = emi * N
+    const totalInt = totalPay - P
+
+    setCalculatedEMI(emi)
+    setTotalInterest(Math.round(totalInt * 100) / 100)
+    setTotalPayment(Math.round(totalPay * 100) / 100)
+
+    // Generate EMI schedule
+    const schedule: EMIScheduleItem[] = []
+    let balance = P
+    const today = new Date()
+    const moratorium = parseInt(moratoriumPeriod) || 0
+
+    for (let i = 1; i <= N; i++) {
+      const dueDate = new Date(today)
+      dueDate.setMonth(dueDate.getMonth() + i + moratorium)
+
+      const interestForMonth = balance * R
+      const principalForMonth = emi - interestForMonth
+      balance = Math.max(0, balance - principalForMonth)
+
+      schedule.push({
+        installment_no: i,
+        due_date: dueDate.toISOString().split("T")[0],
+        principal: Math.round(principalForMonth * 100) / 100,
+        interest: Math.round(interestForMonth * 100) / 100,
+        total: emi,
+        balance: Math.round(balance * 100) / 100,
+      })
+    }
+
+    setEmiSchedule(schedule)
+  }, [sanctionedAmount, interestRate, tenureMonths, moratoriumPeriod])
+
+  // Auto-calculate when values change
+  useEffect(() => {
+    if (sanctionedAmount && interestRate && tenureMonths) {
+      calculateEMI()
+    }
+  }, [sanctionedAmount, interestRate, tenureMonths, moratoriumPeriod, calculateEMI])
+
+  // Validate form
+  const validateForm = (): boolean => {
+    setFormError("")
+
+    const amount = parseFloat(sanctionedAmount)
+    const rate = parseFloat(interestRate)
+    const tenure = parseInt(tenureMonths)
+
+    if (isNaN(amount) || amount <= 0) {
+      setFormError("Please enter a valid sanctioned amount")
+      return false
+    }
+
+    if (selectedApp && amount > selectedApp.scheme_max_amount) {
+      setFormError(`Amount exceeds maximum limit of ${formatCurrency(selectedApp.scheme_max_amount)}`)
+      return false
+    }
+
+    if (isNaN(rate) || rate <= 0 || rate > 50) {
+      setFormError("Please enter a valid interest rate (0-50%)")
+      return false
+    }
+
+    if (isNaN(tenure) || tenure <= 0) {
+      setFormError("Please enter a valid tenure in months")
+      return false
+    }
+
+    if (selectedApp && tenure < selectedApp.scheme_min_period) {
+      setFormError(`Tenure must be at least ${selectedApp.scheme_min_period} months`)
+      return false
+    }
+
+    if (selectedApp && tenure > selectedApp.scheme_max_period) {
+      setFormError(`Tenure cannot exceed ${selectedApp.scheme_max_period} months`)
+      return false
+    }
+
+    return true
+  }
+
+  // Process approval
+  const processApproval = async () => {
+    if (!selectedApp) return
+    if (!validateForm()) return
+
+    setIsSubmitting(true)
+    setFormError("")
 
     try {
-      const res = await fetch("/api/loans/calculate-emi", {
+      const res = await fetch("/api/loans/sanction", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          principal: amount,
-          interest_rate: rate,
-          tenure_months: tenure
-        })
+          loan_application_id: selectedApp.loan_application_id,
+          action: "APPROVE",
+          sanctioned_amount: parseFloat(sanctionedAmount),
+          interest_rate: parseFloat(interestRate),
+          loan_tenure_months: parseInt(tenureMonths),
+          moratorium_period: parseInt(moratoriumPeriod) || 0,
+          remarks: remarks,
+        }),
       })
 
       const data = await res.json()
-      if (data.error) throw new Error(data.error)
 
-      setEmiCalculation({
-        emi_amount: data.emi_amount,
-        total_amount: data.total_amount,
-        total_interest: data.total_interest,
-        schedule: data.schedule || []
-      })
-    } catch (error) {
-      console.error("EMI calculation failed:", error)
-      // Fallback to client-side calculation
-      const P = amount
-      const R = rate / 12 / 100
-      const N = tenure
-
-      let emi = 0
-      if (R > 0) {
-        emi = (P * R * Math.pow(1 + R, N)) / (Math.pow(1 + R, N) - 1)
-      } else {
-        emi = P / N
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to approve loan")
       }
-      emi = Math.round(emi * 100) / 100
-      const totalAmount = emi * N
-      const totalInterest = totalAmount - P
 
-      setEmiCalculation({
-        emi_amount: emi,
-        total_amount: Math.round(totalAmount * 100) / 100,
-        total_interest: Math.round(totalInterest * 100) / 100,
-        schedule: []
-      })
+      setSuccessMessage(`Loan approved successfully! Sanction ID: ${data.sanction_id}, EMI: ${formatCurrency(data.emi_amount)}`)
+      
+      // Remove from list and reset
+      setApplications(prev => prev.filter(a => a.loan_application_id !== selectedApp.loan_application_id))
+      setTimeout(() => {
+        setSelectedApp(null)
+        setSuccessMessage("")
+      }, 3000)
+    } catch (error: any) {
+      setFormError(error.message)
     } finally {
-      setIsCalculatingEMI(false)
+      setIsSubmitting(false)
     }
-  }, [sanctionAmount, sanctionInterestRate, sanctionTenure])
+  }
 
-  // Auto-calculate EMI when values change
-  useEffect(() => {
-    if (sanctionAction === "APPROVE" && sanctionAmount && sanctionInterestRate && sanctionTenure) {
-      const timer = setTimeout(() => {
-        calculateEMI()
-      }, 500)
-      return () => clearTimeout(timer)
-    }
-  }, [sanctionAmount, sanctionInterestRate, sanctionTenure, sanctionAction, calculateEMI])
+  // Process rejection
+  const processRejection = async () => {
+    if (!selectedApp) return
 
-  // Process sanction
-  const processSanction = async () => {
-    if (!selectedLoan) return
-
-    if (sanctionAction === "APPROVE") {
-      if (!sanctionAmount || !sanctionInterestRate || !sanctionTenure) {
-        setFormError("Please fill all required fields for approval")
-        return
-      }
-
-      const amount = parseFloat(sanctionAmount)
-      if (amount <= 0) {
-        setFormError("Sanctioned amount must be greater than 0")
-        return
-      }
-
-      if (amount > selectedLoan.applied_loan_amount * 1.1) {
-        setFormError("Sanctioned amount cannot exceed applied amount by more than 10%")
-        return
-      }
-    }
-
-    if (sanctionAction === "REJECT" && !sanctionRemarks.trim()) {
+    if (!rejectRemarks.trim()) {
       setFormError("Please provide a reason for rejection")
       return
     }
@@ -266,27 +346,28 @@ export default function LoanSanctionPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          loan_application_id: selectedLoan.loan_application_id,
-          action: sanctionAction,
-          sanctioned_amount: sanctionAction === "APPROVE" ? parseFloat(sanctionAmount) : undefined,
-          interest_rate: sanctionAction === "APPROVE" ? parseFloat(sanctionInterestRate) : undefined,
-          loan_tenure_months: sanctionAction === "APPROVE" ? parseInt(sanctionTenure) : undefined,
-          moratorium_period: sanctionAction === "APPROVE" ? parseInt(moratoriumPeriod) : undefined,
-          remarks: sanctionRemarks
-        })
+          loan_application_id: selectedApp.loan_application_id,
+          action: "REJECT",
+          remarks: rejectRemarks,
+        }),
       })
 
       const data = await res.json()
-      if (data.error) throw new Error(data.error)
 
-      setSuccessMessage(
-        sanctionAction === "APPROVE" 
-          ? `Loan ${selectedLoan.reference_no} approved successfully! EMI: ${formatCurrency(data.emi_amount)}`
-          : `Loan ${selectedLoan.reference_no} has been rejected.`
-      )
-      setSuccessOpen(true)
-      setSelectedLoan(null)
-      fetchPendingLoans()
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to reject loan")
+      }
+
+      setShowRejectDialog(false)
+      setSuccessMessage("Loan application rejected")
+      
+      // Remove from list and reset
+      setApplications(prev => prev.filter(a => a.loan_application_id !== selectedApp.loan_application_id))
+      setTimeout(() => {
+        setSelectedApp(null)
+        setSuccessMessage("")
+        setRejectRemarks("")
+      }, 2000)
     } catch (error: any) {
       setFormError(error.message)
     } finally {
@@ -294,487 +375,469 @@ export default function LoanSanctionPage() {
     }
   }
 
-  // Search filter
-  const filteredLoans = pendingLoans.filter(loan => {
-    if (!searchQuery) return true
-    const query = searchQuery.toLowerCase()
-    return (
-      loan.reference_no?.toLowerCase().includes(query) ||
-      loan.member_name?.toLowerCase().includes(query) ||
-      loan.membership_no?.toString().includes(query) ||
-      loan.mobile_no?.includes(query)
-    )
-  })
+  // Filter applications
+  const filteredApplications = applications.filter(
+    (app) =>
+      app.reference_no.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      app.member_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      app.membership_no.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  // Refresh
+  const handleRefresh = () => {
+    setRefreshing(true)
+    fetchApplications()
+  }
 
   return (
     <DashboardWrapper>
-      <div className="flex flex-col gap-6 p-6">
+      <div className="flex min-h-[calc(100vh-4rem)] flex-col gap-6 p-4 md:p-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => router.push("/loans")}>
-              <ArrowLeft className="h-5 w-5" />
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="outline" size="icon" onClick={() => router.push("/loans")}>
+              <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">Loan Sanction</h1>
-              <p className="text-muted-foreground">Review and approve/reject loan applications</p>
+              <h1 className="text-2xl font-bold tracking-tight text-foreground">Loan Sanction</h1>
+              <p className="text-sm text-muted-foreground">Review and approve or reject loan applications</p>
             </div>
           </div>
-          <Button variant="outline" onClick={fetchPendingLoans} disabled={isLoadingList}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingList ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          </div>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-5">
-          {/* Pending Applications List */}
-          <Card className="lg:col-span-2">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Clock className="h-5 w-5 text-amber-500" />
-                Pending Applications
-                <Badge variant="secondary" className="ml-auto">
-                  {pendingLoans.length}
-                </Badge>
-              </CardTitle>
-              <div className="relative mt-2">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by name, reference, mobile..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="max-h-[600px] overflow-y-auto">
-                {isLoadingList ? (
-                  <div className="flex items-center justify-center py-10">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          {/* Applications List */}
+          <div className="lg:col-span-2">
+            <Card className="h-full">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Pending Applications</CardTitle>
+                <CardDescription>{applications.length} applications awaiting review</CardDescription>
+                <div className="relative mt-2">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by reference, name, or membership..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                {loading ? (
+                  <div className="flex h-48 items-center justify-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   </div>
-                ) : filteredLoans.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-10 text-center">
-                    <CheckCircle className="h-12 w-12 text-green-500/50 mb-3" />
-                    <p className="text-muted-foreground">No pending applications</p>
-                    <p className="text-sm text-muted-foreground">All caught up!</p>
+                ) : filteredApplications.length === 0 ? (
+                  <div className="flex h-48 flex-col items-center justify-center text-center p-4">
+                    <FileText className="h-12 w-12 text-muted-foreground/50" />
+                    <p className="mt-3 text-sm text-muted-foreground">No pending applications</p>
                   </div>
                 ) : (
-                  <div className="divide-y">
-                    {filteredLoans.map((loan) => (
-                      <div
-                        key={loan.loan_application_id}
-                        className={`p-4 cursor-pointer transition-colors hover:bg-muted/50 ${
-                          selectedLoan?.loan_application_id === loan.loan_application_id
-                            ? "bg-primary/5 border-l-4 border-l-primary"
-                            : ""
+                  <div className="max-h-[calc(100vh-20rem)] overflow-y-auto divide-y">
+                    {filteredApplications.map((app) => (
+                      <button
+                        key={app.loan_application_id}
+                        onClick={() => selectApplication(app)}
+                        className={`w-full p-4 text-left transition-colors hover:bg-muted/50 ${
+                          selectedApp?.loan_application_id === app.loan_application_id ? "bg-primary/5 border-l-2 border-l-primary" : ""
                         }`}
-                        onClick={() => selectLoan(loan)}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
-                            <p className="font-medium truncate">{loan.member_name}</p>
-                            <p className="text-sm text-muted-foreground">{loan.reference_no}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-semibold text-green-600">
-                              {formatCurrency(loan.applied_loan_amount)}
+                            <p className="font-medium text-foreground truncate">{app.member_name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {app.reference_no} | {app.membership_no}
                             </p>
-                            <p className="text-xs text-muted-foreground">{loan.scheme_name}</p>
                           </div>
+                          <Badge variant="outline" className="shrink-0 text-xs">
+                            {app.scheme_name}
+                          </Badge>
                         </div>
-                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {formatDate(loan.application_date)}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Phone className="h-3 w-3" />
-                            {loan.mobile_no || "---"}
+                        <div className="mt-2 flex items-center justify-between text-sm">
+                          <span className="font-semibold text-primary">{formatCurrency(app.applied_loan_amount)}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(app.application_date).toLocaleDateString("en-IN")}
                           </span>
                         </div>
-                      </div>
+                        <p className="mt-1 text-xs text-muted-foreground truncate">
+                          Purpose: {app.loan_purpose || "Not specified"}
+                        </p>
+                      </button>
                     ))}
                   </div>
                 )}
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Sanction Form */}
-          <Card className="lg:col-span-3">
-            {!selectedLoan ? (
-              <div className="flex flex-col items-center justify-center h-full min-h-[500px] text-center p-6">
-                <FileText className="h-16 w-16 text-muted-foreground/30 mb-4" />
-                <h3 className="text-lg font-medium text-muted-foreground">Select an Application</h3>
-                <p className="text-sm text-muted-foreground max-w-xs mt-1">
-                  Click on a pending application from the list to review and process sanction
-                </p>
-              </div>
+          <div className="lg:col-span-3">
+            {!selectedApp ? (
+              <Card className="h-full">
+                <CardContent className="flex h-96 flex-col items-center justify-center text-center">
+                  <Shield className="h-16 w-16 text-muted-foreground/30" />
+                  <h3 className="mt-4 text-lg font-medium text-foreground">Select an Application</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Choose a pending application from the list to review and process
+                  </p>
+                </CardContent>
+              </Card>
             ) : (
-              <>
-                <CardHeader className="border-b">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        {selectedLoan.reference_no}
-                        <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
-                          <Clock className="h-3 w-3 mr-1" />
-                          Pending
-                        </Badge>
-                      </CardTitle>
-                      <CardDescription className="mt-1">
-                        {selectedLoan.member_name} | {selectedLoan.membership_no}
-                      </CardDescription>
+              <div className="space-y-4">
+                {/* Success/Error Messages */}
+                {successMessage && (
+                  <Alert className="border-green-500 bg-green-50 dark:bg-green-950/20">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="text-green-700 dark:text-green-400">{successMessage}</AlertDescription>
+                  </Alert>
+                )}
+                {formError && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{formError}</AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Application Details */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          <User className="h-5 w-5 text-primary" />
+                          {selectedApp.member_name}
+                        </CardTitle>
+                        <CardDescription className="mt-1">
+                          {selectedApp.reference_no} | Membership: {selectedApp.membership_no}
+                        </CardDescription>
+                      </div>
+                      <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                        <Clock className="mr-1 h-3 w-3" />
+                        Pending Review
+                      </Badge>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => setSelectedLoan(null)}>
-                      <XCircle className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardHeader>
-
-                <CardContent className="pt-6">
-                  <Tabs defaultValue="details" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3 mb-6">
-                      <TabsTrigger value="details">Application Details</TabsTrigger>
-                      <TabsTrigger value="sanction">Sanction Form</TabsTrigger>
-                      <TabsTrigger value="emi" disabled={!emiCalculation}>EMI Schedule</TabsTrigger>
-                    </TabsList>
-
-                    {/* Application Details Tab */}
-                    <TabsContent value="details" className="space-y-4">
-                      <div className="grid gap-4 md:grid-cols-2">
-                        {/* Member Info */}
-                        <Card className="border-muted">
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium flex items-center gap-2">
-                              <User className="h-4 w-4 text-blue-500" />
-                              Member Information
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent className="text-sm space-y-2">
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Name:</span>
-                              <span className="font-medium">{selectedLoan.member_name}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Membership No:</span>
-                              <span>{selectedLoan.membership_no}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Customer Code:</span>
-                              <span>{selectedLoan.customer_code}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Mobile:</span>
-                              <span>{selectedLoan.mobile_no || "---"}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Aadhaar:</span>
-                              <span>{selectedLoan.aadhaar_no ? `XXXX-XXXX-${selectedLoan.aadhaar_no.slice(-4)}` : "---"}</span>
-                            </div>
-                          </CardContent>
-                        </Card>
-
-                        {/* Loan Details */}
-                        <Card className="border-muted">
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium flex items-center gap-2">
-                              <CreditCard className="h-4 w-4 text-green-500" />
-                              Loan Request
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent className="text-sm space-y-2">
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Scheme:</span>
-                              <span className="font-medium">{selectedLoan.scheme_name}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Type:</span>
-                              <span>{selectedLoan.loan_type || "Term Loan"}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Applied Amount:</span>
-                              <span className="font-semibold text-green-600">
-                                {formatCurrency(selectedLoan.applied_loan_amount)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Scheme Rate:</span>
-                              <span>{selectedLoan.scheme_interest_rate}% p.a.</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Tenure Range:</span>
-                              <span>{selectedLoan.minimum_period_months} - {selectedLoan.maximum_period_months} months</span>
-                            </div>
-                          </CardContent>
-                        </Card>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                      <div className="rounded-lg border p-3 bg-muted/30">
+                        <p className="text-xs text-muted-foreground">Applied Amount</p>
+                        <p className="mt-1 text-lg font-bold text-primary">{formatCurrency(selectedApp.applied_loan_amount)}</p>
                       </div>
-
-                      {/* Purpose */}
-                      {selectedLoan.loan_purpose && (
-                        <Card className="border-muted">
-                          <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium flex items-center gap-2">
-                              <FileText className="h-4 w-4 text-purple-500" />
-                              Loan Purpose
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <p className="text-sm">{selectedLoan.loan_purpose}</p>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </TabsContent>
-
-                    {/* Sanction Form Tab */}
-                    <TabsContent value="sanction" className="space-y-6">
-                      {/* Action Selection */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <Button
-                          type="button"
-                          variant={sanctionAction === "APPROVE" ? "default" : "outline"}
-                          className={`h-auto py-4 ${sanctionAction === "APPROVE" ? "bg-green-600 hover:bg-green-700" : ""}`}
-                          onClick={() => setSanctionAction("APPROVE")}
-                        >
-                          <div className="flex flex-col items-center gap-2">
-                            <CheckCircle className="h-6 w-6" />
-                            <span className="font-semibold">Approve</span>
-                            <span className="text-xs opacity-80">Sanction the loan</span>
-                          </div>
-                        </Button>
-                        <Button
-                          type="button"
-                          variant={sanctionAction === "REJECT" ? "destructive" : "outline"}
-                          className="h-auto py-4"
-                          onClick={() => setSanctionAction("REJECT")}
-                        >
-                          <div className="flex flex-col items-center gap-2">
-                            <Ban className="h-6 w-6" />
-                            <span className="font-semibold">Reject</span>
-                            <span className="text-xs opacity-80">Decline application</span>
-                          </div>
-                        </Button>
+                      <div className="rounded-lg border p-3 bg-muted/30">
+                        <p className="text-xs text-muted-foreground">Scheme</p>
+                        <p className="mt-1 font-medium">{selectedApp.scheme_name}</p>
+                        <p className="text-xs text-muted-foreground">Max: {formatCurrency(selectedApp.scheme_max_amount)}</p>
                       </div>
-
-                      {sanctionAction === "APPROVE" && (
-                        <>
-                          {/* Amount and Rate */}
-                          <div className="grid gap-4 md:grid-cols-2">
-                            <div className="space-y-2">
-                              <Label className="flex items-center gap-2">
-                                <IndianRupee className="h-4 w-4 text-muted-foreground" />
-                                Sanctioned Amount *
-                              </Label>
-                              <Input
-                                type="number"
-                                placeholder="Enter amount"
-                                value={sanctionAmount}
-                                onChange={(e) => setSanctionAmount(e.target.value)}
-                                className="text-lg font-semibold"
-                              />
-                              <p className="text-xs text-muted-foreground">
-                                Applied: {formatCurrency(selectedLoan.applied_loan_amount)}
-                              </p>
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="flex items-center gap-2">
-                                <Percent className="h-4 w-4 text-muted-foreground" />
-                                Interest Rate (% p.a.) *
-                              </Label>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                placeholder="e.g., 12.5"
-                                value={sanctionInterestRate}
-                                onChange={(e) => setSanctionInterestRate(e.target.value)}
-                              />
-                              <p className="text-xs text-muted-foreground">
-                                Scheme Rate: {selectedLoan.scheme_interest_rate}%
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Tenure and Moratorium */}
-                          <div className="grid gap-4 md:grid-cols-2">
-                            <div className="space-y-2">
-                              <Label className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-muted-foreground" />
-                                Loan Tenure (Months) *
-                              </Label>
-                              <Input
-                                type="number"
-                                placeholder="e.g., 24"
-                                value={sanctionTenure}
-                                onChange={(e) => setSanctionTenure(e.target.value)}
-                              />
-                              <p className="text-xs text-muted-foreground">
-                                Range: {selectedLoan.minimum_period_months} - {selectedLoan.maximum_period_months} months
-                              </p>
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="flex items-center gap-2">
-                                <Clock className="h-4 w-4 text-muted-foreground" />
-                                Moratorium Period (Months)
-                              </Label>
-                              <Input
-                                type="number"
-                                placeholder="0"
-                                value={moratoriumPeriod}
-                                onChange={(e) => setMoratoriumPeriod(e.target.value)}
-                              />
-                              <p className="text-xs text-muted-foreground">
-                                Grace period before EMI starts
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* EMI Summary */}
-                          {emiCalculation && (
-                            <Card className="border-green-200 bg-green-50/50">
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-medium flex items-center gap-2 text-green-700">
-                                  <Calculator className="h-4 w-4" />
-                                  EMI Calculation Summary
-                                </CardTitle>
-                              </CardHeader>
-                              <CardContent>
-                                <div className="grid grid-cols-3 gap-4 text-center">
-                                  <div>
-                                    <p className="text-2xl font-bold text-green-700">
-                                      {formatCurrency(emiCalculation.emi_amount)}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">Monthly EMI</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-lg font-semibold text-blue-600">
-                                      {formatCurrency(emiCalculation.total_interest)}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">Total Interest</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-lg font-semibold">
-                                      {formatCurrency(emiCalculation.total_amount)}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">Total Payable</p>
-                                  </div>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          )}
-
-                          {isCalculatingEMI && (
-                            <div className="flex items-center justify-center py-4">
-                              <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                              <span className="text-sm text-muted-foreground">Calculating EMI...</span>
-                            </div>
-                          )}
-                        </>
-                      )}
-
-                      {/* Remarks */}
-                      <div className="space-y-2">
-                        <Label className="flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                          Remarks {sanctionAction === "REJECT" && <span className="text-destructive">*</span>}
-                        </Label>
-                        <Textarea
-                          placeholder={
-                            sanctionAction === "REJECT"
-                              ? "Please provide a reason for rejection (required)"
-                              : "Any additional notes or conditions"
-                          }
-                          value={sanctionRemarks}
-                          onChange={(e) => setSanctionRemarks(e.target.value)}
-                          rows={3}
-                        />
+                      <div className="rounded-lg border p-3 bg-muted/30">
+                        <p className="text-xs text-muted-foreground">Scheme Interest</p>
+                        <p className="mt-1 font-medium">{selectedApp.scheme_interest_rate}% p.a.</p>
                       </div>
+                      <div className="rounded-lg border p-3 bg-muted/30">
+                        <p className="text-xs text-muted-foreground">Tenure Range</p>
+                        <p className="mt-1 font-medium">{selectedApp.scheme_min_period} - {selectedApp.scheme_max_period} months</p>
+                      </div>
+                    </div>
 
-                      {/* Error message */}
-                      {formError && (
-                        <div className="flex items-center gap-2 text-destructive text-sm bg-destructive/10 p-3 rounded-lg">
-                          <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                          {formError}
-                        </div>
-                      )}
-                    </TabsContent>
+                    {selectedApp.loan_purpose && (
+                      <div className="mt-4 rounded-lg border p-3 bg-muted/30">
+                        <p className="text-xs text-muted-foreground">Loan Purpose</p>
+                        <p className="mt-1 text-sm">{selectedApp.loan_purpose}</p>
+                      </div>
+                    )}
 
-                    {/* EMI Schedule Tab */}
-                    <TabsContent value="emi" className="space-y-4">
-                      {emiCalculation && emiCalculation.schedule.length > 0 ? (
-                        <div className="border rounded-lg overflow-hidden">
+                    {/* Security/Collateral Details */}
+                    {loadingDetails ? (
+                      <div className="mt-4 flex items-center justify-center p-4">
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : securities.length > 0 && (
+                      <div className="mt-4">
+                        <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                          <Shield className="h-4 w-4 text-primary" />
+                          Security / Collateral Details
+                        </p>
+                        <div className="rounded-lg border overflow-hidden">
                           <Table>
                             <TableHeader>
-                              <TableRow>
-                                <TableHead className="w-16">No.</TableHead>
-                                <TableHead className="text-right">Principal</TableHead>
-                                <TableHead className="text-right">Interest</TableHead>
-                                <TableHead className="text-right">EMI</TableHead>
-                                <TableHead className="text-right">Balance</TableHead>
+                              <TableRow className="bg-muted/50">
+                                <TableHead className="text-xs">Type</TableHead>
+                                <TableHead className="text-xs">Description</TableHead>
+                                <TableHead className="text-xs text-right">Value</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {emiCalculation.schedule.slice(0, 12).map((row) => (
-                                <TableRow key={row.installment_no}>
-                                  <TableCell className="font-medium">{row.installment_no}</TableCell>
-                                  <TableCell className="text-right">{formatCurrency(row.principal)}</TableCell>
-                                  <TableCell className="text-right">{formatCurrency(row.interest)}</TableCell>
-                                  <TableCell className="text-right font-semibold">{formatCurrency(row.total)}</TableCell>
-                                  <TableCell className="text-right">{formatCurrency(row.balance)}</TableCell>
+                              {securities.map((sec) => (
+                                <TableRow key={sec.security_id}>
+                                  <TableCell className="text-xs">{sec.security_type}</TableCell>
+                                  <TableCell className="text-xs">{sec.security_description}</TableCell>
+                                  <TableCell className="text-xs text-right font-medium">{formatCurrency(sec.security_value)}</TableCell>
                                 </TableRow>
                               ))}
+                              <TableRow className="bg-muted/30">
+                                <TableCell colSpan={2} className="text-xs font-medium">Total Security Value</TableCell>
+                                <TableCell className="text-xs text-right font-bold text-primary">
+                                  {formatCurrency(securities.reduce((s, sec) => s + sec.security_value, 0))}
+                                </TableCell>
+                              </TableRow>
                             </TableBody>
                           </Table>
-                          {emiCalculation.schedule.length > 12 && (
-                            <div className="p-3 bg-muted/50 text-center text-sm text-muted-foreground">
-                              Showing first 12 of {emiCalculation.schedule.length} installments
-                            </div>
-                          )}
                         </div>
-                      ) : (
-                        <div className="text-center py-10 text-muted-foreground">
-                          <Info className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                          <p>Fill in the sanction details to generate EMI schedule</p>
-                        </div>
-                      )}
-                    </TabsContent>
-                  </Tabs>
-                </CardContent>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
 
-                <CardFooter className="border-t bg-muted/30 flex justify-end gap-3">
-                  <Button variant="outline" onClick={() => setSelectedLoan(null)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={processSanction}
-                    disabled={isSubmitting}
-                    variant={sanctionAction === "REJECT" ? "destructive" : "default"}
-                    className={sanctionAction === "APPROVE" ? "bg-green-600 hover:bg-green-700" : ""}
-                  >
-                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {sanctionAction === "APPROVE" ? "Approve & Sanction" : "Reject Application"}
-                  </Button>
-                </CardFooter>
-              </>
+                {/* Sanction Parameters */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Calculator className="h-5 w-5 text-primary" />
+                      Sanction Parameters
+                    </CardTitle>
+                    <CardDescription>Configure loan terms for approval</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="sanctionedAmount" className="flex items-center gap-1">
+                          <IndianRupee className="h-3 w-3" />
+                          Sanctioned Amount *
+                        </Label>
+                        <Input
+                          id="sanctionedAmount"
+                          type="number"
+                          value={sanctionedAmount}
+                          onChange={(e) => setSanctionedAmount(e.target.value)}
+                          placeholder="Enter amount"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Max: {formatCurrency(selectedApp.scheme_max_amount)}
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="interestRate" className="flex items-center gap-1">
+                          <Percent className="h-3 w-3" />
+                          Interest Rate (% p.a.) *
+                        </Label>
+                        <Input
+                          id="interestRate"
+                          type="number"
+                          step="0.01"
+                          value={interestRate}
+                          onChange={(e) => setInterestRate(e.target.value)}
+                          placeholder="Enter rate"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Scheme rate: {selectedApp.scheme_interest_rate}%
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="tenureMonths" className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          Loan Tenure (Months) *
+                        </Label>
+                        <Input
+                          id="tenureMonths"
+                          type="number"
+                          value={tenureMonths}
+                          onChange={(e) => setTenureMonths(e.target.value)}
+                          placeholder="Enter tenure"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Range: {selectedApp.scheme_min_period} - {selectedApp.scheme_max_period} months
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="moratorium" className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          Moratorium Period (Months)
+                        </Label>
+                        <Select value={moratoriumPeriod} onValueChange={setMoratoriumPeriod}>
+                          <SelectTrigger id="moratorium">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="0">No Moratorium</SelectItem>
+                            <SelectItem value="1">1 Month</SelectItem>
+                            <SelectItem value="2">2 Months</SelectItem>
+                            <SelectItem value="3">3 Months</SelectItem>
+                            <SelectItem value="6">6 Months</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="remarks">Remarks / Conditions</Label>
+                      <Textarea
+                        id="remarks"
+                        value={remarks}
+                        onChange={(e) => setRemarks(e.target.value)}
+                        placeholder="Add any special conditions or notes for this sanction..."
+                        rows={2}
+                      />
+                    </div>
+
+                    {/* EMI Summary */}
+                    {calculatedEMI && (
+                      <div className="rounded-lg border bg-gradient-to-br from-primary/5 to-primary/10 p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="font-medium flex items-center gap-2">
+                            <TrendingUp className="h-4 w-4 text-primary" />
+                            EMI Calculation Summary
+                          </h4>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowSchedule(true)}
+                            className="text-xs"
+                          >
+                            <Eye className="mr-1 h-3 w-3" />
+                            View Schedule
+                          </Button>
+                        </div>
+                        <div className="grid gap-4 sm:grid-cols-3">
+                          <div className="text-center p-3 rounded-lg bg-background/80">
+                            <p className="text-xs text-muted-foreground">Monthly EMI</p>
+                            <p className="text-xl font-bold text-primary">{formatCurrency(calculatedEMI)}</p>
+                          </div>
+                          <div className="text-center p-3 rounded-lg bg-background/80">
+                            <p className="text-xs text-muted-foreground">Total Interest</p>
+                            <p className="text-lg font-semibold text-foreground">{formatCurrency(totalInterest || 0)}</p>
+                          </div>
+                          <div className="text-center p-3 rounded-lg bg-background/80">
+                            <p className="text-xs text-muted-foreground">Total Repayment</p>
+                            <p className="text-lg font-semibold text-foreground">{formatCurrency(totalPayment || 0)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                  <CardFooter className="flex justify-between border-t pt-4">
+                    <Button
+                      variant="destructive"
+                      onClick={() => setShowRejectDialog(true)}
+                      disabled={isSubmitting}
+                    >
+                      <XCircle className="mr-2 h-4 w-4" />
+                      Reject Application
+                    </Button>
+                    <Button onClick={processApproval} disabled={isSubmitting || !calculatedEMI}>
+                      {isSubmitting ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                      )}
+                      Approve & Sanction
+                    </Button>
+                  </CardFooter>
+                </Card>
+              </div>
             )}
-          </Card>
+          </div>
         </div>
 
-        {/* Success Dialog */}
-        <AlertDialog open={successOpen} onOpenChange={setSuccessOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-green-600" />
-                Success
-              </AlertDialogTitle>
-              <AlertDialogDescription>{successMessage}</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogAction onClick={() => setSuccessOpen(false)}>Continue</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        {/* EMI Schedule Dialog */}
+        <Dialog open={showSchedule} onOpenChange={setShowSchedule}>
+          <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle>EMI Repayment Schedule</DialogTitle>
+              <DialogDescription>
+                {selectedApp?.member_name} - {selectedApp?.reference_no}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead className="text-xs">No.</TableHead>
+                    <TableHead className="text-xs">Due Date</TableHead>
+                    <TableHead className="text-xs text-right">Principal</TableHead>
+                    <TableHead className="text-xs text-right">Interest</TableHead>
+                    <TableHead className="text-xs text-right">EMI</TableHead>
+                    <TableHead className="text-xs text-right">Balance</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {emiSchedule.map((item) => (
+                    <TableRow key={item.installment_no}>
+                      <TableCell className="text-sm">{item.installment_no}</TableCell>
+                      <TableCell className="text-sm">{new Date(item.due_date).toLocaleDateString("en-IN")}</TableCell>
+                      <TableCell className="text-sm text-right">{formatCurrency(item.principal)}</TableCell>
+                      <TableCell className="text-sm text-right">{formatCurrency(item.interest)}</TableCell>
+                      <TableCell className="text-sm text-right font-medium">{formatCurrency(item.total)}</TableCell>
+                      <TableCell className="text-sm text-right">{formatCurrency(item.balance)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <DialogFooter className="border-t pt-4">
+              <Button variant="outline" onClick={() => setShowSchedule(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Rejection Dialog */}
+        <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-destructive">
+                <XCircle className="h-5 w-5" />
+                Reject Application
+              </DialogTitle>
+              <DialogDescription>
+                This will reject the loan application. Please provide a reason for rejection.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="rounded-lg border p-3 bg-muted/50">
+                <p className="text-sm">
+                  <span className="text-muted-foreground">Applicant:</span>{" "}
+                  <span className="font-medium">{selectedApp?.member_name}</span>
+                </p>
+                <p className="text-sm mt-1">
+                  <span className="text-muted-foreground">Amount:</span>{" "}
+                  <span className="font-medium">{formatCurrency(selectedApp?.applied_loan_amount || 0)}</span>
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="rejectRemarks">Reason for Rejection *</Label>
+                <Textarea
+                  id="rejectRemarks"
+                  value={rejectRemarks}
+                  onChange={(e) => setRejectRemarks(e.target.value)}
+                  placeholder="Enter the reason for rejecting this application..."
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowRejectDialog(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={processRejection}
+                disabled={isSubmitting || !rejectRemarks.trim()}
+              >
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Confirm Rejection
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardWrapper>
   )
