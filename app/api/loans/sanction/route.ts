@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     const { rows: apps } = await client.query(
       `SELECT la.*, ls.scheme_name, ls.interest_rate as scheme_rate, ls.loan_gl_account
        FROM loan_applications la
-       JOIN loan_schemes ls ON la.loan_product_id = ls.scheme_id
+       JOIN loan_schemes ls ON la.scheme_id = ls.scheme_id
        WHERE la.loan_application_id = $1 AND la.branch_id = $2`,
       [loan_application_id, branchId]
     )
