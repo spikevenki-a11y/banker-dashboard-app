@@ -189,8 +189,8 @@ export async function POST(request: NextRequest) {
       RETURNING *`,
       [
         loanApplicationId, branchId, application_date || new Date().toISOString().split('T')[0],
-        membership_no, scheme_id, loan_purpose || '', loan_amount,session.userId,
-        referenceNo
+        membership_no, scheme_id, loan_purpose || '', loan_amount,referenceNo,session.userId
+        
       ]
     )
 
