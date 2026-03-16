@@ -22,7 +22,23 @@ export async function POST(request: NextRequest) {
       loan_tenure_months,
       moratorium_period,
       remarks,
+      repayment_type,
+      number_of_installments,
+      installment_start_date
     } = body
+    console.log("Sanction Request Body:", body)
+    console.log("the data is", {
+      loan_application_id,
+      action,
+      sanctioned_amount,
+      interest_rate,
+      loan_tenure_months,
+      moratorium_period,
+      remarks,
+      repayment_type,
+      number_of_installments,
+      installment_start_date
+    })
 
     if (!loan_application_id || !action) {
       return NextResponse.json(
@@ -69,13 +85,16 @@ export async function POST(request: NextRequest) {
       const N = parseInt(loan_tenure_months)
       
       let emiAmount = 0
-      if (R > 0) {
-        emiAmount = (P * R * Math.pow(1 + R, N)) / (Math.pow(1 + R, N) - 1)
-      } else {
-        emiAmount = P / N
+        if(repayment_type === 'CLOSING_TIME'){
+          emiAmount = sanctioned_amount
+      }else{
+        if (R > 0) {
+          emiAmount = (P * R * Math.pow(1 + R, N)) / (Math.pow(1 + R, N) - 1)
+        } else {
+          emiAmount = P / N
+        }
+        emiAmount = Math.round(emiAmount * 100) / 100
       }
-      emiAmount = Math.round(emiAmount * 100) / 100
-
       // Generate sanction ID
       const { rows: seqResult } = await client.query(
         `SELECT COALESCE(MAX(sanction_id), 0) + 1 as next_id FROM loan_sanction_details`
@@ -87,11 +106,11 @@ export async function POST(request: NextRequest) {
         `INSERT INTO loan_sanction_details (
           sanction_id, loan_application_id, sanctioned_amount, sanction_date,
           interest_rate, loan_tenure_months, payment_amount, moratorium_period,
-          sanction_status, approved_by, remarks, created_at
-        ) VALUES ($1, $2, $3, CURRENT_DATE, $4, $5, $6, $7, 'SANCTIONED', $8, $9, NOW())`,
+          sanction_status, approved_by, remarks, created_at,repayment_type,number_of_installments,installment_start_date
+        ) VALUES ($1, $2, $3, CURRENT_DATE, $4, $5, $6, $7, 'SANCTIONED', $8, $9, NOW(), $10, $11, $12)`,
         [
           sanctionId, loan_application_id, sanctioned_amount, interest_rate,
-          loan_tenure_months, emiAmount, moratorium_period || 0, session.userId, remarks || ''
+          loan_tenure_months, emiAmount, moratorium_period || 0, session.userId, remarks || '', repayment_type, number_of_installments, installment_start_date
         ]
       )
 
