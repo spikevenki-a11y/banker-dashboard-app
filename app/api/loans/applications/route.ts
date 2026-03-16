@@ -14,8 +14,21 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get("status")
     const membershipNo = searchParams.get("membershipNo")
+    const applicationId = searchParams.get("id")
+    const includeSecurity = searchParams.get("include_security") === "true"
     const limit = parseInt(searchParams.get("limit") || "50")
     const offset = parseInt(searchParams.get("offset") || "0")
+
+    // If fetching single application with security details
+    if (applicationId && includeSecurity) {
+      const { rows: securities } = await pool.query(
+        `SELECT security_id, security_type, security_description, security_value, document_reference
+         FROM loan_security_details WHERE loan_application_id = $1
+         ORDER BY security_id`,
+        [applicationId]
+      )
+      return NextResponse.json({ securities })
+    }
 
     let query = `
       SELECT 
