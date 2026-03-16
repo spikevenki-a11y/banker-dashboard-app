@@ -123,6 +123,11 @@ export default function LoanSanctionPage() {
   const [tenureMonths, setTenureMonths] = useState("")
   const [moratoriumPeriod, setMoratoriumPeriod] = useState("0")
   const [remarks, setRemarks] = useState("")
+  
+  // Repayment details
+  const [repaymentType, setRepaymentType] = useState("MONTHLY")
+  const [numberOfInstallments, setNumberOfInstallments] = useState(0)
+  const [installmentStartDate, setInstallmentStartDate] = useState("")
 
   // EMI calculation
   const [calculatedEMI, setCalculatedEMI] = useState<number | null>(null)
@@ -149,6 +154,62 @@ export default function LoanSanctionPage() {
       currency: "INR",
       maximumFractionDigits: 0,
     }).format(amount)
+  }
+
+  // Repayment type options
+  const repaymentTypeOptions = [
+    { value: "CLOSING_TIME", label: "Closing Time", periodsPerYear: 0 },
+    { value: "MONTHLY", label: "Monthly", periodsPerYear: 12 },
+    { value: "QUARTERLY", label: "Quarterly", periodsPerYear: 4 },
+    { value: "HALF_YEARLY", label: "Half Yearly", periodsPerYear: 2 },
+    { value: "YEARLY", label: "Yearly", periodsPerYear: 1 },
+  ]
+
+  // Suggest repayment type based on tenure
+  const suggestRepaymentType = (tenureInMonths: number): string => {
+    if (tenureInMonths <= 1) return "CLOSING_TIME"
+    if (tenureInMonths <= 12) return "MONTHLY"
+    if (tenureInMonths <= 24) return "MONTHLY"
+    if (tenureInMonths <= 36) return "QUARTERLY"
+    if (tenureInMonths <= 60) return "HALF_YEARLY"
+    return "YEARLY"
+  }
+
+  // Calculate number of installments based on tenure and repayment type
+  const calculateInstallments = (tenureInMonths: number, type: string): number => {
+    if (type === "CLOSING_TIME") return 1
+    const option = repaymentTypeOptions.find(o => o.value === type)
+    if (!option || option.periodsPerYear === 0) return 1
+    return Math.ceil((tenureInMonths / 12) * option.periodsPerYear)
+  }
+
+  // Calculate first installment date
+  const calculateFirstInstallmentDate = (type: string, moratorium: number): string => {
+    const today = identity?.businessDate ? new Date(identity.businessDate) : new Date()
+    let monthsToAdd = moratorium
+    
+    switch (type) {
+      case "CLOSING_TIME":
+        monthsToAdd += parseInt(tenureMonths) || 1
+        break
+      case "MONTHLY":
+        monthsToAdd += 1
+        break
+      case "QUARTERLY":
+        monthsToAdd += 3
+        break
+      case "HALF_YEARLY":
+        monthsToAdd += 6
+        break
+      case "YEARLY":
+        monthsToAdd += 12
+        break
+      default:
+        monthsToAdd += 1
+    }
+    
+    today.setMonth(today.getMonth() + monthsToAdd)
+    return today.toISOString().split("T")[0]
   }
 
   // Fetch identity
@@ -208,27 +269,34 @@ export default function LoanSanctionPage() {
     setFormError("")
 
     // Pre-fill form with applied values
+    const defaultTenure = app.minimum_period_months || 12
     setSanctionedAmount(app.applied_loan_amount.toString())
     setInterestRate(app.scheme_interest_rate?.toString() || "12")
-    setTenureMonths(app.minimum_period_months?.toString() || "12")
+    setTenureMonths(defaultTenure.toString())
     setMoratoriumPeriod("0")
     setRemarks("")
     setCalculatedEMI(null)
     setTotalInterest(null)
     setTotalPayment(null)
     setEmiSchedule([])
+    
+    // Set suggested repayment type based on tenure
+    const suggestedType = suggestRepaymentType(defaultTenure)
+    setRepaymentType(suggestedType)
+    setNumberOfInstallments(calculateInstallments(defaultTenure, suggestedType))
+    setInstallmentStartDate(calculateFirstInstallmentDate(suggestedType, 0))
 
     await fetchSecurityDetails(app.loan_application_id)
     setLoadingDetails(false)
   }
 
-  // Calculate EMI
+  // Calculate EMI based on repayment type
   const calculateEMI = useCallback(() => {
     const P = parseFloat(sanctionedAmount)
     const annualRate = parseFloat(interestRate)
-    const N = parseInt(tenureMonths)
+    const tenureInMonths = parseInt(tenureMonths)
 
-    if (isNaN(P) || isNaN(annualRate) || isNaN(N) || P <= 0 || N <= 0) {
+    if (isNaN(P) || isNaN(annualRate) || isNaN(tenureInMonths) || P <= 0 || tenureInMonths <= 0) {
       setCalculatedEMI(null)
       setTotalInterest(null)
       setTotalPayment(null)
@@ -236,11 +304,45 @@ export default function LoanSanctionPage() {
       return
     }
 
-    const R = annualRate / 12 / 100 // Monthly interest rate
+    // Calculate number of installments based on repayment type
+    const numInstallments = calculateInstallments(tenureInMonths, repaymentType)
+    setNumberOfInstallments(numInstallments)
+    
+    // Calculate installment start date
+    const moratorium = parseInt(moratoriumPeriod) || 0
+    setInstallmentStartDate(calculateFirstInstallmentDate(repaymentType, moratorium))
+
+    // Get months per period based on repayment type
+    let monthsPerPeriod = 1
+    switch (repaymentType) {
+      case "CLOSING_TIME":
+        monthsPerPeriod = tenureInMonths
+        break
+      case "MONTHLY":
+        monthsPerPeriod = 1
+        break
+      case "QUARTERLY":
+        monthsPerPeriod = 3
+        break
+      case "HALF_YEARLY":
+        monthsPerPeriod = 6
+        break
+      case "YEARLY":
+        monthsPerPeriod = 12
+        break
+    }
+
+    // Calculate periodic interest rate
+    const periodicRate = (annualRate / 12 / 100) * monthsPerPeriod
+    const N = repaymentType === "CLOSING_TIME" ? 1 : numInstallments
 
     let emi: number
-    if (R > 0) {
-      emi = (P * R * Math.pow(1 + R, N)) / (Math.pow(1 + R, N) - 1)
+    if (repaymentType === "CLOSING_TIME") {
+      // For closing time, total = principal + interest for full tenure
+      const totalInterestAmount = P * (annualRate / 100) * (tenureInMonths / 12)
+      emi = P + totalInterestAmount
+    } else if (periodicRate > 0) {
+      emi = (P * periodicRate * Math.pow(1 + periodicRate, N)) / (Math.pow(1 + periodicRate, N) - 1)
     } else {
       emi = P / N
     }
@@ -253,39 +355,50 @@ export default function LoanSanctionPage() {
     setTotalInterest(Math.round(totalInt * 100) / 100)
     setTotalPayment(Math.round(totalPay * 100) / 100)
 
-    // Generate EMI schedule
+    // Generate repayment schedule
     const schedule: EMIScheduleItem[] = []
     let balance = P
-    const today = new Date()
-    const moratorium = parseInt(moratoriumPeriod) || 0
+    const today = identity?.businessDate ? new Date(identity.businessDate) : new Date()
+    const moratoriumPeriodVal = parseInt(moratoriumPeriod) || 0
 
     for (let i = 1; i <= N; i++) {
       const dueDate = new Date(today)
-      dueDate.setMonth(dueDate.getMonth() + i + moratorium)
+      dueDate.setMonth(dueDate.getMonth() + (i * monthsPerPeriod) + moratoriumPeriodVal)
 
-      const interestForMonth = balance * R
-      const principalForMonth = emi - interestForMonth
-      balance = Math.max(0, balance - principalForMonth)
+      const interestForPeriod = balance * periodicRate
+      const principalForPeriod = emi - interestForPeriod
+      balance = Math.max(0, balance - principalForPeriod)
 
       schedule.push({
         installment_no: i,
         due_date: dueDate.toISOString().split("T")[0],
-        principal: Math.round(principalForMonth * 100) / 100,
-        interest: Math.round(interestForMonth * 100) / 100,
+        principal: Math.round(principalForPeriod * 100) / 100,
+        interest: Math.round(interestForPeriod * 100) / 100,
         total: emi,
         balance: Math.round(balance * 100) / 100,
       })
     }
 
     setEmiSchedule(schedule)
-  }, [sanctionedAmount, interestRate, tenureMonths, moratoriumPeriod])
+  }, [sanctionedAmount, interestRate, tenureMonths, moratoriumPeriod, repaymentType, identity])
 
   // Auto-calculate when values change
   useEffect(() => {
     if (sanctionedAmount && interestRate && tenureMonths) {
       calculateEMI()
     }
-  }, [sanctionedAmount, interestRate, tenureMonths, moratoriumPeriod, calculateEMI])
+  }, [sanctionedAmount, interestRate, tenureMonths, moratoriumPeriod, repaymentType, calculateEMI])
+
+  // Update suggested repayment type when tenure changes
+  useEffect(() => {
+    if (tenureMonths) {
+      const tenure = parseInt(tenureMonths)
+      if (!isNaN(tenure) && tenure > 0) {
+        const suggested = suggestRepaymentType(tenure)
+        setRepaymentType(suggested)
+      }
+    }
+  }, [tenureMonths])
 
   // Validate form
   const validateForm = (): boolean => {
@@ -342,6 +455,9 @@ export default function LoanSanctionPage() {
           interest_rate: parseFloat(interestRate),
           loan_tenure_months: parseInt(tenureMonths),
           moratorium_period: parseInt(moratoriumPeriod) || 0,
+          repayment_type: repaymentType,
+          number_of_installments: numberOfInstallments,
+          installment_start_date: installmentStartDate,
           remarks: remarks,
         }),
       })
@@ -444,6 +560,9 @@ export default function LoanSanctionPage() {
     setTotalInterest(null)
     setTotalPayment(null)
     setEmiSchedule([])
+    setRepaymentType("MONTHLY")
+    setNumberOfInstallments(0)
+    setInstallmentStartDate("")
   }
 
   return (
@@ -742,16 +861,64 @@ export default function LoanSanctionPage() {
                         </div>
                       </div>
 
+                      {/* Row 3: Repayment Type */}
+                      <div className="grid gap-4 sm:grid-cols-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="repayment-type">Repayment Type *</Label>
+                          <Select value={repaymentType} onValueChange={setRepaymentType}>
+                            <SelectTrigger id="repayment-type">
+                              <SelectValue placeholder="Select repayment type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {repaymentTypeOptions.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">
+                            Suggested based on tenure
+                          </p>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="num-installments">Number of Installments</Label>
+                          <Input
+                            id="num-installments"
+                            type="number"
+                            value={numberOfInstallments}
+                            readOnly
+                            className="bg-muted"
+                          />
+                          <p className="text-xs text-muted-foreground">Auto-calculated</p>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="installment-start">First Installment Date</Label>
+                          <Input
+                            id="installment-start"
+                            type="date"
+                            value={installmentStartDate}
+                            onChange={(e) => setInstallmentStartDate(e.target.value)}
+                          />
+                          <p className="text-xs text-muted-foreground">When first payment is due</p>
+                        </div>
+                      </div>
+
                       {/* EMI Calculation Summary */}
                       {calculatedEMI && (
                         <div className="rounded-lg border-2 border-teal-200 bg-teal-50 dark:border-teal-900 dark:bg-teal-950/20 p-4">
                           <h4 className="text-sm font-medium mb-3 flex items-center gap-2 text-teal-700 dark:text-teal-400">
                             <TrendingUp className="h-4 w-4" />
-                            EMI Calculation
+                            {repaymentType === "CLOSING_TIME" ? "Repayment Calculation" : "EMI Calculation"}
                           </h4>
-                          <div className="grid gap-4 sm:grid-cols-3">
+                          <div className="grid gap-4 sm:grid-cols-4">
                             <div>
-                              <p className="text-xs text-muted-foreground">Monthly EMI</p>
+                              <p className="text-xs text-muted-foreground">
+                                {repaymentType === "CLOSING_TIME" ? "Closing Amount" : 
+                                 repaymentType === "MONTHLY" ? "Monthly EMI" :
+                                 repaymentType === "QUARTERLY" ? "Quarterly EMI" :
+                                 repaymentType === "HALF_YEARLY" ? "Half-Yearly EMI" : "Yearly EMI"}
+                              </p>
                               <p className="text-lg font-bold text-teal-700 dark:text-teal-400">{formatCurrency(calculatedEMI)}</p>
                             </div>
                             <div>
@@ -762,16 +929,22 @@ export default function LoanSanctionPage() {
                               <p className="text-xs text-muted-foreground">Total Payment</p>
                               <p className="text-lg font-semibold">{formatCurrency(totalPayment || 0)}</p>
                             </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">No. of Installments</p>
+                              <p className="text-lg font-semibold">{numberOfInstallments}</p>
+                            </div>
                           </div>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="mt-3"
-                            onClick={() => setShowScheduleDialog(true)}
-                          >
-                            <Eye className="mr-2 h-4 w-4" />
-                            View Repayment Schedule
-                          </Button>
+                          {repaymentType !== "CLOSING_TIME" && (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="mt-3"
+                              onClick={() => setShowScheduleDialog(true)}
+                            >
+                              <Eye className="mr-2 h-4 w-4" />
+                              View Repayment Schedule
+                            </Button>
+                          )}
                         </div>
                       )}
 
@@ -891,8 +1064,25 @@ export default function LoanSanctionPage() {
                 <span className="text-muted-foreground">Tenure:</span>
                 <span>{tenureMonths} months</span>
               </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Repayment Type:</span>
+                <span>{repaymentTypeOptions.find(o => o.value === repaymentType)?.label || repaymentType}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">No. of Installments:</span>
+                <span>{numberOfInstallments}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">First Installment Date:</span>
+                <span>{installmentStartDate ? new Date(installmentStartDate).toLocaleDateString("en-IN") : "-"}</span>
+              </div>
               <div className="flex justify-between text-sm border-t pt-2">
-                <span className="font-semibold">Monthly EMI:</span>
+                <span className="font-semibold">
+                  {repaymentType === "CLOSING_TIME" ? "Closing Amount:" : 
+                   repaymentType === "MONTHLY" ? "Monthly EMI:" :
+                   repaymentType === "QUARTERLY" ? "Quarterly EMI:" :
+                   repaymentType === "HALF_YEARLY" ? "Half-Yearly EMI:" : "Yearly EMI:"}
+                </span>
                 <span className="font-bold text-primary">{formatCurrency(calculatedEMI || 0)}</span>
               </div>
             </div>
