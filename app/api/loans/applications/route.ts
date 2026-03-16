@@ -157,11 +157,16 @@ export async function POST(request: NextRequest) {
       [branchId]
     )
     const loanApplicationId = seqResult[0].next_id
+    console.log("Generated loan application ID:", loanApplicationId)
 
     // Generate reference number
-    const referenceNo = `LN${branchId}${String(loanApplicationId).padStart(6, '0')}`
+    const referenceNo = loanApplicationId
 
     // Insert loan application
+    console.log("Inserting loan application data:", {
+      loanApplicationId, branchId, application_date, membership_no,
+      scheme_id, loan_purpose, loan_amount, referenceNo
+    })
     const { rows: inserted } = await client.query(
       `INSERT INTO loan_applications (
         loan_application_id, branch_id, application_date, membership_no,
@@ -171,8 +176,8 @@ export async function POST(request: NextRequest) {
       RETURNING *`,
       [
         loanApplicationId, branchId, application_date || new Date().toISOString().split('T')[0],
-        membership_no, scheme_id, loan_purpose || '', loan_amount,
-        referenceNo, session.userId
+        membership_no, scheme_id, loan_purpose || '', loan_amount,session.userId,
+        referenceNo
       ]
     )
 
@@ -180,7 +185,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      application: inserted[0],
+      application: inserted[1],
       reference_no: referenceNo,
       message: `Loan application ${referenceNo} created successfully`
     })

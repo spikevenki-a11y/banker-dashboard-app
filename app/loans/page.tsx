@@ -722,7 +722,7 @@ export default function LoansPage() {
                     <TableBody>
                       {filteredLoans.map((loan) => (
                         <TableRow key={loan.id}>
-                          <TableCell className="font-mono font-medium">{loan.reference_no}</TableCell>
+                          <TableCell className="font-mono font-medium">{loan.loan_application_id}</TableCell>
                           <TableCell>
                             <div>
                               <div className="font-medium">{loan.member_name || 'N/A'}</div>
@@ -997,7 +997,7 @@ export default function LoansPage() {
                 <DialogHeader>
                   <DialogTitle>Loan Sanction</DialogTitle>
                   <DialogDescription>
-                    {selectedLoan?.reference_no} - {selectedLoan?.member_name}
+                    {selectedLoan?.loan_application_id} - {selectedLoan?.member_name}
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
