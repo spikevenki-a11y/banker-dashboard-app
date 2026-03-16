@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
               m.membership_no as mem_no
        FROM loan_applications la
        JOIN loan_sanction_details ls ON la.loan_application_id = ls.loan_application_id
-       JOIN loan_schemes lscheme ON la.loan_product_id = lscheme.scheme_id
+       JOIN loan_schemes lscheme ON la.scheme_id = lscheme.scheme_id
        JOIN memberships m ON la.membership_no = CAST(m.membership_no AS VARCHAR)
        WHERE la.loan_application_id = $1 AND la.branch_id = $2`,
       [loan_application_id, branchId]
@@ -63,7 +63,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate loan account number
-    const loanAccountNo = `LN${branchId}${String(app.loan_application_id).padStart(8, '0')}`
+    // const loanAccountNo = `LN${branchId}${String(app.loan_application_id).padStart(8, '0')}`
+    const loanAccountNo = app.loan_application_id
 
     // Create batch for GL entries
     const { rows: [batch] } = await client.query(`

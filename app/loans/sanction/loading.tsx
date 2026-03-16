@@ -1,5 +1,5 @@
-import LoadingWrapper from "@/app/_components/loading-wrapper"
+import {LoadingWrapper} from "@/app/_components/loading-wrapper"
 
 export default function Loading() {
-  return <LoadingWrapper />
+  return <LoadingWrapper children={undefined} />
 }
