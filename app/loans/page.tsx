@@ -756,7 +756,7 @@ export default function LoansPage() {
                                 </DropdownMenuItem>
                                 {loan.application_status === "PENDING" && (
                                   <>
-                                    <DropdownMenuItem onClick={() => openSanctionDialog(loan)}>
+                                    <DropdownMenuItem onClick={() => router.push(`/loans/sanction?applicationId=${loan.loan_application_id}`)}>
                                       <CheckCircle className="mr-2 h-4 w-4" />
                                       Sanction
                                     </DropdownMenuItem>
@@ -770,13 +770,13 @@ export default function LoansPage() {
                                   </>
                                 )}
                                 {loan.application_status === "SANCTIONED" && (
-                                  <DropdownMenuItem onClick={() => openDisbursementDialog(loan)}>
+                                  <DropdownMenuItem onClick={() => router.push(`/loans/disbursement?applicationId=${loan.loan_application_id}`)}>
                                     <Wallet className="mr-2 h-4 w-4" />
                                     Disburse
                                   </DropdownMenuItem>
                                 )}
                                 {(loan.application_status === "ACTIVE" || loan.application_status === "OVERDUE") && (
-                                  <DropdownMenuItem onClick={() => openCollectionDialog(loan)}>
+                                  <DropdownMenuItem onClick={() => router.push(`/loans/collection?applicationId=${loan.loan_application_id}`)}>
                                     <CreditCard className="mr-2 h-4 w-4" />
                                     Collection
                                   </DropdownMenuItem>
