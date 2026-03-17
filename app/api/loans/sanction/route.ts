@@ -13,6 +13,7 @@ export async function POST(request: NextRequest) {
     const session = JSON.parse(c.value)
     const branchId = session.branch
     const body = await request.json()
+    const businessDate = session.businessDate
 
     const {
       loan_application_id,
@@ -107,10 +108,10 @@ export async function POST(request: NextRequest) {
           sanction_id, loan_application_id, sanctioned_amount, sanction_date,
           interest_rate, loan_tenure_months, payment_amount, moratorium_period,
           sanction_status, approved_by, remarks, created_at,repayment_type,number_of_installments,installment_start_date
-        ) VALUES ($1, $2, $3, CURRENT_DATE, $4, $5, $6, $7, 'SANCTIONED', $8, $9, NOW(), $10, $11, $12)`,
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'SANCTIONED', $9, $10, NOW(), $11, $12, $13)`,
         [
-          sanctionId, loan_application_id, sanctioned_amount, interest_rate,
-          loan_tenure_months, emiAmount, moratorium_period || 0, session.userId, remarks || '', repayment_type, number_of_installments, installment_start_date
+          sanctionId, loan_application_id, sanctioned_amount, businessDate,
+          interest_rate, loan_tenure_months, emiAmount, moratorium_period || 0, session.userId, remarks || '', repayment_type, number_of_installments, installment_start_date
         ]
       )
 

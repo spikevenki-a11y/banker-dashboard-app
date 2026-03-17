@@ -179,6 +179,13 @@ export async function POST(request: NextRequest) {
       ])
     }
 
+    //update loan application outstanding balance
+    await client.query(`
+      UPDATE loan_applications 
+      SET loan_outstanding = loan_outstanding + $1, updated_at = NOW() 
+      WHERE loan_application_id = $2
+    `, [disbursement_amount, loan_application_id])
+
     // Update application status to ACTIVE
     await client.query(
       `UPDATE loan_applications SET application_status = 'ACTIVE', updated_at = NOW() 
