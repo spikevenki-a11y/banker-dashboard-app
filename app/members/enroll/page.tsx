@@ -121,6 +121,7 @@ export default function EnrollMemberPage() {
       })
 
       const data = await response.json()
+      console.log("Aadhaar lookup response:", data)
 
       if (data.found && data.customer) {
         const customer = data.customer
@@ -461,24 +462,51 @@ export default function EnrollMemberPage() {
                     className={fieldsReadOnly ? "bg-muted" : ""}
                   />
                 </div>
+                
+                  <div className="space-y-2">
+                    <Label>Mobile Number</Label>
+                    <Input
+                      value ={newMember.phone}
+                      readOnly={fieldsReadOnly}
+                      className={fieldsReadOnly ? "bg-muted" : ""}
+                    />
+                  </div>
               </TabsContent>
 
               {/* KYC TAB */}
               <TabsContent value="kyc">
-                <div className="grid grid-cols-1 gap-4 py-4 md:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 py-4 md:grid-cols-4">
                   <div className="space-y-2">
-                    <Label>ID Type</Label>
+                    <Label>Aadhar no</Label>
                     <Input
-                      value={newMember.id_type}
+                      value ={newMember.aadhaar_no}
                       onChange={(e) => setNewMember({ ...newMember, id_type: e.target.value })}
                       readOnly={fieldsReadOnly}
                       className={fieldsReadOnly ? "bg-muted" : ""}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>ID Number</Label>
+                    <Label>pan_no</Label>
                     <Input
-                      value={newMember.id_number}
+                      value ={newMember.pan_no}
+                      onChange={(e) => setNewMember({ ...newMember, id_number: e.target.value })}
+                      readOnly={fieldsReadOnly}
+                      className={fieldsReadOnly ? "bg-muted" : ""}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>driving_license_no</Label>
+                    <Input
+                      value ={newMember.driving_license_no}
+                      onChange={(e) => setNewMember({ ...newMember, id_number: e.target.value })}
+                      readOnly={fieldsReadOnly}
+                      className={fieldsReadOnly ? "bg-muted" : ""}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>ration_no</Label>
+                    <Input
+                      value ={newMember.ration_no}
                       onChange={(e) => setNewMember({ ...newMember, id_number: e.target.value })}
                       readOnly={fieldsReadOnly}
                       className={fieldsReadOnly ? "bg-muted" : ""}

@@ -149,6 +149,10 @@ export async function POST(request: NextRequest) {
 
     let balance = P
     const startDate = new Date(businessDate)
+    const { rows: schedSeq } = await client.query(
+        `SELECT COALESCE(MAX(schedule_id), 0) + 1 as next_id FROM loan_repayment_schedule_details`
+      )
+    let nextScheduleId = schedSeq[0].next_id
     
     for (let i = 1; i <= N; i++) {
       const interestAmt = balance * R
@@ -159,11 +163,6 @@ export async function POST(request: NextRequest) {
       const dueDate = new Date(startDate)
       dueDate.setMonth(dueDate.getMonth() + i)
 
-      // Generate schedule ID
-      const { rows: schedSeq } = await client.query(
-        `SELECT COALESCE(MAX(schedule_id), 0) + 1 as next_id FROM loan_repayment_schedule_details`
-      )
-
       await client.query(`
         INSERT INTO loan_repayment_schedule_details (
           schedule_id, loan_account_no, installment_no, due_date,
@@ -171,7 +170,8 @@ export async function POST(request: NextRequest) {
           balance_principal, payment_status, created_at
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING', NOW())
       `, [
-        schedSeq[0].next_id, loanAccountNo, i, dueDate.toISOString().split('T')[0],
+        nextScheduleId,
+        loanAccountNo, i, dueDate.toISOString().split('T')[0],
         Math.round(principalAmt * 100) / 100,
         Math.round(interestAmt * 100) / 100,
         Math.round(emi * 100) / 100,
