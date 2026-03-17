@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
               m.membership_no as mem_no
        FROM loan_applications la
        JOIN loan_sanction_details ls ON la.loan_application_id = ls.loan_application_id
-       JOIN loan_schemes lscheme ON la.loan_product_id = lscheme.scheme_id
+       JOIN loan_schemes lscheme ON la.scheme_id = lscheme.scheme_id
        JOIN memberships m ON la.membership_no = CAST(m.membership_no AS VARCHAR)
        WHERE la.loan_application_id = $1 AND la.branch_id = $2`,
       [loan_application_id, branchId]
@@ -63,7 +63,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate loan account number
-    const loanAccountNo = `LN${branchId}${String(app.loan_application_id).padStart(8, '0')}`
+    // const loanAccountNo = `LN${branchId}${String(app.loan_application_id).padStart(8, '0')}`
+    const loanAccountNo = app.loan_application_id
 
     // Create batch for GL entries
     const { rows: [batch] } = await client.query(`
@@ -148,6 +149,10 @@ export async function POST(request: NextRequest) {
 
     let balance = P
     const startDate = new Date(businessDate)
+    const { rows: schedSeq } = await client.query(
+        `SELECT COALESCE(MAX(schedule_id), 0) + 1 as next_id FROM loan_repayment_schedule_details`
+      )
+    let nextScheduleId = schedSeq[0].next_id
     
     for (let i = 1; i <= N; i++) {
       const interestAmt = balance * R
@@ -158,11 +163,6 @@ export async function POST(request: NextRequest) {
       const dueDate = new Date(startDate)
       dueDate.setMonth(dueDate.getMonth() + i)
 
-      // Generate schedule ID
-      const { rows: schedSeq } = await client.query(
-        `SELECT COALESCE(MAX(schedule_id), 0) + 1 as next_id FROM loan_repayment_schedule_details`
-      )
-
       await client.query(`
         INSERT INTO loan_repayment_schedule_details (
           schedule_id, loan_account_no, installment_no, due_date,
@@ -170,13 +170,21 @@ export async function POST(request: NextRequest) {
           balance_principal, payment_status, created_at
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING', NOW())
       `, [
-        schedSeq[0].next_id, loanAccountNo, i, dueDate.toISOString().split('T')[0],
+        nextScheduleId,
+        loanAccountNo, i, dueDate.toISOString().split('T')[0],
         Math.round(principalAmt * 100) / 100,
         Math.round(interestAmt * 100) / 100,
         Math.round(emi * 100) / 100,
         Math.round(balance * 100) / 100
       ])
     }
+
+    //update loan application outstanding balance
+    await client.query(`
+      UPDATE loan_applications 
+      SET loan_outstanding = loan_outstanding + $1, updated_at = NOW() 
+      WHERE loan_application_id = $2
+    `, [disbursement_amount, loan_application_id])
 
     // Update application status to ACTIVE
     await client.query(

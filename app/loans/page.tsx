@@ -191,7 +191,8 @@ export default function LoansPage() {
       console.log("Fetching loans with params:", params.toString())
       const res = await fetch(`/api/loans/applications?${params}`)
       const data = await res.json()
-      
+      console.log("Fetched loans data:", data)
+
       if (data.error) throw new Error(data.error)
       setLoans(data.applications || [])
     } catch (error: any) {
@@ -712,9 +713,10 @@ export default function LoansPage() {
                         <TableHead>Reference No</TableHead>
                         <TableHead>Member</TableHead>
                         <TableHead>Loan Type</TableHead>
-                        <TableHead>Applied Amount</TableHead>
-                        <TableHead>Sanctioned</TableHead>
-                        <TableHead>EMI</TableHead>
+                        <TableHead>Loan Amount</TableHead>
+                        <TableHead>Disbursed Date</TableHead>
+                        <TableHead>Tenure</TableHead>
+                        <TableHead>Collectable</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
@@ -730,13 +732,24 @@ export default function LoansPage() {
                             </div>
                           </TableCell>
                           <TableCell>{loan.scheme_name || loan.loan_type}</TableCell>
-                          <TableCell className="font-semibold">{formatCurrency(loan.applied_loan_amount)}</TableCell>
                           <TableCell className="font-semibold">
-                            {loan.sanctioned_amount ? formatCurrency(loan.sanctioned_amount) : '---'}
+                            
+                            <div>
+                              <div className="font-medium">{formatCurrency(loan.loan_outstanding) || 'N/A'}</div>
+                              <div className="text-xs text-muted-foreground">{formatCurrency(loan.applied_loan_amount)}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-semibold">
+                                {loan.sanction_date
+                                  ? new Date(loan.sanction_date)
+                                      .toLocaleDateString('en-GB')
+                                      .replace(/\//g, '-')
+                                  : '---'}
                           </TableCell>
                           <TableCell>
-                            {loan.emi_amount ? formatCurrency(loan.emi_amount) : '---'}
+                            {loan.maximum_period_months +' m'}
                           </TableCell>
+                          <TableCell>0.00</TableCell>
                           <TableCell>
                             <Badge className={getStatusBadge(loan.application_status)}>
                               {loan.application_status}

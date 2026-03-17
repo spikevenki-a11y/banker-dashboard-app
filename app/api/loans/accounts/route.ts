@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
         ls.interest_rate,
         ls.loan_tenure_months,
         ls.payment_amount as emi_amount,
-        ls.sanction_date,
+        ls.sanction_date AS sanction_date,
         lscheme.scheme_name,
         lscheme.loan_type,
         m.customer_code,
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
         (SELECT COUNT(*) FROM loan_repayment_schedule_details WHERE loan_account_no = ltd.loan_account_no AND payment_status = 'OVERDUE') as overdue_installments
       FROM loan_applications la
       JOIN loan_sanction_details ls ON la.loan_application_id = ls.loan_application_id
-      JOIN loan_schemes lscheme ON la.loan_product_id = lscheme.scheme_id
+      JOIN loan_schemes lscheme ON la.scheme_id = lscheme.scheme_id
       JOIN memberships m ON la.membership_no = CAST(m.membership_no AS VARCHAR)
       JOIN customers c ON m.customer_code = c.customer_code
       LEFT JOIN LATERAL (
