@@ -87,6 +87,9 @@ export async function GET(request: NextRequest) {
 
     const { rows: countResult } = await pool.query(countQuery, countParams)
 
+    console.log(`Fetched ${applications.length} loan applications (Total: ${countResult[0]?.total || 0})`)
+    console.log("Sample application data:", applications)
+
     return NextResponse.json({
       applications,
       total: parseInt(countResult[0]?.total || "0"),

@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
     const { rows: loans } = await client.query(
       `SELECT la.*, ls.loan_gl_account, ls.interest_income_gl_account
        FROM loan_applications la
-       JOIN loan_schemes ls ON la.loan_product_id = ls.scheme_id
+       JOIN loan_schemes ls ON la.scheme_id = ls.scheme_id
        WHERE la.reference_no = SUBSTRING($1 FROM 1 FOR 2) || SUBSTRING($1 FROM 3 FOR 8)
          OR EXISTS (
            SELECT 1 FROM loan_transaction_details ltd 
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
       `SELECT DISTINCT ls.loan_gl_account, ls.interest_income_gl_account
        FROM loan_transaction_details ltd
        JOIN loan_applications la ON ltd.reference_no = la.reference_no
-       JOIN loan_schemes ls ON la.loan_product_id = ls.scheme_id
+       JOIN loan_schemes ls ON la.scheme_id = ls.scheme_id
        WHERE ltd.loan_account_no = $1 AND ltd.branch_id = $2
        LIMIT 1`,
       [loan_account_no, branchId]
@@ -291,6 +291,14 @@ export async function POST(request: NextRequest) {
       businessDate, branchId, voucherNo, loan_account_no,
       payment_amount, newBalance, narration || `Repayment - EMI ${paidInstallments.join(',')}`
     ])
+
+    // update loan application outstanding balance
+    
+      await client.query(`
+      UPDATE loan_applications 
+      SET loan_outstanding = loan_outstanding - $1, updated_at = NOW() 
+      WHERE loan_application_id = $2
+    `, [payment_amount, loan_account_no])
 
     // Check if loan is fully paid
     const { rows: pendingCheck } = await client.query(
