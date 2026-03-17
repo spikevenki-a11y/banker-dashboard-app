@@ -146,6 +146,7 @@ export default function LoanSanctionPage() {
   const [formError, setFormError] = useState("")
   const [successOpen, setSuccessOpen] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
+  const [sanctionedLoanAppId, setSanctionedLoanAppId] = useState<number | null>(null)
 
   // Format currency
   const formatCurrency = (amount: number) => {
@@ -468,6 +469,10 @@ export default function LoanSanctionPage() {
         throw new Error(data.error || "Failed to approve loan")
       }
 
+      // Store the loan application ID for navigation to disbursement
+      const loanAppId = selectedApp.loan_application_id
+      setSanctionedLoanAppId(loanAppId)
+      
       setSuccessMessage(
         `Loan sanctioned successfully!\n\n` +
         `Sanction ID: ${data.sanction_id}\n` +
@@ -479,7 +484,7 @@ export default function LoanSanctionPage() {
       setShowConfirmDialog(false)
       
       // Remove from list and reset
-      setApplications(prev => prev.filter(a => a.loan_application_id !== selectedApp.loan_application_id))
+      setApplications(prev => prev.filter(a => a.loan_application_id !== loanAppId))
       setSelectedApp(null)
     } catch (error: any) {
       setFormError(error.message)
@@ -563,6 +568,7 @@ export default function LoanSanctionPage() {
     setRepaymentType("MONTHLY")
     setNumberOfInstallments(0)
     setInstallmentStartDate("")
+    setSanctionedLoanAppId(null)
   }
 
   return (
@@ -1147,14 +1153,36 @@ export default function LoanSanctionPage() {
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2 text-teal-600">
                 <CheckCircle2 className="h-5 w-5" />
-                Success
+                {successMessage.includes("sanctioned") ? "Loan Sanctioned Successfully!" : "Success"}
               </AlertDialogTitle>
               <AlertDialogDescription className="whitespace-pre-line">
                 {successMessage}
+                {successMessage.includes("sanctioned") && (
+                  <span className="block mt-3 text-muted-foreground">
+                    You can now proceed to disburse this loan or return to process more applications.
+                  </span>
+                )}
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogAction onClick={() => setSuccessOpen(false)}>OK</AlertDialogAction>
+            <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
+              <AlertDialogAction 
+                onClick={() => setSuccessOpen(false)}
+                className={successMessage.includes("sanctioned") ? "bg-muted text-foreground hover:bg-muted/80" : ""}
+              >
+                {successMessage.includes("sanctioned") ? "Stay Here" : "OK"}
+              </AlertDialogAction>
+              {successMessage.includes("sanctioned") && sanctionedLoanAppId && (
+                <AlertDialogAction
+                  onClick={() => {
+                    setSuccessOpen(false)
+                    router.push(`/loans/disbursement?loanId=${sanctionedLoanAppId}`)
+                  }}
+                  className="bg-teal-600 hover:bg-teal-700 text-white"
+                >
+                  Proceed to Disbursement
+                  <ChevronRight className="ml-1 h-4 w-4" />
+                </AlertDialogAction>
+              )}
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

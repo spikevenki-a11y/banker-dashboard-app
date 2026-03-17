@@ -771,12 +771,32 @@ export default function LoanDisbursementPage() {
                 <CheckCircle2 className="h-5 w-5" />
                 Disbursement Successful
               </AlertDialogTitle>
-              <AlertDialogDescription className="whitespace-pre-line">
-                {successMessage}
+              <AlertDialogDescription asChild>
+                <div>
+                  <span className="whitespace-pre-line block">{successMessage}</span>
+                  <span className="block mt-3 text-muted-foreground">
+                    The loan has been successfully disbursed. The member can now begin repayments as per the EMI schedule.
+                  </span>
+                </div>
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogAction onClick={() => setSuccessOpen(false)}>OK</AlertDialogAction>
+            <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
+              <AlertDialogAction 
+                onClick={() => setSuccessOpen(false)}
+                className="bg-muted text-foreground hover:bg-muted/80"
+              >
+                Disburse More
+              </AlertDialogAction>
+              <AlertDialogAction
+                onClick={() => {
+                  setSuccessOpen(false)
+                  router.push("/loans")
+                }}
+                className="bg-teal-600 hover:bg-teal-700 text-white"
+              >
+                Go to Loans Dashboard
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
