@@ -277,9 +277,12 @@ export default function ShareDepositPage() {
       if (!res.ok) throw new Error(data.error)
       if (data.found && data.memberData) {
         setMembers(data.memberData ?? [])
+      }else {
+        setMembers([])
       }
     } catch (err: any) {
       console.error("Member search error:", err)
+      setMembers([])
     }
   }
 
