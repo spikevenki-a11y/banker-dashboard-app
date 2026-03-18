@@ -167,6 +167,7 @@ function DepositTransactionsContent() {
       console.log(data)
       if (res.ok) {
         setAccount(data.account)
+        console.log("account data", data.account)
         setTransactions(data.transactions || [])
         setTotalTxns(data.total || 0)
         setRdInstallments(data.rdInstallments || [])
