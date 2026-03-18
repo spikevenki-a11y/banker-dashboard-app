@@ -1,11 +1,12 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -23,6 +24,8 @@ import {
   Search,
   Camera,
   PenTool,
+  CheckCircle2,
+  UserPlus,
 } from "lucide-react"
 import { DashboardWrapper } from "../_components/dashboard-wrapper"
 
@@ -114,7 +117,17 @@ const initialCustomer: Customer = {
     customer_type: undefined
 }
 
+interface CreatedCustomer {
+  customer_code: string
+  full_name: string
+  father_name: string
+  phone: string
+  aadhar_id: string
+  email: string
+}
+
 export default function CustomerPage() {
+  const router = useRouter()
   const [newCustomer, setNewCustomer] = useState<Customer>(initialCustomer)
   const [photo, setPhoto] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string>("")
@@ -123,6 +136,8 @@ export default function CustomerPage() {
   const [sameAsPermanent, setSameAsPermanent] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [activeTab, setActiveTab] = useState<"personal" | "address" | "kycdetails">("personal")
+  const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false)
+  const [createdCustomer, setCreatedCustomer] = useState<CreatedCustomer | null>(null)
 
 
   const formatAadhar = (value: string) => {
@@ -170,14 +185,32 @@ export default function CustomerPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
 
-      alert("Customer created : " + data.customer_code)
-      resetAddressFields(); // 👈 clear everything here
-      setNewCustomer(initialCustomer)
+      // Store created customer info for success dialog
+      setCreatedCustomer({
+        customer_code: data.customer_code,
+        full_name: newCustomer.full_name,
+        father_name: newCustomer.father_name,
+        phone: newCustomer.phone,
+        aadhar_id: newCustomer.aadhar_id,
+        email: newCustomer.email,
+      })
+      setIsSuccessDialogOpen(true)
+      resetAddressFields()
     } catch (e: any) {
       console.log(e.message)
+      alert("Failed to create customer: " + e.message)
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const handleNavigateToEnroll = () => {
+    if (createdCustomer) {
+      // Navigate to enroll member page with Aadhaar pre-filled
+      router.push(`/members/enroll?aadhaar=${createdCustomer.aadhar_id}`)
+    }
+    setIsSuccessDialogOpen(false)
+    setCreatedCustomer(null)
   }
 
   return (
@@ -825,6 +858,83 @@ export default function CustomerPage() {
                         {isSubmitting ? "Creating..." : "Create Customer"}
                     </Button>
                 </div>
+
+      {/* Success Dialog */}
+      <Dialog open={isSuccessDialogOpen} onOpenChange={setIsSuccessDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
+                <CheckCircle2 className="h-6 w-6 text-green-600" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg">Customer Created Successfully</DialogTitle>
+                <DialogDescription>
+                  The customer has been registered in the system.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          {createdCustomer && (
+            <div className="mt-4 rounded-lg border bg-muted/50 p-4">
+              <h4 className="mb-3 font-medium text-foreground">Customer Information</h4>
+              <div className="grid gap-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Customer Code:</span>
+                  <span className="font-medium">{createdCustomer.customer_code}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Full Name:</span>
+                  <span className="font-medium">{createdCustomer.full_name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Father Name:</span>
+                  <span className="font-medium">{createdCustomer.father_name}</span>
+                </div>
+                {createdCustomer.phone && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Phone:</span>
+                    <span className="font-medium">{createdCustomer.phone}</span>
+                  </div>
+                )}
+                {createdCustomer.aadhar_id && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Aadhaar:</span>
+                    <span className="font-medium">{createdCustomer.aadhar_id}</span>
+                  </div>
+                )}
+                {createdCustomer.email && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Email:</span>
+                    <span className="font-medium">{createdCustomer.email}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="mt-4 flex gap-2 sm:justify-between">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsSuccessDialogOpen(false)
+                setCreatedCustomer(null)
+              }}
+            >
+              Close
+            </Button>
+            <Button
+              onClick={handleNavigateToEnroll}
+              className="gap-2"
+              disabled={!createdCustomer?.aadhar_id}
+            >
+              <UserPlus className="h-4 w-4" />
+              Navigate to Enroll Member
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
     </DashboardWrapper>
   )

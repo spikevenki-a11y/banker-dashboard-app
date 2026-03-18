@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useAuth } from "@/lib/auth-context"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -59,7 +59,9 @@ type NewMemberForm = {
 export default function EnrollMemberPage() {
   const { user } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [isSearching, setIsSearching] = useState(false)
+  const [hasAutoSearched, setHasAutoSearched] = useState(false)
   const [fieldsReadOnly, setFieldsReadOnly] = useState(true)
   const [memberFieldsReadOnly, setMemberFieldsReadOnly] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -106,10 +108,10 @@ export default function EnrollMemberPage() {
     return () => URL.revokeObjectURL(url)
   }, [signature])
 
-  const handleAadhaarSearch = async () => {
-    if (!newMember.aadhaar_no || newMember.aadhaar_no.length < 12) {
-      alert("Please enter a valid 12-digit Aadhaar number")
-      return
+  // Function to search by Aadhaar
+  const searchByAadhaar = useCallback(async (aadhaarNo: string) => {
+    if (!aadhaarNo || aadhaarNo.length < 12) {
+      return false
     }
 
     setIsSearching(true)
@@ -117,7 +119,7 @@ export default function EnrollMemberPage() {
       const response = await fetch("/api/customers/lookup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ aadhaar_no: newMember.aadhaar_no }),
+        body: JSON.stringify({ aadhaar_no: aadhaarNo }),
       })
 
       const data = await response.json()
@@ -125,8 +127,9 @@ export default function EnrollMemberPage() {
 
       if (data.found && data.customer) {
         const customer = data.customer
-        setNewMember({
-          ...newMember,
+        setNewMember(prev => ({
+          ...prev,
+          aadhaar_no: aadhaarNo,
           customer_code: customer.customer_code,
           customer_type: customer.customer_type || "",
           full_name: customer.full_name || "",
@@ -147,18 +150,39 @@ export default function EnrollMemberPage() {
           ration_no: customer.ration_no || "",
           driving_license_no: customer.driving_license_no || "",
           address: `${customer.house_no || ""}, ${customer.street || ""} ,${customer.village || ""} ,${customer.thaluk || ""} ,${customer.district || ""} ,${customer.state || ""} - ${customer.pincode || ""}`,
-        })
+        }))
         setFieldsReadOnly(true)
         setMemberFieldsReadOnly(false)
+        return true
       } else {
         setIsCustomerNotFoundOpen(true)
+        return false
       }
     } catch (error) {
       console.error("Aadhaar lookup error:", error)
       alert("Failed to lookup customer. Please try again.")
+      return false
     } finally {
       setIsSearching(false)
     }
+  }, [])
+
+  // Auto-search when aadhaar param is present in URL (from Create Customer flow)
+  useEffect(() => {
+    const aadhaarFromUrl = searchParams.get("aadhaar")
+    if (aadhaarFromUrl && !hasAutoSearched) {
+      setHasAutoSearched(true)
+      setNewMember(prev => ({ ...prev, aadhaar_no: aadhaarFromUrl }))
+      searchByAadhaar(aadhaarFromUrl)
+    }
+  }, [searchParams, hasAutoSearched, searchByAadhaar])
+
+  const handleAadhaarSearch = async () => {
+    if (!newMember.aadhaar_no || newMember.aadhaar_no.length < 12) {
+      alert("Please enter a valid 12-digit Aadhaar number")
+      return
+    }
+    await searchByAadhaar(newMember.aadhaar_no)
   }
 
   const handleEnrollMember = async () => {
