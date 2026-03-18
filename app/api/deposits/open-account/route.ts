@@ -119,9 +119,9 @@ export async function POST(req: Request) {
         createdby, createddate
       ) VALUES (
         $1, $2, $3, $4, $5,
-        $6, $6, $7, 0,
-        $8, $9, 1,
-        $10, CURRENT_DATE
+        $6, $6, 0, 0,
+        $7, $8, 1,
+        $9, CURRENT_DATE
       ) RETURNING accountnumber`,
       [
         branchId,
@@ -130,7 +130,6 @@ export async function POST(req: Request) {
         accountNumber,
         membership_no,
         account_open_date,
-        amt,
         interest,
         tds_applicable === true ? "Y" : (scheme.tds_applicable ? "Y" : "N"),
         userId,
