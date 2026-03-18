@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ArrowLeft, Search, Loader2, CheckCircle2, User, Banknote, Calendar, Calculator, Shield, FileText, Users, X, IndianRupee, TrendingUp, Clock } from "lucide-react"
+import { ArrowLeft, Search, Loader2, CheckCircle2, User, Banknote, Calendar, Calculator, Shield, FileText, Users, X, IndianRupee, TrendingUp, Clock, ChevronRight } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 
 type MemberInfo = {
@@ -885,26 +885,38 @@ export default function LoanApplicationPage() {
               <CheckCircle2 className="h-6 w-6" />
               Application Submitted Successfully!
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <p>Loan application has been created successfully.</p>
-              <div className="mt-4 rounded-lg bg-green-50 p-4 text-center">
-                <p className="text-sm text-muted-foreground">Application Number</p>
-                <p className="text-2xl font-bold text-green-700">{createdApplicationNo}</p>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>Loan application has been created successfully.</p>
+                <div className="mt-4 rounded-lg bg-green-50 p-4 text-center">
+                  <p className="text-sm text-muted-foreground">Application Number</p>
+                  <p className="text-2xl font-bold text-green-700">{createdApplicationNo}</p>
+                </div>
+                <p className="mt-4 text-sm">
+                  The application is now pending for sanction approval. You can proceed to sanction or return to the Loans dashboard.
+                </p>
               </div>
-              <p className="mt-4 text-sm">
-                The application is now pending for sanction approval. You can track the status from the Loans dashboard.
-              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
             <AlertDialogAction
               onClick={() => {
                 setSuccessOpen(false)
                 router.push("/loans")
               }}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="bg-muted text-foreground hover:bg-muted/80"
             >
               Go to Loans
+            </AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => {
+                setSuccessOpen(false)
+                router.push(`/loans/sanction?appId=${createdApplicationNo}`)
+              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Proceed to Sanction
+              <ChevronRight className="ml-1 h-4 w-4" />
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
