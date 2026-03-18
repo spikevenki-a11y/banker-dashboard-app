@@ -172,7 +172,7 @@ export default function CustomerPage() {
 
       alert("Customer created : " + data.customer_code)
       resetAddressFields(); // 👈 clear everything here
-    //   setNewCustomer(emptyCustomer)
+      setNewCustomer(initialCustomer)
     } catch (e: any) {
       console.log(e.message)
     } finally {
