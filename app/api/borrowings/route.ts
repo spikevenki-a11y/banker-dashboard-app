@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
-import { query } from "@/lib/connection/db"
+import pool from "@/lib/connection/db"
 import { getSession } from "@/lib/auth/session"
+import { cookies } from "next/headers"
 
 // GET - Fetch borrowing accounts and transactions
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSession()
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const c = (await cookies()).get("banker_session")
+    if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const session = JSON.parse(c.value)
+    
 
     const { searchParams } = new URL(request.url)
     const accountNumber = searchParams.get("accountNumber")
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
 
     if (type === "transactions" && accountNumber) {
       // Fetch transactions for a specific account
-      const transactions = await query(
+      const transactions = await pool.query(
         `SELECT * FROM borrowing_transactions 
          WHERE account_number = $1 
          ORDER BY transaction_date DESC, created_date DESC`,
@@ -66,7 +67,7 @@ export async function GET(request: NextRequest) {
 
     sql += ` ORDER BY bm.created_date DESC`
 
-    const result = await query(sql, params)
+    const result = await pool.query(sql, params)
 
     return NextResponse.json({ 
       success: true, 
@@ -81,10 +82,10 @@ export async function GET(request: NextRequest) {
 // POST - Create borrowing account or transaction
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession()
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    
+    const c = (await cookies()).get("banker_session")
+    const session = JSON.parse(c.value)
+    if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const body = await request.json()
     const { action } = body
@@ -118,14 +119,14 @@ export async function POST(request: NextRequest) {
 
       // Generate account number
       const prefix = type_of_borrowing === "cash_credit" ? "CC" : "BL"
-      const countResult = await query(
+      const countResult = await pool.query(
         `SELECT COUNT(*) as count FROM borrowing_master WHERE type_of_borrowing = $1`,
         [type_of_borrowing]
       )
       const count = parseInt(countResult.rows[0].count) + 1
       const accountNumber = `${prefix}${count.toString().padStart(6, "0")}`
 
-      const result = await query(
+      const result = await pool.query(
         `INSERT INTO borrowing_master (
           account_number, borrowing_agency, branch_id, type_of_borrowing,
           description, amount_sanctioned, ledger_balance, date_of_sanction, purpose,
@@ -180,7 +181,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Get account details
-      const accountResult = await query(
+      const accountResult = await pool.query(
         `SELECT * FROM borrowing_master WHERE account_number = $1`,
         [account_number]
       )
@@ -200,7 +201,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Insert transaction
-      const txnResult = await query(
+      const txnResult = await pool.query(
         `INSERT INTO borrowing_transactions (
           branch_id, transaction_date, voucher_no, transaction_type,
           account_number, drawal_amount, ledger_balance_amount, status, created_by
@@ -220,7 +221,7 @@ export async function POST(request: NextRequest) {
       )
 
       // Update account balance
-      await query(
+      await pool.query(
         `UPDATE borrowing_master SET ledger_balance = $1 WHERE account_number = $2`,
         [newBalance, account_number]
       )
@@ -254,7 +255,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Get account details
-      const accountResult = await query(
+      const accountResult = await pool.query(
         `SELECT * FROM borrowing_master WHERE account_number = $1`,
         [account_number]
       )
@@ -275,7 +276,7 @@ export async function POST(request: NextRequest) {
       const newBalance = parseFloat(account.ledger_balance || 0) - principalPaid
 
       // Insert transaction
-      const txnResult = await query(
+      const txnResult = await pool.query(
         `INSERT INTO borrowing_transactions (
           branch_id, transaction_date, voucher_no, transaction_type,
           account_number, repayment_amount, charge_amount, iod_amount,
@@ -303,7 +304,7 @@ export async function POST(request: NextRequest) {
 
       // Update account balance and interest paid date
       const newStatus = newBalance <= 0 ? "CLOSED" : "ACTIVE"
-      await query(
+      await pool.query(
         `UPDATE borrowing_master 
          SET ledger_balance = $1, status = $2 
          WHERE account_number = $3`,
