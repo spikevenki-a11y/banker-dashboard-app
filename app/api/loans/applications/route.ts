@@ -119,6 +119,7 @@ export async function POST(request: NextRequest) {
       loan_amount,
       loan_purpose,
       application_date,
+      tenure_months
     } = body
 
     if (!membership_no || !scheme_id || !loan_amount) {
@@ -187,12 +188,12 @@ export async function POST(request: NextRequest) {
       `INSERT INTO loan_applications (
         loan_application_id, branch_id, application_date, membership_no,
         scheme_id, loan_purpose, applied_loan_amount, reference_no,
-        application_status, created_by, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING', $9, NOW())
+        application_status, created_by, created_at,loan_tenure_months
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING', $9, NOW(), $10)
       RETURNING *`,
       [
         loanApplicationId, branchId, application_date || new Date().toISOString().split('T')[0],
-        membership_no, scheme_id, loan_purpose || '', loan_amount,referenceNo,session.userId
+        membership_no, scheme_id, loan_purpose || '', loan_amount,referenceNo,session.userId, tenure_months
         
       ]
     )

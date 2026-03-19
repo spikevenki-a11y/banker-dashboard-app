@@ -9,6 +9,8 @@ export async function GET(request: NextRequest) {
     const c = (await cookies()).get("banker_session")
     if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     const session = JSON.parse(c.value)
+    const branchId = session.branch
+    const userId = session.userId
     
 
     const { searchParams } = new URL(request.url)
@@ -47,10 +49,10 @@ export async function GET(request: NextRequest) {
     const params: any[] = []
     let paramCount = 0
 
-    if (session.user.role !== "admin" && session.user.branch_id) {
+    if (session.role !== "admin" && branchId) {
       paramCount++
       sql += ` AND bm.branch_id = $${paramCount}`
-      params.push(session.user.branch_id)
+      params.push(branchId)
     }
 
     if (status && status !== "all") {
@@ -85,6 +87,8 @@ export async function POST(request: NextRequest) {
     
     const c = (await cookies()).get("banker_session")
     const session = JSON.parse(c.value)
+    const branchId = session.branch
+    const userId = session.userId
     if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const body = await request.json()
@@ -139,7 +143,7 @@ export async function POST(request: NextRequest) {
         [
           accountNumber,
           borrowing_agency || null,
-          session.user.branch_id,
+          branchId,
           type_of_borrowing,
           description || null,
           amount_sanctioned,
@@ -158,7 +162,7 @@ export async function POST(request: NextRequest) {
           repayment_start_date || null,
           reference_number || null,
           "ACTIVE",
-          session.user.username
+          userId
         ]
       )
 
@@ -208,7 +212,7 @@ export async function POST(request: NextRequest) {
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *`,
         [
-          session.user.branch_id,
+          branchId,
           transaction_date,
           voucher_no || null,
           "drawal",
@@ -216,7 +220,7 @@ export async function POST(request: NextRequest) {
           drawal_amount,
           newBalance,
           "COMPLETED",
-          session.user.username
+          userId
         ]
       )
 
@@ -285,7 +289,7 @@ export async function POST(request: NextRequest) {
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         RETURNING *`,
         [
-          session.user.branch_id,
+          branchId,
           transaction_date,
           voucher_no || null,
           "repayment",
@@ -298,7 +302,7 @@ export async function POST(request: NextRequest) {
           newBalance,
           transaction_date,
           "COMPLETED",
-          session.user.username
+          userId
         ]
       )
 

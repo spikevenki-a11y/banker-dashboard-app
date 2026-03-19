@@ -107,6 +107,14 @@ export default function LoanApplicationPage() {
   const [successOpen, setSuccessOpen] = useState(false)
   const [createdApplicationNo, setCreatedApplicationNo] = useState("")
 
+  // Loan purposes
+  const [purposes, setPurposes] = useState([]);
+  const [selectedPurposeId, setSelectedPurposeId] = useState(""); 
+
+  // Loan securities
+  const [securities, setSecurities] = useState([]);
+  const [selectedSecurityId, setSelectedSecurityId] = useState(""); 
+
   // Fetch schemes on mount
   useEffect(() => {
     async function fetchSchemes() {
@@ -222,6 +230,7 @@ export default function LoanApplicationPage() {
       setIsSearching(false)
     }
   }
+  
 
   const handleMemberBlur = () => {
     if (membershipNo.trim() && !memberInfo && !isSearching) {
@@ -287,7 +296,7 @@ export default function LoanApplicationPage() {
           loan_amount: Number(loanAmount),
           tenure_months: Number(tenureMonths),
           interest_rate: Number(interestRate),
-          loan_purpose: loanPurpose,
+          loan_purpose: selectedPurposeId,
           collateral_details: collateralDetails,
           guarantor_name: guarantorName,
           guarantor_membership_no: guarantorMembership,
@@ -332,6 +341,26 @@ export default function LoanApplicationPage() {
       currency: "INR",
       maximumFractionDigits: 0,
     }).format(amount)
+  }
+
+  const loadpurpose = async (schemeId: string) => {
+    try {      const res = await fetch(`/api/loans/aplication_settings/purpose?schemeId=${schemeId}`, {})
+      const data = await res.json()
+      console.log("Purposes for scheme", schemeId, data)
+      setPurposes(data.schemes || []); // store purposes
+    } catch (error) {
+      console.error("Failed to load loan purposes:", error)
+    }
+  }
+
+  const loadSecurity = async (schemeId: string) => {
+    try {      const res = await fetch(`/api/loans/aplication_settings/security?schemeId=${schemeId}`, {})
+      const data = await res.json()
+      console.log("Securities for scheme", schemeId, data)
+      setSecurities(data.security || []); // store securities
+    } catch (error) {
+      console.error("Failed to load loan securities:", error)
+    }
   }
 
   return (
@@ -465,7 +494,17 @@ export default function LoanApplicationPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="scheme">Loan Scheme *</Label>
-                        <Select value={selectedSchemeId} onValueChange={setSelectedSchemeId} disabled={loadingSchemes}>
+                        <Select 
+                          value={selectedSchemeId} 
+                          
+                          onValueChange={(value) => {
+                            setSelectedSchemeId(value);
+                            loadpurpose(value);
+                            loadSecurity(value);
+                          }}
+
+                          disabled={loadingSchemes}
+                          >
                           <SelectTrigger id="scheme">
                             <SelectValue placeholder={loadingSchemes ? "Loading schemes..." : "Select a loan scheme"} />
                           </SelectTrigger>
@@ -545,23 +584,25 @@ export default function LoanApplicationPage() {
                         />
                       </div>
                     </div>
-
                     <div className="space-y-2">
                       <Label htmlFor="loan-purpose">Loan Purpose</Label>
-                      <Select value={loanPurpose} onValueChange={setLoanPurpose}>
-                        <SelectTrigger id="loan-purpose">
-                          <SelectValue placeholder="Select purpose" />
+                      <Select
+                        value={selectedPurposeId}
+                        onValueChange={setSelectedPurposeId}
+                        disabled={!purposes.length}
+                      >
+                        <SelectTrigger id="purpose">
+                          <SelectValue placeholder="Select a purpose" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Personal">Personal</SelectItem>
-                          <SelectItem value="Business">Business</SelectItem>
-                          <SelectItem value="Education">Education</SelectItem>
-                          <SelectItem value="Agriculture">Agriculture</SelectItem>
-                          <SelectItem value="Housing">Housing</SelectItem>
-                          <SelectItem value="Vehicle">Vehicle</SelectItem>
-                          <SelectItem value="Medical">Medical</SelectItem>
-                          <SelectItem value="Marriage">Marriage</SelectItem>
-                          <SelectItem value="Other">Other</SelectItem>
+                          {purposes.map((purpose) => (
+                            <SelectItem
+                              key={purpose.purpose_id}
+                              value={String(purpose.purpose_id)}
+                            >
+                              {purpose.purpose_name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -583,45 +624,74 @@ export default function LoanApplicationPage() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="collateral">Collateral Details</Label>
-                      <Textarea
-                        id="collateral"
-                        placeholder="Enter collateral/security details (if any)"
-                        value={collateralDetails}
-                        onChange={(e) => setCollateralDetails(e.target.value)}
-                        rows={2}
-                      />
+                      <Label htmlFor="loan-purpose">Security Type</Label>
+                      <Select
+                        value={selectedSecurityId}
+                        onValueChange ={(value) => 
+                          setSelectedSecurityId(value)
+
+                        }
+                        disabled={!securities.length}
+                      >
+                        <SelectTrigger id="purpose">
+                          <SelectValue placeholder="Select a purpose" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {securities.map((sec) => (
+                            <SelectItem
+                              key={sec.security_id}
+                              value={String(sec.security_id)}
+                            >
+                              {sec.security_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    {(Number(selectedSecurityId) === 6) && (
+                    <div className="space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="guarantor-name">Guarantor Name</Label>
-                        <Input
-                          id="guarantor-name"
-                          placeholder="Enter guarantor name"
-                          value={guarantorName}
-                          onChange={(e) => setGuarantorName(e.target.value)}
+                        <Label htmlFor="collateral">Collateral Details</Label>
+                        <Textarea
+                          id="collateral"
+                          placeholder="Enter collateral/security details (if any)"
+                          value={collateralDetails}
+                          onChange={(e) => setCollateralDetails(e.target.value)}
+                          rows={2}
                         />
                       </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="guarantor-name">Guarantor Name</Label>
+                          <Input
+                            id="guarantor-name"
+                            placeholder="Enter guarantor name"
+                            value={guarantorName}
+                            onChange={(e) => setGuarantorName(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="guarantor-membership">Guarantor Membership No</Label>
+                          <Input
+                            id="guarantor-membership"
+                            placeholder="Enter membership no"
+                            value={guarantorMembership}
+                            onChange={(e) => setGuarantorMembership(e.target.value)}
+                          />
+                        </div>
+                      </div>
                       <div className="space-y-2">
-                        <Label htmlFor="guarantor-membership">Guarantor Membership No</Label>
-                        <Input
-                          id="guarantor-membership"
-                          placeholder="Enter membership no"
-                          value={guarantorMembership}
-                          onChange={(e) => setGuarantorMembership(e.target.value)}
+                        <Label htmlFor="remarks">Remarks</Label>
+                        <Textarea
+                          id="remarks"
+                          placeholder="Any additional remarks"
+                          value={remarks}
+                          onChange={(e) => setRemarks(e.target.value)}
+                          rows={2}
                         />
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="remarks">Remarks</Label>
-                      <Textarea
-                        id="remarks"
-                        placeholder="Any additional remarks"
-                        value={remarks}
-                        onChange={(e) => setRemarks(e.target.value)}
-                        rows={2}
-                      />
-                    </div>
+                    )}
                   </CardContent>
                 </Card>
 
