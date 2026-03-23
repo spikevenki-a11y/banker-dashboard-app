@@ -63,6 +63,7 @@ export default function AccountsList({
       setLoading(true);
       const response = await fetch("/api/sundry-creditors/accounts");
       const result = await response.json();
+      console.log("Accounts API response:", result);
 
       if (result.data) {
         setAccounts(result.data);
@@ -149,7 +150,7 @@ export default function AccountsList({
                       {account.parent_account_number}
                     </TableCell>
                     <TableCell className="text-right font-semibold">
-                      ₹{account.current_balance.toFixed(2)}
+                      ₹{account.current_balance}
                     </TableCell>
                     <TableCell>
                       <Badge className={getStatusBadgeClass(account.account_status)}>

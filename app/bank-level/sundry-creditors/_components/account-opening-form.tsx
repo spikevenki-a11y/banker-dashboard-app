@@ -51,9 +51,11 @@ export default function AccountOpeningForm({
       setLoadingLedgers(true);
       const response = await fetch("/api/sundry-creditors/ledger-accounts");
       const result = await response.json();
+      console.log("Ledger accounts API response:", result);
 
-      if (result.data) {
-        setLedgerAccounts(result.data);
+      if (result.success) {
+        setLedgerAccounts(result.accounts);
+        console.log("Fetched ledger accounts:", result.accounts);
       }
     } catch (err) {
       console.error("Failed to fetch ledger accounts:", err);
@@ -86,7 +88,6 @@ export default function AccountOpeningForm({
         body: JSON.stringify({
           ...formData,
           opening_balance: parseFloat(formData.opening_balance) || 0,
-          branch_id: 1, // Default branch - can be made dynamic
         }),
       });
 

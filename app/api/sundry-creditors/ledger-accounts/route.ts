@@ -1,25 +1,34 @@
-import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import pool from "@/lib/connection/db"
+import { cookies } from "next/headers"
 
-export async function GET() {
-  const supabase = await createClient();
+export async function GET(){
 
   try {
-    const { data, error } = await supabase
-      .from("chart_of_accounts")
-      .select("*")
-      .eq("head_code", 14000000)
-      .order("accountcode", { ascending: true });
+    const c = (await cookies()).get("banker_session")
+    if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const session = JSON.parse(c.value)
+    const branchId = session.branch
+    const userId = session.userId
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
+    
 
-    return NextResponse.json({ data });
-  } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to fetch ledger accounts" },
-      { status: 500 }
-    );
+    // Fetch transactions for a specific account
+    const ledger_accounts = await pool.query(
+      `SELECT accountcode,accountname FROM chart_of_accounts 
+        WHERE parentaccountcode = 14000000
+        and branch_id = $1
+        ORDER BY accountcode DESC`,
+        [branchId]
+    )
+
+    return NextResponse.json({ 
+      success: true, 
+      accounts: ledger_accounts.rows 
+    })
+  } catch (error: any) {
+    console.error("Sundry Creditors GET Ledger Accounts error:", error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
 }

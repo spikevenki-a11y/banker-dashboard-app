@@ -41,6 +41,7 @@ export default function ViewAccount({
       setError(null);
       const response = await fetch(`/api/sundry-creditors/accounts/${accountId}`);
       const result = await response.json();
+      console.log("Account details API response:", result);
 
       if (!response.ok) {
         setError(result.error || "Failed to fetch account details");
