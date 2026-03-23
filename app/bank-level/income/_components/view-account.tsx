@@ -41,12 +41,8 @@ export default function ViewAccount({ accountNumber, onBack }: ViewAccountProps)
         setError(null)
 
         const response = await fetch(`/api/income/accounts/${accountNumber}`)
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch account details")
-        }
-
         const data = await response.json()
+          console.log("Fetched account details:", data)
         setAccount(data)
       } catch (err) {
         console.error("Error fetching account:", err)
@@ -107,7 +103,7 @@ export default function ViewAccount({ accountNumber, onBack }: ViewAccountProps)
   const balance = account.current_balance || 0
   const changeFromOpening = balance - (account.opening_balance || 0)
   const changePercent = account.opening_balance 
-    ? ((changeFromOpening / account.opening_balance) * 100).toFixed(2)
+    ? ((changeFromOpening / account.opening_balance) * 100)
     : "0.00"
 
   return (
@@ -141,7 +137,7 @@ export default function ViewAccount({ accountNumber, onBack }: ViewAccountProps)
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹{balance.toFixed(2)}</div>
+            <div className="text-2xl font-bold">₹{balance}</div>
           </CardContent>
         </Card>
 
@@ -152,7 +148,7 @@ export default function ViewAccount({ accountNumber, onBack }: ViewAccountProps)
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹{(account.opening_balance || 0).toFixed(2)}</div>
+            <div className="text-2xl font-bold">₹{(account.opening_balance || 0)}</div>
           </CardContent>
         </Card>
 
@@ -164,7 +160,7 @@ export default function ViewAccount({ accountNumber, onBack }: ViewAccountProps)
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${changeFromOpening >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              ₹{changeFromOpening.toFixed(2)}
+              ₹{changeFromOpening}
             </div>
           </CardContent>
         </Card>

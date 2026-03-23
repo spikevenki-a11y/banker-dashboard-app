@@ -1,28 +1,30 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { NextRequest, NextResponse } from "next/server";
+import pool from "@/lib/connection/db"
+import { cookies } from "next/headers"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const branch_id = request.nextUrl.searchParams.get('branch_id')
+    
+    const c = (await cookies()).get("banker_session")
+    if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const session = JSON.parse(c.value)
+    const branchId = session.branch
+    const userId = session.userId
 
-    if (!branch_id) {
-      return NextResponse.json(
-        { error: 'branch_id is required' },
-        { status: 400 }
-      )
-    }
+    
+    // Fetch transactions for a specific account
+    const list_of_accounts = await pool.query(
+      `SELECT * FROM income_accounts 
+        WHERE 
+         branch_id = $1
+        ORDER BY account_number DESC`,
+        [branchId]
+    )
 
-    const { data: accounts, error } = await supabase
-      .from('income_accounts')
-      .select('*')
-      .eq('branch_id', parseInt(branch_id))
-      .eq('account_status', 'ACTIVE')
-      .order('created_at', { ascending: false })
-
-    if (error) throw error
-
-    return NextResponse.json(accounts)
+    return NextResponse.json({ 
+      success: true, 
+      data: list_of_accounts.rows 
+    })
   } catch (error: any) {
     console.error('Error fetching income accounts:', error)
     return NextResponse.json(
@@ -34,7 +36,14 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
+      
+      const c = (await cookies()).get("banker_session")
+      if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      const session = JSON.parse(c.value)
+      const branchId = session.branch
+      const userId = session.userId
+      const businessDate = session.businessDate
+
     const body = await request.json()
 
     const {
@@ -42,52 +51,37 @@ export async function POST(request: NextRequest) {
       account_name,
       gl_account_code,
       opening_balance,
-      description,
-      branch_id,
+      description
     } = body
 
-    if (!account_number || !account_name || !gl_account_code || !branch_id) {
+    if (!account_number || !account_name || !gl_account_code) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
       )
     }
 
-    // Check if account number already exists
-    const { data: existingAccount } = await supabase
-      .from('income_accounts')
-      .select('id')
-      .eq('account_number', account_number)
-      .single()
-
-    if (existingAccount) {
-      return NextResponse.json(
-        { error: 'Account number already exists' },
-        { status: 400 }
-      )
-    }
-
-    const { data: newAccount, error } = await supabase
-      .from('income_accounts')
-      .insert([
-        {
+    const result = await pool.query(
+        `INSERT INTO public.income_accounts (
           account_number,
           account_name,
           gl_account_code,
-          opening_balance: opening_balance || 0,
-          current_balance: opening_balance || 0,
+          opening_date,
+          closing_date,
+          opening_balance,
+          current_balance,
+          account_status,
           description,
           branch_id,
-          account_status: 'ACTIVE',
-          created_by: (await supabase.auth.getUser()).data.user?.id,
-        },
-      ])
-      .select()
-      .single()
+          created_by
+        ) VALUES ($1,$2,$3,$4,NULL,0.00,0.00,'ACTIVE',$5,$6 , $7)
+        RETURNING *`,
+        [account_number, account_name, gl_account_code, businessDate, description, branchId, userId]    )
 
-    if (error) throw error
+         const data = result.rows
 
-    return NextResponse.json(newAccount, { status: 201 })
+
+    return NextResponse.json({ data: data[0] }, { status: 201 });
   } catch (error: any) {
     console.error('Error creating income account:', error)
     return NextResponse.json(

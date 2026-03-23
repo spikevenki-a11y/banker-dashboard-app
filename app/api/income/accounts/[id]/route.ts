@@ -1,41 +1,56 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import pool from "@/lib/connection/db"
+import { cookies } from "next/headers"
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabase = await createClient()
-    const accountNumber = params.id
+      
+      const c = (await cookies()).get("banker_session")
+      if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      const session = JSON.parse(c.value)
+      const branchId = session.branch
+      const userId = session.userId
 
-    // Get account details
-    const { data: account, error: accountError } = await supabase
-      .from('income_accounts')
-      .select('*')
-      .eq('account_number', accountNumber)
-      .single()
+    
+    const { id } = await params;
+    const accountNumber = id
+    console.log("Fetching details for account number:", accountNumber)
 
-    if (accountError || !account) {
-      return NextResponse.json(
-        { error: 'Account not found' },
-        { status: 404 }
-      )
+
+    // Fetch account details
+    const account_details = await pool.query(
+      `SELECT * FROM income_accounts 
+        WHERE 
+         branch_id = $1
+         and account_number = $2`,
+        [branchId, accountNumber]
+    )
+    const account_data = account_details.rows[0]
+    console.log("Fetched account data:", account_data)
+    if (!account_data) {
+      return NextResponse.json({ error: "Account not found" }, { status: 404 })
     }
 
-    // Get GL account details
-    const { data: glAccount, error: glError } = await supabase
-      .from('chart_of_accounts')
-      .select('*')
-      .eq('accountcode', account.gl_account_code)
-      .single()
-
-    if (glError) console.warn('GL account details not available:', glError)
+    
+    // Fetch GL account details
+    const gl_account_details = await pool.query(
+      `SELECT * FROM chart_of_accounts 
+        WHERE 
+         branch_id = $1
+         and accountcode = $2`,
+        [branchId, account_data.gl_account_code]
+    )
+    const gl_account_data = gl_account_details.rows[0]
 
     return NextResponse.json({
-      ...account,
-      gl_account: glAccount || null,
+      ...account_data,
+      gl_account: gl_account_data || null,
     })
+
   } catch (error: any) {
     console.error('Error fetching income account:', error)
     return NextResponse.json(
