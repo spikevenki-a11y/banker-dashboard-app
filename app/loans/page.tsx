@@ -171,11 +171,12 @@ export default function LoansPage() {
   const [collectionMode, setCollectionMode] = useState<"CASH" | "TRANSFER">("CASH")
   const [collectionNarration, setCollectionNarration] = useState("")
   
-  // Loan details view
-  const [emiSchedule, setEmiSchedule] = useState<EMISchedule[]>([])
-  const [loanTransactions, setLoanTransactions] = useState<LoanTransaction[]>([])
-  const [loanSummary, setLoanSummary] = useState<any>(null)
-  const [isLoadingDetails, setIsLoadingDetails] = useState(false)
+  // Loan details view - REMOVED: Now using dedicated page at /loans/[id]
+  // These state variables are no longer used
+  // const [emiSchedule, setEmiSchedule] = useState<EMISchedule[]>([])
+  // const [loanTransactions, setLoanTransactions] = useState<LoanTransaction[]>([])
+  // const [loanSummary, setLoanSummary] = useState<any>(null)
+  // const [isLoadingDetails, setIsLoadingDetails] = useState(false)
   
   // Success dialog
   const [successOpen, setSuccessOpen] = useState(false)
@@ -496,28 +497,7 @@ export default function LoansPage() {
     }
   }
 
-  // Load loan details (EMI schedule, transactions)
-  const loadLoanDetails = async (loan: LoanApplication) => {
-    setSelectedLoan(loan)
-    setIsLoadingDetails(true)
-    
-    try {
-      const loanAccountNo = `LN${loan.reference_no?.substring(2) || loan.loan_application_id.toString().padStart(8, '0')}`
-      
-      const res = await fetch(`/api/loans/repayment?loanAccountNo=${loanAccountNo}`)
-      const data = await res.json()
-      
-      if (!data.error) {
-        setEmiSchedule(data.schedule || [])
-        setLoanTransactions(data.transactions || [])
-        setLoanSummary(data.summary || {})
-      }
-    } catch (error) {
-      console.error("Failed to load loan details:", error)
-    } finally {
-      setIsLoadingDetails(false)
-    }
-  }
+  // Load loan details function - REMOVED: Now using dedicated page at /loans/[id]
 
   // Open sanction dialog
   const openSanctionDialog = (loan: LoanApplication) => {
@@ -763,7 +743,7 @@ export default function LoansPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => loadLoanDetails(loan)}>
+                                <DropdownMenuItem onClick={() => router.push(`/loans/${loan.loan_application_id}`)}>
                                   <Eye className="mr-2 h-4 w-4" />
                                   View Details
                                 </DropdownMenuItem>
@@ -1220,231 +1200,7 @@ export default function LoansPage() {
               </DialogContent>
             </Dialog>
 
-            {/* View Loan Details Dialog */}
-            <Dialog open={!!selectedLoan && !isSanctionOpen && !isDisbursementOpen && !isCollectionOpen} onOpenChange={() => setSelectedLoan(null)}>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Loan Details - {selectedLoan?.reference_no}</DialogTitle>
-                  <DialogDescription>Complete loan information and repayment schedule</DialogDescription>
-                </DialogHeader>
-                {selectedLoan && (
-                  <Tabs defaultValue="overview" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3">
-                      <TabsTrigger value="overview">Overview</TabsTrigger>
-                      <TabsTrigger value="schedule">EMI Schedule</TabsTrigger>
-                      <TabsTrigger value="transactions">Transactions</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="overview" className="space-y-4">
-                      <div className="grid gap-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label className="text-muted-foreground">Reference Number</Label>
-                            <p className="font-mono font-medium">{selectedLoan.reference_no}</p>
-                          </div>
-                          <div>
-                            <Label className="text-muted-foreground">Status</Label>
-                            <div className="mt-1">
-                              <Badge className={getStatusBadge(selectedLoan.application_status)}>
-                                {selectedLoan.application_status}
-                              </Badge>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label className="text-muted-foreground">Member Name</Label>
-                            <p className="font-medium">{selectedLoan.member_name || 'N/A'}</p>
-                          </div>
-                          <div>
-                            <Label className="text-muted-foreground">Membership No</Label>
-                            <p className="font-mono font-medium">{selectedLoan.membership_no}</p>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label className="text-muted-foreground">Loan Scheme</Label>
-                            <p className="font-medium">{selectedLoan.scheme_name}</p>
-                          </div>
-                          <div>
-                            <Label className="text-muted-foreground">Purpose</Label>
-                            <p className="font-medium">{selectedLoan.loan_purpose || '---'}</p>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label className="text-muted-foreground">Applied Amount</Label>
-                            <p className="text-2xl font-bold text-foreground">{formatCurrency(selectedLoan.applied_loan_amount)}</p>
-                          </div>
-                          <div>
-                            <Label className="text-muted-foreground">Sanctioned Amount</Label>
-                            <p className="text-2xl font-bold text-teal-600">
-                              {selectedLoan.sanctioned_amount ? formatCurrency(selectedLoan.sanctioned_amount) : '---'}
-                            </p>
-                          </div>
-                        </div>
-                        {selectedLoan.sanctioned_amount && (
-                          <>
-                            <div className="grid grid-cols-3 gap-4">
-                              <div>
-                                <Label className="text-muted-foreground">Interest Rate</Label>
-                                <p className="font-medium">{selectedLoan.sanctioned_interest_rate}% p.a.</p>
-                              </div>
-                              <div>
-                                <Label className="text-muted-foreground">Tenure</Label>
-                                <p className="font-medium">{selectedLoan.sanctioned_tenure} months</p>
-                              </div>
-                              <div>
-                                <Label className="text-muted-foreground">EMI Amount</Label>
-                                <p className="text-xl font-semibold">{formatCurrency(selectedLoan.emi_amount || 0)}</p>
-                              </div>
-                            </div>
-                          </>
-                        )}
-                        {loanSummary && Object.keys(loanSummary).length > 0 && (
-                          <div className="rounded-lg border p-4 bg-muted/50">
-                            <h4 className="font-semibold mb-3">Repayment Summary</h4>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="flex justify-between text-sm">
-                                <span className="text-muted-foreground">Paid Installments:</span>
-                                <span className="font-medium">{loanSummary.paid_installments || 0}</span>
-                              </div>
-                              <div className="flex justify-between text-sm">
-                                <span className="text-muted-foreground">Pending Installments:</span>
-                                <span className="font-medium">{loanSummary.pending_installments || 0}</span>
-                              </div>
-                              <div className="flex justify-between text-sm">
-                                <span className="text-muted-foreground">Total Principal Paid:</span>
-                                <span className="font-medium">{formatCurrency(loanSummary.total_principal_paid || 0)}</span>
-                              </div>
-                              <div className="flex justify-between text-sm">
-                                <span className="text-muted-foreground">Total Interest Paid:</span>
-                                <span className="font-medium">{formatCurrency(loanSummary.total_interest_paid || 0)}</span>
-                              </div>
-                              <div className="flex justify-between text-sm">
-                                <span className="text-muted-foreground">Next Due Date:</span>
-                                <span className="font-medium">{formatDate(loanSummary.next_due_date)}</span>
-                              </div>
-                              <div className="flex justify-between text-sm">
-                                <span className="text-muted-foreground">Overdue Installments:</span>
-                                <span className={`font-medium ${(loanSummary.overdue_installments || 0) > 0 ? 'text-red-600' : ''}`}>
-                                  {loanSummary.overdue_installments || 0}
-                                </span>
-                              </div>
-                            </div>
-                            {(loanSummary.paid_installments || 0) > 0 && (
-                              <div className="mt-4">
-                                <div className="flex justify-between text-sm mb-1">
-                                  <span>Progress</span>
-                                  <span>{Math.round(((loanSummary.paid_installments || 0) / ((loanSummary.paid_installments || 0) + (loanSummary.pending_installments || 0))) * 100)}%</span>
-                                </div>
-                                <Progress 
-                                  value={((loanSummary.paid_installments || 0) / ((loanSummary.paid_installments || 0) + (loanSummary.pending_installments || 0))) * 100} 
-                                  className="h-2" 
-                                />
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </TabsContent>
-                    <TabsContent value="schedule" className="space-y-4">
-                      {isLoadingDetails ? (
-                        <div className="flex items-center justify-center py-8">
-                          <Loader2 className="h-6 w-6 animate-spin" />
-                        </div>
-                      ) : emiSchedule.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground">
-                          No EMI schedule available (loan not yet disbursed)
-                        </div>
-                      ) : (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>EMI #</TableHead>
-                              <TableHead>Due Date</TableHead>
-                              <TableHead>EMI Amount</TableHead>
-                              <TableHead>Principal</TableHead>
-                              <TableHead>Interest</TableHead>
-                              <TableHead>Balance</TableHead>
-                              <TableHead>Status</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {emiSchedule.map((emi) => (
-                              <TableRow key={emi.schedule_id}>
-                                <TableCell className="font-medium">{emi.installment_no}</TableCell>
-                                <TableCell>{formatDate(emi.due_date)}</TableCell>
-                                <TableCell className="font-semibold">{formatCurrency(emi.total_installment)}</TableCell>
-                                <TableCell>{formatCurrency(emi.principal_amount)}</TableCell>
-                                <TableCell>{formatCurrency(emi.interest_amount)}</TableCell>
-                                <TableCell className="font-mono">{formatCurrency(emi.balance_principal)}</TableCell>
-                                <TableCell>
-                                  <Badge
-                                    className={
-                                      emi.payment_status === "PAID"
-                                        ? "bg-teal-100 text-teal-700"
-                                        : emi.payment_status === "OVERDUE"
-                                          ? "bg-red-100 text-red-700"
-                                          : "bg-orange-100 text-orange-700"
-                                    }
-                                  >
-                                    {emi.payment_status}
-                                  </Badge>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      )}
-                    </TabsContent>
-                    <TabsContent value="transactions" className="space-y-4">
-                      {isLoadingDetails ? (
-                        <div className="flex items-center justify-center py-8">
-                          <Loader2 className="h-6 w-6 animate-spin" />
-                        </div>
-                      ) : loanTransactions.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground">
-                          No transactions found
-                        </div>
-                      ) : (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Date</TableHead>
-                              <TableHead>Voucher</TableHead>
-                              <TableHead>Type</TableHead>
-                              <TableHead>Debit</TableHead>
-                              <TableHead>Credit</TableHead>
-                              <TableHead>Balance</TableHead>
-                              <TableHead>Remarks</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {loanTransactions.map((txn) => (
-                              <TableRow key={txn.id}>
-                                <TableCell>{formatDate(txn.transaction_date)}</TableCell>
-                                <TableCell className="font-mono">{txn.voucher_no}</TableCell>
-                                <TableCell>
-                                  <Badge variant="outline">{txn.transaction_type}</Badge>
-                                </TableCell>
-                                <TableCell className="text-red-600">
-                                  {parseFloat(txn.debit_amount?.toString()) > 0 ? formatCurrency(txn.debit_amount) : '---'}
-                                </TableCell>
-                                <TableCell className="text-teal-600">
-                                  {parseFloat(txn.credit_amount?.toString()) > 0 ? formatCurrency(txn.credit_amount) : '---'}
-                                </TableCell>
-                                <TableCell className="font-mono">{formatCurrency(txn.balance_after_transaction)}</TableCell>
-                                <TableCell className="max-w-[200px] truncate">{txn.remarks}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      )}
-                    </TabsContent>
-                  </Tabs>
-                )}
-              </DialogContent>
-            </Dialog>
+            {/* View Loan Details Dialog - REMOVED: Now using dedicated page at /loans/[id] */}
 
             {/* Delete Confirmation */}
             <AlertDialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
