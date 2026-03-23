@@ -60,10 +60,13 @@ export default function BankLevelPage() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+        <Card 
+          className="hover:shadow-lg transition-shadow cursor-pointer border-purple-200 hover:border-purple-400"
+          onClick={() => router.push("/bank-level/sundry-creditors")}
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Sundry Creditors</CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
+            <Wallet className="h-4 w-4 text-purple-600" />
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">Payable due from us</p>
