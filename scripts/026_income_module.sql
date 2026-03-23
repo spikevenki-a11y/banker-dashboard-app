@@ -1,56 +1,61 @@
 -- Income Module Tables
+-- This module manages income accounts and transactions for the bank-level finance operations
 
--- Income Accounts Table
+-- Create income_accounts table
 CREATE TABLE IF NOT EXISTS income_accounts (
-    id SERIAL PRIMARY KEY,
-    account_name VARCHAR(255) NOT NULL,
-    ledger_account_id INTEGER NOT NULL REFERENCES generalledgeraccounts(id),
-    account_code VARCHAR(50) NOT NULL UNIQUE,
-    opening_balance DECIMAL(15, 2) DEFAULT 0,
-    current_balance DECIMAL(15, 2) DEFAULT 0,
-    description TEXT,
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by VARCHAR(255),
-    branch_code VARCHAR(50)
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_number VARCHAR(50) UNIQUE NOT NULL,
+  account_name VARCHAR(255) NOT NULL,
+  gl_account_code BIGINT NOT NULL,
+  opening_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  closing_date DATE,
+  opening_balance NUMERIC(15,2) NOT NULL DEFAULT 0,
+  current_balance NUMERIC(15,2) NOT NULL DEFAULT 0,
+  account_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE', -- ACTIVE, CLOSED, INACTIVE
+  description TEXT,
+  branch_id BIGINT NOT NULL,
+  created_by UUID NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- Income Transactions Table
+-- Create income_transactions table
 CREATE TABLE IF NOT EXISTS income_transactions (
-    id SERIAL PRIMARY KEY,
-    income_account_id INTEGER NOT NULL REFERENCES income_accounts(id) ON DELETE CASCADE,
-    transaction_date DATE NOT NULL,
-    transaction_type VARCHAR(10) NOT NULL CHECK (transaction_type IN ('CREDIT', 'DEBIT')),
-    amount DECIMAL(15, 2) NOT NULL,
-    running_balance DECIMAL(15, 2) DEFAULT 0,
-    description TEXT,
-    reference_no VARCHAR(100),
-    cheque_no VARCHAR(50),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by VARCHAR(255),
-    branch_code VARCHAR(50),
-    FOREIGN KEY (branch_code) REFERENCES branch_code_details(branch_code)
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_number VARCHAR(50) NOT NULL REFERENCES income_accounts(account_number),
+  transaction_date DATE NOT NULL,
+  voucher_no INTEGER,
+  voucher_type VARCHAR(20), -- CREDIT, DEBIT
+  description TEXT NOT NULL,
+  debit_amount NUMERIC(15,2) NOT NULL DEFAULT 0,
+  credit_amount NUMERIC(15,2) NOT NULL DEFAULT 0,
+  running_balance NUMERIC(15,2) NOT NULL DEFAULT 0,
+  reference_no VARCHAR(100),
+  created_by UUID NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  branch_id BIGINT NOT NULL
 );
 
--- Create indexes for better performance
-CREATE INDEX idx_income_accounts_ledger ON income_accounts(ledger_account_id);
-CREATE INDEX idx_income_accounts_code ON income_accounts(account_code);
-CREATE INDEX idx_income_accounts_branch ON income_accounts(branch_code);
-CREATE INDEX idx_income_transactions_account ON income_transactions(income_account_id);
-CREATE INDEX idx_income_transactions_date ON income_transactions(transaction_date);
-CREATE INDEX idx_income_transactions_branch ON income_transactions(branch_code);
+-- Create indexes for better query performance
+CREATE INDEX IF NOT EXISTS idx_income_accounts_gl_account ON income_accounts(gl_account_code);
+CREATE INDEX IF NOT EXISTS idx_income_accounts_status ON income_accounts(account_status);
+CREATE INDEX IF NOT EXISTS idx_income_accounts_branch ON income_accounts(branch_id);
+CREATE INDEX IF NOT EXISTS idx_income_transactions_account ON income_transactions(account_number);
+CREATE INDEX IF NOT EXISTS idx_income_transactions_date ON income_transactions(transaction_date);
+CREATE INDEX IF NOT EXISTS idx_income_transactions_branch ON income_transactions(branch_id);
 
--- Add trigger to update updated_at timestamp
-CREATE OR REPLACE FUNCTION update_income_accounts_timestamp()
+-- Create audit trigger for income_accounts
+CREATE OR REPLACE FUNCTION update_income_accounts_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
-    NEW.updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
+  NEW.updated_at = CURRENT_TIMESTAMP;
+  RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER income_accounts_timestamp
+DROP TRIGGER IF EXISTS income_accounts_updated_at_trigger ON income_accounts;
+
+CREATE TRIGGER income_accounts_updated_at_trigger
 BEFORE UPDATE ON income_accounts
 FOR EACH ROW
-EXECUTE FUNCTION update_income_accounts_timestamp();
+EXECUTE FUNCTION update_income_accounts_updated_at();
