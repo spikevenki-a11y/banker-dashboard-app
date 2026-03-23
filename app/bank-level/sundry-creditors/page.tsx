@@ -6,8 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import AccountOpeningForm from "./_components/account-opening-form";
 import AccountsList from "./_components/accounts-list";
 import ViewAccount from "./_components/view-account";
-
+import { DashboardWrapper } from "@/app/_components/dashboard-wrapper";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, Landmark } from "lucide-react";
+import { useRouter } from "next/navigation"
 export default function SundryCreditorsPage() {
+  
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState("list");
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(
     null
@@ -24,44 +29,104 @@ export default function SundryCreditorsPage() {
     setActiveTab("view");
   };
 
+
+function formatCurrency(val: number | string) {
+  return `₹${Number(val || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">Sundry Creditors Management</CardTitle>
-        </CardHeader>
-      </Card>
+    <DashboardWrapper>
+      <div className="flex h-screen overflow-hidden">
+        <div className="flex flex-1 flex-col overflow-hidden">
+            <main className="flex-1 overflow-y-auto bg-background p-6">
+              {/* Header */}
+              <div className="mb-6 flex items-center gap-4">
+                <Button variant="ghost" size="icon" onClick={() => router.push("/bank-level")}>
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <div className="flex-1">
+                  <h1 className="text-3xl font-bold tracking-tight text-foreground">Sundry Accounts</h1>
+                   <p className="text-muted-foreground">
+                    {"Sundry Creditors Management"}
+                    {/* {user?.role === "admin"
+                      ? "All branches - Manage borrowings, drawals, and repayments"
+                      : `${user?.branch?.name || "Branch"} - Manage borrowings, drawals, and repayments`} */}
+                  </p> 
+                </div>
+                {/* <Button onClick={fetchAccounts} variant="outline" size="icon">
+                  <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+                </Button> */}
+              </div>
+              <div className="space-y-6">
+                {/* Stats Cards */}
+                <div className="mb-6 grid gap-4 md:grid-cols-4">
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Total Accounts</p>
+                          <p className="text-2xl font-bold text-foreground">
+                            20
+                          </p>
+                        </div>
+                        <div className="rounded-lg bg-blue-50 p-3">
+                          <Landmark className="h-5 w-5 text-blue-600" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Total Balance</p>
+                          <p className="text-2xl font-bold text-foreground">
+                            {formatCurrency(35400)} 
+                            
+                          </p>
+                        </div>
+                        <div className="rounded-lg bg-blue-50 p-3">
+                          <Landmark className="h-5 w-5 text-blue-600" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="list">List Accounts</TabsTrigger>
-          <TabsTrigger value="create">Account Opening</TabsTrigger>
-          <TabsTrigger value="view">View Account</TabsTrigger>
-        </TabsList>
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="list">List Accounts</TabsTrigger>
+                    <TabsTrigger value="create">Account Opening</TabsTrigger>
+                    <TabsTrigger value="view">View Account</TabsTrigger>
+                  </TabsList>
 
-        <TabsContent value="list" className="space-y-4">
-          <AccountsList
-            onViewAccount={handleViewAccount}
-            refreshTrigger={refreshTrigger}
-          />
-        </TabsContent>
+                  <TabsContent value="list" className="space-y-4">
+                    <AccountsList
+                      onViewAccount={handleViewAccount}
+                      refreshTrigger={refreshTrigger}
+                    />
+                  </TabsContent>
 
-        <TabsContent value="create" className="space-y-4">
-          <AccountOpeningForm onSuccess={handleAccountCreated} />
-        </TabsContent>
+                  <TabsContent value="create" className="space-y-4">
+                    <AccountOpeningForm onSuccess={handleAccountCreated} />
+                  </TabsContent>
 
-        <TabsContent value="view" className="space-y-4">
-          {selectedAccountId ? (
-            <ViewAccount accountId={selectedAccountId} />
-          ) : (
-            <Card className="p-8 text-center">
-              <p className="text-muted-foreground">
-                Please select an account from the list to view details
-              </p>
-            </Card>
-          )}
-        </TabsContent>
-      </Tabs>
-    </div>
+                  <TabsContent value="view" className="space-y-4">
+                    {selectedAccountId ? (
+                      <ViewAccount accountId={selectedAccountId} />
+                    ) : (
+                      <Card className="p-8 text-center">
+                        <p className="text-muted-foreground">
+                          Please select an account from the list to view details
+                        </p>
+                      </Card>
+                    )}
+                  </TabsContent>
+                </Tabs>
+              </div>
+          </main>
+        </div>
+      </div>
+    </DashboardWrapper>
   );
 }

@@ -23,3 +23,22 @@ CREATE TABLE sundry_creditors (
     created_by VARCHAR(100),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+
+-- Create sundry_transactions table
+CREATE TABLE IF NOT EXISTS sundry_creditors_transactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  branch_id BIGINT NOT NULL,
+  account_number VARCHAR(50) NOT NULL,
+  transaction_date DATE NOT NULL,
+  voucher_no INTEGER,
+  voucher_type VARCHAR(20), -- CREDIT, DEBIT
+  description TEXT NOT NULL,
+  debit_amount NUMERIC(15,2) NOT NULL DEFAULT 0,
+  credit_amount NUMERIC(15,2) NOT NULL DEFAULT 0,
+  running_balance NUMERIC(15,2) NOT NULL DEFAULT 0,
+  reference_no VARCHAR(100),
+  created_by UUID NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  branch_id BIGINT NOT NULL
+);
