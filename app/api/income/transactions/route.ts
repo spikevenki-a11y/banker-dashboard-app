@@ -223,9 +223,9 @@ export async function POST(request: NextRequest) {
       const { rows: accounts } = await client.query(
         `SELECT ia.*, gla.accountcode 
          FROM income_accounts ia
-         LEFT JOIN general_ledger_accounts gla ON gla.accountcode = ia.gl_account_code
+         LEFT JOIN chart_of_accounts   gla ON gla.accountcode = ia.gl_account_code
          WHERE ia.account_number = $1 AND ia.branch_id = $2
-         FOR UPDATE`,
+         FOR UPDATE OF ia`,
         [entry.account_number, session.branch]
       )
 
@@ -298,22 +298,21 @@ export async function POST(request: NextRequest) {
           transaction_date, voucher_type,
           description, debit_amount, credit_amount,
           running_balance, reference_no,
-          gl_batch_id, voucher_no,
+          voucher_no,
           created_by
         ) VALUES (
           $1, $2,
           $3, $4,
           $5, $6, $7,
           $8, $9,
-          $10, $11,
-          $12
+          $10, $11
         )
       `, [
         session.branch, entry.account_number,
         transaction_date || businessDate, voucher_type,
         entry.description, debitAmt, creditAmt,
         newBalance, reference_no || null,
-        batchId, voucherNo,
+        voucherNo,
         session.userId
       ])
 
