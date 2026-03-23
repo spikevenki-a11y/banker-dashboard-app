@@ -48,7 +48,7 @@ CREATE INDEX IF NOT EXISTS idx_sundry_debitors_txn_date ON sundry_debitors_trans
 -- Insert sequence for sundry debtors account numbers if not exists
 INSERT INTO nextnumber (branch_id, accounttype, nextvalue)
 SELECT DISTINCT branch_id, 62, 1
-FROM branches
+FROM branchparameters
 WHERE NOT EXISTS (
-  SELECT 1 FROM nextnumber WHERE nextnumber.branch_id = branches.branch_id AND accounttype = 62
+  SELECT 1 FROM nextnumber WHERE nextnumber.branch_id = branchparameters.branch_id AND accounttype = 62
 );
