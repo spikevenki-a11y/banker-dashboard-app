@@ -1,28 +1,34 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import pool from "@/lib/connection/db"
+import { cookies } from "next/headers"
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   const supabase = await createClient();
-  const { searchParams } = new URL(request.url);
-  const branchId = searchParams.get("branch_id");
 
   try {
-    let query = supabase
-      .from("sundry_creditors")
-      .select("*")
-      .order("created_at", { ascending: false });
+    
+    const c = (await cookies()).get("banker_session")
+    if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const session = JSON.parse(c.value)
+    const branchId = session.branch
+    const userId = session.userId
 
-    if (branchId) {
-      query = query.eq("branch_id", branchId);
-    }
+    
+    // Fetch transactions for a specific account
+    const list_of_accounts = await pool.query(
+      `SELECT * FROM sundry_creditors 
+        WHERE 
+         branch_id = $1
+        ORDER BY account_number DESC`,
+        [branchId]
+    )
 
-    const { data, error } = await query;
+    return NextResponse.json({ 
+      success: true, 
+      data: list_of_accounts.rows 
+    })
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-
-    return NextResponse.json({ data });
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to fetch accounts" },
@@ -35,45 +41,70 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient();
 
   try {
+    
+    const c = (await cookies()).get("banker_session")
+    if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const session = JSON.parse(c.value)
+    const branchId = session.branch
+    const userId = session.userId
+    const businessDate = session.businessDate
+
     const body = await request.json();
     const {
       account_number,
       account_name,
       parent_account_number,
       opening_balance,
-      description,
-      branch_id,
+      description
     } = body;
 
     if (
       !account_number ||
       !account_name ||
-      !parent_account_number ||
-      !branch_id
+      !parent_account_number
     ) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
       );
     }
+    const nextNo = await pool.query(
+      `SELECT nextvalue FROM nextnumber 
+        WHERE  branch_id = $1
+        and accounttype = 61`,
+        [branchId]
+    )
+    const { rows: [seq] } = await pool.query(
+      `
+      UPDATE nextnumber
+      SET nextvalue = nextvalue+ 1
+      WHERE branch_id = $1
+      RETURNING nextvalue
+      `,
+      [branchId]
+    )
+    const runningNo = String(seq["nextvalue"]).padStart(7, "0")
+    const nextAccountNumber = `${branchId}${runningNo}`
+    
+    const result = await pool.query(
+        `INSERT INTO sundry_creditors (
+            branch_id,
+            parent_account_number,
+            account_number,
+            account_name,
+            account_description,
+            account_opened_date,
+            ledger_balance,
+            clear_balance,
+            unclear_balance,
+            account_status,
+            account_closed_date,
+            created_by
+        ) VALUES ($1,$2,$3,$4,$5,$6,0.00,0.00,0.00,'ACTIVE',NULL,$7)
+        RETURNING *`,
+        [branchId, parent_account_number, nextAccountNumber, account_name, description, businessDate, userId]    )
 
-    const { data, error } = await supabase
-      .from("sundry_creditors")
-      .insert({
-        account_number,
-        account_name,
-        parent_account_number,
-        opening_balance: opening_balance || 0,
-        current_balance: opening_balance || 0,
-        description,
-        branch_id,
-        account_status: "ACTIVE",
-      })
-      .select();
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
+        const data = result.rows
 
     return NextResponse.json({ data: data[0] }, { status: 201 });
   } catch (error) {
