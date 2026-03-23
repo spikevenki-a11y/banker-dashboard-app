@@ -1,37 +1,35 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { NextRequest, NextResponse } from "next/server";
+import pool from "@/lib/connection/db"
+import { cookies } from "next/headers"
 
-export async function GET(request: NextRequest) {
+export async function GET(){
+
   try {
-    const supabase = await createClient()
-    const branch_id = request.nextUrl.searchParams.get('branch_id')
+    const c = (await cookies()).get("banker_session")
+    if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const session = JSON.parse(c.value)
+    const branchId = session.branch
+    const userId = session.userId
 
-    if (!branch_id) {
-      return NextResponse.json(
-        { error: 'branch_id is required' },
-        { status: 400 }
-      )
-    }
+    
 
-    // Get all income ledger accounts (head code 30000000)
-    // Income head is typically code 30000000, we'll fetch accounts under this head
-    const { data: incomeAccounts, error } = await supabase
-      .from('chart_of_accounts')
-      .select('*')
-      .eq('branch_id', parseInt(branch_id))
-      .eq('isledger', 1)
-      // Filter for Income accounts - they typically start with 30 or have parentaccountcode for income head
-      .or(`accountcode.gte.30000000,accountcode.lt.40000000`)
-      .order('accountname', { ascending: true })
-
-    if (error) throw error
-
-    return NextResponse.json(incomeAccounts)
-  } catch (error: any) {
-    console.error('Error fetching income ledger accounts:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to fetch income ledger accounts' },
-      { status: 500 }
+    // Get ledger accounts for income (assuming parent account code for income is 32000000)
+    const ledger_accounts = await pool.query(
+      `SELECT accountcode,accountname FROM chart_of_accounts 
+        WHERE parentaccountcode = 32000000
+        and isledger = '1'
+        and branch_id = $1
+        ORDER BY accountcode DESC`,
+        [branchId]
     )
+
+    return NextResponse.json({ 
+      success: true, 
+      accounts: ledger_accounts.rows 
+    })
+  } catch (error: any) {
+    console.error("Income GET Ledger Accounts error:", error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
 }

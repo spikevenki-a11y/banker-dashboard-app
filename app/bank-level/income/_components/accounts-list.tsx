@@ -37,19 +37,11 @@ export default function AccountsList({ onViewAccount, refreshTrigger }: Accounts
         setLoading(true)
         setError(null)
 
-        if (!user?.branch_id) {
-          setError("Branch information not available")
-          return
-        }
-
-        const response = await fetch(`/api/income/accounts?branch_id=${user.branch_id}`)
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch accounts")
-        }
+        const response = await fetch(`/api/income/accounts`)
 
         const data = await response.json()
-        setAccounts(Array.isArray(data) ? data : [])
+        console.log("Fetched accounts:", data)
+        setAccounts(data.data);
       } catch (err) {
         console.error("Error fetching accounts:", err)
         setError(err instanceof Error ? err.message : "Failed to fetch accounts")
@@ -137,7 +129,7 @@ export default function AccountsList({ onViewAccount, refreshTrigger }: Accounts
                     <TableCell className="font-mono text-sm">{account.account_number}</TableCell>
                     <TableCell>{account.account_name}</TableCell>
                     <TableCell className="text-right font-mono">
-                      ₹{account.current_balance.toFixed(2)}
+                      ₹{account.current_balance}
                     </TableCell>
                     <TableCell>
                       <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-green-100 text-green-800">

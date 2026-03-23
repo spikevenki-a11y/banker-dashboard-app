@@ -1,10 +1,8 @@
-import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/connection/db"
 import { cookies } from "next/headers"
 
 export async function GET() {
-  const supabase = await createClient();
 
   try {
     
@@ -38,7 +36,6 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
 
   try {
     

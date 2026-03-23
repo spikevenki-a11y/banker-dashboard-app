@@ -13,7 +13,6 @@ import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react"
 interface GLAccount {
   accountcode: number
   accountname: string
-  accounttypecode: number
 }
 
 export default function AccountOpeningForm({ onAccountCreated }: { onAccountCreated: () => void }) {
@@ -33,16 +32,17 @@ export default function AccountOpeningForm({ onAccountCreated }: { onAccountCrea
 
   useEffect(() => {
     const fetchGLAccounts = async () => {
-      try {
-        if (!user?.branch_id) return
+      console.log("Fetching GL accounts for branch:", user?.branch_id)
+      try { 
         
         const response = await fetch(
-          `/api/income/ledger-accounts?branch_id=${user.branch_id}`
+          `/api/income/ledger-accounts`
         )
-        if (!response.ok) throw new Error("Failed to fetch GL accounts")
         
         const accounts = await response.json()
-        setGlAccounts(accounts)
+        if (!accounts.success) throw new Error("Failed to fetch GL accounts")
+        console.log("Fetched GL accounts:", accounts.accounts)
+        setGlAccounts(accounts.accounts)
       } catch (error) {
         console.error("Error fetching GL accounts:", error)
         setMessage({
@@ -192,9 +192,12 @@ export default function AccountOpeningForm({ onAccountCreated }: { onAccountCrea
                   <SelectValue placeholder={fetchingGL ? "Loading accounts..." : "Select a ledger account"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {glAccounts.map(account => (
-                    <SelectItem key={account.accountcode} value={account.accountcode.toString()}>
-                      {account.accountname} ({account.accountcode})
+                  {glAccounts.map((account) => (
+                    <SelectItem
+                      key={account.accountcode}
+                      value={account.accountcode.toString()}
+                    >
+                      {account.accountcode} - {account.accountname}
                     </SelectItem>
                   ))}
                 </SelectContent>
