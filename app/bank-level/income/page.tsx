@@ -91,13 +91,7 @@ export default function IncomePage() {
               </TabsContent>
 
               <TabsContent value="transactions" className="mt-6">
-                {selectedAccount ? (
-                  <TransactionsList accountNumber={selectedAccount} />
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    Please select an account from the list to view transactions
-                  </div>
-                )}
+                <TransactionsList />
               </TabsContent>
             </Tabs>
           </CardContent>
