@@ -8,9 +8,12 @@ import AccountOpeningForm from "./_components/account-opening-form"
 import AccountsList from "./_components/accounts-list"
 import ViewAccount from "./_components/view-account"
 import TransactionsList from "./_components/transactions-list"
-import { Plus, List, Eye, CreditCard } from "lucide-react"
+import { Plus, List, Eye, CreditCard, ArrowLeft } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { useRouter } from "next/navigation"
 
 export default function IncomePage() {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState("list")
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
@@ -34,6 +37,15 @@ export default function IncomePage() {
     <DashboardWrapper>
       <div className="p-8">
         <div className="mb-8">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push("/bank-level")}
+            className="mb-4"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Bank Level
+          </Button>
           <h1 className="text-3xl font-bold text-foreground">Income Module</h1>
           <p className="text-muted-foreground">Manage income accounts and transactions</p>
         </div>
