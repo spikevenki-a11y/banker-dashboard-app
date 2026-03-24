@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
-import { DashboardWrapper } from "@/_components/dashboard-wrapper"
+import { DashboardWrapper } from "../../_components/dashboard-wrapper"
 import { ArrowLeft, CreditCard, Loader2 } from "lucide-react"
 
 type LoanApplication = {
