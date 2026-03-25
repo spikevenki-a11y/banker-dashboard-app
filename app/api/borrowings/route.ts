@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
 
       const result = await pool.query(
         `INSERT INTO borrowing_master (
-          account_number, borrowing_agency, branch_id, type_of_borrowing,
+          account_number, investment_head, branch_id, type_of_borrowing,
           description, amount_sanctioned, ledger_balance, date_of_sanction, purpose,
           rate_of_interest, interest_payable, moratorium_interest,
           number_of_installments, installment_months, moratorium_months,

@@ -783,9 +783,9 @@ export default function MembersPage() {
                 </CardContent>
               </Card>
 
-              {/* <Card
+              <Card
                 className="cursor-pointer transition-all hover:shadow-lg hover:border-red-500"
-                onClick={() => setActiveAction("membership-closure")}
+                onClick={() => router.push("/members/closure")}
               >
                 <CardHeader className="pb-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-red-50">
@@ -793,10 +793,10 @@ export default function MembersPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <CardTitle className="text-lg">Membership Closure</CardTitle>
+                  <CardTitle className="text-lg">Member Closure</CardTitle>
                   <CardDescription className="mt-1">Close member account</CardDescription>
                 </CardContent>
-              </Card> */}
+              </Card>
             </div>
 
             <Card>

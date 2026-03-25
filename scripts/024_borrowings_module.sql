@@ -2,7 +2,7 @@ CREATE TABLE borrowing_master (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
     account_number VARCHAR(50) NOT NULL,
-    borrowing_agency VARCHAR(100),
+    borrowing_head VARCHAR(100),
     branch_id INT,
 
     type_of_borrowing VARCHAR(50) NOT NULL, --('cash_credit', 'loan')
