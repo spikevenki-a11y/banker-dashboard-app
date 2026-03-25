@@ -53,3 +53,12 @@ CREATE TABLE investment_transactions (
     authorised_by VARCHAR(100),
     authorised_date TIMESTAMP
 );
+
+
+
+INSERT INTO chart_of_accounts
+(branch_id, accountcode, accountname, accounttypecode, isledger,parentaccountcode, accountbalance, isactive, createddate, modifieddate)
+VALUES(23108001, 22010000, 'Shares Investments', 1, B'1',22000000, 0, B'1', now(), now()),
+(23108001, 22020000, 'Investment In Dccb', 1, B'1',22000000, 0, B'1', now(), now()),
+(23108001, 22030000, 'Investment In TNSC', 1, B'1',22000000, 0, B'1', now(), now()),
+(23108001, 22040000, 'Investment In Other Institutions', 1, B'1',22000000, 0, B'1', now(), now());

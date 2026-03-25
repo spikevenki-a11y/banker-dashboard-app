@@ -73,3 +73,16 @@ CREATE TABLE borrowing_transactions (
     authorised_by VARCHAR(100),
     authorised_date TIMESTAMP
 );
+
+INSERT INTO chart_of_accounts
+(branch_id, accountcode, accountname, accounttypecode, isledger,parentaccountcode, accountbalance, isactive, createddate, modifieddate)
+VALUES(23108001, 13010000, 'Borrowings From Central Co-Op Bank', 1, B'1',13000000, 0, B'1', now(), now()),
+(23108001, 13020000, 'Borrowings From State Co-Op Bank', 1, B'1',13000000, 0, B'1', now(), now()),
+(23108001, 13030000, 'Borrowings From TN Govt', 1, B'1',13000000, 0, B'1', now(), now()),
+(23108001, 13040000, 'Borrowings From Other Banks', 1, B'1',13000000, 0, B'1', now(), now());
+
+INSERT INTO chart_of_accounts
+(branch_id, accountcode, accountname, accounttypecode, isledger,parentaccountcode, accountbalance, isactive, createddate, modifieddate)
+VALUES(23108001, 13010100, 'S.A.O Crop Loans', 1, B'1',13010000, 0, B'1', now(), now()),
+(23108001, 13010200, 'M.T Loans', 1, B'1',13010000, 0, B'1', now(), now()),
+(23108001, 13020100, 'Cash Credit Accounts', 1, B'1',13020000, 0, B'1', now(), now());
