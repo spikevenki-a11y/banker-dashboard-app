@@ -116,6 +116,9 @@ export default function BorrowingsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
 
+  // Ledger accounts for Select Ledger dropdown
+  const [ledgerAccounts, setLedgerAccounts] = useState<{ accountcode: number; accountname: string }[]>([])
+
   // Account Opening Form
   const [borrowingAgency, setBorrowingAgency] = useState("")
   const [typeOfBorrowing, setTypeOfBorrowing] = useState("")
@@ -204,6 +207,10 @@ export default function BorrowingsPage() {
   useEffect(() => {
     fetchAccounts()
     fetchLoginDate()
+    fetch("/api/borrowings/ledger-accounts")
+      .then((r) => r.json())
+      .then((data) => { if (data.accounts) setLedgerAccounts(data.accounts) })
+      .catch(console.error)
   }, [fetchAccounts])
 
   // Fetch transaction history
@@ -679,12 +686,19 @@ export default function BorrowingsPage() {
                           </div>
 
                           <div className="space-y-2">
-                            <Label>Borrowing Agency</Label>
-                            <Input
-                              placeholder="e.g., State Bank of India"
-                              value={borrowingAgency}
-                              onChange={(e) => setBorrowingAgency(e.target.value)}
-                            />
+                            <Label>Borrowing Head</Label>
+                            <Select value={borrowingAgency} onValueChange={setBorrowingAgency}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select borrowings ledger" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {ledgerAccounts.map((acc) => (
+                                  <SelectItem key={acc.accountcode} value={acc.accountcode}>
+                                    {acc.accountname}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
 
                           <div className="space-y-2">
