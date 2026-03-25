@@ -1,21 +1,21 @@
--- Sundry Creditor Transactions Table
-CREATE TABLE IF NOT EXISTS sundry_creditor_transactions (
-    id SERIAL PRIMARY KEY,
-    branch_id INTEGER NOT NULL,
-    account_number VARCHAR(50) NOT NULL,
-    transaction_date DATE NOT NULL,
-    voucher_type VARCHAR(20) NOT NULL,
-    description TEXT,
-    debit_amount NUMERIC(18,2) DEFAULT 0,
-    credit_amount NUMERIC(18,2) DEFAULT 0,
-    running_balance NUMERIC(18,2) DEFAULT 0,
-    reference_no VARCHAR(50),
-    gl_batch_id INTEGER,
-    voucher_no INTEGER,
-    created_by INTEGER,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+create table public.sundry_creditor_transactions (
+  id uuid not null default gen_random_uuid (),
+  branch_id integer not null,
+  account_number character varying(50) not null,
+  transaction_date date not null,
+  voucher_type character varying(20) not null,
+  description text null,
+  debit_amount numeric(18, 2) null default 0,
+  credit_amount numeric(18, 2) null default 0,
+  running_balance numeric(18, 2) null default 0,
+  reference_no character varying(50) null,
+  gl_batch_id integer null,
+  voucher_no integer null,
+  created_by uuid not null,
+  created_at timestamp without time zone null default CURRENT_TIMESTAMP,
+  updated_at timestamp without time zone null default CURRENT_TIMESTAMP,
+  constraint sundry_creditor_transactions_pkey primary key (id)
+) TABLESPACE pg_default;
 
 -- Add indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_sundry_creditor_txn_branch ON sundry_creditor_transactions(branch_id);
