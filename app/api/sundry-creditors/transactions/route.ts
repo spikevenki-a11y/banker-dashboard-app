@@ -195,9 +195,9 @@ export async function POST(request: NextRequest) {
       const { rows: accounts } = await client.query(
         `SELECT sc.*, gla.accountcode 
          FROM sundry_creditors sc
-         LEFT JOIN general_ledger_accounts gla ON gla.accountcode = sc.parent_account_number
+         LEFT JOIN chart_of_accounts gla ON gla.accountcode = sc.parent_account_number::BIGINT
          WHERE sc.account_number = $1 AND sc.branch_id = $2
-         FOR UPDATE`,
+         FOR UPDATE OF sc`,
         [entry.account_number, session.branch]
       )
 

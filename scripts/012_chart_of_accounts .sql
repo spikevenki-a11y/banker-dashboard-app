@@ -1,6 +1,3 @@
-ALTER TABLE generalledgeraccounts RENAME TO chart_of_accounts;
--- Renaming the table generalledgeraccounts to chart_of_accounts for better clarity and alignment with accounting terminology.
-
 ALTER TABLE chart_of_accounts
  ADD CONSTRAINT uq_chart_of_accounts_branch_id_account_code
   UNIQUE (branch_id, accountcode);
