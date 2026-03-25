@@ -15,6 +15,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog"
 import {
   AlertCircle,
@@ -26,6 +27,9 @@ import {
   Banknote,
   ArrowUpRight,
   History,
+  IndianRupee,
+  Calendar,
+  FileText,
 } from "lucide-react"
 
 interface Transaction {
@@ -77,6 +81,18 @@ export default function TransactionsList() {
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
+  
+  // Success dialog state
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [successData, setSuccessData] = useState<{
+    batch_id?: number
+    voucher_no?: string
+    total_amount: number
+    entries_count: number
+    transaction_type: string
+    voucher_type: string
+    transaction_date: string
+  } | null>(null)
 
   // Selected account for viewing transactions
   const [selectedAccount, setSelectedAccount] = useState<string>("")
@@ -224,16 +240,24 @@ export default function TransactionsList() {
         throw new Error(data.error || "Failed to create transaction")
       }
 
-      setMessage({
-        type: "success",
-        text: data.message || `Transaction recorded successfully! Batch: ${data.batch_id}, Voucher: ${data.voucher_no}`,
+      // Store success data for popup
+      setSuccessData({
+        batch_id: data.batch_id,
+        voucher_no: data.voucher_no,
+        total_amount: getTotalAmount(),
+        entries_count: entries.length,
+        transaction_type: transactionType,
+        voucher_type: voucherType,
+        transaction_date: transactionDate,
       })
+      setShowSuccessDialog(true)
 
       // Reset form
       setEntries([])
       setVoucherType("")
       setSelectedBatch(0)
       setShowForm(false)
+      setMessage(null)
 
       // Refresh transactions if an account is selected
       if (selectedAccount) {
@@ -764,6 +788,88 @@ export default function TransactionsList() {
           )}
         </CardContent>
       </Card>
+
+      {/* Success Dialog */}
+      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+              <CheckCircle2 className="h-10 w-10 text-green-600" />
+            </div>
+            <DialogTitle className="text-center text-xl">Transaction Saved Successfully!</DialogTitle>
+            <DialogDescription className="text-center">
+              Your sundry creditor transaction has been recorded
+            </DialogDescription>
+          </DialogHeader>
+          
+          {successData && (
+            <div className="space-y-4 py-4">
+              <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Voucher No
+                  </span>
+                  <span className="font-mono font-semibold">{successData.voucher_no || "N/A"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Batch ID
+                  </span>
+                  <span className="font-mono font-semibold">{successData.batch_id || "N/A"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Transaction Date
+                  </span>
+                  <span className="font-medium">{formatDate(successData.transaction_date)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Voucher Type</span>
+                  <Badge variant="outline" className={
+                    successData.voucher_type === "CASH"
+                      ? "border-green-300 text-green-700 bg-green-50"
+                      : "border-blue-300 text-blue-700 bg-blue-50"
+                  }>
+                    {successData.voucher_type}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Transaction Type</span>
+                  <Badge variant="outline" className={
+                    successData.transaction_type === "CREDIT"
+                      ? "border-green-300 text-green-700 bg-green-50"
+                      : "border-red-300 text-red-700 bg-red-50"
+                  }>
+                    {successData.transaction_type}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Accounts</span>
+                  <span className="font-medium">{successData.entries_count} account(s)</span>
+                </div>
+                <div className="border-t pt-3 mt-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium flex items-center gap-2">
+                      <IndianRupee className="h-4 w-4" />
+                      Total Amount
+                    </span>
+                    <span className="text-xl font-bold text-orange-600">{formatCurrency(successData.total_amount)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button onClick={() => setShowSuccessDialog(false)} className="w-full">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
