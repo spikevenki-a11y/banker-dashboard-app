@@ -92,6 +92,7 @@ type BorrowingTransaction = {
   interest_amount: number
   ledger_balance_amount: number
   last_interest_paid_date: string
+  voucher_type: string
   status: string
   created_by: string
   created_date: string
@@ -142,6 +143,7 @@ export default function BorrowingsPage() {
   const [drawalAmount, setDrawalAmount] = useState("")
   const [drawalDate, setDrawalDate] = useState("")
   const [drawalVoucher, setDrawalVoucher] = useState("")
+  const [drawalTransactionType, setDrawalTransactionType] = useState("CASH")
   const [selectedDrawalAccount, setSelectedDrawalAccount] = useState<BorrowingAccount | null>(null)
 
   // Repayment Form
@@ -149,6 +151,7 @@ export default function BorrowingsPage() {
   const [repaymentAmount, setRepaymentAmount] = useState("")
   const [repaymentDate, setRepaymentDate] = useState("")
   const [repaymentVoucher, setRepaymentVoucher] = useState("")
+  const [repaymentTransactionType, setRepaymentTransactionType] = useState("CASH")
   const [principalAmount, setPrincipalAmount] = useState("")
   const [interestAmountPaid, setInterestAmountPaid] = useState("")
   const [chargeAmount, setChargeAmount] = useState("0")
