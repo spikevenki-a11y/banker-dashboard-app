@@ -149,10 +149,13 @@ export default function BankLevelPage() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+        <Card 
+          className="hover:shadow-lg transition-shadow cursor-pointer border-orange-200 hover:border-orange-400"
+          onClick={() => router.push("/bank-level/expenses")}
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Expenses</CardTitle>
-            <Receipt className="h-4 w-4 text-muted-foreground" />
+            <Receipt className="h-4 w-4 text-orange-600" />
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">Expense Management</p>

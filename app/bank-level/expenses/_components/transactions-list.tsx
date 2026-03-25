@@ -6,11 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -26,9 +24,8 @@ import {
   Plus,
   Search,
   Trash2,
-  X,
-  Banknote,
-  ArrowUpRight,
+  Receipt,
+  ArrowDownRight,
   History,
   IndianRupee,
   Calendar,
@@ -49,7 +46,7 @@ interface Transaction {
   created_at: string
 }
 
-interface IncomeAccount {
+interface ExpenseAccount {
   id: string
   account_number: string
   account_name: string
@@ -77,7 +74,7 @@ interface IncompleteBatch {
 
 export default function TransactionsList() {
   const { user } = useAuth()
-  const [accounts, setAccounts] = useState<IncomeAccount[]>([])
+  const [accounts, setAccounts] = useState<ExpenseAccount[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -103,7 +100,7 @@ export default function TransactionsList() {
 
   // Transaction form state
   const [transactionDate, setTransactionDate] = useState(new Date().toISOString().split('T')[0])
-  const [transactionType, setTransactionType] = useState<"CREDIT" | "DEBIT">("CREDIT")
+  const [transactionType, setTransactionType] = useState<"DEBIT" | "CREDIT">("DEBIT")
   const [voucherType, setVoucherType] = useState<"CASH" | "TRANSFER" | "">("")
   const [selectedBatch, setSelectedBatch] = useState<number>(0)
   const [incompleteBatches, setIncompleteBatches] = useState<IncompleteBatch[]>([])
@@ -119,7 +116,7 @@ export default function TransactionsList() {
     const fetchAccounts = async () => {
       try {
         setLoading(true)
-        const response = await fetch(`/api/income/accounts`)
+        const response = await fetch(`/api/expenses/accounts`)
         const data = await response.json()
         if (data.data) {
           setAccounts(data.data)
@@ -146,7 +143,7 @@ export default function TransactionsList() {
   const fetchTransactions = async (accountNumber: string) => {
     try {
       setLoadingTxns(true)
-      const response = await fetch(`/api/income/transactions?account_number=${accountNumber}`)
+      const response = await fetch(`/api/expenses/transactions?account_number=${accountNumber}`)
       if (response.ok) {
         const data = await response.json()
         setTransactions(Array.isArray(data) ? data : [])
@@ -170,7 +167,7 @@ export default function TransactionsList() {
     }
   }
 
-  const handleAddEntry = (account: IncomeAccount) => {
+  const handleAddEntry = (account: ExpenseAccount) => {
     // Check if already added
     if (entries.find(e => e.account_number === account.account_number)) {
       return
@@ -220,14 +217,14 @@ export default function TransactionsList() {
         throw new Error("All entries must have a valid positive amount")
       }
 
-      const response = await fetch("/api/income/transactions", {
+      const response = await fetch("/api/expenses/transactions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           entries: entries.map(e => ({
             account_number: e.account_number,
             amount: parseFloat(e.amount),
-            description: e.description || `Income ${transactionType}`
+            description: e.description || `Expense ${transactionType}`
           })),
           transaction_date: transactionDate,
           transaction_type: transactionType,
@@ -322,11 +319,11 @@ export default function TransactionsList() {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
-              <Banknote className="h-5 w-5" />
-              Income Transactions
+              <Receipt className="h-5 w-5" />
+              Expense Transactions
             </CardTitle>
             <CardDescription>
-              Record income transactions with cash or transfer voucher types
+              Record expense transactions with cash or transfer voucher types
             </CardDescription>
           </div>
           <Button onClick={() => {
@@ -343,11 +340,11 @@ export default function TransactionsList() {
 
       {/* Transaction Form */}
       {showForm && (
-        <Card className="border-teal-200 bg-teal-50/30">
+        <Card className="border-orange-200 bg-orange-50/30">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <ArrowUpRight className="h-5 w-5" />
-              Record Income Transaction
+              <ArrowDownRight className="h-5 w-5" />
+              Record Expense Transaction
             </CardTitle>
             <CardDescription>
               Add multiple accounts in a single batch transaction
@@ -387,14 +384,14 @@ export default function TransactionsList() {
                   <Label htmlFor="transactionType">Transaction Type</Label>
                   <Select 
                     value={transactionType} 
-                    onValueChange={(v) => setTransactionType(v as "CREDIT" | "DEBIT")}
+                    onValueChange={(v) => setTransactionType(v as "DEBIT" | "CREDIT")}
                   >
                     <SelectTrigger disabled={submitting}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="CREDIT">Credit (Income In)</SelectItem>
-                      <SelectItem value="DEBIT">Debit (Income Out)</SelectItem>
+                      <SelectItem value="DEBIT">Debit (Expense Out)</SelectItem>
+                      <SelectItem value="CREDIT">Credit (Expense Refund)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -463,14 +460,14 @@ export default function TransactionsList() {
                 {entries.length === 0 ? (
                   <div className="text-center py-8 border-2 border-dashed rounded-lg bg-muted/30">
                     <p className="text-muted-foreground">
-                      No accounts added. Click "Add Account" to select income accounts.
+                      No accounts added. Click "Add Account" to select expense accounts.
                     </p>
                   </div>
                 ) : (
                   <div className="space-y-3">
                     {entries.map((entry, index) => (
                       <div key={entry.id} className="flex items-start gap-4 p-4 border rounded-lg bg-background">
-                        <div className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-teal-100 text-sm font-bold text-teal-700">
+                        <div className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-orange-100 text-sm font-bold text-orange-700">
                           {index + 1}
                         </div>
                         <div className="flex-1 grid md:grid-cols-4 gap-4">
@@ -520,7 +517,7 @@ export default function TransactionsList() {
                     <div className="flex justify-end p-4 border-t bg-muted/30 rounded-lg">
                       <div className="text-right">
                         <p className="text-sm text-muted-foreground">Total Amount</p>
-                        <p className="text-2xl font-bold text-teal-600">{formatCurrency(getTotalAmount())}</p>
+                        <p className="text-2xl font-bold text-orange-600">{formatCurrency(getTotalAmount())}</p>
                       </div>
                     </div>
                   </div>
@@ -563,7 +560,7 @@ export default function TransactionsList() {
       <Dialog open={showAccountSelector} onOpenChange={setShowAccountSelector}>
         <DialogContent className="max-w-2xl max-h-[80vh]">
           <DialogHeader>
-            <DialogTitle>Select Income Account</DialogTitle>
+            <DialogTitle>Select Expense Account</DialogTitle>
             <DialogDescription>
               Choose an account to add to the transaction
             </DialogDescription>
@@ -782,7 +779,7 @@ export default function TransactionsList() {
             </div>
             <DialogTitle className="text-center text-xl">Transaction Saved Successfully!</DialogTitle>
             <DialogDescription className="text-center">
-              Your income transaction has been recorded
+              Your expense transaction has been recorded
             </DialogDescription>
           </DialogHeader>
           
@@ -823,9 +820,9 @@ export default function TransactionsList() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Transaction Type</span>
                   <Badge variant="outline" className={
-                    successData.transaction_type === "CREDIT"
-                      ? "border-green-300 text-green-700 bg-green-50"
-                      : "border-red-300 text-red-700 bg-red-50"
+                    successData.transaction_type === "DEBIT"
+                      ? "border-red-300 text-red-700 bg-red-50"
+                      : "border-green-300 text-green-700 bg-green-50"
                   }>
                     {successData.transaction_type}
                   </Badge>
@@ -840,7 +837,7 @@ export default function TransactionsList() {
                       <IndianRupee className="h-4 w-4" />
                       Total Amount
                     </span>
-                    <span className="text-xl font-bold text-teal-600">{formatCurrency(successData.total_amount)}</span>
+                    <span className="text-xl font-bold text-orange-600">{formatCurrency(successData.total_amount)}</span>
                   </div>
                 </div>
               </div>

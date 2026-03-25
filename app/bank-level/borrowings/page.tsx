@@ -1293,18 +1293,29 @@ export default function BorrowingsPage() {
 
             {/* Success Dialog */}
             <AlertDialog open={successOpen} onOpenChange={setSuccessOpen}>
-              <AlertDialogContent>
+              <AlertDialogContent className="max-w-md">
                 <AlertDialogHeader>
-                  <AlertDialogTitle className="flex items-center gap-2 text-teal-600">
-                    <CheckCircle2 className="h-5 w-5" />
-                    Success
+                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+                    <CheckCircle2 className="h-10 w-10 text-green-600" />
+                  </div>
+                  <AlertDialogTitle className="text-center text-xl">
+                    Transaction Saved Successfully!
                   </AlertDialogTitle>
-                  <AlertDialogDescription className="whitespace-pre-line">
-                    {successMessage}
+                  <AlertDialogDescription className="text-center">
+                    Your borrowing transaction has been recorded
                   </AlertDialogDescription>
                 </AlertDialogHeader>
+                <div className="py-4">
+                  <div className="rounded-lg border bg-muted/30 p-4">
+                    <p className="whitespace-pre-line text-sm text-foreground">
+                      {successMessage}
+                    </p>
+                  </div>
+                </div>
                 <AlertDialogFooter>
-                  <AlertDialogAction onClick={() => setSuccessOpen(false)}>OK</AlertDialogAction>
+                  <AlertDialogAction onClick={() => setSuccessOpen(false)} className="w-full">
+                    Close
+                  </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
