@@ -3222,6 +3222,11 @@ snapshots:
 
   pg-int8@1.0.1: {}
 
+  pg-native@3.7.0:
+    dependencies:
+      libpq: 1.10.0
+      pg-types: 2.2.0
+
   pg-pool@3.13.0(pg@8.20.0):
     dependencies:
       pg: 8.20.0
