@@ -53,6 +53,7 @@ type BorrowingAccount = {
   id: string
   account_number: string
   borrowing_agency: string
+  investment_head: string | null
   branch_id: number
   type_of_borrowing: string
   description: string
@@ -139,6 +140,7 @@ export default function BorrowingsPage() {
   const [moratoriumInterest, setMoratoriumInterest] = useState(false)
 
   // Drawal Form
+  const [drawalLedger, setDrawalLedger] = useState("")
   const [drawalAccount, setDrawalAccount] = useState("")
   const [drawalAmount, setDrawalAmount] = useState("")
   const [drawalDate, setDrawalDate] = useState("")
@@ -147,6 +149,7 @@ export default function BorrowingsPage() {
   const [selectedDrawalAccount, setSelectedDrawalAccount] = useState<BorrowingAccount | null>(null)
 
   // Repayment Form
+  const [repaymentLedger, setRepaymentLedger] = useState("")
   const [repaymentAccount, setRepaymentAccount] = useState("")
   const [repaymentAmount, setRepaymentAmount] = useState("")
   const [repaymentDate, setRepaymentDate] = useState("")
@@ -235,11 +238,25 @@ export default function BorrowingsPage() {
     }
   }
 
+  // Handle ledger selection for drawal
+  const handleDrawalLedgerSelect = (ledgerCode: string) => {
+    setDrawalLedger(ledgerCode)
+    setDrawalAccount("")
+    setSelectedDrawalAccount(null)
+  }
+
   // Handle account selection for drawal
   const handleDrawalAccountSelect = (accountNumber: string) => {
     setDrawalAccount(accountNumber)
     const account = accounts.find(a => a.account_number === accountNumber)
     setSelectedDrawalAccount(account || null)
+  }
+
+  // Handle ledger selection for repayment
+  const handleRepaymentLedgerSelect = (ledgerCode: string) => {
+    setRepaymentLedger(ledgerCode)
+    setRepaymentAccount("")
+    setSelectedRepaymentAccount(null)
   }
 
   // Handle account selection for repayment
@@ -313,7 +330,7 @@ export default function BorrowingsPage() {
 
   // Submit drawal
   const submitDrawal = async () => {
-    if (!drawalAccount || !drawalAmount || !drawalDate) {
+    if (!drawalLedger || !drawalAccount || !drawalAmount || !drawalDate) {
       setFormError("Please fill all required fields")
       return
     }
@@ -327,10 +344,12 @@ export default function BorrowingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "drawal",
+          ledger_account: drawalLedger,
           account_number: drawalAccount,
           drawal_amount: parseFloat(drawalAmount),
           transaction_date: drawalDate,
-          voucher_no: drawalVoucher
+          voucher_no: drawalVoucher,
+          voucher_type: drawalTransactionType
         })
       })
 
@@ -350,7 +369,7 @@ export default function BorrowingsPage() {
 
   // Submit repayment
   const submitRepayment = async () => {
-    if (!repaymentAccount || !repaymentAmount || !repaymentDate) {
+    if (!repaymentLedger || !repaymentAccount || !repaymentAmount || !repaymentDate) {
       setFormError("Please fill all required fields")
       return
     }
@@ -364,10 +383,12 @@ export default function BorrowingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "repayment",
+          ledger_account: repaymentLedger,
           account_number: repaymentAccount,
           repayment_amount: parseFloat(repaymentAmount),
           transaction_date: repaymentDate,
           voucher_no: repaymentVoucher,
+          voucher_type: repaymentTransactionType,
           principal_amount: parseFloat(principalAmount) || 0,
           interest_amount: parseFloat(interestAmountPaid) || 0,
           charge_amount: parseFloat(chargeAmount) || 0,
@@ -409,17 +430,21 @@ export default function BorrowingsPage() {
   }
 
   const resetDrawalForm = () => {
+    setDrawalLedger("")
     setDrawalAccount("")
     setDrawalAmount("")
     setDrawalVoucher("")
+    setDrawalTransactionType("CASH")
     setSelectedDrawalAccount(null)
     setFormError("")
   }
 
   const resetRepaymentForm = () => {
+    setRepaymentLedger("")
     setRepaymentAccount("")
     setRepaymentAmount("")
     setRepaymentVoucher("")
+    setRepaymentTransactionType("CASH")
     setPrincipalAmount("")
     setInterestAmountPaid("")
     setChargeAmount("0")
@@ -440,6 +465,14 @@ export default function BorrowingsPage() {
 
   // Active accounts for drawal/repayment
   const activeAccounts = accounts.filter(a => a.status === "ACTIVE")
+  console.log("Active accounts:", activeAccounts)
+  // Ledger-filtered accounts for each form
+  const drawalFilteredAccounts = drawalLedger
+    ? activeAccounts.filter(a => String(a.borrowing_head) === drawalLedger)
+    : activeAccounts
+  const repaymentFilteredAccounts = repaymentLedger
+    ? activeAccounts.filter(a => String(a.borrowing_head) === repaymentLedger)
+    : activeAccounts
 
   // Stats
   const totalSanctioned = accounts.reduce((sum, acc) => sum + parseFloat(acc.amount_sanctioned?.toString() || "0"), 0)
@@ -933,13 +966,29 @@ export default function BorrowingsPage() {
                       <CardContent className="space-y-4">
                         <div className="grid gap-4 sm:grid-cols-2">
                           <div className="space-y-2 sm:col-span-2">
-                            <Label>Select Account *</Label>
-                            <Select value={drawalAccount} onValueChange={handleDrawalAccountSelect}>
+                            <Label>Select Ledger *</Label>
+                            <Select value={drawalLedger} onValueChange={handleDrawalLedgerSelect}>
                               <SelectTrigger>
-                                <SelectValue placeholder="Select borrowing account" />
+                                <SelectValue placeholder="Select ledger account" />
                               </SelectTrigger>
                               <SelectContent>
-                                {activeAccounts.map((acc) => (
+                                {ledgerAccounts.map((ledger) => (
+                                  <SelectItem key={ledger.accountcode} value={String(ledger.accountcode)}>
+                                    {ledger.accountname}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-2 sm:col-span-2">
+                            <Label>Select Account *</Label>
+                            <Select value={drawalAccount} onValueChange={handleDrawalAccountSelect} disabled={!drawalLedger}>
+                              <SelectTrigger>
+                                <SelectValue placeholder={drawalLedger ? "Select borrowing account" : "Select a ledger first"} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {drawalFilteredAccounts.map((acc) => (
                                   <SelectItem key={acc.account_number} value={acc.account_number}>
                                     {acc.account_number} - {acc.borrowing_agency || "N/A"} ({formatCurrency(acc.amount_sanctioned - (acc.ledger_balance || 0))} available)
                                   </SelectItem>
@@ -1008,6 +1057,19 @@ export default function BorrowingsPage() {
                               onChange={(e) => setDrawalVoucher(e.target.value)}
                             />
                           </div>
+
+                          <div className="space-y-2">
+                            <Label>Voucher Type *</Label>
+                            <Select value={drawalTransactionType} onValueChange={setDrawalTransactionType}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select voucher type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="CASH">Cash</SelectItem>
+                                <SelectItem value="TRANSFER">Transfer</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
 
                         {formError && (
@@ -1063,15 +1125,31 @@ export default function BorrowingsPage() {
                       <CardContent className="space-y-4">
                         <div className="grid gap-4 sm:grid-cols-2">
                           <div className="space-y-2 sm:col-span-2">
-                            <Label>Select Account *</Label>
-                            <Select value={repaymentAccount} onValueChange={handleRepaymentAccountSelect}>
+                            <Label>Select Ledger *</Label>
+                            <Select value={repaymentLedger} onValueChange={handleRepaymentLedgerSelect}>
                               <SelectTrigger>
-                                <SelectValue placeholder="Select borrowing account" />
+                                <SelectValue placeholder="Select ledger account" />
                               </SelectTrigger>
                               <SelectContent>
-                                {activeAccounts.map((acc) => (
+                                {ledgerAccounts.map((ledger) => (
+                                  <SelectItem key={ledger.accountcode} value={String(ledger.accountcode)}>
+                                    {ledger.accountname}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-2 sm:col-span-2">
+                            <Label>Select Account *</Label>
+                            <Select value={repaymentAccount} onValueChange={handleRepaymentAccountSelect} disabled={!repaymentLedger}>
+                              <SelectTrigger>
+                                <SelectValue placeholder={repaymentLedger ? "Select borrowing account" : "Select a ledger first"} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {repaymentFilteredAccounts.map((acc) => (
                                   <SelectItem key={acc.account_number} value={acc.account_number}>
-                                    {acc.account_number} - {acc.borrowing_agency || "N/A"} (Balance: {formatCurrency(acc.ledger_balance)})
+                                    {acc.account_number} -(Balance: {formatCurrency(acc.ledger_balance)})
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -1191,6 +1269,19 @@ export default function BorrowingsPage() {
                               value={repaymentVoucher}
                               onChange={(e) => setRepaymentVoucher(e.target.value)}
                             />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Voucher Type *</Label>
+                            <Select value={repaymentTransactionType} onValueChange={setRepaymentTransactionType}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select voucher type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="CASH">Cash</SelectItem>
+                                <SelectItem value="TRANSFER">Transfer</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
                         </div>
 
