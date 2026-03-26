@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
-import { getSession } from "@/lib/auth/session"
 import { cookies } from "next/headers"
 
 // GET - Fetch borrowing accounts and transactions
@@ -10,8 +9,6 @@ export async function GET(request: NextRequest) {
     if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     const session = JSON.parse(c.value)
     const branchId = session.branch
-    const userId = session.userId
-    
 
     const { searchParams } = new URL(request.url)
     const accountNumber = searchParams.get("accountNumber")
@@ -86,10 +83,10 @@ export async function POST(request: NextRequest) {
   try {
     
     const c = (await cookies()).get("banker_session")
+    if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     const session = JSON.parse(c.value)
     const branchId = session.branch
     const userId = session.userId
-    if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const body = await request.json()
     const { action } = body
@@ -128,11 +125,11 @@ export async function POST(request: NextRequest) {
         [type_of_borrowing]
       )
       const count = parseInt(countResult.rows[0].count) + 1
-      const accountNumber = `${prefix}${count.toString().padStart(6, "0")}`
+      const accountNumber = `${branchId}${"070"}${count.toString().padStart(6, "0")}`
 
       const result = await pool.query(
         `INSERT INTO borrowing_master (
-          account_number, investment_head, branch_id, type_of_borrowing,
+          account_number, borrowing_head, branch_id, type_of_borrowing,
           description, amount_sanctioned, ledger_balance, date_of_sanction, purpose,
           rate_of_interest, interest_payable, moratorium_interest,
           number_of_installments, installment_months, moratorium_months,
@@ -171,158 +168,6 @@ export async function POST(request: NextRequest) {
         message: "Borrowing account created successfully",
         account: result.rows[0],
         account_number: accountNumber
-      })
-    }
-
-    if (action === "drawal") {
-      // Record a drawal (drawdown)
-      const { account_number, drawal_amount, transaction_date, voucher_no } = body
-
-      if (!account_number || !drawal_amount || !transaction_date) {
-        return NextResponse.json({ 
-          error: "Missing required fields: account_number, drawal_amount, transaction_date" 
-        }, { status: 400 })
-      }
-
-      // Get account details
-      const accountResult = await pool.query(
-        `SELECT * FROM borrowing_master WHERE account_number = $1`,
-        [account_number]
-      )
-
-      if (accountResult.rows.length === 0) {
-        return NextResponse.json({ error: "Account not found" }, { status: 404 })
-      }
-
-      const account = accountResult.rows[0]
-      const newBalance = parseFloat(account.ledger_balance || 0) + parseFloat(drawal_amount)
-
-      // Check if drawal exceeds sanctioned amount
-      if (newBalance > parseFloat(account.amount_sanctioned)) {
-        return NextResponse.json({ 
-          error: `Drawal amount exceeds sanctioned limit. Available: ${account.amount_sanctioned - (account.ledger_balance || 0)}` 
-        }, { status: 400 })
-      }
-
-      // Insert transaction
-      const txnResult = await pool.query(
-        `INSERT INTO borrowing_transactions (
-          branch_id, transaction_date, voucher_no, transaction_type,
-          account_number, drawal_amount, ledger_balance_amount, status, created_by
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        RETURNING *`,
-        [
-          branchId,
-          transaction_date,
-          voucher_no || null,
-          "drawal",
-          account_number,
-          drawal_amount,
-          newBalance,
-          "COMPLETED",
-          userId
-        ]
-      )
-
-      // Update account balance
-      await pool.query(
-        `UPDATE borrowing_master SET ledger_balance = $1 WHERE account_number = $2`,
-        [newBalance, account_number]
-      )
-
-      return NextResponse.json({
-        success: true,
-        message: "Drawal recorded successfully",
-        transaction: txnResult.rows[0],
-        new_balance: newBalance
-      })
-    }
-
-    if (action === "repayment") {
-      // Record a repayment
-      const {
-        account_number,
-        transaction_date,
-        voucher_no,
-        repayment_amount,
-        principal_amount,
-        interest_amount,
-        charge_amount,
-        iod_amount,
-        penal_interest_amount
-      } = body
-
-      if (!account_number || !repayment_amount || !transaction_date) {
-        return NextResponse.json({ 
-          error: "Missing required fields: account_number, repayment_amount, transaction_date" 
-        }, { status: 400 })
-      }
-
-      // Get account details
-      const accountResult = await pool.query(
-        `SELECT * FROM borrowing_master WHERE account_number = $1`,
-        [account_number]
-      )
-
-      if (accountResult.rows.length === 0) {
-        return NextResponse.json({ error: "Account not found" }, { status: 404 })
-      }
-
-      const account = accountResult.rows[0]
-      
-      // Calculate principal if not provided (after interest deductions)
-      const totalDeductions = (parseFloat(interest_amount) || 0) + 
-                             (parseFloat(charge_amount) || 0) + 
-                             (parseFloat(iod_amount) || 0) + 
-                             (parseFloat(penal_interest_amount) || 0)
-      const principalPaid = principal_amount || (parseFloat(repayment_amount) - totalDeductions)
-      
-      const newBalance = parseFloat(account.ledger_balance || 0) - principalPaid
-
-      // Insert transaction
-      const txnResult = await pool.query(
-        `INSERT INTO borrowing_transactions (
-          branch_id, transaction_date, voucher_no, transaction_type,
-          account_number, repayment_amount, charge_amount, iod_amount,
-          penal_interest_amount, interest_amount, ledger_balance_amount,
-          last_interest_paid_date, status, created_by
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-        RETURNING *`,
-        [
-          branchId,
-          transaction_date,
-          voucher_no || null,
-          "repayment",
-          account_number,
-          repayment_amount,
-          charge_amount || 0,
-          iod_amount || 0,
-          penal_interest_amount || 0,
-          interest_amount || 0,
-          newBalance,
-          transaction_date,
-          "COMPLETED",
-          userId
-        ]
-      )
-
-      // Update account balance and interest paid date
-      const newStatus = newBalance <= 0 ? "CLOSED" : "ACTIVE"
-      await pool.query(
-        `UPDATE borrowing_master 
-         SET ledger_balance = $1, status = $2 
-         WHERE account_number = $3`,
-        [Math.max(0, newBalance), newStatus, account_number]
-      )
-
-      return NextResponse.json({
-        success: true,
-        message: "Repayment recorded successfully",
-        transaction: txnResult.rows[0],
-        new_balance: Math.max(0, newBalance),
-        principal_paid: principalPaid,
-        interest_paid: interest_amount || 0,
-        account_status: newStatus
       })
     }
 

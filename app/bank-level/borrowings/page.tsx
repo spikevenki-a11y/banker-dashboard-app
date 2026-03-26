@@ -48,11 +48,13 @@ import {
   CreditCard,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
+import { SearchableSelect } from "@/components/ui/searchable-select"
 
 type BorrowingAccount = {
   id: string
   account_number: string
   borrowing_agency: string
+  investment_head: string | null
   branch_id: number
   type_of_borrowing: string
   description: string
@@ -98,6 +100,26 @@ type BorrowingTransaction = {
   created_date: string
 }
 
+type VoucherDetails = {
+  transactionType: "drawal" | "repayment"
+  voucherNo: string | number
+  batchId: string | number
+  transactionDate: string
+  voucherType: string
+  ledgerName: string
+  accountNumber: string
+  borrowingAgency: string
+  // Drawal
+  drawalAmount?: number
+  // Repayment breakdown
+  repaymentAmount?: number
+  principalPaid?: number
+  interestPaid?: number
+  otherCharges?: number
+  accountStatus?: string
+  newBalance: number
+}
+
 function formatCurrency(val: number | string) {
   return `₹${Number(val || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
@@ -139,6 +161,7 @@ export default function BorrowingsPage() {
   const [moratoriumInterest, setMoratoriumInterest] = useState(false)
 
   // Drawal Form
+  const [drawalLedger, setDrawalLedger] = useState("")
   const [drawalAccount, setDrawalAccount] = useState("")
   const [drawalAmount, setDrawalAmount] = useState("")
   const [drawalDate, setDrawalDate] = useState("")
@@ -147,6 +170,7 @@ export default function BorrowingsPage() {
   const [selectedDrawalAccount, setSelectedDrawalAccount] = useState<BorrowingAccount | null>(null)
 
   // Repayment Form
+  const [repaymentLedger, setRepaymentLedger] = useState("")
   const [repaymentAccount, setRepaymentAccount] = useState("")
   const [repaymentAmount, setRepaymentAmount] = useState("")
   const [repaymentDate, setRepaymentDate] = useState("")
@@ -168,7 +192,7 @@ export default function BorrowingsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formError, setFormError] = useState("")
   const [successOpen, setSuccessOpen] = useState(false)
-  const [successMessage, setSuccessMessage] = useState("")
+  const [voucherDetails, setVoucherDetails] = useState<VoucherDetails | null>(null)
 
   // Fetch accounts
   const fetchAccounts = useCallback(async () => {
@@ -235,11 +259,25 @@ export default function BorrowingsPage() {
     }
   }
 
+  // Handle ledger selection for drawal
+  const handleDrawalLedgerSelect = (ledgerCode: string) => {
+    setDrawalLedger(ledgerCode)
+    setDrawalAccount("")
+    setSelectedDrawalAccount(null)
+  }
+
   // Handle account selection for drawal
   const handleDrawalAccountSelect = (accountNumber: string) => {
     setDrawalAccount(accountNumber)
     const account = accounts.find(a => a.account_number === accountNumber)
     setSelectedDrawalAccount(account || null)
+  }
+
+  // Handle ledger selection for repayment
+  const handleRepaymentLedgerSelect = (ledgerCode: string) => {
+    setRepaymentLedger(ledgerCode)
+    setRepaymentAccount("")
+    setSelectedRepaymentAccount(null)
   }
 
   // Handle account selection for repayment
@@ -313,7 +351,7 @@ export default function BorrowingsPage() {
 
   // Submit drawal
   const submitDrawal = async () => {
-    if (!drawalAccount || !drawalAmount || !drawalDate) {
+    if (!drawalLedger || !drawalAccount || !drawalAmount || !drawalDate) {
       setFormError("Please fill all required fields")
       return
     }
@@ -322,22 +360,36 @@ export default function BorrowingsPage() {
     setFormError("")
 
     try {
-      const res = await fetch("/api/borrowings", {
+      const res = await fetch("/api/borrowings/drawal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "drawal",
+          ledger_account: drawalLedger,
           account_number: drawalAccount,
           drawal_amount: parseFloat(drawalAmount),
           transaction_date: drawalDate,
-          voucher_no: drawalVoucher
+          voucher_no: drawalVoucher,
+          voucher_type: drawalTransactionType
         })
       })
 
       const data = await res.json()
       if (data.error) throw new Error(data.error)
 
-      setSuccessMessage(`Drawal of ${formatCurrency(drawalAmount)} recorded successfully!\nNew Balance: ${formatCurrency(data.new_balance)}`)
+      const ledgerName = ledgerAccounts.find(l => String(l.accountcode) === drawalLedger)?.accountname ?? drawalLedger
+      setVoucherDetails({
+        transactionType: "drawal",
+        voucherNo: data.voucher_no,
+        batchId: data.batch_id,
+        transactionDate: drawalDate,
+        voucherType: drawalTransactionType,
+        ledgerName,
+        accountNumber: drawalAccount,
+        borrowingAgency: selectedDrawalAccount?.borrowing_agency ?? "",
+        drawalAmount: parseFloat(drawalAmount),
+        newBalance: data.new_balance,
+      })
       setSuccessOpen(true)
       resetDrawalForm()
       fetchAccounts()
@@ -350,7 +402,7 @@ export default function BorrowingsPage() {
 
   // Submit repayment
   const submitRepayment = async () => {
-    if (!repaymentAccount || !repaymentAmount || !repaymentDate) {
+    if (!repaymentLedger || !repaymentAccount || !repaymentAmount || !repaymentDate) {
       setFormError("Please fill all required fields")
       return
     }
@@ -359,15 +411,16 @@ export default function BorrowingsPage() {
     setFormError("")
 
     try {
-      const res = await fetch("/api/borrowings", {
+      const res = await fetch("/api/borrowings/repayment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "repayment",
+          ledger_account: repaymentLedger,
           account_number: repaymentAccount,
           repayment_amount: parseFloat(repaymentAmount),
           transaction_date: repaymentDate,
           voucher_no: repaymentVoucher,
+          voucher_type: repaymentTransactionType,
           principal_amount: parseFloat(principalAmount) || 0,
           interest_amount: parseFloat(interestAmountPaid) || 0,
           charge_amount: parseFloat(chargeAmount) || 0,
@@ -379,9 +432,27 @@ export default function BorrowingsPage() {
       const data = await res.json()
       if (data.error) throw new Error(data.error)
 
-      setSuccessMessage(
-        `Repayment recorded successfully!\n\nPrincipal Paid: ${formatCurrency(data.principal_paid)}\nInterest Paid: ${formatCurrency(data.interest_paid)}\nNew Balance: ${formatCurrency(data.new_balance)}${data.account_status === "CLOSED" ? "\n\nAccount has been CLOSED!" : ""}`
-      )
+      const otherCharges =
+        (parseFloat(chargeAmount) || 0) +
+        (parseFloat(iodAmount) || 0) +
+        (parseFloat(penalInterestAmount) || 0)
+      const ledgerName = ledgerAccounts.find(l => String(l.accountcode) === repaymentLedger)?.accountname ?? repaymentLedger
+      setVoucherDetails({
+        transactionType: "repayment",
+        voucherNo: data.voucher_no,
+        batchId: data.batch_id,
+        transactionDate: repaymentDate,
+        voucherType: repaymentTransactionType,
+        ledgerName,
+        accountNumber: repaymentAccount,
+        borrowingAgency: selectedRepaymentAccount?.borrowing_agency ?? "",
+        repaymentAmount: parseFloat(repaymentAmount),
+        principalPaid: data.principal_paid,
+        interestPaid: data.interest_paid,
+        otherCharges,
+        accountStatus: data.account_status,
+        newBalance: data.new_balance,
+      })
       setSuccessOpen(true)
       resetRepaymentForm()
       fetchAccounts()
@@ -409,17 +480,21 @@ export default function BorrowingsPage() {
   }
 
   const resetDrawalForm = () => {
+    setDrawalLedger("")
     setDrawalAccount("")
     setDrawalAmount("")
     setDrawalVoucher("")
+    setDrawalTransactionType("CASH")
     setSelectedDrawalAccount(null)
     setFormError("")
   }
 
   const resetRepaymentForm = () => {
+    setRepaymentLedger("")
     setRepaymentAccount("")
     setRepaymentAmount("")
     setRepaymentVoucher("")
+    setRepaymentTransactionType("CASH")
     setPrincipalAmount("")
     setInterestAmountPaid("")
     setChargeAmount("0")
@@ -440,6 +515,14 @@ export default function BorrowingsPage() {
 
   // Active accounts for drawal/repayment
   const activeAccounts = accounts.filter(a => a.status === "ACTIVE")
+  console.log("Active accounts:", activeAccounts)
+  // Ledger-filtered accounts for each form
+  const drawalFilteredAccounts = drawalLedger
+    ? activeAccounts.filter(a => String(a.borrowing_head) === drawalLedger)
+    : activeAccounts
+  const repaymentFilteredAccounts = repaymentLedger
+    ? activeAccounts.filter(a => String(a.borrowing_head) === repaymentLedger)
+    : activeAccounts
 
   // Stats
   const totalSanctioned = accounts.reduce((sum, acc) => sum + parseFloat(acc.amount_sanctioned?.toString() || "0"), 0)
@@ -933,19 +1016,32 @@ export default function BorrowingsPage() {
                       <CardContent className="space-y-4">
                         <div className="grid gap-4 sm:grid-cols-2">
                           <div className="space-y-2 sm:col-span-2">
+                            <Label>Select Ledger *</Label>
+                            <SearchableSelect
+                              value={drawalLedger}
+                              onValueChange={handleDrawalLedgerSelect}
+                              placeholder="Select ledger account"
+                              searchPlaceholder="Search ledger..."
+                              options={ledgerAccounts.map((l) => ({
+                                value: String(l.accountcode),
+                                label: l.accountname,
+                              }))}
+                            />
+                          </div>
+
+                          <div className="space-y-2 sm:col-span-2">
                             <Label>Select Account *</Label>
-                            <Select value={drawalAccount} onValueChange={handleDrawalAccountSelect}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select borrowing account" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {activeAccounts.map((acc) => (
-                                  <SelectItem key={acc.account_number} value={acc.account_number}>
-                                    {acc.account_number} - {acc.borrowing_agency || "N/A"} ({formatCurrency(acc.amount_sanctioned - (acc.ledger_balance || 0))} available)
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <SearchableSelect
+                              value={drawalAccount}
+                              onValueChange={handleDrawalAccountSelect}
+                              placeholder={drawalLedger ? "Select borrowing account" : "Select a ledger first"}
+                              searchPlaceholder="Search by account no. or agency..."
+                              disabled={!drawalLedger}
+                              options={drawalFilteredAccounts.map((acc) => ({
+                                value: acc.account_number,
+                                label: `${acc.account_number} - ${acc.borrowing_agency || "N/A"} (${formatCurrency(acc.amount_sanctioned - (acc.ledger_balance || 0))} available)`,
+                              }))}
+                            />
                           </div>
 
                           {selectedDrawalAccount && (
@@ -1008,6 +1104,19 @@ export default function BorrowingsPage() {
                               onChange={(e) => setDrawalVoucher(e.target.value)}
                             />
                           </div>
+
+                          <div className="space-y-2">
+                            <Label>Voucher Type *</Label>
+                            <Select value={drawalTransactionType} onValueChange={setDrawalTransactionType}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select voucher type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="CASH">Cash</SelectItem>
+                                <SelectItem value="TRANSFER">Transfer</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
 
                         {formError && (
@@ -1063,19 +1172,32 @@ export default function BorrowingsPage() {
                       <CardContent className="space-y-4">
                         <div className="grid gap-4 sm:grid-cols-2">
                           <div className="space-y-2 sm:col-span-2">
+                            <Label>Select Ledger *</Label>
+                            <SearchableSelect
+                              value={repaymentLedger}
+                              onValueChange={handleRepaymentLedgerSelect}
+                              placeholder="Select ledger account"
+                              searchPlaceholder="Search ledger..."
+                              options={ledgerAccounts.map((l) => ({
+                                value: String(l.accountcode),
+                                label: l.accountname,
+                              }))}
+                            />
+                          </div>
+
+                          <div className="space-y-2 sm:col-span-2">
                             <Label>Select Account *</Label>
-                            <Select value={repaymentAccount} onValueChange={handleRepaymentAccountSelect}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select borrowing account" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {activeAccounts.map((acc) => (
-                                  <SelectItem key={acc.account_number} value={acc.account_number}>
-                                    {acc.account_number} - {acc.borrowing_agency || "N/A"} (Balance: {formatCurrency(acc.ledger_balance)})
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <SearchableSelect
+                              value={repaymentAccount}
+                              onValueChange={handleRepaymentAccountSelect}
+                              placeholder={repaymentLedger ? "Select borrowing account" : "Select a ledger first"}
+                              searchPlaceholder="Search by account no. or agency..."
+                              disabled={!repaymentLedger}
+                              options={repaymentFilteredAccounts.map((acc) => ({
+                                value: acc.account_number,
+                                label: `${acc.account_number} - ${acc.borrowing_agency || "N/A"} (Balance: ${formatCurrency(acc.ledger_balance)})`,
+                              }))}
+                            />
                           </div>
 
                           {selectedRepaymentAccount && (
@@ -1191,6 +1313,19 @@ export default function BorrowingsPage() {
                               value={repaymentVoucher}
                               onChange={(e) => setRepaymentVoucher(e.target.value)}
                             />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Voucher Type *</Label>
+                            <Select value={repaymentTransactionType} onValueChange={setRepaymentTransactionType}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select voucher type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="CASH">Cash</SelectItem>
+                                <SelectItem value="TRANSFER">Transfer</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
                         </div>
 
@@ -1312,26 +1447,112 @@ export default function BorrowingsPage() {
             <AlertDialog open={successOpen} onOpenChange={setSuccessOpen}>
               <AlertDialogContent className="max-w-md">
                 <AlertDialogHeader>
-                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-                    <CheckCircle2 className="h-10 w-10 text-green-600" />
+                  <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
+                    <CheckCircle2 className="h-8 w-8 text-green-600" />
                   </div>
-                  <AlertDialogTitle className="text-center text-xl">
-                    Transaction Saved Successfully!
+                  <AlertDialogTitle className="text-center text-lg">
+                    {voucherDetails?.transactionType === "drawal"
+                      ? "Drawal Recorded Successfully"
+                      : "Repayment Recorded Successfully"}
                   </AlertDialogTitle>
-                  <AlertDialogDescription className="text-center">
-                    Your borrowing transaction has been recorded
+                  <AlertDialogDescription className="text-center text-xs">
+                    GL batch created and pending approval
                   </AlertDialogDescription>
                 </AlertDialogHeader>
-                <div className="py-4">
-                  <div className="rounded-lg border bg-muted/30 p-4">
-                    <p className="whitespace-pre-line text-sm text-foreground">
-                      {successMessage}
-                    </p>
+
+                {voucherDetails && (
+                  <div className="space-y-3 py-2">
+                    {/* Voucher header band */}
+                    <div className="flex items-center justify-between rounded-md bg-muted px-4 py-2 text-sm">
+                      <span className="font-semibold text-foreground">
+                        Voucher&nbsp;#{voucherDetails.voucherNo}
+                      </span>
+                      <span className="text-muted-foreground">
+                        Batch&nbsp;#{voucherDetails.batchId}
+                      </span>
+                    </div>
+
+                    {/* Details grid */}
+                    <div className="rounded-lg border divide-y text-sm">
+                      {[
+                        { label: "Date", value: formatDate(voucherDetails.transactionDate) },
+                        { label: "Voucher Type", value: voucherDetails.voucherType },
+                        { label: "Ledger", value: voucherDetails.ledgerName },
+                        { label: "Account No.", value: voucherDetails.accountNumber },
+                        ...(voucherDetails.borrowingAgency
+                          ? [{ label: "Agency", value: voucherDetails.borrowingAgency }]
+                          : []),
+                      ].map(({ label, value }) => (
+                        <div key={label} className="flex justify-between px-4 py-2">
+                          <span className="text-muted-foreground">{label}</span>
+                          <span className="font-medium text-foreground">{value}</span>
+                        </div>
+                      ))}
+
+                      {/* Drawal amount */}
+                      {voucherDetails.transactionType === "drawal" && (
+                        <div className="flex justify-between px-4 py-2">
+                          <span className="text-muted-foreground">Drawal Amount</span>
+                          <span className="font-semibold text-foreground">
+                            {formatCurrency(voucherDetails.drawalAmount!)}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Repayment breakdown */}
+                      {voucherDetails.transactionType === "repayment" && (
+                        <>
+                          <div className="flex justify-between px-4 py-2">
+                            <span className="text-muted-foreground">Total Repayment</span>
+                            <span className="font-semibold text-foreground">
+                              {formatCurrency(voucherDetails.repaymentAmount!)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between px-4 py-2">
+                            <span className="text-muted-foreground">Principal Paid</span>
+                            <span className="font-medium text-teal-600">
+                              {formatCurrency(voucherDetails.principalPaid!)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between px-4 py-2">
+                            <span className="text-muted-foreground">Interest Paid</span>
+                            <span className="font-medium text-orange-600">
+                              {formatCurrency(voucherDetails.interestPaid!)}
+                            </span>
+                          </div>
+                          {(voucherDetails.otherCharges ?? 0) > 0 && (
+                            <div className="flex justify-between px-4 py-2">
+                              <span className="text-muted-foreground">Other Charges</span>
+                              <span className="font-medium">
+                                {formatCurrency(voucherDetails.otherCharges!)}
+                              </span>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {/* New balance — always shown */}
+                      <div className="flex justify-between bg-muted/40 px-4 py-2">
+                        <span className="font-medium text-foreground">New Balance</span>
+                        <span className="font-semibold text-foreground">
+                          {formatCurrency(voucherDetails.newBalance)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Account closed badge */}
+                    {voucherDetails.accountStatus === "CLOSED" && (
+                      <div className="flex items-center justify-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700">
+                        <CheckCircle2 className="h-4 w-4" />
+                        Account has been fully closed
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
+
                 <AlertDialogFooter>
                   <AlertDialogAction onClick={() => setSuccessOpen(false)} className="w-full">
-                    Close
+                    Done
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
