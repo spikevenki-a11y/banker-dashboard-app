@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
         [type_of_borrowing]
       )
       const count = parseInt(countResult.rows[0].count) + 1
-      const accountNumber = `${branchId}${"070"}${count.toString().padStart(6, "0")}`
+      const accountNumber = `${branchId}${"04"}${count.toString().padStart(6, "0")}`
 
       const result = await pool.query(
         `INSERT INTO borrowing_master (

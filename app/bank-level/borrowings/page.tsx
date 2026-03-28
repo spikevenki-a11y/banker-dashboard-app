@@ -694,7 +694,7 @@ export default function BorrowingsPage() {
                           <TableHeader>
                             <TableRow>
                               <TableHead>Account No</TableHead>
-                              <TableHead>Agency</TableHead>
+                              <TableHead>Purpose</TableHead>
                               <TableHead>Type</TableHead>
                               <TableHead className="text-right">Sanctioned</TableHead>
                               <TableHead className="text-right">Balance</TableHead>
@@ -708,7 +708,7 @@ export default function BorrowingsPage() {
                             {filteredAccounts.map((account) => (
                               <TableRow key={account.id}>
                                 <TableCell className="font-mono font-medium">{account.account_number}</TableCell>
-                                <TableCell>{account.borrowing_agency || "---"}</TableCell>
+                                <TableCell>{account.purpose || "---"}</TableCell>
                                 <TableCell>
                                   <Badge className={getTypeBadge(account.type_of_borrowing)}>
                                     {account.type_of_borrowing === "cash_credit" ? "Cash Credit" : "Loan"}
@@ -975,7 +975,7 @@ export default function BorrowingsPage() {
                             </span>
                           </div>
                           <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Agency</span>
+                            <span className="text-muted-foreground">Borrowing Head</span>
                             <span className="font-medium">{borrowingAgency || "---"}</span>
                           </div>
                           <div className="flex justify-between text-sm">

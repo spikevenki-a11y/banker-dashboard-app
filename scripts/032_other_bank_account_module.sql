@@ -1,15 +1,16 @@
-CREATE TABLE investment_master (
+CREATE TABLE bank_accounts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     branch_id INT,
 
     account_number VARCHAR(50) NOT NULL,
-    investment_head VARCHAR(100),
+    account_head VARCHAR(100),
 
     description TEXT,
-    amount_invested DECIMAL(15,2),
-    ledger_balance DECIMAL(15,2),
+    account_balance DECIMAL(15,2),
+    account_clear_balance DECIMAL(15,2),
+    account_unclear_balance DECIMAL(15,2),
 
-    date_of_investment DATE,
+    date_of_account_opening DATE,
 
     rate_of_interest DECIMAL(5,2),
     interest_receivable DECIMAL(15,2),
@@ -26,7 +27,7 @@ CREATE TABLE investment_master (
 
 
 
-CREATE TABLE investment_transactions (
+CREATE TABLE bank_accounts_transactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
     branch_id INT NOT NULL,
@@ -42,7 +43,7 @@ CREATE TABLE investment_transactions (
     debit_amount DECIMAL(15,2) DEFAULT 0,
     credit_amount DECIMAL(15,2) DEFAULT 0,
 
-    interest_amount DECIMAL(15,2) DEFAULT 0, -- when interest is involved while closing an investment or receiving interest
+    interest_amount DECIMAL(15,2) DEFAULT 0,
     ledger_balance_amount DECIMAL(15,2),
 
     status VARCHAR(50),
@@ -58,7 +59,8 @@ CREATE TABLE investment_transactions (
 
 INSERT INTO chart_of_accounts
 (branch_id, accountcode, accountname, accounttypecode, isledger,parentaccountcode, accountbalance, isactive, createddate, modifieddate)
-VALUES(23108001, 22010000, 'Shares Investments', 1, B'1',22000000, 0, B'1', now(), now()),
-(23108001, 22020000, 'Investment In Dccb', 1, B'1',22000000, 0, B'1', now(), now()),
-(23108001, 22030000, 'Investment In TNSC', 1, B'1',22000000, 0, B'1', now(), now()),
-(23108001, 22040000, 'Investment In Other Institutions', 1, B'1',22000000, 0, B'1', now(), now());
+VALUES(23108001, 23200000, 'Bank Balances', 1, B'1',23000000, 0, B'1', now(), now()),
+(23108001, 23201000, 'Current Account with DCCB/SCB', 1, B'1',23200000, 0, B'1', now(), now()),
+(23108001, 23202000, 'Savings Account with DCCB/SCB', 1, B'1',23200000, 0, B'1', now(), now()),
+(23108001, 23203000, 'Current Account with other banks', 1, B'1',23200000, 0, B'1', now(), now()),
+(23108001, 23204000, 'Savings Account with other banks', 1, B'1',23200000, 0, B'1', now(), now());

@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -r investment /d/ZueTech/banker-dashboard-app --include=*.ts --include=*.tsx)"
+    ]
+  }
+}

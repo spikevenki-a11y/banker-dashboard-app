@@ -59,3 +59,28 @@ CREATE TRIGGER expense_accounts_updated_at_trigger
 BEFORE UPDATE ON expense_accounts
 FOR EACH ROW
 EXECUTE FUNCTION update_expense_accounts_updated_at();
+
+
+// Insert default expense accounts into chart_of_accounts
+INSERT INTO chart_of_accounts
+(branch_id, accountcode, accountname, accounttypecode, isledger,parentaccountcode, accountbalance, isactive, createddate, modifieddate)
+VALUES(23108001, 43010000, 'Salary And Allowances', 1, B'1',43000000, 0, B'1', now(), now()),
+(23108001, 43020000, 'Rent', 1, B'1',43000000, 0, B'1', now(), now()),
+(23108001, 43030000, 'Utilities', 1, B'1',43000000, 0, B'1', now(), now()),
+(23108001, 43040000, 'Office Supplies', 1, B'1',43000000, 0, B'1', now(), now()),
+(23108001, 43050000, 'Professional Fees', 1, B'1',43000000, 0, B'1', now(), now()),
+(23108001, 43060000, 'Travel Expenses', 1, B'1',43000000, 0, B'1', now(), now()),
+(23108001, 43070000, 'Marketing And Advertising', 1, B'1',43000000, 0, B'1', now(), now()),
+(23108001, 43080000, 'Depreciation On Properties', 1, B'1',43000000, 0, B'1', now(), now()),
+(23108001, 43090000, 'Miscellaneous Expenses', 1, B'1',43000000, 0, B'1', now(), now());
+
+// Insert default Depreciation accounts into Depreciation On Properties
+INSERT INTO chart_of_accounts
+(branch_id, accountcode, accountname, accounttypecode, isledger,parentaccountcode, accountbalance, isactive, createddate, modifieddate)
+VALUES(23108001, 43080100, 'Depreciation On Properties - Buildings', 1, B'1',43080000, 0, B'1', now(), now()),
+(23108001, 43080200, 'Depreciation On Properties - Computers', 1, B'1',43080000, 0, B'1', now(), now()),
+(23108001, 43080300, 'Depreciation On Properties - Condemned Others', 1, B'1',43080000, 0, B'1', now(), now()),
+(23108001, 43080400, 'Depreciation On Properties - Furniture And Fixtures', 1, B'1',43080000, 0, B'1', now(), now()),
+(23108001, 43080500, 'Depreciation On Properties - Land', 1, B'1',43080000, 0, B'1', now(), now()),
+(23108001, 43080600, 'Depreciation On Properties - Other Fixed Assets', 1, B'1',43080000, 0, B'1', now(), now()),
+(23108001, 43080700, 'Depreciation On Properties - Vehicles', 1, B'1',43080000, 0, B'1', now(), now());
