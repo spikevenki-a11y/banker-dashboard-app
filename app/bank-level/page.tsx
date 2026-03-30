@@ -95,20 +95,26 @@ export default function BankLevelPage() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+        <Card
+          className="hover:shadow-lg transition-shadow cursor-pointer border-teal-200 hover:border-teal-400"
+          onClick={() => router.push("/bank-level/other-liabilities")}
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Other Liabilities</CardTitle>
-            <TrendingDown className="h-4 w-4 text-muted-foreground" />
+            <TrendingDown className="h-4 w-4 text-teal-600" />
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">Other Liabilities</p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+        <Card
+          className="hover:shadow-lg transition-shadow cursor-pointer border-indigo-200 hover:border-indigo-400"
+          onClick={() => router.push("/bank-level/other-assets")}
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Other Assets</CardTitle>
-            <PiggyBank className="h-4 w-4 text-muted-foreground" />
+            <PiggyBank className="h-4 w-4 text-indigo-600" />
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">Other Assets Management</p>
