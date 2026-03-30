@@ -121,30 +121,39 @@ export default function BankLevelPage() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+        <Card
+          className="hover:shadow-lg transition-shadow cursor-pointer border-violet-200 hover:border-violet-400"
+          onClick={() => router.push("/bank-level/reserve-and-fund")}
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Reserve & Funds</CardTitle>
-            <Shield className="h-4 w-4 text-muted-foreground" />
+            <Shield className="h-4 w-4 text-violet-600" />
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">Reserve and Funds Management</p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+        <Card
+          className="hover:shadow-lg transition-shadow cursor-pointer border-emerald-200 hover:border-emerald-400"
+          onClick={() => router.push("/bank-level/grants-and-subsidies")}
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Grants & Subsidies</CardTitle>
-            <Gift className="h-4 w-4 text-muted-foreground" />
+            <Gift className="h-4 w-4 text-emerald-600" />
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">Grants and Subsidies Management</p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+        <Card
+          className="hover:shadow-lg transition-shadow cursor-pointer border-amber-200 hover:border-amber-400"
+          onClick={() => router.push("/bank-level/provisions")}
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Provisions</CardTitle>
-            <AlertCircle className="h-4 w-4 text-muted-foreground" />
+            <AlertCircle className="h-4 w-4 text-amber-600" />
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">Provisions Management</p>
