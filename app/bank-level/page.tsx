@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Calculator, Landmark, TrendingDown, TrendingUp, Building2, Users, Wallet, PiggyBank, Receipt, DollarSign, Shield, Gift, AlertCircle, Banknote } from "lucide-react"
+import { Landmark, TrendingDown, TrendingUp, Building2, Users, Wallet, PiggyBank, Receipt, DollarSign, Shield, Gift, AlertCircle } from "lucide-react"
 import { DashboardWrapper } from "../_components/dashboard-wrapper"
 
 export default function BankLevelPage() {
@@ -17,10 +17,13 @@ export default function BankLevelPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+        <Card
+          className="hover:shadow-lg transition-shadow cursor-pointer border-sky-200 hover:border-sky-400"
+          onClick={() => router.push("/bank-level/other-bank-accounts")}
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Other Bank Accounts</CardTitle>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
+            <Building2 className="h-4 w-4 text-sky-600" />
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">Account managed in other institutions</p>
@@ -79,10 +82,13 @@ export default function BankLevelPage() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+        <Card
+          className="hover:shadow-lg transition-shadow cursor-pointer border-yellow-200 hover:border-yellow-400"
+          onClick={() => router.push("/bank-level/fixed-assets")}
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Fixed Assets</CardTitle>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
+            <Building2 className="h-4 w-4 text-yellow-600" />
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">Assets Management</p>

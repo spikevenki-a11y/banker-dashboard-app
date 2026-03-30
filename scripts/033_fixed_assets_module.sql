@@ -12,20 +12,30 @@ sales details
 // Fixed Assets Module
 
 CREATE TABLE asset_categories (
-    category_id INT PRIMARY KEY AUTO_INCREMENT,
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    category_id INT ,
     category_name VARCHAR(100) NOT NULL,
     description TEXT,
     parent_category_id INT NULL,
     gl_account_code VARCHAR(50), -- link to chart of accounts for asset value
     depreciation_gl_account_code VARCHAR(50), -- link to chart of accounts for depreciation
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+create table asset_items (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    branch_id INT NOT NULL,
+    asset_id INT,
+    asset_name VARCHAR(150) NOT NULL,
+    category_id INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (parent_category_id) REFERENCES asset_categories(category_id)
+    updated_at TIMESTAMP 
 );
 
 CREATE TABLE asset_items_details (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     branch_id INT NOT NULL,
-    asset_id INT PRIMARY KEY AUTO_INCREMENT,
+    asset_id INT ,
     asset_name VARCHAR(150) NOT NULL,
     category_id INT NOT NULL,
 
@@ -37,23 +47,24 @@ CREATE TABLE asset_items_details (
     purchase_value DECIMAL(15,2),
     net_book_value DECIMAL(15,2),
 
+    asset_quantity int,
+
     last_depreciation_date DATE,
 
-    status ENUM('active','sold','scrapped','inactive') DEFAULT 'active',
+    status VARCHAR(100) DEFAULT 'active', --('active','sold','scrapped','inactive')
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP 
 
-    FOREIGN KEY (category_id) REFERENCES asset_categories(category_id)
 );
 
-CREATE TABLE purchase_details (
+CREATE TABLE asset_purchase_details (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     branch_id INT NOT NULL,
     transaction_date DATE NOT NULL,
     batch_id INT,
     voucher_no VARCHAR(50),
-    purchase_id INT PRIMARY KEY AUTO_INCREMENT,
+    purchase_id INT ,
     
     invoice_no VARCHAR(100),
 
@@ -62,41 +73,43 @@ CREATE TABLE purchase_details (
     vendor_contact VARCHAR(100),
     vendor_address TEXT,
     
+    
     purchase_date DATE NOT NULL,
+
     total_amount DECIMAL(15,2),
 
     remarks TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE purchase_items (
+CREATE TABLE asset_purchase_items (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     branch_id INT NOT NULL,
-    purchase_item_id INT PRIMARY KEY AUTO_INCREMENT,
     purchase_id INT NOT NULL,
+    purchase_item_id INT ,
+    asset_id INT,
     asset_name VARCHAR(150),
     quantity INT DEFAULT 1,
     unit_cost DECIMAL(15,2),
-    total_cost DECIMAL(15,2),
-
-    FOREIGN KEY (purchase_id) REFERENCES purchase_details(purchase_id)
+    sgst int, -- State Government goods Service Tax
+    cgst int, -- Central Government goods service tax 
+    total_cost DECIMAL(15,2)
 );
 
-CREATE TABLE depreciation_master (
+
+CREATE TABLE asset_depreciation_master (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     branch_id INT NOT NULL,
+    serial_number VARCHAR(100),
     depreciation_id INT ,
-    asset_id INT NOT NULL,
 
-    method ENUM('SLM','WDV') NOT NULL, -- Straight Line / Written Down
-    useful_life_years INT,
+    method VARCHAR(100) , --ENUM('SLM','WDV'), -- Straight Line / Written Down
     depreciation_rate DECIMAL(5,2),
 
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (asset_id) REFERENCES asset_items_details(asset_id)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE depreciation_details (
+CREATE TABLE asset_depreciation_details (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     branch_id INT NOT NULL,
     dep_detail_id INT ,
@@ -107,12 +120,10 @@ CREATE TABLE depreciation_details (
     accumulated_depreciation DECIMAL(15,2),
     book_value DECIMAL(15,2),
 
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    FOREIGN KEY (asset_id) REFERENCES asset_items_details(asset_id)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ); 
 
-CREATE TABLE sales_details (
+CREATE TABLE asset_sales_details (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     branch_id INT NOT NULL,
 
@@ -129,10 +140,9 @@ CREATE TABLE sales_details (
     buyer_name VARCHAR(150),
     remarks TEXT,
 
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    FOREIGN KEY (asset_id) REFERENCES asset_items_details(asset_id)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
 
 CREATE TABLE asset_parameters (
     branch_id INT PRIMARY KEY,
@@ -145,7 +155,7 @@ CREATE TABLE asset_parameters (
     depr_based_on_book_value BOOLEAN DEFAULT TRUE,
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP 
 );
 
 // Insert default asset categories
