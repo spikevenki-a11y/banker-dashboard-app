@@ -35,7 +35,6 @@ export default function AccountOpeningForm({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    account_number: "",
     account_name: "",
     parent_account_number: "",
     opening_balance: "0",
@@ -71,7 +70,6 @@ export default function AccountOpeningForm({
     setSuccessMessage(null);
 
     if (
-      !formData.account_number ||
       !formData.account_name ||
       !formData.parent_account_number
     ) {
@@ -100,7 +98,6 @@ export default function AccountOpeningForm({
 
       setSuccessMessage("Account created successfully!");
       setFormData({
-        account_number: "",
         account_name: "",
         parent_account_number: "",
         opening_balance: "0",
@@ -142,22 +139,6 @@ export default function AccountOpeningForm({
           )}
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="account_number">Account Number *</Label>
-              <Input
-                id="account_number"
-                placeholder="e.g., CR001"
-                value={formData.account_number}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    account_number: e.target.value,
-                  })
-                }
-                required
-              />
-            </div>
-
             <div className="space-y-2">
               <Label htmlFor="account_name">Account Name *</Label>
               <Input

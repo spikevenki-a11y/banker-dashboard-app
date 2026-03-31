@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(grep -r investment /d/ZueTech/banker-dashboard-app --include=*.ts --include=*.tsx)"
+      "Bash(grep -r investment /d/ZueTech/banker-dashboard-app --include=*.ts --include=*.tsx)",
+      "Bash(grep -E \"\\\\.\\(sql|ts|js\\)$\")",
+      "Bash(grep -l \"gl_batch\\\\|gl_batches\" /d/ZueTech/banker-dashboard-app/scripts/*.sql)",
+      "Bash(grep -n \"CREATE TABLE IF NOT EXISTS gl_batch\" /d/ZueTech/banker-dashboard-app/scripts/*.sql)"
     ]
   }
 }
