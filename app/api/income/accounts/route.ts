@@ -47,19 +47,24 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
 
     const {
-      account_number,
       account_name,
       gl_account_code,
-      opening_balance,
       description
     } = body
 
-    if (!account_number || !account_name || !gl_account_code) {
+    if (!account_name || !gl_account_code) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
       )
     }
+
+    const { rows: [countRow] } = await pool.query(
+      `SELECT COUNT(*) AS count FROM income_accounts WHERE branch_id = $1`,
+      [branchId]
+    )
+    const seq = String(parseInt(countRow.count) + 1).padStart(7, "0")
+    const accountNumber = `${branchId}${seq}`
 
     const result = await pool.query(
         `INSERT INTO public.income_accounts (
@@ -74,9 +79,9 @@ export async function POST(request: NextRequest) {
           description,
           branch_id,
           created_by
-        ) VALUES ($1,$2,$3,$4,NULL,0.00,0.00,'ACTIVE',$5,$6 , $7)
+        ) VALUES ($1,$2,$3,$4,NULL,0.00,0.00,'ACTIVE',$5,$6,$7)
         RETURNING *`,
-        [account_number, account_name, gl_account_code, businessDate, description, branchId, userId]    )
+        [accountNumber, account_name, gl_account_code, businessDate, description, branchId, userId]    )
 
          const data = result.rows
 

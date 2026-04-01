@@ -102,6 +102,13 @@ type VoucherDetails = {
   accountClosed?: boolean
 }
 
+type IncompleteBatch = {
+  batch_id: number
+  voucher_id: number
+  voucher_type: string
+  business_date: string
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatCurrency(val: number | string) {
@@ -179,6 +186,13 @@ export default function OtherBankAccountsPage() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
 
+  // ── Batch selector ───────────────────────────────────────────────────────────
+  const [incompleteBatches, setIncompleteBatches] = useState<IncompleteBatch[]>([])
+  const [depositSelectedBatch, setDepositSelectedBatch] = useState(0)
+  const [withdrawSelectedBatch, setWithdrawSelectedBatch] = useState(0)
+  const [depositBatchPopupOpen, setDepositBatchPopupOpen] = useState(false)
+  const [withdrawBatchPopupOpen, setWithdrawBatchPopupOpen] = useState(false)
+
   // ── Form state ───────────────────────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formError, setFormError] = useState("")
@@ -222,6 +236,18 @@ export default function OtherBankAccountsPage() {
       .catch(console.error)
   }, [fetchAccounts])
 
+  // ── Batch fetching ────────────────────────────────────────────────────────────
+
+  const fetchIncompleteBatches = async () => {
+    try {
+      const res = await fetch("/api/fas/incomplete-batches", { credentials: "include" })
+      const data = await res.json()
+      if (res.ok && data.data) setIncompleteBatches(data.data)
+    } catch (e) {
+      console.error("Failed to fetch incomplete batches", e)
+    }
+  }
+
   // ── Transaction history ──────────────────────────────────────────────────────
 
   const fetchHistory = async (account: BankAccount) => {
@@ -261,6 +287,18 @@ export default function OtherBankAccountsPage() {
     `${a.account_number} — ${a.description || "No description"} (Balance: ${formatCurrency(a.account_balance)})`
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
+
+  const handleDepositVoucherTypeChange = (v: string) => {
+    setDepositVoucherType(v)
+    setDepositSelectedBatch(0)
+    if (v === "TRANSFER") fetchIncompleteBatches()
+  }
+
+  const handleWithdrawVoucherTypeChange = (v: string) => {
+    setWithdrawVoucherType(v)
+    setWithdrawSelectedBatch(0)
+    if (v === "TRANSFER") fetchIncompleteBatches()
+  }
 
   const handleDepositLedgerSelect = (v: string) => {
     setDepositLedger(v)
@@ -317,6 +355,7 @@ export default function OtherBankAccountsPage() {
     setDepositVoucherType("CASH")
     setDepositNarration("")
     setSelectedDepositAccount(null)
+    setDepositSelectedBatch(0)
     setFormError("")
   }
 
@@ -329,6 +368,7 @@ export default function OtherBankAccountsPage() {
     setWithdrawNarration("")
     setCloseAccount(false)
     setSelectedWithdrawAccount(null)
+    setWithdrawSelectedBatch(0)
     setFormError("")
   }
 
@@ -400,6 +440,7 @@ export default function OtherBankAccountsPage() {
           voucher_no: depositVoucher,
           voucher_type: depositVoucherType,
           narration: depositNarration,
+          selected_batch: depositSelectedBatch,
         }),
       })
       const data = await res.json()
@@ -447,6 +488,7 @@ export default function OtherBankAccountsPage() {
           voucher_no: withdrawVoucher,
           voucher_type: withdrawVoucherType,
           narration: withdrawNarration,
+          selected_batch: withdrawSelectedBatch,
           close_account: closeAccount,
         }),
       })
@@ -974,7 +1016,7 @@ export default function OtherBankAccountsPage() {
 
                           <div className="space-y-2">
                             <Label>Voucher Type *</Label>
-                            <Select value={depositVoucherType} onValueChange={setDepositVoucherType}>
+                            <Select value={depositVoucherType} onValueChange={handleDepositVoucherTypeChange}>
                               <SelectTrigger><SelectValue /></SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="CASH">Cash</SelectItem>
@@ -982,6 +1024,23 @@ export default function OtherBankAccountsPage() {
                               </SelectContent>
                             </Select>
                           </div>
+
+                          {depositVoucherType === "TRANSFER" && (
+                            <div className="space-y-2">
+                              <Label>GL Batch</Label>
+                              <div className="flex gap-2">
+                                <Input
+                                  readOnly
+                                  value={depositSelectedBatch !== 0 ? `Batch #${depositSelectedBatch}` : "New Batch"}
+                                  className="flex-1"
+                                />
+                                <Button type="button" variant="outline" onClick={() => setDepositBatchPopupOpen(true)}>
+                                  Select
+                                </Button>
+                              </div>
+                              <p className="text-xs text-muted-foreground">Join an existing GL batch or create a new one</p>
+                            </div>
+                          )}
 
                           <div className="space-y-2 sm:col-span-2">
                             <Label>Narration</Label>
@@ -1131,7 +1190,7 @@ export default function OtherBankAccountsPage() {
 
                           <div className="space-y-2">
                             <Label>Voucher Type *</Label>
-                            <Select value={withdrawVoucherType} onValueChange={setWithdrawVoucherType}>
+                            <Select value={withdrawVoucherType} onValueChange={handleWithdrawVoucherTypeChange}>
                               <SelectTrigger><SelectValue /></SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="CASH">Cash</SelectItem>
@@ -1139,6 +1198,23 @@ export default function OtherBankAccountsPage() {
                               </SelectContent>
                             </Select>
                           </div>
+
+                          {withdrawVoucherType === "TRANSFER" && (
+                            <div className="space-y-2">
+                              <Label>GL Batch</Label>
+                              <div className="flex gap-2">
+                                <Input
+                                  readOnly
+                                  value={withdrawSelectedBatch !== 0 ? `Batch #${withdrawSelectedBatch}` : "New Batch"}
+                                  className="flex-1"
+                                />
+                                <Button type="button" variant="outline" onClick={() => setWithdrawBatchPopupOpen(true)}>
+                                  Select
+                                </Button>
+                              </div>
+                              <p className="text-xs text-muted-foreground">Join an existing GL batch or create a new one</p>
+                            </div>
+                          )}
 
                           <div className="space-y-2 sm:col-span-2">
                             <Label>Narration</Label>
@@ -1196,6 +1272,110 @@ export default function OtherBankAccountsPage() {
                 </div>
               </TabsContent>
             </Tabs>
+
+            {/* ── Deposit Batch Selector Dialog ── */}
+            <Dialog open={depositBatchPopupOpen} onOpenChange={setDepositBatchPopupOpen}>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Select GL Batch</DialogTitle>
+                  <DialogDescription>Choose an existing incomplete batch or create a new one for this transfer</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <Button
+                    className="w-full"
+                    variant="outline"
+                    onClick={() => { setDepositSelectedBatch(0); setDepositBatchPopupOpen(false) }}
+                  >
+                    Create New Batch
+                  </Button>
+                  {incompleteBatches.length > 0 && (
+                    <div className="border rounded-lg max-h-[300px] overflow-y-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Batch ID</TableHead>
+                            <TableHead>Voucher ID</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {incompleteBatches.map((batch) => (
+                            <TableRow key={batch.batch_id}>
+                              <TableCell className="font-mono">{batch.batch_id}</TableCell>
+                              <TableCell>{batch.voucher_id}</TableCell>
+                              <TableCell><Badge variant="outline">{batch.voucher_type}</Badge></TableCell>
+                              <TableCell>{formatDate(batch.business_date)}</TableCell>
+                              <TableCell>
+                                <Button size="sm" onClick={() => { setDepositSelectedBatch(batch.batch_id); setDepositBatchPopupOpen(false) }}>
+                                  Select
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                  {incompleteBatches.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-2">No incomplete batches found. A new batch will be created.</p>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* ── Withdrawal Batch Selector Dialog ── */}
+            <Dialog open={withdrawBatchPopupOpen} onOpenChange={setWithdrawBatchPopupOpen}>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Select GL Batch</DialogTitle>
+                  <DialogDescription>Choose an existing incomplete batch or create a new one for this transfer</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <Button
+                    className="w-full"
+                    variant="outline"
+                    onClick={() => { setWithdrawSelectedBatch(0); setWithdrawBatchPopupOpen(false) }}
+                  >
+                    Create New Batch
+                  </Button>
+                  {incompleteBatches.length > 0 && (
+                    <div className="border rounded-lg max-h-[300px] overflow-y-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Batch ID</TableHead>
+                            <TableHead>Voucher ID</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {incompleteBatches.map((batch) => (
+                            <TableRow key={batch.batch_id}>
+                              <TableCell className="font-mono">{batch.batch_id}</TableCell>
+                              <TableCell>{batch.voucher_id}</TableCell>
+                              <TableCell><Badge variant="outline">{batch.voucher_type}</Badge></TableCell>
+                              <TableCell>{formatDate(batch.business_date)}</TableCell>
+                              <TableCell>
+                                <Button size="sm" onClick={() => { setWithdrawSelectedBatch(batch.batch_id); setWithdrawBatchPopupOpen(false) }}>
+                                  Select
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                  {incompleteBatches.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-2">No incomplete batches found. A new batch will be created.</p>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
 
             {/* ── Transaction History Dialog ── */}
             <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
