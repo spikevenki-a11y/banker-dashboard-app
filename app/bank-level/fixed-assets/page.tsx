@@ -247,6 +247,9 @@ export default function FixedAssetsPage() {
   const [purchaseDialogItems, setPurchaseDialogItems] = useState<any[]>([])
   const [purchaseDialogData,  setPurchaseDialogData]  = useState<Purchase | null>(null)
   const [confirmingPurchaseId, setConfirmingPurchaseId] = useState<number | null>(null)
+  const [cancelConfirmOpen,   setCancelConfirmOpen]   = useState(false)
+  const [pendingCancelId,     setPendingCancelId]     = useState<number | null>(null)
+  const [cancellingPurchaseId, setCancellingPurchaseId] = useState<number | null>(null)
 
   // ─── Data loaders ──────────────────────────────────────────────────────────
 
@@ -370,6 +373,24 @@ export default function FixedAssetsPage() {
       })
       await loadAll()
     } finally { setConfirmingPurchaseId(null) }
+  }
+
+  async function cancelPurchase(purchaseId: number) {
+    setCancellingPurchaseId(purchaseId)
+    try {
+      const res  = await fetch("/api/fixed-assets/purchase", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ purchase_id: purchaseId }),
+      })
+      const data = await res.json()
+      if (!data.success) { setErrorMsg(data.error); return }
+      await loadAll()
+    } finally {
+      setCancellingPurchaseId(null)
+      setCancelConfirmOpen(false)
+      setPendingCancelId(null)
+    }
   }
 
   async function openPurchaseDialog(purchaseId: number) {
@@ -792,7 +813,9 @@ export default function FixedAssetsPage() {
                       <TableCell className="text-right font-medium">{fmt(p.total_amount)}</TableCell>
                       <TableCell className="text-sm">{p.voucher_no || "—"}</TableCell>
                       <TableCell>
-                        {p.batch_id
+                        {p.status === "CANCELLED"
+                          ? <Badge className="text-xs bg-red-100 text-red-700">Cancelled</Badge>
+                          : p.batch_id
                           ? <Badge className="text-xs bg-green-100 text-green-700">Confirmed</Badge>
                           : <Badge className="text-xs bg-yellow-100 text-yellow-700">Pending</Badge>}
                       </TableCell>
@@ -804,17 +827,29 @@ export default function FixedAssetsPage() {
                           >
                             <Eye className="h-4 w-4 text-blue-600" />
                           </Button>
-                          {!p.batch_id && (
-                            <Button
-                              variant="ghost" size="sm" title="Confirm Purchase"
-                              className="text-green-600 hover:text-green-700"
-                              disabled={confirmingPurchaseId === p.purchase_id}
-                              onClick={() => confirmPurchase(p.purchase_id, "CASH")}
-                            >
-                              {confirmingPurchaseId === p.purchase_id
-                                ? <Loader2 className="h-4 w-4 animate-spin" />
-                                : <CheckCircle2 className="h-4 w-4" />}
-                            </Button>
+                          {!p.batch_id && p.status !== "CANCELLED" && (
+                            <>
+                              <Button
+                                variant="ghost" size="sm" title="Confirm Purchase"
+                                className="text-green-600 hover:text-green-700"
+                                disabled={confirmingPurchaseId === p.purchase_id || cancellingPurchaseId === p.purchase_id}
+                                onClick={() => confirmPurchase(p.purchase_id, "CASH")}
+                              >
+                                {confirmingPurchaseId === p.purchase_id
+                                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                                  : <CheckCircle2 className="h-4 w-4" />}
+                              </Button>
+                              <Button
+                                variant="ghost" size="sm" title="Cancel Purchase"
+                                className="text-red-500 hover:text-red-600"
+                                disabled={cancellingPurchaseId === p.purchase_id || confirmingPurchaseId === p.purchase_id}
+                                onClick={() => { setPendingCancelId(p.purchase_id); setCancelConfirmOpen(true) }}
+                              >
+                                {cancellingPurchaseId === p.purchase_id
+                                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                                  : <XCircle className="h-4 w-4" />}
+                              </Button>
+                            </>
                           )}
                         </div>
                       </TableCell>
@@ -1227,6 +1262,32 @@ export default function FixedAssetsPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* ── Cancel Purchase Confirmation Dialog ──────────────────────────── */}
+      <AlertDialog open={cancelConfirmOpen} onOpenChange={setCancelConfirmOpen}>
+        <AlertDialogContent className="max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Purchase?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the pending purchase record and all its line items. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button variant="outline" onClick={() => { setCancelConfirmOpen(false); setPendingCancelId(null) }}>
+              Keep
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={cancellingPurchaseId === pendingCancelId}
+              onClick={() => pendingCancelId && cancelPurchase(pendingCancelId)}
+            >
+              {cancellingPurchaseId === pendingCancelId
+                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Cancelling...</>
+                : "Yes, Cancel Purchase"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ── Error Dialog ─────────────────────────────────────────────────── */}
       <AlertDialog open={!!errorMsg} onOpenChange={() => setErrorMsg("")}>

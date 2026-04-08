@@ -130,6 +130,56 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// DELETE — cancel a pending purchase (only allowed before confirmation)
+export async function DELETE(request: NextRequest) {
+  const c = (await cookies()).get("banker_session")
+  if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const client = await pool.connect()
+
+  try {
+    const session  = JSON.parse(c.value)
+    const branchId = session.branch
+
+    const { purchase_id } = await request.json()
+    if (!purchase_id) {
+      return NextResponse.json({ error: "purchase_id is required" }, { status: 400 })
+    }
+
+    await client.query("BEGIN")
+
+    const { rows: [purchase] } = await client.query(
+      `SELECT * FROM asset_purchase_details WHERE purchase_id = $1 AND branch_id = $2`,
+      [purchase_id, branchId]
+    )
+    if (!purchase) {
+      await client.query("ROLLBACK")
+      return NextResponse.json({ error: "Purchase not found" }, { status: 404 })
+    }
+    if (purchase.batch_id) {
+      await client.query("ROLLBACK")
+      return NextResponse.json({ error: "Cannot cancel a confirmed purchase" }, { status: 400 })
+    }
+    if (purchase.status === "CANCELLED") {
+      await client.query("ROLLBACK")
+      return NextResponse.json({ error: "Purchase is already cancelled" }, { status: 400 })
+    }
+
+    await client.query(
+      `UPDATE asset_purchase_details SET status = 'CANCELLED' WHERE purchase_id = $1 AND branch_id = $2`,
+      [purchase_id, branchId]
+    )
+
+    await client.query("COMMIT")
+    return NextResponse.json({ success: true, message: "Purchase cancelled successfully" })
+  } catch (error: any) {
+    await client.query("ROLLBACK")
+    console.error("Fixed Assets Purchase DELETE error:", error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  } finally {
+    client.release()
+  }
+}
+
 // PATCH — confirm purchase: create individual asset records + GL entries
 export async function PATCH(request: NextRequest) {
   const c = (await cookies()).get("banker_session")
@@ -238,7 +288,8 @@ export async function PATCH(request: NextRequest) {
       let snBase = parseInt(snRow.count) + 1
 
       for (let i = 0; i < qty; i++) {
-        const serialNo = `FA${String(branchId).slice(-4)}${new Date(txnDate).getFullYear()}${String(snBase++).padStart(5, "0")}`
+        // const serialNo = `FA${String(branchId).slice(-4)}${new Date(txnDate).getFullYear()}${String(snBase++).padStart(5, "0")}`
+        const serialNo = `${String(branchId)}${new Date(txnDate).getFullYear()}${String(snBase++).padStart(5, "0")}`
         await client.query(
           `INSERT INTO asset_items_details
              (branch_id, asset_id, asset_name, category_id,
