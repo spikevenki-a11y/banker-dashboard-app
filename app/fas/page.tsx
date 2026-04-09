@@ -32,10 +32,13 @@ export default function FASPage() {
             </CardContent>
           </Card>
 
-          <Card className="cursor-pointer transition-shadow hover:shadow-lg">
+          <Card
+            className="cursor-pointer transition-shadow hover:shadow-lg border-indigo-200 hover:border-indigo-400"
+            onClick={() => router.push("/fas/day-end")}
+          >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">DayEnd</CardTitle>
-              <Calculator className="h-4 w-4 text-muted-foreground" />
+              <Calculator className="h-4 w-4 text-indigo-600" />
             </CardHeader>
             <CardContent>
               <p className="text-xs text-muted-foreground">
