@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -26,6 +26,7 @@ import {
   PenTool,
   CheckCircle2,
   UserPlus,
+  ArrowLeft,
 } from "lucide-react"
 import { DashboardWrapper } from "../_components/dashboard-wrapper"
 
@@ -129,6 +130,14 @@ interface CreatedCustomer {
 export default function CustomerPage() {
   const router = useRouter()
   const [newCustomer, setNewCustomer] = useState<Customer>(initialCustomer)
+  const [castes, setCastes] = useState<{ serial_no: string; caste_name: string }[]>([])
+
+  useEffect(() => {
+    fetch("/api/customers/caste", { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => { if (d.success) setCastes(d.castes) })
+      .catch(console.error)
+  }, [])
   const [photo, setPhoto] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string>("")
   const [signature, setSignature] = useState<File | null>(null)
@@ -216,6 +225,15 @@ export default function CustomerPage() {
   return (
     <DashboardWrapper>
     <div className="flex-1 space-y-6 p-8">
+        <div className="flex items-center gap-4 mb-2">
+          <Button variant="ghost" size="icon" onClick={() => router.back()}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Create Customer</h1>
+            <p className="text-sm text-muted-foreground">Register a new customer account</p>
+          </div>
+        </div>
         <div className="grid grid-cols-3 gap-4 border-b">
             <div className="space-y-2 px-5 ">
                 
@@ -426,13 +444,15 @@ export default function CustomerPage() {
                                         <select
                                         id="caste"
                                         className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                        value={newCustomer.caste}
+                                        value={newCustomer.caste as string}
                                         onChange={(e) => setNewCustomer({ ...newCustomer, caste: e.target.value })}
                                         >
                                             <option value="">Select Caste</option>
-                                            <option value="OBC">OBC</option>
-                                            <option value="SC">SC</option>
-                                            <option value="ST">ST</option>
+                                            {castes.map((c) => (
+                                                <option key={c.serial_no} value={c.caste_name}>
+                                                    {c.caste_name}
+                                                </option>
+                                            ))}
                                         </select>
                                     </div>
                                     <div className="space-y-2">

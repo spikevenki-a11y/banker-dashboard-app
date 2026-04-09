@@ -42,7 +42,7 @@ CREATE TABLE investment_transactions (
     debit_amount DECIMAL(15,2) DEFAULT 0,
     credit_amount DECIMAL(15,2) DEFAULT 0,
 
-    interest_amount DECIMAL(15,2) DEFAULT 0,
+    interest_amount DECIMAL(15,2) DEFAULT 0, -- when interest is involved while closing an investment or receiving interest
     ledger_balance_amount DECIMAL(15,2),
 
     status VARCHAR(50),

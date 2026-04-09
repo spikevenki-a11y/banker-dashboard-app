@@ -12,7 +12,7 @@ export async function GET() {
     // Get ledger accounts for expenses (parent account code for expenses is 33000000)
     const ledger_accounts = await pool.query(
       `SELECT accountcode, accountname FROM chart_of_accounts 
-        WHERE parentaccountcode = 33000000
+        WHERE parentaccountcode = 43000000
         AND isledger = '1'
         AND branch_id = $1
         ORDER BY accountcode DESC`,

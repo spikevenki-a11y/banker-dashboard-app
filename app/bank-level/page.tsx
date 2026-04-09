@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Calculator, Landmark, TrendingDown, TrendingUp, Building2, Users, Wallet, PiggyBank, Receipt, DollarSign, Shield, Gift, AlertCircle, Banknote } from "lucide-react"
+import { Landmark, TrendingDown, TrendingUp, Building2, Users, Wallet, PiggyBank, Receipt, DollarSign, Shield, Gift, AlertCircle } from "lucide-react"
 import { DashboardWrapper } from "../_components/dashboard-wrapper"
 
 export default function BankLevelPage() {
@@ -17,10 +17,13 @@ export default function BankLevelPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+        <Card
+          className="hover:shadow-lg transition-shadow cursor-pointer border-sky-200 hover:border-sky-400"
+          onClick={() => router.push("/bank-level/other-bank-accounts")}
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Other Bank Accounts</CardTitle>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
+            <Building2 className="h-4 w-4 text-sky-600" />
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">Account managed in other institutions</p>
@@ -40,10 +43,13 @@ export default function BankLevelPage() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+        <Card
+          className="hover:shadow-lg transition-shadow cursor-pointer border-emerald-200 hover:border-emerald-400"
+          onClick={() => router.push("/bank-level/investments")}
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Investment</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <TrendingUp className="h-4 w-4 text-emerald-600" />
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">Investment related accounts</p>
@@ -76,60 +82,78 @@ export default function BankLevelPage() {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+        <Card
+          className="hover:shadow-lg transition-shadow cursor-pointer border-yellow-200 hover:border-yellow-400"
+          onClick={() => router.push("/bank-level/fixed-assets")}
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Fixed Assets</CardTitle>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
+            <Building2 className="h-4 w-4 text-yellow-600" />
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">Assets Management</p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+        <Card
+          className="hover:shadow-lg transition-shadow cursor-pointer border-teal-200 hover:border-teal-400"
+          onClick={() => router.push("/bank-level/other-liabilities")}
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Other Liabilities</CardTitle>
-            <TrendingDown className="h-4 w-4 text-muted-foreground" />
+            <TrendingDown className="h-4 w-4 text-teal-600" />
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">Other Liabilities</p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+        <Card
+          className="hover:shadow-lg transition-shadow cursor-pointer border-indigo-200 hover:border-indigo-400"
+          onClick={() => router.push("/bank-level/other-assets")}
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Other Assets</CardTitle>
-            <PiggyBank className="h-4 w-4 text-muted-foreground" />
+            <PiggyBank className="h-4 w-4 text-indigo-600" />
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">Other Assets Management</p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+        <Card
+          className="hover:shadow-lg transition-shadow cursor-pointer border-violet-200 hover:border-violet-400"
+          onClick={() => router.push("/bank-level/reserve-and-fund")}
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Reserve & Funds</CardTitle>
-            <Shield className="h-4 w-4 text-muted-foreground" />
+            <Shield className="h-4 w-4 text-violet-600" />
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">Reserve and Funds Management</p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+        <Card
+          className="hover:shadow-lg transition-shadow cursor-pointer border-emerald-200 hover:border-emerald-400"
+          onClick={() => router.push("/bank-level/grants-and-subsidies")}
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Grants & Subsidies</CardTitle>
-            <Gift className="h-4 w-4 text-muted-foreground" />
+            <Gift className="h-4 w-4 text-emerald-600" />
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">Grants and Subsidies Management</p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+        <Card
+          className="hover:shadow-lg transition-shadow cursor-pointer border-amber-200 hover:border-amber-400"
+          onClick={() => router.push("/bank-level/provisions")}
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Provisions</CardTitle>
-            <AlertCircle className="h-4 w-4 text-muted-foreground" />
+            <AlertCircle className="h-4 w-4 text-amber-600" />
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">Provisions Management</p>

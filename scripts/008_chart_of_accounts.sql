@@ -58,6 +58,21 @@ VALUES
 (23080102, 25000000, 'Sundry Debtors',         2, b'1', 20000000, 0, b'1', now(), now()),
 (23080102, 26000000, 'Other Assets',           2, b'1', 20000000, 0, b'1', now(), now());
 
+
+INSERT INTO public.chart_of_accounts
+(branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate)
+VALUES
+(23080102, 23100000, 'Cash In Hand',     2, b'1', 23000000, 0, b'1', now(), now()),
+(23080102, 23200000, 'Bank Balances',    2, b'1', 23000000, 0, b'1', now(), now());
+
+
+INSERT INTO public.chart_of_accounts
+(branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate)
+VALUES
+(23080102, 23201000, 'Cash In Hand',     2, b'1', 23200000, 0, b'1', now(), now()),
+(23080102, 23201000, 'Cash In Hand',     2, b'1', 23200000, 0, b'1', now(), now()),
+
+
 -- -----------------------------
 -- 3️⃣ Income (Parent + Children)
 -- -----------------------------
@@ -175,10 +190,10 @@ INSERT INTO public.chart_of_accounts
 (branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate)
 VALUES
 (23080101, 41000000, 'Interest Paid',        4, b'1', 40000000, 0, b'1', now(), now()),
-(23080101, 42000000, 'Salary Expenses',      4, b'1', 40000000, 0, b'1', now(), now()),
-(23080101, 43000000, 'Other Expenses',       4, b'1', 40000000, 0, b'1', now(), now()),
+(23080101, 42000000, 'Interest Payable',      4, b'1', 40000000, 0, b'1', now(), now()),
+(23080101, 43000000, 'Establishment And Other Expenses',       4, b'1', 40000000, 0, b'1', now(), now()),
 (23080101, 44000000, 'Provision Created',    4, b'1', 40000000, 0, b'1', now(), now()),
-(23080101, 45000000, 'Asset Depreciations',  4, b'1', 40000000, 0, b'1', now(), now());
+(23080101, 45000000, 'Trade Expenditure',  4, b'1', 40000000, 0, b'1', now(), now());
 
 -- -----------------------------
 -- 5️⃣ Profit & Loss (Parent + Child)

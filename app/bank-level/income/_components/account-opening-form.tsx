@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -16,12 +15,9 @@ interface GLAccount {
 }
 
 export default function AccountOpeningForm({ onAccountCreated }: { onAccountCreated: () => void }) {
-  const { user } = useAuth()
   const [formData, setFormData] = useState({
-    accountNumber: "",
     accountName: "",
     glAccountCode: "",
-    openingBalance: "0",
     description: "",
   })
 
@@ -32,16 +28,10 @@ export default function AccountOpeningForm({ onAccountCreated }: { onAccountCrea
 
   useEffect(() => {
     const fetchGLAccounts = async () => {
-      console.log("Fetching GL accounts for branch:", user?.branch_id)
-      try { 
-        
-        const response = await fetch(
-          `/api/income/ledger-accounts`
-        )
-        
+      try {
+        const response = await fetch(`/api/income/ledger-accounts`)
         const accounts = await response.json()
         if (!accounts.success) throw new Error("Failed to fetch GL accounts")
-        console.log("Fetched GL accounts:", accounts.accounts)
         setGlAccounts(accounts.accounts)
       } catch (error) {
         console.error("Error fetching GL accounts:", error)
@@ -55,23 +45,13 @@ export default function AccountOpeningForm({ onAccountCreated }: { onAccountCrea
     }
 
     fetchGLAccounts()
-  }, [user?.branch_id])
+  }, [])
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: value,
-    }))
-  }
-
-  const handleGLAccountChange = (value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      glAccountCode: value,
-    }))
+    setFormData(prev => ({ ...prev, [name]: value }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -80,9 +60,6 @@ export default function AccountOpeningForm({ onAccountCreated }: { onAccountCrea
     setMessage(null)
 
     try {
-      if (!formData.accountNumber.trim()) {
-        throw new Error("Account number is required")
-      }
       if (!formData.accountName.trim()) {
         throw new Error("Account name is required")
       }
@@ -94,12 +71,9 @@ export default function AccountOpeningForm({ onAccountCreated }: { onAccountCrea
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          account_number: formData.accountNumber,
           account_name: formData.accountName,
           gl_account_code: parseInt(formData.glAccountCode),
-          opening_balance: parseFloat(formData.openingBalance) || 0,
           description: formData.description,
-          branch_id: user?.branch_id,
         }),
       })
 
@@ -111,16 +85,10 @@ export default function AccountOpeningForm({ onAccountCreated }: { onAccountCrea
 
       setMessage({
         type: "success",
-        text: `Account ${formData.accountNumber} created successfully!`,
+        text: "Account created successfully!",
       })
 
-      setFormData({
-        accountNumber: "",
-        accountName: "",
-        glAccountCode: "",
-        openingBalance: "0",
-        description: "",
-      })
+      setFormData({ accountName: "", glAccountCode: "", description: "" })
 
       setTimeout(onAccountCreated, 1500)
     } catch (error) {
@@ -162,19 +130,7 @@ export default function AccountOpeningForm({ onAccountCreated }: { onAccountCrea
 
           <div className="grid md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label htmlFor="accountNumber">Account Number</Label>
-              <Input
-                id="accountNumber"
-                name="accountNumber"
-                placeholder="e.g., INC-001"
-                value={formData.accountNumber}
-                onChange={handleInputChange}
-                disabled={loading}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="accountName">Account Name</Label>
+              <Label htmlFor="accountName">Account Name *</Label>
               <Input
                 id="accountName"
                 name="accountName"
@@ -186,8 +142,8 @@ export default function AccountOpeningForm({ onAccountCreated }: { onAccountCrea
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="glAccountCode">Ledger Account (Income Head)</Label>
-              <Select value={formData.glAccountCode} onValueChange={handleGLAccountChange}>
+              <Label htmlFor="glAccountCode">Ledger Account (Income Head) *</Label>
+              <Select value={formData.glAccountCode} onValueChange={(value) => setFormData(prev => ({ ...prev, glAccountCode: value }))}>
                 <SelectTrigger disabled={loading || fetchingGL}>
                   <SelectValue placeholder={fetchingGL ? "Loading accounts..." : "Select a ledger account"} />
                 </SelectTrigger>
@@ -202,20 +158,9 @@ export default function AccountOpeningForm({ onAccountCreated }: { onAccountCrea
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="openingBalance">Opening Balance</Label>
-              <Input
-                id="openingBalance"
-                name="openingBalance"
-                type="number"
-                placeholder="0.00"
-                value={formData.openingBalance}
-                onChange={handleInputChange}
-                disabled={loading}
-                step="0.01"
-              />
+              <p className="text-xs text-muted-foreground">
+                Maps to parent ledger account from Chart of Accounts
+              </p>
             </div>
           </div>
 

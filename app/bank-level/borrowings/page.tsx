@@ -101,14 +101,17 @@ type BorrowingTransaction = {
 }
 
 type VoucherDetails = {
-  transactionType: "drawal" | "repayment"
-  voucherNo: string | number
-  batchId: string | number
+  transactionType: "open" | "drawal" | "repayment"
+  voucherNo?: string | number
+  batchId?: string | number
   transactionDate: string
-  voucherType: string
-  ledgerName: string
+  voucherType?: string
+  ledgerName?: string
   accountNumber: string
-  borrowingAgency: string
+  borrowingAgency?: string
+  // Account opening
+  typeOfBorrowing?: string
+  amountSanctioned?: number
   // Drawal
   drawalAmount?: number
   // Repayment breakdown
@@ -117,7 +120,7 @@ type VoucherDetails = {
   interestPaid?: number
   otherCharges?: number
   accountStatus?: string
-  newBalance: number
+  newBalance?: number
 }
 
 function formatCurrency(val: number | string) {
@@ -338,7 +341,14 @@ export default function BorrowingsPage() {
       const data = await res.json()
       if (data.error) throw new Error(data.error)
 
-      setSuccessMessage(`Borrowing account ${data.account_number} created successfully!`)
+      setVoucherDetails({
+        transactionType: "open",
+        transactionDate: dateOfSanction,
+        accountNumber: data.account_number,
+        borrowingAgency: borrowingAgency,
+        typeOfBorrowing: typeOfBorrowing,
+        amountSanctioned: parseFloat(amountSanctioned),
+      })
       setSuccessOpen(true)
       resetAccountForm()
       fetchAccounts()
@@ -694,7 +704,7 @@ export default function BorrowingsPage() {
                           <TableHeader>
                             <TableRow>
                               <TableHead>Account No</TableHead>
-                              <TableHead>Agency</TableHead>
+                              <TableHead>Purpose</TableHead>
                               <TableHead>Type</TableHead>
                               <TableHead className="text-right">Sanctioned</TableHead>
                               <TableHead className="text-right">Balance</TableHead>
@@ -708,7 +718,7 @@ export default function BorrowingsPage() {
                             {filteredAccounts.map((account) => (
                               <TableRow key={account.id}>
                                 <TableCell className="font-mono font-medium">{account.account_number}</TableCell>
-                                <TableCell>{account.borrowing_agency || "---"}</TableCell>
+                                <TableCell>{account.purpose || "---"}</TableCell>
                                 <TableCell>
                                   <Badge className={getTypeBadge(account.type_of_borrowing)}>
                                     {account.type_of_borrowing === "cash_credit" ? "Cash Credit" : "Loan"}
@@ -975,7 +985,7 @@ export default function BorrowingsPage() {
                             </span>
                           </div>
                           <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Agency</span>
+                            <span className="text-muted-foreground">Borrowing Head</span>
                             <span className="font-medium">{borrowingAgency || "---"}</span>
                           </div>
                           <div className="flex justify-between text-sm">
@@ -1451,43 +1461,73 @@ export default function BorrowingsPage() {
                     <CheckCircle2 className="h-8 w-8 text-green-600" />
                   </div>
                   <AlertDialogTitle className="text-center text-lg">
-                    {voucherDetails?.transactionType === "drawal"
+                    {voucherDetails?.transactionType === "open"
+                      ? "Borrowing Account Opened Successfully"
+                      : voucherDetails?.transactionType === "drawal"
                       ? "Drawal Recorded Successfully"
                       : "Repayment Recorded Successfully"}
                   </AlertDialogTitle>
                   <AlertDialogDescription className="text-center text-xs">
-                    GL batch created and pending approval
+                    {voucherDetails?.transactionType === "open"
+                      ? "The borrowing account has been registered"
+                      : "GL batch created and pending approval"}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
 
                 {voucherDetails && (
                   <div className="space-y-3 py-2">
-                    {/* Voucher header band */}
-                    <div className="flex items-center justify-between rounded-md bg-muted px-4 py-2 text-sm">
-                      <span className="font-semibold text-foreground">
-                        Voucher&nbsp;#{voucherDetails.voucherNo}
-                      </span>
-                      <span className="text-muted-foreground">
-                        Batch&nbsp;#{voucherDetails.batchId}
-                      </span>
-                    </div>
+                    {/* Voucher header band — only for drawal/repayment */}
+                    {voucherDetails.transactionType !== "open" && (
+                      <div className="flex items-center justify-between rounded-md bg-muted px-4 py-2 text-sm">
+                        <span className="font-semibold text-foreground">
+                          Voucher&nbsp;#{voucherDetails.voucherNo}
+                        </span>
+                        <span className="text-muted-foreground">
+                          Batch&nbsp;#{voucherDetails.batchId}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Details grid */}
                     <div className="rounded-lg border divide-y text-sm">
-                      {[
-                        { label: "Date", value: formatDate(voucherDetails.transactionDate) },
-                        { label: "Voucher Type", value: voucherDetails.voucherType },
-                        { label: "Ledger", value: voucherDetails.ledgerName },
-                        { label: "Account No.", value: voucherDetails.accountNumber },
-                        ...(voucherDetails.borrowingAgency
-                          ? [{ label: "Agency", value: voucherDetails.borrowingAgency }]
-                          : []),
-                      ].map(({ label, value }) => (
-                        <div key={label} className="flex justify-between px-4 py-2">
-                          <span className="text-muted-foreground">{label}</span>
-                          <span className="font-medium text-foreground">{value}</span>
-                        </div>
-                      ))}
+                      {voucherDetails.transactionType === "open" ? (
+                        <>
+                          {[
+                            { label: "Account No.", value: voucherDetails.accountNumber },
+                            { label: "Sanction Date", value: formatDate(voucherDetails.transactionDate) },
+                            ...(voucherDetails.borrowingAgency ? [{ label: "Agency", value: voucherDetails.borrowingAgency }] : []),
+                            ...(voucherDetails.typeOfBorrowing ? [{ label: "Type", value: voucherDetails.typeOfBorrowing }] : []),
+                          ].map(({ label, value }) => (
+                            <div key={label} className="flex justify-between px-4 py-2">
+                              <span className="text-muted-foreground">{label}</span>
+                              <span className="font-medium text-foreground">{value}</span>
+                            </div>
+                          ))}
+                          <div className="flex justify-between bg-muted/40 px-4 py-2">
+                            <span className="font-medium text-foreground">Amount Sanctioned</span>
+                            <span className="font-semibold text-foreground">
+                              {formatCurrency(voucherDetails.amountSanctioned!)}
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          {[
+                            { label: "Date", value: formatDate(voucherDetails.transactionDate) },
+                            { label: "Voucher Type", value: voucherDetails.voucherType! },
+                            { label: "Ledger", value: voucherDetails.ledgerName! },
+                            { label: "Account No.", value: voucherDetails.accountNumber },
+                            ...(voucherDetails.borrowingAgency
+                              ? [{ label: "Agency", value: voucherDetails.borrowingAgency }]
+                              : []),
+                          ].map(({ label, value }) => (
+                            <div key={label} className="flex justify-between px-4 py-2">
+                              <span className="text-muted-foreground">{label}</span>
+                              <span className="font-medium text-foreground">{value}</span>
+                            </div>
+                          ))}
+                        </>
+                      )}
 
                       {/* Drawal amount */}
                       {voucherDetails.transactionType === "drawal" && (
@@ -1531,13 +1571,15 @@ export default function BorrowingsPage() {
                         </>
                       )}
 
-                      {/* New balance — always shown */}
-                      <div className="flex justify-between bg-muted/40 px-4 py-2">
-                        <span className="font-medium text-foreground">New Balance</span>
-                        <span className="font-semibold text-foreground">
-                          {formatCurrency(voucherDetails.newBalance)}
-                        </span>
-                      </div>
+                      {/* New balance — shown for drawal/repayment */}
+                      {voucherDetails.newBalance !== undefined && (
+                        <div className="flex justify-between bg-muted/40 px-4 py-2">
+                          <span className="font-medium text-foreground">New Balance</span>
+                          <span className="font-semibold text-foreground">
+                            {formatCurrency(voucherDetails.newBalance)}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Account closed badge */}
