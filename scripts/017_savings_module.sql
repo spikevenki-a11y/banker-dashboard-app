@@ -32,6 +32,7 @@ create table savings_schemes (
   minimum_age integer not null default 0,
   maximum_age integer not null default 0,
   is_staff_only boolean not null default false,
+  interest_payable_allowed boolean not null default false,
   scheme_status varchar(20) not null default 'ACTIVE',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

@@ -154,8 +154,7 @@ CREATE TABLE IF NOT EXISTS loan_interest_accrual (
   id                    UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
   branch_id             BIGINT          NOT NULL
                           REFERENCES branchparameters(branch_id),
-  loan_application_id   BIGINT          NOT NULL
-                          REFERENCES loan_applications(loan_application_id),
+  loan_application_id   BIGINT          NOT NULL,
   accrual_date          DATE            NOT NULL,
   outstanding_principal NUMERIC(15,2)   NOT NULL DEFAULT 0,
   interest_rate         NUMERIC(5,2)    NOT NULL DEFAULT 0,
@@ -168,10 +167,8 @@ CREATE TABLE IF NOT EXISTS loan_interest_accrual (
   npa_flag              BOOLEAN         NOT NULL DEFAULT false,
   dayend_id             UUID            NOT NULL
                           REFERENCES dayend_log(id),
-  created_at            TIMESTAMP       NOT NULL DEFAULT now(),
+  created_at            TIMESTAMP       NOT NULL DEFAULT now()
 
-  CONSTRAINT uq_loan_accrual_loan_date
-    UNIQUE (loan_application_id, accrual_date)
 );
 
 CREATE INDEX IF NOT EXISTS idx_loan_accrual_loan
