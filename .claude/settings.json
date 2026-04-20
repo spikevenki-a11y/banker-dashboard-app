@@ -5,7 +5,8 @@
       "Bash(grep -E \"\\\\.\\(sql|ts|js\\)$\")",
       "Bash(grep -l \"gl_batch\\\\|gl_batches\" /d/ZueTech/banker-dashboard-app/scripts/*.sql)",
       "Bash(grep -n \"CREATE TABLE IF NOT EXISTS gl_batch\" /d/ZueTech/banker-dashboard-app/scripts/*.sql)",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

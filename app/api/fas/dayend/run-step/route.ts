@@ -69,7 +69,8 @@ export async function POST(req: NextRequest) {
     let recordsProcessed = 0
 
     if (stepName === "SAVINGS_ACCRUAL") {
-      // Accrue daily interest for active savings accounts
+      // Accrue daily interest only for accounts whose scheme has interest_payable_allowed = true.
+      // Accounts belonging to schemes where interest_payable_allowed = false are excluded entirely.
       const accrualRes = await client.query(
         `INSERT INTO savings_interest_accrual
            (branch_id, account_number, accrual_date, opening_balance, interest_rate,
@@ -79,25 +80,33 @@ export async function POST(req: NextRequest) {
            sa.account_number,
            $1::date,
            sa.clear_balance,
-           COALESCE(ip.savings_interest_rate, 0),
-           ROUND(sa.clear_balance * COALESCE(ip.savings_interest_rate, 0) / 100.0 / 365.0, 4),
+           COALESCE(ip.base_rate, 0),
+           ROUND(sa.clear_balance * COALESCE(ip.base_rate, 0) / 100.0 / 365.0, 4),
            COALESCE(sa.accrued_interest_balance, 0) +
-             ROUND(sa.clear_balance * COALESCE(ip.savings_interest_rate, 0) / 100.0 / 365.0, 4),
+             ROUND(sa.clear_balance * COALESCE(ip.base_rate, 0) / 100.0 / 365.0, 4),
            false,
            $2::uuid
          FROM savings_accounts sa
+         -- Validate interest_payable_allowed on the scheme; exclude accounts where it is false
+         INNER JOIN savings_schemes ss
+           ON ss.scheme_id = sa.scheme_id
+          AND ss.interest_payable_allowed = true
          LEFT JOIN interest_policy ip ON ip.branch_id = sa.branch_id
-         WHERE sa.branch_id = $3 AND sa.account_status = 'Active'
+         WHERE sa.branch_id = $3
+           AND sa.account_status = 'Active'
          ON CONFLICT (account_number, accrual_date) DO NOTHING`,
         [businessDate, dayendId, branchId]
       )
       recordsProcessed = accrualRes.rowCount ?? 0
 
-      // Update running accrued_interest_balance on savings_accounts
+      // Update running accrued_interest_balance — only for eligible (interest_payable_allowed) accounts
       await client.query(
         `UPDATE savings_accounts sa
          SET accrued_interest_balance = sia.cumulative_accrual
          FROM savings_interest_accrual sia
+         INNER JOIN savings_schemes ss
+           ON ss.scheme_id = (SELECT scheme_id FROM savings_accounts WHERE account_number = sia.account_number)
+          AND ss.interest_payable_allowed = true
          WHERE sia.account_number = sa.account_number
            AND sia.accrual_date = $1::date
            AND sa.branch_id = $2`,
@@ -115,12 +124,12 @@ export async function POST(req: NextRequest) {
            da.deposittype,
            $1::date,
            da.clearbalance,
-           da.interestrate,
-           ROUND(da.clearbalance * da.interestrate / 100.0 / 365.0, 4),
+           da.rateofinterest,
+           ROUND(da.clearbalance * da.rateofinterest / 100.0 / 365.0, 4),
            COALESCE(
              (SELECT cumulative_accrual FROM deposit_interest_accrual
               WHERE account_id = da.id ORDER BY accrual_date DESC LIMIT 1), 0
-           ) + ROUND(da.clearbalance * da.interestrate / 100.0 / 365.0, 4),
+           ) + ROUND(da.clearbalance * da.rateofinterest / 100.0 / 365.0, 4),
            false,
            $2::uuid
          FROM deposit_account da
@@ -144,9 +153,9 @@ export async function POST(req: NextRequest) {
            la.branch_id,
            la.loan_application_id,
            $1::date,
-           la.outstanding_balance,
+           la.loan_outstanding,
            la.interest_rate,
-           ROUND(la.outstanding_balance * la.interest_rate / 100.0 / 365.0, 4),
+           ROUND(la.loan_outstanding * la.interest_rate / 100.0 / 365.0, 4),
            la.overdue_days,
            la.npa_flag,
            $2::uuid

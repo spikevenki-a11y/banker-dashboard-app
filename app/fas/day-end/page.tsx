@@ -51,6 +51,11 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   Coins,
+  ChevronLeft,
+  ChevronRight,
+  FileCheck,
+  FileX,
+  PlayCircle,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 
@@ -112,6 +117,19 @@ interface CashFlow {
   makerName: string
   makerEmpCode: string
   approvedAt: string | null
+}
+
+interface PendingVoucher {
+  id: string
+  batchId: number
+  voucherId: number
+  businessDate: string
+  voucherType: string
+  status: string
+  makerName: string
+  makerEmpCode: string
+  totalDebit: number
+  totalCredit: number
 }
 
 interface HistoryRow {
@@ -201,9 +219,17 @@ export default function DayEndPage() {
 
   const [runningStep, setRunningStep] = useState<string | null>(null)
   const [confirmStep, setConfirmStep] = useState<string | null>(null)
+  const [runningAll, setRunningAll] = useState(false)
+  const [confirmRunAll, setConfirmRunAll] = useState(false)
 
-  const [activeTab, setActiveTab] = useState<"overview" | "cash-flows" | "steps" | "history">("overview")
+  const [activeTab, setActiveTab] = useState<"overview" | "pending-vouchers" | "cash-flows" | "steps" | "history">("overview")
   const [flowFilter, setFlowFilter] = useState<"ALL" | "RECEIPT" | "PAYMENT">("ALL")
+
+  // Pending vouchers table state
+  const [pendingVouchers, setPendingVouchers] = useState<PendingVoucher[]>([])
+  const [pvLoading, setPvLoading] = useState(false)
+  const [pvPage, setPvPage] = useState(1)
+  const [pvPageSize, setPvPageSize] = useState<10 | 20 | 50>(10)
 
   // Fetch summary
   const fetchSummary = useCallback(async () => {
@@ -219,6 +245,20 @@ export default function DayEndPage() {
       setError("Network error. Please try again.")
     } finally {
       setLoading(false)
+    }
+  }, [])
+
+  // Fetch pending vouchers (reuses the same endpoint as verify-vouchers page)
+  const fetchPendingVouchers = useCallback(async () => {
+    setPvLoading(true)
+    try {
+      const res = await fetch("/api/fas/pending-vouchers")
+      const data = await res.json()
+      if (res.ok) setPendingVouchers(data.data || [])
+    } catch {
+      // silent
+    } finally {
+      setPvLoading(false)
     }
   }, [])
 
@@ -258,10 +298,11 @@ export default function DayEndPage() {
     fetchHistory()
   }, [fetchSummary, fetchHistory])
 
-  // Fetch cash flows when tab is opened
+  // Fetch pending vouchers / cash flows when those tabs are opened
   useEffect(() => {
+    if (activeTab === "pending-vouchers") { fetchPendingVouchers(); setPvPage(1) }
     if (activeTab === "cash-flows") fetchCashFlows()
-  }, [activeTab, fetchCashFlows])
+  }, [activeTab, fetchPendingVouchers, fetchCashFlows])
 
   // Initiate day-end
   async function handleInitiate() {
@@ -309,6 +350,61 @@ export default function DayEndPage() {
       setRunningStep(null)
       setConfirmStep(null)
     }
+  }
+
+  // Run all remaining steps sequentially
+  async function handleRunAll() {
+    if (!summary?.dayend?.id) return
+    setRunningAll(true)
+    setConfirmRunAll(false)
+    setError("")
+    setSuccess("")
+
+    // Re-fetch to get the latest step statuses before starting
+    await fetchSummary()
+
+    let currentSummary = summary
+    for (const step of STEPS) {
+      // Always re-read the latest stepMap from state before each step
+      const latestStepData = currentSummary?.steps?.find((s) => s.step_name === step.key)
+      if (latestStepData?.status === "DONE") continue  // already done, skip
+
+      setRunningStep(step.key)
+      try {
+        const res = await fetch("/api/fas/dayend/run-step", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dayendId: summary.dayend.id, stepName: step.key }),
+        })
+        const data = await res.json()
+        if (!res.ok) {
+          setError(`Run All stopped: ${step.label} failed — ${data.error || "Unknown error"}`)
+          setRunningStep(null)
+          setRunningAll(false)
+          await fetchSummary()
+          return
+        }
+        // Refresh summary so the next iteration sees up-to-date step statuses
+        const refreshRes = await fetch("/api/fas/dayend/summary")
+        const refreshData = await refreshRes.json()
+        if (refreshRes.ok) {
+          setSummary(refreshData)
+          currentSummary = refreshData
+        }
+      } catch {
+        setError(`Run All stopped: network error during ${step.label}.`)
+        setRunningStep(null)
+        setRunningAll(false)
+        await fetchSummary()
+        return
+      }
+    }
+
+    setRunningStep(null)
+    setRunningAll(false)
+    setSuccess("All day-end steps completed successfully.")
+    await fetchSummary()
+    await fetchHistory()
   }
 
   const stepMap = Object.fromEntries(
@@ -597,10 +693,11 @@ export default function DayEndPage() {
             <div className="mb-4 flex gap-1 border-b">
               {(
                 [
-                  { key: "overview",    label: "Overview" },
-                  { key: "cash-flows",  label: "Cash Flows" },
-                  { key: "steps",       label: "Day-End Steps" },
-                  { key: "history",     label: "History" },
+                  { key: "overview",          label: "Overview" },
+                  { key: "pending-vouchers",  label: `Pending Vouchers${(summary?.pendingVouchers || 0) > 0 ? ` (${summary!.pendingVouchers})` : ""}` },
+                  { key: "cash-flows",        label: "Cash Flows" },
+                  { key: "steps",             label: "Day-End Steps" },
+                  { key: "history",           label: "History" },
                 ] as const
               ).map((tab) => (
                 <button
@@ -734,6 +831,224 @@ export default function DayEndPage() {
                 </Card>
               </div>
             )}
+
+            {/* ══════════════ PENDING VOUCHERS TAB ══════════════ */}
+            {activeTab === "pending-vouchers" && (() => {
+              const balanced   = pendingVouchers.filter((v) => v.totalDebit === v.totalCredit)
+              const unbalanced = pendingVouchers.filter((v) => v.totalDebit !== v.totalCredit)
+              const totalPages = Math.max(1, Math.ceil(pendingVouchers.length / pvPageSize))
+              const safePage   = Math.min(pvPage, totalPages)
+              const pageSlice  = pendingVouchers.slice((safePage - 1) * pvPageSize, safePage * pvPageSize)
+              const start      = pendingVouchers.length === 0 ? 0 : (safePage - 1) * pvPageSize + 1
+              const end        = Math.min(safePage * pvPageSize, pendingVouchers.length)
+              return (
+                <div className="space-y-4">
+                  {/* Summary chips */}
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2">
+                      <Clock className="h-4 w-4 text-blue-500" />
+                      <span className="text-xs font-semibold">{pendingVouchers.length} Total Pending</span>
+                    </div>
+                    <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2">
+                      <FileCheck className="h-4 w-4 text-green-500" />
+                      <span className="text-xs font-semibold text-green-700">{balanced.length} Balanced</span>
+                    </div>
+                    <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2">
+                      <FileX className="h-4 w-4 text-red-500" />
+                      <span className="text-xs font-semibold text-red-700">{unbalanced.length} Unbalanced</span>
+                    </div>
+                    {hasPendingVouchers && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="ml-auto gap-1.5 text-xs border-blue-300 text-blue-700 hover:bg-blue-50"
+                        onClick={() => router.push("/fas/verify-vouchers")}
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Go to Verify Vouchers
+                      </Button>
+                    )}
+                  </div>
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <FileWarning className="h-4 w-4 text-yellow-600" />
+                            Pending Vouchers
+                          </CardTitle>
+                          <CardDescription>
+                            {pvLoading
+                              ? "Loading…"
+                              : pendingVouchers.length === 0
+                              ? "No pending vouchers — all clear"
+                              : `Showing ${start}–${end} of ${pendingVouchers.length} voucher${pendingVouchers.length !== 1 ? "s" : ""} awaiting verification`}
+                          </CardDescription>
+                        </div>
+                        {/* Page-size selector */}
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>Rows per page:</span>
+                          <div className="flex rounded-md border overflow-hidden">
+                            {([10, 20, 50] as const).map((n) => (
+                              <button
+                                key={n}
+                                onClick={() => { setPvPageSize(n); setPvPage(1) }}
+                                className={`px-2.5 py-1 text-xs font-medium transition-colors ${
+                                  pvPageSize === n
+                                    ? "bg-indigo-600 text-white"
+                                    : "bg-background text-muted-foreground hover:bg-muted"
+                                }`}
+                              >
+                                {n}
+                              </button>
+                            ))}
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0"
+                            onClick={() => { fetchPendingVouchers(); setPvPage(1) }}
+                            disabled={pvLoading}
+                          >
+                            <RefreshCw className={`h-3.5 w-3.5 ${pvLoading ? "animate-spin" : ""}`} />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardHeader>
+
+                    <CardContent className="p-0">
+                      {pvLoading ? (
+                        <div className="flex items-center justify-center py-12 text-muted-foreground">
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Loading pending vouchers…
+                        </div>
+                      ) : pendingVouchers.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-14 text-center">
+                          <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
+                            <CheckCircle2 className="h-8 w-8 text-green-600" />
+                          </div>
+                          <p className="font-semibold text-foreground">All clear!</p>
+                          <p className="mt-1 text-sm text-muted-foreground">No pending vouchers — day-end can proceed.</p>
+                        </div>
+                      ) : (
+                        <>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="pl-6 text-xs">#</TableHead>
+                                <TableHead className="text-xs">Batch #</TableHead>
+                                <TableHead className="text-xs">Voucher #</TableHead>
+                                <TableHead className="text-xs">Business Date</TableHead>
+                                <TableHead className="text-xs">Type</TableHead>
+                                <TableHead className="text-xs">Created By</TableHead>
+                                <TableHead className="text-right text-xs">Debit (₹)</TableHead>
+                                <TableHead className="text-right text-xs">Credit (₹)</TableHead>
+                                <TableHead className="text-xs pr-6">Balance</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {pageSlice.map((v, i) => {
+                                const isBalanced = v.totalDebit === v.totalCredit
+                                return (
+                                  <TableRow key={v.id} className="hover:bg-muted/50">
+                                    <TableCell className="pl-6 text-xs text-muted-foreground">
+                                      {(safePage - 1) * pvPageSize + i + 1}
+                                    </TableCell>
+                                    <TableCell className="font-mono text-xs font-semibold">{v.batchId}</TableCell>
+                                    <TableCell className="font-mono text-xs">{v.voucherId}</TableCell>
+                                    <TableCell className="text-xs">
+                                      {new Date(v.businessDate).toLocaleDateString("en-IN", {
+                                        day: "2-digit", month: "short", year: "numeric",
+                                      })}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge variant="outline" className="text-[10px]">{v.voucherType}</Badge>
+                                    </TableCell>
+                                    <TableCell className="text-xs">
+                                      {v.makerName}
+                                      {v.makerEmpCode && (
+                                        <span className="ml-1 text-muted-foreground">({v.makerEmpCode})</span>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono text-xs text-red-600">
+                                      {new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 }).format(v.totalDebit)}
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono text-xs text-green-600">
+                                      {new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 }).format(v.totalCredit)}
+                                    </TableCell>
+                                    <TableCell className="pr-6">
+                                      {isBalanced ? (
+                                        <Badge variant="outline" className="border-green-300 bg-green-50 text-[10px] text-green-700">
+                                          Balanced
+                                        </Badge>
+                                      ) : (
+                                        <Badge variant="destructive" className="text-[10px]">Unbalanced</Badge>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                )
+                              })}
+                            </TableBody>
+                          </Table>
+
+                          {/* Pagination bar */}
+                          <div className="flex items-center justify-between border-t px-6 py-3">
+                            <p className="text-xs text-muted-foreground">
+                              {start}–{end} of {pendingVouchers.length} records
+                            </p>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                size="sm" variant="outline"
+                                className="h-7 w-7 p-0"
+                                onClick={() => setPvPage((p) => Math.max(1, p - 1))}
+                                disabled={safePage === 1}
+                              >
+                                <ChevronLeft className="h-4 w-4" />
+                              </Button>
+                              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                .filter((p) =>
+                                  p === 1 || p === totalPages ||
+                                  Math.abs(p - safePage) <= 1
+                                )
+                                .reduce<(number | "…")[]>((acc, p, idx, arr) => {
+                                  if (idx > 0 && typeof arr[idx - 1] === "number" && (p as number) - (arr[idx - 1] as number) > 1) {
+                                    acc.push("…")
+                                  }
+                                  acc.push(p)
+                                  return acc
+                                }, [])
+                                .map((p, i) =>
+                                  p === "…" ? (
+                                    <span key={`ellipsis-${i}`} className="px-1 text-xs text-muted-foreground">…</span>
+                                  ) : (
+                                    <Button
+                                      key={p}
+                                      size="sm" variant={safePage === p ? "default" : "outline"}
+                                      className={`h-7 w-7 p-0 text-xs ${safePage === p ? "bg-indigo-600 hover:bg-indigo-700" : ""}`}
+                                      onClick={() => setPvPage(p as number)}
+                                    >
+                                      {p}
+                                    </Button>
+                                  )
+                                )}
+                              <Button
+                                size="sm" variant="outline"
+                                className="h-7 w-7 p-0"
+                                onClick={() => setPvPage((p) => Math.min(totalPages, p + 1))}
+                                disabled={safePage === totalPages}
+                              >
+                                <ChevronRight className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              )
+            })()}
 
             {/* ══════════════ CASH FLOWS TAB ══════════════ */}
             {activeTab === "cash-flows" && (
@@ -895,13 +1210,36 @@ export default function DayEndPage() {
                 ) : (
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Settings2 className="h-4 w-4 text-indigo-600" />
-                        Day-End Steps
-                      </CardTitle>
-                      <CardDescription>
-                        Run each step in order — each step must complete before the next can run
-                      </CardDescription>
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <Settings2 className="h-4 w-4 text-indigo-600" />
+                            Day-End Steps
+                          </CardTitle>
+                          <CardDescription>
+                            Run each step in order — or use Run All to execute all remaining steps sequentially
+                          </CardDescription>
+                        </div>
+                        {!dayendDone && (
+                          <Button
+                            className="shrink-0 gap-2 bg-indigo-600 hover:bg-indigo-700"
+                            onClick={() => setConfirmRunAll(true)}
+                            disabled={!!runningStep || runningAll || !summary?.dayend}
+                          >
+                            {runningAll ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Running{runningStep ? ` — ${STEPS.find((s) => s.key === runningStep)?.label}…` : "…"}
+                              </>
+                            ) : (
+                              <>
+                                <PlayCircle className="h-4 w-4" />
+                                Run All
+                              </>
+                            )}
+                          </Button>
+                        )}
+                      </div>
                     </CardHeader>
                     <CardContent className="p-0">
                       <Table>
@@ -1068,6 +1406,50 @@ export default function DayEndPage() {
             >
               {initiating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Initiate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirm Run All */}
+      <AlertDialog open={confirmRunAll} onOpenChange={(open) => { if (!open) setConfirmRunAll(false) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <PlayCircle className="h-5 w-5 text-indigo-600" />
+              Run All Day-End Steps?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>
+                  This will execute all remaining day-end steps for{" "}
+                  <strong>{fmtDate(summary?.businessDate || null)}</strong> one by one in order:
+                </p>
+                <ol className="ml-4 list-decimal space-y-0.5">
+                  {STEPS.map((s) => {
+                    const done = stepMap[s.key]?.status === "DONE"
+                    return (
+                      <li key={s.key} className={done ? "text-green-600 line-through" : ""}>
+                        {s.label}{done ? " (already done)" : ""}
+                      </li>
+                    )
+                  })}
+                </ol>
+                <p className="font-medium text-destructive">
+                  If any step fails, the sequence will stop at that step.
+                  This action cannot be undone.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRunAll}
+              className="bg-indigo-600 hover:bg-indigo-700"
+            >
+              <PlayCircle className="mr-2 h-4 w-4" />
+              Run All Steps
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

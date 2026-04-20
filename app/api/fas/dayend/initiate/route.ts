@@ -18,9 +18,11 @@ export async function POST() {
   if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const u = JSON.parse(c.value)
+  console.log("User session data:", u)
   const branchId = u.branch
   const businessDate: string = u.businessDate
-  const userId = u.id
+  const userId = u.userId
+  console.log(`Initiating day-end for branch ${branchId} on ${businessDate} by user ${userId}`)
 
   const client = await pool.connect()
   try {
