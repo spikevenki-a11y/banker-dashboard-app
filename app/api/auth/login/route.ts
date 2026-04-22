@@ -30,9 +30,10 @@ export async function POST(request: Request) {
       .from("branch_business_day")
       .select("business_date,is_open")
       .eq("branch_id", user.branch)
+      .eq("is_open", true)
       .maybeSingle()
 
-    console.log(day?.business_date)
+    console.log("---------------------------------------------"+day?.business_date)
     if (!day?.is_open)
       return NextResponse.json({ error: "Branch day not opened" }, { status: 403 })
 
