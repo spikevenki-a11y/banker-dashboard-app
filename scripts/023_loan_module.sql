@@ -263,3 +263,103 @@ VALUES (
     FALSE,
     'ACTIVE'
 );
+
+INSERT INTO public.chart_of_accounts
+(branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate, serial_no)
+VALUES
+('23108001','21102000','FD Loan Account','2','1','21000000','0.00','1',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,gen_random_uuid());
+
+INSERT INTO public.chart_of_accounts
+(branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate, serial_no)
+VALUES
+('23108001','31103000','Interest Received on FD Loan','3','1','31000000','0.00','1',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,gen_random_uuid());
+
+INSERT INTO public.chart_of_accounts
+(branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate, serial_no)
+VALUES
+('23108001','26102000','Interest Receivable on FD Loan','2','1','26000000','0.00','1',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,gen_random_uuid());
+
+INSERT INTO public.chart_of_accounts
+(branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate, serial_no)
+VALUES
+('23108001','31104000','Penal Interest on FD Loan','3','1','31000000','0.00','1',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,gen_random_uuid());
+
+INSERT INTO public.chart_of_accounts
+(branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate, serial_no)
+VALUES
+('23108001','32102000','FD Loan Processing Fee','3','1','32000000','0.00','1',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,gen_random_uuid());
+
+INSERT INTO public.loan_schemes (
+    branch_id,
+    scheme_id,
+    scheme_name,
+    scheme_description,
+    loan_type,
+    minimum_loan_amount,
+    maximum_loan_amount,
+    minimum_period_months,
+    maximum_period_months,
+    repayment_frequency,
+    installment_calculation_method,
+    interest_policy_id,
+    interest_rate,
+    interest_calculation_method,
+    interest_frequency,
+    compounding_frequency,
+    interest_rounding,
+    minimum_interest_payable,
+    penal_interest_rate,
+    penalty_grace_days,
+    processing_fee_percent,
+    processing_fee_min,
+    processing_fee_max,
+    prepayment_allowed,
+    prepayment_penalty_percent,
+    collateral_required,
+    loan_gl_account,
+    interest_income_gl_account,
+    interest_receivable_gl_account,
+    penal_interest_gl_account,
+    processing_fee_gl_account,
+    minimum_age,
+    maximum_age,
+    is_staff_only,
+    scheme_status
+)
+VALUES (
+    23108001,
+    502,
+    'FD Loan',
+    'Loan against Fixed Deposit with simple interest',
+    'FD_LOAN',
+    5000.00,
+    5000000.00,
+    1,
+    60,
+    'MONTHLY',
+    'EMI',
+    'FD_SIMPLE',
+    10.00,
+    'SIMPLE',
+    'MONTHLY',
+    NULL,
+    'NEAREST',
+    0.00,
+    2.00,
+    5,
+    0.50,
+    50.00,
+    2000.00,
+    TRUE,
+    0.50,
+    TRUE,
+    '21102000',
+    '31103000',
+    '26102000',
+    '31104000',
+    '32102000',
+    18,
+    70,
+    FALSE,
+    'ACTIVE'
+);

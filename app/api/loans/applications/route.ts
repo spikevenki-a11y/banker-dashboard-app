@@ -119,7 +119,11 @@ export async function POST(request: NextRequest) {
       loan_amount,
       loan_purpose,
       application_date,
-      tenure_months
+      tenure_months,
+      guarantor_name,
+      guarantor_membership_no,
+      remarks,
+      security,
     } = body
 
     if (!membership_no || !scheme_id || !loan_amount) {
@@ -184,27 +188,192 @@ export async function POST(request: NextRequest) {
       loanApplicationId, branchId, application_date, membership_no,
       scheme_id, loan_purpose, loan_amount, referenceNo
     })
-    const { rows: inserted } = await client.query(
+    await client.query(
       `INSERT INTO loan_applications (
         loan_application_id, branch_id, application_date, membership_no,
         scheme_id, loan_purpose, applied_loan_amount, reference_no,
-        application_status, created_by, created_at,loan_tenure_months
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING', $9, NOW(), $10)
-      RETURNING *`,
+        application_status, created_by, created_at, loan_tenure_months
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING', $9, NOW(), $10)`,
       [
-        loanApplicationId, branchId, application_date || new Date().toISOString().split('T')[0],
-        membership_no, scheme_id, loan_purpose || '', loan_amount,referenceNo,session.userId, tenure_months
-        
+        loanApplicationId, branchId,
+        application_date || new Date().toISOString().split('T')[0],
+        membership_no, scheme_id, loan_purpose || '', loan_amount,
+        referenceNo, session.userId, tenure_months,
       ]
     )
+
+    // Persist security details if provided
+    if (security?.security_type_id) {
+      const secRefNo = `SEC-${branchId}-${loanApplicationId}-1`
+
+      const { rows: secRows } = await client.query(
+        `INSERT INTO loan_securities (
+          branch_id, loan_application_id, security_type_id, security_ref_no,
+          description, is_primary_security, assessed_value, valuation_date,
+          security_status, verification_status, created_by, created_at
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'PENDING','PENDING',$9,NOW())
+        RETURNING id`,
+        [
+          branchId, loanApplicationId, security.security_type_id, secRefNo,
+          security.description || null,
+          security.is_primary_security !== false,
+          security.assessed_value || null,
+          security.valuation_date || null,
+          session.userId,
+        ]
+      )
+
+      const securityId = secRows[0].id
+      const typeId = Number(security.security_type_id)
+
+      if (typeId === 6) {
+        // Gold
+        await client.query(
+          `INSERT INTO security_gold_details (
+            security_id, gold_form, purity_karat, number_of_items,
+            gross_weight_grams, stone_weight_grams, net_weight_grams,
+            packet_no, appraiser_name, appraiser_license_no, appraisal_date,
+            gold_rate_per_gram, gold_rate_date, market_value, storage_location, created_at
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW())`,
+          [
+            securityId,
+            security.gold_form || 'ORNAMENTS',
+            security.purity_karat || 22,
+            security.number_of_items || null,
+            security.gross_weight_grams || 0,
+            security.stone_weight_grams || 0,
+            security.net_weight_grams || 0,
+            security.packet_no || null,
+            security.appraiser_name || null,
+            security.appraiser_license_no || null,
+            security.appraisal_date || null,
+            security.gold_rate_per_gram || null,
+            security.gold_rate_date || null,
+            security.market_value || null,
+            security.storage_location || null,
+          ]
+        )
+      } else if ([1, 2].includes(typeId)) {
+        // Land / Building
+        await client.query(
+          `INSERT INTO security_property_details (
+            security_id, property_type, ownership_type, survey_no, owner_name,
+            address_line1, city, district, state, pincode,
+            land_area_sqft, built_up_area_sqft, land_area_acres,
+            registration_no, registration_date, document_type,
+            guideline_value, market_value, encumbrance_cert_date,
+            title_clear, legal_opinion_by, legal_opinion_date, created_at
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,NOW())`,
+          [
+            securityId,
+            security.property_type || (typeId === 1 ? 'AGRICULTURAL' : 'RESIDENTIAL'),
+            security.ownership_type || 'OWNED',
+            security.survey_no || null,
+            security.owner_name || null,
+            security.address_line1 || null,
+            security.city || null,
+            security.district || null,
+            security.state_name || null,
+            security.pincode || null,
+            security.land_area_sqft || null,
+            security.built_up_area_sqft || null,
+            security.land_area_acres || null,
+            security.registration_no || null,
+            security.registration_date || null,
+            security.document_type || null,
+            security.guideline_value || null,
+            security.market_value || null,
+            security.encumbrance_cert_date || null,
+            security.title_clear || null,
+            security.legal_opinion_by || null,
+            security.legal_opinion_date || null,
+          ]
+        )
+      } else if (typeId === 7) {
+        // Vehicle
+        await client.query(
+          `INSERT INTO security_vehicle_details (
+            security_id, vehicle_type, registration_no, chassis_no, engine_no,
+            manufacturer, model, year_of_manufacture, registration_date,
+            rc_book_held, insurance_policy_no, insurance_expiry,
+            purchase_price, current_market_value, created_at
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW())`,
+          [
+            securityId,
+            security.vehicle_type || 'FOUR_WHEELER',
+            security.vehicle_registration_no || null,
+            security.chassis_no || null,
+            security.engine_no || null,
+            security.manufacturer || null,
+            security.model || null,
+            security.year_of_manufacture || null,
+            security.vehicle_registration_date || null,
+            security.rc_book_held || false,
+            security.insurance_policy_no || null,
+            security.insurance_expiry || null,
+            security.purchase_price || null,
+            security.current_market_value || null,
+          ]
+        )
+      } else if ([8, 12].includes(typeId)) {
+        // Deposit / NSC / KVP
+        await client.query(
+          `INSERT INTO security_deposit_details (
+            security_id, deposit_type, deposit_account_no, certificate_no,
+            institution_name, deposit_amount, deposit_date,
+            maturity_date, maturity_amount, interest_rate, lien_amount, created_at
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW())`,
+          [
+            securityId,
+            security.deposit_type || 'FD',
+            security.deposit_account_no || null,
+            security.certificate_no || null,
+            security.institution_name || null,
+            security.deposit_amount || 0,
+            security.deposit_date || null,
+            security.maturity_date || null,
+            security.maturity_amount || null,
+            security.deposit_interest_rate || null,
+            security.lien_amount || null,
+          ]
+        )
+      } else if (typeId === 10) {
+        // Insurance
+        await client.query(
+          `INSERT INTO security_insurance_details (
+            security_id, policy_no, policy_type, insurer_name, insured_name,
+            sum_assured, surrender_value, surrender_value_date,
+            premium_amount, premium_frequency, policy_start_date, policy_maturity_date,
+            assignment_done, assignee_name, created_at
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW())`,
+          [
+            securityId,
+            security.policy_no || null,
+            security.policy_type || 'LIFE',
+            security.insurer_name || null,
+            security.insured_name || null,
+            security.sum_assured || null,
+            security.surrender_value || null,
+            security.surrender_value_date || null,
+            security.premium_amount || null,
+            security.premium_frequency || null,
+            security.policy_start_date || null,
+            security.policy_maturity_date || null,
+            security.assignment_done || false,
+            security.assignment_done ? (security.assignee_name || null) : null,
+          ]
+        )
+      }
+      // For types 3,4,5,9,11 — base loan_securities record is sufficient
+    }
 
     await client.query("COMMIT")
 
     return NextResponse.json({
       success: true,
-      application: inserted[1],
+      loan_application_id: loanApplicationId,
       reference_no: referenceNo,
-      message: `Loan application ${referenceNo} created successfully`
+      message: `Loan application ${referenceNo} created successfully`,
     })
   } catch (error: any) {
     await client.query("ROLLBACK")

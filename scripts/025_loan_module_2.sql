@@ -45,7 +45,8 @@ insert into loan_scheme_security_master (security_id, security_name) values
 (5, 'Accounts Receivable'),
 (6, 'Gold'),
 (7, 'Vehicle'),
-(8, 'Other');
+(8, 'Deposit'),
+(9, 'Other');
 
 
 create table loan_scheme_security_mapping (
