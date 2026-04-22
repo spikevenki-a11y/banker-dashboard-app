@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
          FROM loan_applications la
          WHERE la.branch_id = $3
            AND la.application_status IN ('APPROVED','DISBURSED','ACTIVE')
-         ON CONFLICT (loan_application_id, accrual_date) DO NOTHING`,
+          `,
         [businessDate, dayendId, branchId]
       )
       recordsProcessed = accrualRes.rowCount ?? 0
@@ -184,15 +184,27 @@ export async function POST(req: NextRequest) {
     } else if (stepName === "MATURITY_CHECK") {
       // Mark matured deposits as PENDING_CLOSURE
       const matRes = await client.query(
-        `UPDATE deposit_account
-         SET maturity_action = 'PENDING_CLOSURE',
-             maturity_processed_date = $1::date
-         WHERE branch_id = $2
-           AND accountstatus = 1
-           AND maturitydate <= $1::date
-           AND maturity_action IS NULL`,
-        [businessDate, branchId]
-      )
+  `UPDATE deposit_account da
+   SET maturity_action = 'PENDING_CLOSURE',
+       maturity_processed_date = $1::date
+   WHERE da.branch_id = $2
+     AND da.accountstatus = 1
+     AND da.maturity_action IS NULL
+     AND (
+       (da.deposittype = 'RECURRING' AND EXISTS (
+          SELECT 1 FROM recurring_deposit_details rd
+          WHERE rd.accountnumber = da.accountnumber
+            AND rd.maturitydate <= $1::date
+       ))
+       OR
+       (da.deposittype = 'TERM' AND EXISTS (
+          SELECT 1 FROM term_deposit_details td
+          WHERE td.accountnumber = da.accountnumber
+            AND td.maturitydate <= $1::date
+       ))
+     )`,
+  [businessDate, branchId]
+)
       recordsProcessed = matRes.rowCount ?? 0
     } else if (stepName === "TRIAL_BALANCE") {
       // Verify all posted GL batches for today are balanced
@@ -254,6 +266,22 @@ export async function POST(req: NextRequest) {
         await client.query(
           `UPDATE dayend_log SET status = 'COMPLETED', completed_at = now() WHERE id = $1`,
           [dayendId]
+        )
+
+        await client.query(
+          `UPDATE branch_business_day
+          SET is_open = false,
+              closed_at = NOW()
+          WHERE branch_id = $1
+            AND business_date = $2::date`,
+          [branchId, businessDate]
+        )
+
+        await client.query(
+          `INSERT INTO branch_business_day
+            (branch_id, business_date, is_open, opened_at)
+          VALUES ($1, $2::date + INTERVAL '1 day', true, NOW())`,
+          [branchId, businessDate]
         )
       }
     }
