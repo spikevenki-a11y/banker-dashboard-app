@@ -16,6 +16,7 @@ export async function GET(req: NextRequest) {
     if (!membershipNo) {
       return NextResponse.json({ error: "Membership number is required" }, { status: 400 })
     }
+    console.log(`Fetching deposit accounts for member ${membershipNo} in branch ${branchId}`)
 
     const { rows } = await pool.query(
       `SELECT
@@ -44,12 +45,13 @@ export async function GET(req: NextRequest) {
        WHERE da.membership_no = $1
          AND da.branch_id    = $2
          AND da.accountstatus = 1
+          and da.clearbalance != 0
        ORDER BY da.accountopendate DESC`,
       [membershipNo, branchId]
     )
 
-    const typeLabel: Record<string, string> = { T: "FD", R: "RD", P: "Pigmy" }
-    const typeCode: Record<string, string> = { T: "FD", R: "RD", P: "OTHER" }
+    const typeLabel: Record<string, string> = { TERM: "FD", RECURRING: "RD", PIGMY: "Pigmy" }
+    const typeCode: Record<string, string> = { TERM: "FD", RECURRING: "RD", PIGMY: "OTHER" }
 
     const deposits = rows.map((r) => ({
       accountNumber: String(r.accountnumber),
@@ -69,6 +71,8 @@ export async function GET(req: NextRequest) {
       interestRate: Number(r.rateofinterest),
       periodMonths: r.periodmonths ?? null,
     }))
+
+    console.log(`Fetched ${deposits.length} deposit accounts for member ${membershipNo} in branch ${branchId}`) 
 
     return NextResponse.json({ success: true, deposits })
   } catch (error: any) {
