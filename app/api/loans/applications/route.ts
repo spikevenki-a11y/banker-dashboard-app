@@ -227,7 +227,7 @@ export async function POST(request: NextRequest) {
       const typeId = Number(security.security_type_id)
 
       if (typeId === 6) {
-        // Gold
+        // Gold — summary record
         await client.query(
           `INSERT INTO security_gold_details (
             security_id, gold_form, purity_karat, number_of_items,
@@ -253,6 +253,28 @@ export async function POST(request: NextRequest) {
             security.storage_location || null,
           ]
         )
+
+        // Gold — individual items
+        const goldItems: any[] = Array.isArray(security.gold_items) ? security.gold_items : []
+        for (const item of goldItems) {
+          await client.query(
+            `INSERT INTO security_gold_items (
+              security_id, item_seq, ornament_name, gold_form, purity_karat,
+              number_of_pieces, gross_weight_grams, stone_weight_grams, net_weight_grams, created_at
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())`,
+            [
+              securityId,
+              item.item_seq || 1,
+              item.ornament_name,
+              item.gold_form || 'ORNAMENTS',
+              item.purity_karat || 22,
+              item.number_of_pieces || 1,
+              item.gross_weight_grams || 0,
+              item.stone_weight_grams || 0,
+              item.net_weight_grams || 0,
+            ]
+          )
+        }
       } else if ([1, 2].includes(typeId)) {
         // Land / Building
         await client.query(

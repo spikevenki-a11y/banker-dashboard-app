@@ -81,6 +81,26 @@ type MemberDepositAccount = {
   periodMonths: number | null
 }
 
+type GoldItem = {
+  ornament_name: string
+  gold_form: string
+  purity_karat: string
+  number_of_pieces: string
+  gross_weight_grams: string
+  stone_weight_grams: string
+  net_weight_grams: string
+}
+
+const emptyGoldItem: GoldItem = {
+  ornament_name: "",
+  gold_form: "ORNAMENTS",
+  purity_karat: "22",
+  number_of_pieces: "1",
+  gross_weight_grams: "",
+  stone_weight_grams: "0",
+  net_weight_grams: "",
+}
+
 type SecurityForm = {
   // Common
   description: string
@@ -244,8 +264,27 @@ export default function LoanApplicationPage() {
   const [memberDepositAccounts, setMemberDepositAccounts] = useState<MemberDepositAccount[]>([])
   const [loadingDepositAccounts, setLoadingDepositAccounts] = useState(false)
 
+  // Gold item-by-item tracking
+  const [goldItems, setGoldItems] = useState<GoldItem[]>([])
+  const [goldItemDraft, setGoldItemDraft] = useState<GoldItem>(emptyGoldItem)
+
   const sf = (key: keyof SecurityForm, value: any) =>
     setSecurityForm((prev) => ({ ...prev, [key]: value }))
+
+  const sfDraft = (key: keyof GoldItem, value: string) =>
+    setGoldItemDraft((prev) => ({ ...prev, [key]: value }))
+
+  const handleAddGoldItem = () => {
+    if (!goldItemDraft.ornament_name.trim() || !goldItemDraft.gross_weight_grams) return
+    const gross = parseFloat(goldItemDraft.gross_weight_grams) || 0
+    const stone = parseFloat(goldItemDraft.stone_weight_grams) || 0
+    const net = Math.max(0, gross - stone)
+    setGoldItems((prev) => [...prev, { ...goldItemDraft, net_weight_grams: net.toFixed(3) }])
+    setGoldItemDraft(emptyGoldItem)
+  }
+
+  const handleRemoveGoldItem = (idx: number) =>
+    setGoldItems((prev) => prev.filter((_, i) => i !== idx))
 
   // ── Effects ────────────────────────────────────────────────────────────────
 
@@ -265,21 +304,25 @@ export default function LoanApplicationPage() {
     else { setEmiAmount(null); setTotalInterest(null); setTotalPayment(null); setEmiSchedule([]) }
   }, [loanAmount, tenureMonths, interestRate])
 
-  // Gold auto-calculation: net weight and market value
+  // Gold item totals → propagate to securityForm summary fields
   useEffect(() => {
-    if (selectedSecurityId !== "6") return
-    const gross = parseFloat(securityForm.gross_weight_grams) || 0
-    const stone = parseFloat(securityForm.stone_weight_grams) || 0
-    const net = Math.max(0, gross - stone)
+    if (selectedSecurityId !== "6" || goldItems.length === 0) return
+    const totalGross = goldItems.reduce((s, i) => s + (parseFloat(i.gross_weight_grams) || 0), 0)
+    const totalStone = goldItems.reduce((s, i) => s + (parseFloat(i.stone_weight_grams) || 0), 0)
+    const totalNet = Math.max(0, totalGross - totalStone)
+    const totalPieces = goldItems.reduce((s, i) => s + (parseInt(i.number_of_pieces) || 1), 0)
     const rate = parseFloat(securityForm.gold_rate_per_gram) || 0
-    const mv = +(net * rate).toFixed(2)
+    const mv = +(totalNet * rate).toFixed(2)
     setSecurityForm((prev) => ({
       ...prev,
-      net_weight_grams: gross > 0 ? net.toFixed(3) : prev.net_weight_grams,
+      gross_weight_grams: totalGross.toFixed(3),
+      stone_weight_grams: totalStone.toFixed(3),
+      net_weight_grams: totalNet.toFixed(3),
+      number_of_items: String(totalPieces),
       market_value: mv > 0 ? String(mv) : prev.market_value,
       assessed_value: mv > 0 ? String(mv) : prev.assessed_value,
     }))
-  }, [securityForm.gross_weight_grams, securityForm.stone_weight_grams, securityForm.gold_rate_per_gram, selectedSecurityId])
+  }, [goldItems, securityForm.gold_rate_per_gram, selectedSecurityId])
 
   // Fetch member's deposit accounts when security type is Deposit (8) and member is known
   useEffect(() => {
@@ -438,13 +481,18 @@ export default function LoanApplicationPage() {
         valuation_date: securityForm.valuation_date || null,
       }
       if (typeId === 6) {
+        const firstItem = goldItems[0]
+        const totalGross = goldItems.reduce((s, i) => s + (parseFloat(i.gross_weight_grams) || 0), 0)
+        const totalStone = goldItems.reduce((s, i) => s + (parseFloat(i.stone_weight_grams) || 0), 0)
+        const totalNet = Math.max(0, totalGross - totalStone)
+        const totalPieces = goldItems.reduce((s, i) => s + (parseInt(i.number_of_pieces) || 1), 0)
         Object.assign(securityPayload, {
-          gold_form: securityForm.gold_form,
-          purity_karat: Number(securityForm.purity_karat),
-          number_of_items: securityForm.number_of_items ? Number(securityForm.number_of_items) : null,
-          gross_weight_grams: Number(securityForm.gross_weight_grams) || 0,
-          stone_weight_grams: Number(securityForm.stone_weight_grams) || 0,
-          net_weight_grams: Number(securityForm.net_weight_grams) || 0,
+          gold_form: firstItem?.gold_form || "ORNAMENTS",
+          purity_karat: Number(firstItem?.purity_karat || 22),
+          number_of_items: goldItems.length > 0 ? totalPieces : null,
+          gross_weight_grams: goldItems.length > 0 ? totalGross : (Number(securityForm.gross_weight_grams) || 0),
+          stone_weight_grams: goldItems.length > 0 ? totalStone : (Number(securityForm.stone_weight_grams) || 0),
+          net_weight_grams: goldItems.length > 0 ? totalNet : (Number(securityForm.net_weight_grams) || 0),
           packet_no: securityForm.packet_no || null,
           appraiser_name: securityForm.appraiser_name || null,
           appraiser_license_no: securityForm.appraiser_license_no || null,
@@ -453,6 +501,16 @@ export default function LoanApplicationPage() {
           gold_rate_date: securityForm.gold_rate_date || null,
           market_value: securityForm.market_value ? Number(securityForm.market_value) : null,
           storage_location: securityForm.storage_location || null,
+          gold_items: goldItems.map((item, idx) => ({
+            item_seq: idx + 1,
+            ornament_name: item.ornament_name,
+            gold_form: item.gold_form,
+            purity_karat: Number(item.purity_karat),
+            number_of_pieces: Number(item.number_of_pieces) || 1,
+            gross_weight_grams: Number(item.gross_weight_grams) || 0,
+            stone_weight_grams: Number(item.stone_weight_grams) || 0,
+            net_weight_grams: Number(item.net_weight_grams) || 0,
+          })),
         })
       } else if ([1, 2].includes(typeId)) {
         Object.assign(securityPayload, {
@@ -559,6 +617,7 @@ export default function LoanApplicationPage() {
     setMembershipNo(""); setMemberInfo(null); setMemberError("")
     setSelectedSchemeId(""); setLoanAmount(""); setTenureMonths(""); setInterestRate("")
     setSelectedPurposeId(""); setSelectedSecurityId(""); setSecurityForm(emptySecurityForm)
+    setGoldItems([]); setGoldItemDraft(emptyGoldItem)
     setGuarantorName(""); setGuarantorMembership(""); setRemarks("")
     setEmiAmount(null); setTotalInterest(null); setTotalPayment(null); setEmiSchedule([])
   }
@@ -745,7 +804,7 @@ export default function LoanApplicationPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Security Type</Label>
-                        <Select value={selectedSecurityId} onValueChange={(v) => { setSelectedSecurityId(v); setSecurityForm(emptySecurityForm) }} disabled={!securities.length}>
+                        <Select value={selectedSecurityId} onValueChange={(v) => { setSelectedSecurityId(v); setSecurityForm(emptySecurityForm); setGoldItems([]); setGoldItemDraft(emptyGoldItem) }} disabled={!securities.length}>
                           <SelectTrigger><SelectValue placeholder={securities.length ? "Select security type" : "No securities for this scheme"} /></SelectTrigger>
                           <SelectContent>
                             {securities.map((s: any) => <SelectItem key={s.security_id} value={String(s.security_id)}>{s.security_name}</SelectItem>)}
@@ -770,46 +829,129 @@ export default function LoanApplicationPage() {
                       <div className="rounded-lg border border-yellow-200 bg-yellow-50/30 p-4 space-y-4">
                         <p className="text-sm font-semibold text-yellow-800">Gold Details</p>
 
-                        <div className="grid grid-cols-3 gap-3">
-                          <div className="space-y-1">
-                            <Label className="text-xs">Gold Form *</Label>
-                            <Select value={securityForm.gold_form} onValueChange={(v) => sf("gold_form", v)}>
-                              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {["ORNAMENTS", "COIN", "BAR", "BISCUIT"].map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
+                        {/* Add ornament item form */}
+                        <div className="rounded-md border border-yellow-300 bg-white p-3 space-y-3">
+                          <p className="text-xs font-medium text-yellow-700">Add Ornament Item</p>
+                          <div className="grid grid-cols-4 gap-2">
+                            <div className="col-span-2 space-y-1">
+                              <Label className="text-xs">Ornament Name *</Label>
+                              <Input className="h-8 text-xs" placeholder="e.g. Necklace, Bangle, Ring"
+                                value={goldItemDraft.ornament_name}
+                                onChange={(e) => sfDraft("ornament_name", e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && handleAddGoldItem()} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Gold Form</Label>
+                              <Select value={goldItemDraft.gold_form} onValueChange={(v) => sfDraft("gold_form", v)}>
+                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {["ORNAMENTS", "COIN", "BAR", "BISCUIT"].map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Purity (K)</Label>
+                              <Select value={goldItemDraft.purity_karat} onValueChange={(v) => sfDraft("purity_karat", v)}>
+                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {["18", "20", "22", "24"].map((k) => <SelectItem key={k} value={k}>{k}K</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
                           </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs">Purity (Karat) *</Label>
-                            <Select value={securityForm.purity_karat} onValueChange={(v) => sf("purity_karat", v)}>
-                              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {["18", "20", "22", "24"].map((k) => <SelectItem key={k} value={k}>{k}K</SelectItem>)}
-                              </SelectContent>
-                            </Select>
+                          <div className="grid grid-cols-4 gap-2">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Pieces</Label>
+                              <Input className="h-8 text-xs" type="number" min="1" placeholder="1"
+                                value={goldItemDraft.number_of_pieces}
+                                onChange={(e) => sfDraft("number_of_pieces", e.target.value)} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Gross Wt (g) *</Label>
+                              <Input className="h-8 text-xs" type="number" step="0.001" placeholder="0.000"
+                                value={goldItemDraft.gross_weight_grams}
+                                onChange={(e) => sfDraft("gross_weight_grams", e.target.value)} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Stone Wt (g)</Label>
+                              <Input className="h-8 text-xs" type="number" step="0.001" placeholder="0.000"
+                                value={goldItemDraft.stone_weight_grams}
+                                onChange={(e) => sfDraft("stone_weight_grams", e.target.value)} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Net Wt (g)</Label>
+                              <Input className="h-8 text-xs bg-muted" readOnly placeholder="Auto"
+                                value={(() => {
+                                  const g = parseFloat(goldItemDraft.gross_weight_grams) || 0
+                                  const s = parseFloat(goldItemDraft.stone_weight_grams) || 0
+                                  return g > 0 ? Math.max(0, g - s).toFixed(3) : ""
+                                })()} />
+                            </div>
                           </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs">No. of Items</Label>
-                            <Input className="h-8 text-xs" type="number" placeholder="Count" value={securityForm.number_of_items} onChange={(e) => sf("number_of_items", e.target.value)} />
+                          <div className="flex justify-end">
+                            <Button size="sm"
+                              disabled={!goldItemDraft.ornament_name.trim() || !goldItemDraft.gross_weight_grams}
+                              onClick={handleAddGoldItem}
+                              className="h-7 text-xs bg-yellow-600 hover:bg-yellow-700 text-white">
+                              + Add Item
+                            </Button>
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-3">
+                        {/* Items table */}
+                        {goldItems.length > 0 && (
                           <div className="space-y-1">
-                            <Label className="text-xs">Gross Weight (grams) *</Label>
-                            <Input className="h-8 text-xs" type="number" step="0.001" placeholder="0.000" value={securityForm.gross_weight_grams} onChange={(e) => sf("gross_weight_grams", e.target.value)} />
+                            <p className="text-xs font-medium text-yellow-700">Items Added ({goldItems.length})</p>
+                            <div className="rounded-md border overflow-hidden">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow className="bg-yellow-50 h-7">
+                                    <TableHead className="text-xs py-1 w-8">#</TableHead>
+                                    <TableHead className="text-xs py-1">Ornament</TableHead>
+                                    <TableHead className="text-xs py-1">Form</TableHead>
+                                    <TableHead className="text-xs py-1">Karat</TableHead>
+                                    <TableHead className="text-xs py-1 text-right">Pcs</TableHead>
+                                    <TableHead className="text-xs py-1 text-right">Gross (g)</TableHead>
+                                    <TableHead className="text-xs py-1 text-right">Net (g)</TableHead>
+                                    <TableHead className="w-6"></TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {goldItems.map((item, idx) => (
+                                    <TableRow key={idx} className="h-7">
+                                      <TableCell className="text-xs py-1">{idx + 1}</TableCell>
+                                      <TableCell className="text-xs py-1 font-medium">{item.ornament_name}</TableCell>
+                                      <TableCell className="text-xs py-1">{item.gold_form}</TableCell>
+                                      <TableCell className="text-xs py-1">{item.purity_karat}K</TableCell>
+                                      <TableCell className="text-xs py-1 text-right">{item.number_of_pieces}</TableCell>
+                                      <TableCell className="text-xs py-1 text-right">{parseFloat(item.gross_weight_grams).toFixed(3)}</TableCell>
+                                      <TableCell className="text-xs py-1 text-right">{item.net_weight_grams}</TableCell>
+                                      <TableCell className="py-1 text-center">
+                                        <button onClick={() => handleRemoveGoldItem(idx)}
+                                          className="text-red-400 hover:text-red-600 font-bold text-base leading-none px-1">×</button>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                  <TableRow className="bg-yellow-50/80 font-semibold h-7">
+                                    <TableCell className="text-xs py-1" colSpan={4}>Totals</TableCell>
+                                    <TableCell className="text-xs py-1 text-right">
+                                      {goldItems.reduce((s, i) => s + (parseInt(i.number_of_pieces) || 1), 0)}
+                                    </TableCell>
+                                    <TableCell className="text-xs py-1 text-right">
+                                      {goldItems.reduce((s, i) => s + (parseFloat(i.gross_weight_grams) || 0), 0).toFixed(3)}
+                                    </TableCell>
+                                    <TableCell className="text-xs py-1 text-right">
+                                      {goldItems.reduce((s, i) => s + (parseFloat(i.net_weight_grams) || 0), 0).toFixed(3)}
+                                    </TableCell>
+                                    <TableCell></TableCell>
+                                  </TableRow>
+                                </TableBody>
+                              </Table>
+                            </div>
                           </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs">Stone Weight (grams)</Label>
-                            <Input className="h-8 text-xs" type="number" step="0.001" placeholder="0.000" value={securityForm.stone_weight_grams} onChange={(e) => sf("stone_weight_grams", e.target.value)} />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs">Net Weight (grams)</Label>
-                            <Input className="h-8 text-xs bg-muted" readOnly value={securityForm.net_weight_grams} placeholder="Auto-calculated" />
-                          </div>
-                        </div>
+                        )}
 
+                        {/* Rate & appraisal details */}
                         <div className="grid grid-cols-3 gap-3">
                           <div className="space-y-1">
                             <Label className="text-xs">Gold Rate / Gram (₹)</Label>
