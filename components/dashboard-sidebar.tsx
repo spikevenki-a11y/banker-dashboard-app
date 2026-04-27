@@ -15,6 +15,7 @@ import {
   Calculator,
   BarChart3,
   ShieldAlert,
+  Lock,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 
@@ -44,6 +45,11 @@ const routes = [
     label: "Term Deposits",
     icon: FileText,
     href: "/fixed-deposits",
+  },
+  {
+    label: "Lockers",
+    icon: Lock,
+    href: "/lockers",
   },
   {
     label: "Loans",

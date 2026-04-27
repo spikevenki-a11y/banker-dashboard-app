@@ -53,9 +53,10 @@ export async function POST(req: Request) {
         gender,
         date_of_birth,
         mobile_no,
+        alt_mobile_no,
         email,
         customer_type
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
     `,
       [
         code,
@@ -64,6 +65,7 @@ export async function POST(req: Request) {
         body.gender,
         body.dob,
         body.phone,
+        body.alt_phone || null,
         body.email,
         body.customer_type,
       ]

@@ -58,6 +58,7 @@ interface Customer {
   state: string
   pin_code: string
   phone: string
+  alt_phone: string
   email: string
   permanant_house_no: string
   permanant_street: string
@@ -100,6 +101,7 @@ const initialCustomer: Customer = {
     state: "",
     pin_code: "",
     phone: "",
+    alt_phone: "",
     email: "",
     permanant_house_no: "",
     permanant_street: "",
@@ -609,17 +611,41 @@ export default function CustomerPage() {
                           </div>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-3 gap-4">
                           <div className="space-y-2">
                             <Label htmlFor="phone">Phone Number *</Label>
                             <Input
                               id="phone"
-                              placeholder="+91 9876543210"
+                              placeholder="9876543210"
+                              maxLength={10}
                               value={newCustomer.phone}
-                              onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
+                              onChange={(e) => {
+                                const v = e.target.value.replace(/\D/g, "")
+                                setNewCustomer({ ...newCustomer, phone: v })
+                              }}
                             />
                           </div>
-                          
+
+                          <div className="space-y-2">
+                            <Label htmlFor="alt_phone">Alternative Phone</Label>
+                            <Input
+                              id="alt_phone"
+                              placeholder="9876543210"
+                              maxLength={10}
+                              value={newCustomer.alt_phone}
+                              onChange={(e) => {
+                                const v = e.target.value.replace(/\D/g, "")
+                                setNewCustomer({ ...newCustomer, alt_phone: v })
+                              }}
+                            />
+                            {newCustomer.alt_phone.length > 0 && newCustomer.alt_phone.length !== 10 && (
+                              <p className="text-xs text-red-500">Must be 10 digits</p>
+                            )}
+                            {newCustomer.alt_phone.length === 10 && newCustomer.alt_phone === newCustomer.phone && (
+                              <p className="text-xs text-red-500">Must differ from primary number</p>
+                            )}
+                          </div>
+
                           <div className="space-y-2">
                             <Label htmlFor="email">Email</Label>
                             <Input
@@ -630,7 +656,7 @@ export default function CustomerPage() {
                               onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
                             />
                           </div>
-                        </div>  
+                        </div>
 
                       </div>
                       <div className="grid gap-4 px-4 py-4">
@@ -874,7 +900,15 @@ export default function CustomerPage() {
                         next
                     </Button>
                     </div>
-                    <Button onClick={handleCreateCustomer} disabled={isSubmitting} hidden={activeTab !== "kycdetails"}>
+                    <Button
+                      onClick={handleCreateCustomer}
+                      disabled={
+                        isSubmitting ||
+                        (newCustomer.alt_phone.length > 0 && newCustomer.alt_phone.length !== 10) ||
+                        (newCustomer.alt_phone.length === 10 && newCustomer.alt_phone === newCustomer.phone)
+                      }
+                      hidden={activeTab !== "kycdetails"}
+                    >
                         {isSubmitting ? "Creating..." : "Create Customer"}
                     </Button>
                 </div>
