@@ -20,8 +20,8 @@ export async function POST(req: Request) {
 
     const { rows } = await pool.query(
       `SELECT m.membership_no, m.member_type, m.status, m.membership_class,
-              c.full_name, c.father_name, c.mobile_no, c.date_of_birth, 
-              c.aadhaar_no, c.customer_code, c.gender
+              c.full_name, c.father_name, c.date_of_birth, 
+              c.customer_code, c.gender
        FROM memberships m
        JOIN customers c ON m.customer_code = c.customer_code
        WHERE m.membership_no = $1 AND m.branch_id = $2 AND m.status = 'ACTIVE'`,
