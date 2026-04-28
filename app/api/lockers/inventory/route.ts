@@ -25,7 +25,7 @@ export async function GET() {
          c.full_name    AS member_name,
          TO_CHAR(ld.expiry_date, 'YYYY-MM-DD') AS expiry_date
        FROM lockers l
-       JOIN locker_types lt ON lt.id = l.locker_type_id
+       JOIN locker_types lt ON lt.locker_type_id = l.locker_type_id
        LEFT JOIN locker_deposits ld ON ld.locker_id = l.id AND ld.status = 'ACTIVE'
        LEFT JOIN memberships m ON m.membership_no = ld.membership_no AND m.branch_id = ld.branch_id
        LEFT JOIN customers   c ON c.customer_code = m.customer_code

@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
        JOIN memberships m  ON m.membership_no = ld.membership_no AND m.branch_id = ld.branch_id
        JOIN customers   c  ON c.customer_code = m.customer_code
        LEFT JOIN lockers l ON l.id = ld.locker_id
-       LEFT JOIN locker_types lt ON lt.id = l.locker_type_id
+       LEFT JOIN locker_types lt ON lt.locker_type_id = l.locker_type_id
        WHERE ld.branch_id = $1${whereExtra}
        ORDER BY ld.created_at DESC`,
       params

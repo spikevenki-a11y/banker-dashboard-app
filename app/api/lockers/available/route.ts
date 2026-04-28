@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
       `SELECT l.id, l.locker_no, l.location, l.status,
               lt.locker_type_id AS type_id, lt.type_name, lt.dimensions, lt.annual_rent
        FROM lockers l
-       JOIN locker_types lt ON lt.id = l.locker_type_id
+       JOIN locker_types lt ON lt.locker_type_id = l.locker_type_id
        WHERE l.branch_id = $1 AND l.status = 'AVAILABLE'${typeFilter}
        ORDER BY l.locker_no`,
       params
