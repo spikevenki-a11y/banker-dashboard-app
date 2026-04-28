@@ -44,7 +44,6 @@ export async function GET(req: NextRequest) {
         c.father_name,
         c.mobile_no,
         c.date_of_birth,
-        c.aadhaar_no,
         c.customer_code,
         c.gender,
         c.email,
