@@ -50,8 +50,7 @@ export async function GET(request: NextRequest) {
         lscheme.loan_gl_account,
         m.customer_code,
         c.full_name as member_name,
-        c.mobile_no,
-        c.aadhaar_no
+        c.mobile_no
       FROM loan_applications la
       LEFT JOIN loan_sanction_details ls ON la.loan_application_id = ls.loan_application_id
       LEFT JOIN loan_schemes lscheme ON la.scheme_id = lscheme.scheme_id
