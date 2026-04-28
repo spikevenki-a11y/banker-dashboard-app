@@ -11,7 +11,10 @@ export async function POST(req: Request) {
   try {
     const session = JSON.parse(c.value)
     const branchId = session.branch
-    const { membership_no, scheme_id, opening_date, initial_deposit, nominee_name, nominee_relation } = await req.json()
+    const { membership_no, scheme_id, opening_date, initial_deposit, nominees } = await req.json()
+    const nomineeList: { name: string; relation: string }[] = Array.isArray(nominees)
+      ? nominees.slice(0, 4)
+      : []
 
     if (!membership_no || !scheme_id || !opening_date) {
       return NextResponse.json({ error: "Membership number, scheme, and opening date are required" }, { status: 400 })
@@ -53,6 +56,19 @@ export async function POST(req: Request) {
       RETURNING id, account_number`,
       [accountNumber, branchId, membership_no, scheme_id, opening_date, scheme.interest_rate, initial_deposit || 0]
     )
+
+    // Insert nominees
+    for (let i = 0; i < nomineeList.length; i++) {
+      const { name, relation } = nomineeList[i]
+      if (name?.trim()) {
+        await client.query(
+          `INSERT INTO savings_account_nominees
+             (account_number, nominee_name, relation, nominee_order)
+           VALUES ($1, $2, $3, $4)`,
+          [accountNumber, name.trim(), relation, i + 1]
+        )
+      }
+    }
 
     await client.query("COMMIT")
     console.log(insertResult.rows[0].account_number)

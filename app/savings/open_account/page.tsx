@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ArrowLeft, Search, Loader2, CheckCircle2, User, CreditCard, Banknote, Users, X } from "lucide-react"
+import { ArrowLeft, Search, Loader2, CheckCircle2, User, CreditCard, Banknote, Users, X, Eye, MapPin, ShieldCheck, TrendingUp, TrendingDown, UserPlus, Trash2 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 
 type MemberInfo = {
@@ -34,6 +35,74 @@ type MemberInfo = {
   aadhaar_no: string
   customer_code: string
   gender: string
+}
+
+type Nominee = {
+  name: string
+  relation: string
+}
+
+type MemberProfile = {
+  membership_no: string
+  membership_class: string
+  member_type: string
+  status: string
+  join_date: string
+  ledger_folio_number: string
+  board_resolution_number: string
+  customer_code: string
+  full_name: string
+  father_name: string
+  gender: string
+  date_of_birth: string
+  customer_type: string
+  spouse_name: string
+  marital_status: string
+  blood_group: string
+  occupation: string
+  mobile_no: string
+  customer_email: string
+  house_no: string
+  street: string
+  village: string
+  thaluk: string
+  district: string
+  state: string
+  pincode: string
+  address_phone: string
+  aadhaar_no: string
+  pan_no: string
+  ration_no: string
+  driving_license_no: string
+}
+
+type AccountAsset = {
+  account_type: string
+  account_number: string
+  scheme_name: string
+  balance: number
+  status: string
+  opening_date: string
+  interest_rate: number
+  close_date?: string
+  extra: any
+}
+
+type LoanAccount = {
+  loan_application_id: number
+  scheme_name: string
+  loan_type: string
+  sanctioned_amount: number
+  interest_rate: number
+  loan_tenure_months: number
+  emi_amount: number
+  sanction_date: string
+  outstanding_balance: number
+  paid_installments: number
+  total_installments: number
+  overdue_installments: number
+  application_status: string
+  loan_account_no: string
 }
 
 type Scheme = {
@@ -79,8 +148,34 @@ export default function OpenSavingsAccountPage() {
   // Form fields
   const [openingDate, setOpeningDate] = useState("")
   const [initialDeposit, setInitialDeposit] = useState("")
-  const [nomineeName, setNomineeName] = useState("")
-  const [nomineeRelation, setNomineeRelation] = useState("")
+
+  // Nominee list (up to 4) + draft entry
+  const MAX_NOMINEES = 4
+  const [nominees, setNominees] = useState<Nominee[]>([])
+  const [draftNomineeName, setDraftNomineeName] = useState("")
+  const [draftNomineeRelation, setDraftNomineeRelation] = useState("")
+
+  const canAddNominee = nominees.length < MAX_NOMINEES
+
+  const handleAddNominee = () => {
+    if (!draftNomineeName.trim() || !draftNomineeRelation) return
+    setNominees((prev) => [...prev, { name: draftNomineeName.trim(), relation: draftNomineeRelation }])
+    setDraftNomineeName("")
+    setDraftNomineeRelation("")
+  }
+
+  const handleRemoveNominee = (idx: number) =>
+    setNominees((prev) => prev.filter((_, i) => i !== idx))
+
+  // View member modal
+  const [viewMemberOpen, setViewMemberOpen] = useState(false)
+  const [viewMemberTab, setViewMemberTab] = useState("personal")
+  const [viewMemberProfile, setViewMemberProfile] = useState<MemberProfile | null>(null)
+  const [viewMemberAssets, setViewMemberAssets] = useState<AccountAsset[]>([])
+  const [viewMemberSummary, setViewMemberSummary] = useState<any>(null)
+  const [viewMemberLoans, setViewMemberLoans] = useState<LoanAccount[]>([])
+  const [viewMemberLoading, setViewMemberLoading] = useState(false)
+  const [viewMemberError, setViewMemberError] = useState("")
 
   // Submit
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -187,6 +282,45 @@ export default function OpenSavingsAccountPage() {
     setSearchResults([])
   }
 
+  const fmt = (n: number) =>
+    `₹${Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`
+
+  const handleViewMember = async () => {
+    if (!memberInfo) return
+    setViewMemberOpen(true)
+    setViewMemberTab("personal")
+    setViewMemberLoading(true)
+    setViewMemberError("")
+    setViewMemberProfile(null)
+    setViewMemberAssets([])
+    setViewMemberSummary(null)
+    setViewMemberLoans([])
+
+    try {
+      const no = memberInfo.membership_no
+      const [profileRes, accountsRes, loansRes] = await Promise.all([
+        fetch(`/api/members/profile?membership_no=${no}`, { credentials: "include" }),
+        fetch(`/api/members/accounts?membership_no=${no}`, { credentials: "include" }),
+        fetch(`/api/loans/accounts?membershipNo=${no}`, { credentials: "include" }),
+      ])
+      const [profileData, accountsData, loansData] = await Promise.all([
+        profileRes.json(),
+        accountsRes.json(),
+        loansRes.json(),
+      ])
+      if (profileData.found) setViewMemberProfile(profileData.profile)
+      if (accountsData.success) {
+        setViewMemberAssets(accountsData.assets || [])
+        setViewMemberSummary(accountsData.summary)
+      }
+      if (loansData.accounts) setViewMemberLoans(loansData.accounts)
+    } catch {
+      setViewMemberError("Failed to load member details. Please try again.")
+    } finally {
+      setViewMemberLoading(false)
+    }
+  }
+
   const handleSubmit = async () => {
     if (!memberInfo || !selectedSchemeId || !openingDate) return
 
@@ -201,8 +335,7 @@ export default function OpenSavingsAccountPage() {
           scheme_id: Number(selectedSchemeId),
           opening_date: openingDate,
           initial_deposit: initialDeposit ? Number(initialDeposit) : 0,
-          nominee_name: nomineeName,
-          nominee_relation: nomineeRelation,
+          nominees,
         }),
       })
 
@@ -225,8 +358,9 @@ export default function OpenSavingsAccountPage() {
     setSelectedSchemeId("")
     // setOpeningDate(new Date().toISOString().split("T")[0])
     setInitialDeposit("")
-    setNomineeName("")
-    setNomineeRelation("")
+    setNominees([])
+    setDraftNomineeName("")
+    setDraftNomineeRelation("")
   }
   
 const getLogindate = async () => {
@@ -329,6 +463,15 @@ const getLogindate = async () => {
                           <Badge variant="outline" className="ml-auto border-teal-300 text-teal-700">
                             {memberInfo.member_type}
                           </Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleViewMember}
+                            className="h-7 gap-1.5 text-xs text-teal-600 hover:text-teal-700 hover:bg-teal-100"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            View Details
+                          </Button>
                         </div>
                         <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                           <div>
@@ -432,42 +575,96 @@ const getLogindate = async () => {
                       <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-100 text-sm font-bold text-teal-700">
                         3
                       </div>
-                      <div>
+                      <div className="flex-1">
                         <CardTitle className="text-lg">Nominee Details</CardTitle>
-                        <CardDescription>Add nominee information for the account</CardDescription>
+                        <CardDescription>Add up to 4 nominees for the account</CardDescription>
                       </div>
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {nominees.length} / {MAX_NOMINEES} added
+                      </span>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="nominee-name">Nominee Name</Label>
-                        <Input
-                          id="nominee-name"
-                          placeholder="Enter nominee name"
-                          value={nomineeName}
-                          onChange={(e) => setNomineeName(e.target.value)}
-                        />
+                  <CardContent className="space-y-4">
+                    {/* Added nominees list */}
+                    {nominees.length > 0 && (
+                      <div className="rounded-lg border divide-y">
+                        {nominees.map((n, idx) => (
+                          <div key={idx} className="flex items-center justify-between px-3 py-2">
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-teal-100 text-xs font-bold text-teal-700">
+                                {idx + 1}
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium">{n.name}</p>
+                                <p className="text-xs text-muted-foreground">{n.relation}</p>
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-red-500 hover:bg-red-50"
+                              onClick={() => handleRemoveNominee(idx)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        ))}
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="nominee-relation">Relationship</Label>
-                        <Select value={nomineeRelation} onValueChange={setNomineeRelation}>
-                          <SelectTrigger id="nominee-relation">
-                            <SelectValue placeholder="Select relationship" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Father">Father</SelectItem>
-                            <SelectItem value="Mother">Mother</SelectItem>
-                            <SelectItem value="Spouse">Spouse</SelectItem>
-                            <SelectItem value="Son">Son</SelectItem>
-                            <SelectItem value="Daughter">Daughter</SelectItem>
-                            <SelectItem value="Brother">Brother</SelectItem>
-                            <SelectItem value="Sister">Sister</SelectItem>
-                            <SelectItem value="Other">Other</SelectItem>
-                          </SelectContent>
-                        </Select>
+                    )}
+
+                    {/* Add nominee entry form */}
+                    {canAddNominee && (
+                      <div className="rounded-lg border border-dashed border-teal-200 bg-teal-50/30 p-4 space-y-3">
+                        <p className="text-xs font-medium text-teal-700 flex items-center gap-1.5">
+                          <UserPlus className="h-3.5 w-3.5" />
+                          Add Nominee
+                        </p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <Label htmlFor="draft-nominee-name" className="text-xs">Nominee Name</Label>
+                            <Input
+                              id="draft-nominee-name"
+                              placeholder="Enter nominee name"
+                              value={draftNomineeName}
+                              onChange={(e) => setDraftNomineeName(e.target.value)}
+                              onKeyDown={(e) => e.key === "Enter" && handleAddNominee()}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="draft-nominee-relation" className="text-xs">Relationship</Label>
+                            <Select value={draftNomineeRelation} onValueChange={setDraftNomineeRelation}>
+                              <SelectTrigger id="draft-nominee-relation">
+                                <SelectValue placeholder="Select relationship" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Father">Father</SelectItem>
+                                <SelectItem value="Mother">Mother</SelectItem>
+                                <SelectItem value="Spouse">Spouse</SelectItem>
+                                <SelectItem value="Son">Son</SelectItem>
+                                <SelectItem value="Daughter">Daughter</SelectItem>
+                                <SelectItem value="Brother">Brother</SelectItem>
+                                <SelectItem value="Sister">Sister</SelectItem>
+                                <SelectItem value="Other">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleAddNominee}
+                          disabled={!draftNomineeName.trim() || !draftNomineeRelation}
+                          className="gap-1.5 bg-white border-teal-300 text-teal-700 hover:bg-teal-50 hover:text-teal-800"
+                        >
+                          <UserPlus className="h-3.5 w-3.5" />
+                          Add Nominee
+                        </Button>
                       </div>
-                    </div>
+                    )}
+
+                    {nominees.length === 0 && !canAddNominee && (
+                      <p className="text-sm text-muted-foreground">Maximum nominees added.</p>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -591,16 +788,337 @@ const getLogindate = async () => {
                         </p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground">Nominee</p>
-                        <p className="text-sm font-semibold">
-                          {nomineeName ? `${nomineeName} (${nomineeRelation || "---"})` : "Not provided"}
-                        </p>
+                        <p className="text-xs text-muted-foreground">Nominees</p>
+                        {nominees.length > 0 ? (
+                          <div className="mt-1 space-y-1">
+                            {nominees.map((n, i) => (
+                              <p key={i} className="text-sm font-semibold">
+                                {i + 1}. {n.name} <span className="font-normal text-muted-foreground">({n.relation})</span>
+                              </p>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm font-semibold text-muted-foreground">Not provided</p>
+                        )}
                       </div>
                     </div>
                   </CardContent>
                 </Card>
               </div>
             </div>
+
+            {/* Member Profile Modal */}
+            <Dialog open={viewMemberOpen} onOpenChange={setViewMemberOpen}>
+              <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+                {/* Fixed header */}
+                <div className="px-6 pt-6 pb-4 border-b shrink-0">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2 text-teal-700 text-lg">
+                      <User className="h-5 w-5" />
+                      Member Profile
+                    </DialogTitle>
+                    <DialogDescription asChild>
+                      <div className="flex items-center gap-2 flex-wrap mt-1">
+                        <span className="font-mono text-sm font-medium text-foreground">
+                          {memberInfo?.membership_no}
+                        </span>
+                        <span className="text-muted-foreground">·</span>
+                        <span className="text-sm">{memberInfo?.full_name}</span>
+                        <Badge
+                          variant="outline"
+                          className={
+                            memberInfo?.status === "ACTIVE"
+                              ? "border-green-300 bg-green-50 text-green-700"
+                              : "border-red-300 bg-red-50 text-red-700"
+                          }
+                        >
+                          {memberInfo?.status}
+                        </Badge>
+                        {memberInfo?.member_type && (
+                          <Badge variant="outline" className="border-teal-300 text-teal-700">
+                            {memberInfo.member_type}
+                          </Badge>
+                        )}
+                        {memberInfo?.membership_class && (
+                          <Badge variant="secondary">{memberInfo.membership_class}</Badge>
+                        )}
+                      </div>
+                    </DialogDescription>
+                  </DialogHeader>
+                </div>
+
+                {/* Loading / error */}
+                {viewMemberLoading && (
+                  <div className="flex flex-1 items-center justify-center py-16">
+                    <Loader2 className="h-7 w-7 animate-spin text-teal-600" />
+                    <span className="ml-3 text-sm text-muted-foreground">Loading member details…</span>
+                  </div>
+                )}
+                {viewMemberError && !viewMemberLoading && (
+                  <div className="flex flex-1 items-center justify-center py-16">
+                    <p className="text-sm text-red-500">{viewMemberError}</p>
+                  </div>
+                )}
+
+                {/* Tabbed content */}
+                {!viewMemberLoading && !viewMemberError && (
+                  <Tabs value={viewMemberTab} onValueChange={setViewMemberTab} className="flex flex-col flex-1 min-h-0">
+                    <TabsList className="mx-6 mt-3 shrink-0 grid grid-cols-4 w-auto">
+                      <TabsTrigger value="personal" className="gap-1.5 text-xs">
+                        <User className="h-3.5 w-3.5" />Personal
+                      </TabsTrigger>
+                      <TabsTrigger value="address" className="gap-1.5 text-xs">
+                        <MapPin className="h-3.5 w-3.5" />Address & KYC
+                      </TabsTrigger>
+                      <TabsTrigger value="assets" className="gap-1.5 text-xs">
+                        <TrendingUp className="h-3.5 w-3.5" />Assets
+                      </TabsTrigger>
+                      <TabsTrigger value="liabilities" className="gap-1.5 text-xs">
+                        <TrendingDown className="h-3.5 w-3.5" />Liabilities
+                      </TabsTrigger>
+                    </TabsList>
+
+                    {/* ── Personal ─────────────────────────────────────── */}
+                    <TabsContent value="personal" className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+                      {viewMemberProfile ? (
+                        <>
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Personal Information</p>
+                            <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+                              {[
+                                ["Full Name",       viewMemberProfile.full_name],
+                                ["Father Name",     viewMemberProfile.father_name || "---"],
+                                ["Date of Birth",   viewMemberProfile.date_of_birth || "---"],
+                                ["Gender",          viewMemberProfile.gender ? viewMemberProfile.gender.charAt(0).toUpperCase() + viewMemberProfile.gender.slice(1) : "---"],
+                                ["Mobile",          viewMemberProfile.mobile_no || "---"],
+                                ["Email",           viewMemberProfile.customer_email || "---"],
+                                ["Blood Group",     viewMemberProfile.blood_group || "---"],
+                                ["Marital Status",  viewMemberProfile.marital_status || "---"],
+                                ["Spouse Name",     viewMemberProfile.spouse_name || "---"],
+                                ["Occupation",      viewMemberProfile.occupation || "---"],
+                                ["Customer Type",   viewMemberProfile.customer_type || "---"],
+                                ["Customer Code",   viewMemberProfile.customer_code?.trim() || "---"],
+                              ].map(([label, value]) => (
+                                <div key={label}>
+                                  <p className="text-xs text-muted-foreground">{label}</p>
+                                  <p className="mt-0.5 text-sm font-medium break-all">{value}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="border-t pt-4">
+                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Membership Information</p>
+                            <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+                              {[
+                                ["Membership No",          viewMemberProfile.membership_no],
+                                ["Member Type",            viewMemberProfile.member_type || "---"],
+                                ["Membership Class",       viewMemberProfile.membership_class || "---"],
+                                ["Status",                 viewMemberProfile.status || "---"],
+                                ["Join Date",              viewMemberProfile.join_date || "---"],
+                                ["Ledger Folio No",        viewMemberProfile.ledger_folio_number || "---"],
+                              ].map(([label, value]) => (
+                                <div key={label}>
+                                  <p className="text-xs text-muted-foreground">{label}</p>
+                                  <p className="mt-0.5 text-sm font-medium">{value}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No personal data available.</p>
+                      )}
+                    </TabsContent>
+
+                    {/* ── Address & KYC ────────────────────────────────── */}
+                    <TabsContent value="address" className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+                      {viewMemberProfile ? (
+                        <>
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Current Address</p>
+                            <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+                              {[
+                                ["House No",    viewMemberProfile.house_no || "---"],
+                                ["Street",      viewMemberProfile.street || "---"],
+                                ["Village",     viewMemberProfile.village || "---"],
+                                ["Taluk",       viewMemberProfile.thaluk || "---"],
+                                ["District",    viewMemberProfile.district || "---"],
+                                ["State",       viewMemberProfile.state || "---"],
+                                ["Pincode",     viewMemberProfile.pincode || "---"],
+                                ["Phone",       viewMemberProfile.address_phone || "---"],
+                              ].map(([label, value]) => (
+                                <div key={label}>
+                                  <p className="text-xs text-muted-foreground">{label}</p>
+                                  <p className="mt-0.5 text-sm font-medium">{value}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="border-t pt-4">
+                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                              <ShieldCheck className="inline h-3.5 w-3.5 mr-1" />KYC Documents
+                            </p>
+                            <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+                              {[
+                                ["Aadhaar No",         viewMemberProfile.aadhaar_no || "---"],
+                                ["PAN No",             viewMemberProfile.pan_no || "---"],
+                                ["Ration No",          viewMemberProfile.ration_no || "---"],
+                                ["Driving License",    viewMemberProfile.driving_license_no || "---"],
+                              ].map(([label, value]) => (
+                                <div key={label}>
+                                  <p className="text-xs text-muted-foreground">{label}</p>
+                                  <p className="mt-0.5 text-sm font-medium font-mono">{value}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No address data available.</p>
+                      )}
+                    </TabsContent>
+
+                    {/* ── Assets ───────────────────────────────────────── */}
+                    <TabsContent value="assets" className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                      {viewMemberSummary && (
+                        <div className="grid grid-cols-3 gap-3">
+                          {[
+                            { label: "Total Assets",      value: fmt(viewMemberSummary.total_assets),      color: "text-teal-700 bg-teal-50 border-teal-200" },
+                            { label: "Total Accounts",    value: String(viewMemberAssets.length),          color: "text-blue-700 bg-blue-50 border-blue-200" },
+                            { label: "Net Worth",         value: fmt(viewMemberSummary.net_worth),         color: "text-green-700 bg-green-50 border-green-200" },
+                          ].map(({ label, value, color }) => (
+                            <div key={label} className={`rounded-lg border p-3 text-center ${color}`}>
+                              <p className="text-xs opacity-70">{label}</p>
+                              <p className="text-base font-bold mt-0.5">{value}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {viewMemberAssets.length > 0 ? (
+                        <div className="rounded-lg border overflow-hidden">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="bg-muted/50">
+                                <TableHead className="text-xs">Type</TableHead>
+                                <TableHead className="text-xs">Account No</TableHead>
+                                <TableHead className="text-xs">Scheme</TableHead>
+                                <TableHead className="text-xs">Rate</TableHead>
+                                <TableHead className="text-xs text-right">Balance</TableHead>
+                                <TableHead className="text-xs">Status</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {viewMemberAssets.map((a, i) => (
+                                <TableRow key={i}>
+                                  <TableCell className="text-xs">
+                                    <Badge variant="secondary" className="text-xs font-normal">{a.account_type}</Badge>
+                                  </TableCell>
+                                  <TableCell className="font-mono text-xs">{a.account_number}</TableCell>
+                                  <TableCell className="text-xs">{a.scheme_name}</TableCell>
+                                  <TableCell className="text-xs">{a.interest_rate ? `${a.interest_rate}%` : "---"}</TableCell>
+                                  <TableCell className="text-xs text-right font-semibold">{fmt(a.balance)}</TableCell>
+                                  <TableCell className="text-xs">
+                                    <span className={`font-medium ${a.status === "ACTIVE" ? "text-green-600" : "text-muted-foreground"}`}>
+                                      {a.status}
+                                    </span>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
+                          <TrendingUp className="h-8 w-8 opacity-20 mb-2" />
+                          <p className="text-sm">No assets found for this member.</p>
+                        </div>
+                      )}
+                    </TabsContent>
+
+                    {/* ── Liabilities ──────────────────────────────────── */}
+                    <TabsContent value="liabilities" className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                      {viewMemberLoans.length > 0 ? (
+                        <>
+                          <div className="grid grid-cols-3 gap-3">
+                            {(() => {
+                              const activeLoans = viewMemberLoans.filter(l => l.application_status === "ACTIVE")
+                              const totalOutstanding = viewMemberLoans.reduce((s, l) => s + Number(l.outstanding_balance || 0), 0)
+                              const totalOverdue = viewMemberLoans.reduce((s, l) => s + Number(l.overdue_installments || 0), 0)
+                              return [
+                                { label: "Active Loans",       value: String(activeLoans.length),  color: "text-orange-700 bg-orange-50 border-orange-200" },
+                                { label: "Total Outstanding",  value: fmt(totalOutstanding),        color: "text-red-700 bg-red-50 border-red-200" },
+                                { label: "Overdue EMIs",       value: String(totalOverdue),         color: totalOverdue > 0 ? "text-red-700 bg-red-50 border-red-200" : "text-green-700 bg-green-50 border-green-200" },
+                              ].map(({ label, value, color }) => (
+                                <div key={label} className={`rounded-lg border p-3 text-center ${color}`}>
+                                  <p className="text-xs opacity-70">{label}</p>
+                                  <p className="text-base font-bold mt-0.5">{value}</p>
+                                </div>
+                              ))
+                            })()}
+                          </div>
+
+                          <div className="rounded-lg border overflow-hidden">
+                            <Table>
+                              <TableHeader>
+                                <TableRow className="bg-muted/50">
+                                  <TableHead className="text-xs">Loan Scheme</TableHead>
+                                  <TableHead className="text-xs text-right">Sanctioned</TableHead>
+                                  <TableHead className="text-xs text-right">Outstanding</TableHead>
+                                  <TableHead className="text-xs text-right">EMI</TableHead>
+                                  <TableHead className="text-xs">EMIs Paid</TableHead>
+                                  <TableHead className="text-xs">Status</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {viewMemberLoans.map((loan, i) => (
+                                  <TableRow key={i}>
+                                    <TableCell className="text-xs">
+                                      <p className="font-medium">{loan.scheme_name}</p>
+                                      {loan.sanction_date && <p className="text-muted-foreground text-xs">{loan.sanction_date}</p>}
+                                    </TableCell>
+                                    <TableCell className="text-xs text-right">{fmt(loan.sanctioned_amount)}</TableCell>
+                                    <TableCell className="text-xs text-right font-semibold text-red-600">{fmt(loan.outstanding_balance)}</TableCell>
+                                    <TableCell className="text-xs text-right">{fmt(loan.emi_amount)}</TableCell>
+                                    <TableCell className="text-xs">
+                                      {loan.paid_installments}/{loan.total_installments}
+                                      {Number(loan.overdue_installments) > 0 && (
+                                        <span className="ml-1 text-red-500">({loan.overdue_installments} overdue)</span>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="text-xs">
+                                      <span className={`font-medium ${loan.application_status === "ACTIVE" ? "text-green-600" : loan.application_status === "OVERDUE" ? "text-red-600" : "text-muted-foreground"}`}>
+                                        {loan.application_status}
+                                      </span>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
+                          <TrendingDown className="h-8 w-8 opacity-20 mb-2" />
+                          <p className="text-sm">No loan accounts found for this member.</p>
+                        </div>
+                      )}
+                    </TabsContent>
+                  </Tabs>
+                )}
+
+                {/* Footer */}
+                {!viewMemberLoading && (
+                  <div className="px-6 py-3 border-t shrink-0 flex justify-end">
+                    <Button variant="outline" size="sm" onClick={() => setViewMemberOpen(false)} className="bg-transparent">
+                      Close
+                    </Button>
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
 
             {/* Member Search Dialog */}
             <Dialog open={searchDialogOpen} onOpenChange={setSearchDialogOpen}>
