@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -93,6 +94,13 @@ export default function CreateLockerDepositPage() {
   const [selectedLockerId, setSelectedLockerId] = useState<string>("")
   const [lockersLoading, setLockersLoading] = useState(false)
 
+  // Transaction details
+  const [voucherType, setVoucherType] = useState<"CASH" | "TRANSFER" | "">("")
+  const [selectedBatch, setSelectedBatch] = useState<number>(0)
+  const [narration, setNarration] = useState("")
+  const [isBatchPopupOpen, setIsBatchPopupOpen] = useState(false)
+  const [incompleteBatches, setIncompleteBatches] = useState<any[]>([])
+
   // Submit
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [successInfo, setSuccessInfo] = useState<{
@@ -126,6 +134,14 @@ export default function CreateLockerDepositPage() {
       if (availData.success) setAvailableLockers(availData.lockers || [])
     } catch {}
     setLockersLoading(false)
+  }
+
+  const fetchIncompleteBatches = async () => {
+    try {
+      const res = await fetch("/api/fas/incomplete-batches", { credentials: "include" })
+      const data = await res.json()
+      if (res.ok && data.data) setIncompleteBatches(data.data)
+    } catch {}
   }
 
   const searchMember = async () => {
@@ -215,6 +231,10 @@ export default function CreateLockerDepositPage() {
 
   const handleSubmit = async () => {
     if (!memberInfo || !depositAmount || !openingDate) return
+    if (!voucherType) {
+      alert("Please select a voucher type.")
+      return
+    }
     setIsSubmitting(true)
     try {
       const res = await fetch("/api/lockers/create-deposit", {
@@ -230,6 +250,9 @@ export default function CreateLockerDepositPage() {
           nominee_name: nomineeName,
           nominee_relation: nomineeRelation,
           locker_id: selectedLockerId || null,
+          voucher_type: voucherType,
+          selected_batch: selectedBatch,
+          narration: narration || "Locker Deposit Opening",
         }),
       })
       const data = await res.json()
@@ -435,11 +458,83 @@ export default function CreateLockerDepositPage() {
               </CardContent>
             </Card>
 
-            {/* Step 3: Assign Locker (optional) */}
+            {/* Step 3: Transaction Details */}
             <Card className={!memberInfo ? "pointer-events-none opacity-50" : ""}>
               <CardHeader>
                 <div className="flex items-center gap-3">
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-sm font-bold text-amber-700">3</div>
+                  <div>
+                    <CardTitle className="text-lg">Transaction Details</CardTitle>
+                    <CardDescription>Select voucher type and batch for GL posting</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="voucher-type">Voucher Type *</Label>
+                    <Select
+                      value={voucherType}
+                      onValueChange={(v) => {
+                        setVoucherType(v as "CASH" | "TRANSFER")
+                        if (v !== "TRANSFER") setSelectedBatch(0)
+                      }}
+                    >
+                      <SelectTrigger id="voucher-type">
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="CASH">Cash</SelectItem>
+                        <SelectItem value="TRANSFER">Transfer</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {voucherType === "TRANSFER" && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>GL Batch ID</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          value={selectedBatch && selectedBatch !== 0 ? String(selectedBatch) : "New Batch"}
+                          readOnly
+                          placeholder="Select or create batch"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="bg-transparent"
+                          onClick={() => {
+                            fetchIncompleteBatches()
+                            setIsBatchPopupOpen(true)
+                          }}
+                        >
+                          Select
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="narration">Narration</Label>
+                  <Textarea
+                    id="narration"
+                    placeholder="e.g. Locker deposit opening"
+                    rows={2}
+                    value={narration}
+                    onChange={(e) => setNarration(e.target.value)}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Step 4: Assign Locker (optional) */}
+            <Card className={!memberInfo ? "pointer-events-none opacity-50" : ""}>
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-sm font-bold text-amber-700">4</div>
                   <div className="flex-1">
                     <CardTitle className="text-lg">Assign Locker <span className="ml-1 text-sm font-normal text-muted-foreground">(Optional)</span></CardTitle>
                     <CardDescription>Select an available locker from the vault</CardDescription>
@@ -540,7 +635,7 @@ export default function CreateLockerDepositPage() {
               </Button>
               <Button
                 onClick={handleSubmit}
-                disabled={!memberInfo || !depositAmount || !openingDate || isSubmitting}
+                disabled={!memberInfo || !depositAmount || !openingDate || !voucherType || isSubmitting}
                 className="gap-2 bg-amber-600 hover:bg-amber-700 text-white"
               >
                 {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -754,6 +849,65 @@ export default function CreateLockerDepositPage() {
                 {popupResults.length} result{popupResults.length !== 1 ? "s" : ""} found
               </p>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* GL Batch Selection Dialog */}
+        <Dialog open={isBatchPopupOpen} onOpenChange={setIsBatchPopupOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Select Incomplete GL Batch</DialogTitle>
+              <DialogDescription>Select an existing batch or create a new one</DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[400px] overflow-y-auto">
+              {incompleteBatches.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">No incomplete batches found. A new batch will be created.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Batch ID</TableHead>
+                      <TableHead>Total Debit</TableHead>
+                      <TableHead>Total Credit</TableHead>
+                      <TableHead>Difference</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {incompleteBatches.map((b) => (
+                      <TableRow key={b.batch_id}>
+                        <TableCell className="font-mono">{b.batch_id}</TableCell>
+                        <TableCell>{fmt(b.total_debit)}</TableCell>
+                        <TableCell>{fmt(b.total_credit)}</TableCell>
+                        <TableCell className="text-destructive">{fmt(b.difference)}</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="bg-transparent"
+                            onClick={() => { setSelectedBatch(b.batch_id); setIsBatchPopupOpen(false) }}
+                          >
+                            Select
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                variant="outline"
+                className="bg-transparent"
+                onClick={() => { setSelectedBatch(0); setIsBatchPopupOpen(false) }}
+              >
+                New Batch
+              </Button>
+              <Button variant="outline" className="bg-transparent" onClick={() => setIsBatchPopupOpen(false)}>
+                Cancel
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
 

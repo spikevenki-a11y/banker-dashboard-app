@@ -64,3 +64,11 @@ CREATE TABLE locker_deposits (
 );
 CREATE INDEX idx_ld_branch ON locker_deposits(branch_id);
 CREATE INDEX idx_ld_member ON locker_deposits(membership_no);
+
+
+
+INSERT INTO deposit_schemes (
+    branch_id,scheme_id,scheme_name,scheme_description,deposit_type,minimum_period_months,maximum_period_months,installment_frequency,minimum_installment_amount,maximum_installment_amount,penal_rate,interest_rate,interest_code,interest_frequency,interest_calculation_method,compounding_frequency,premature_closure_allowed,premature_penal_rate,tds_applicable,deposit_gl_account,interest_payable_gl_account,interest_expense_gl_account
+) VALUES (
+    23108001,24001,'Locker Deposit','Locker Deposit lockers','LOCKER',12,120,'YEARLY',500.00,100000.00,2.00,7.00,0,'ON_MATURITY','COMPOUND','QUARTERLY',true,1.00,true,'12203000','0',    '41203000'
+);
