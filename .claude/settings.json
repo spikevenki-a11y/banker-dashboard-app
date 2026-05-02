@@ -8,7 +8,8 @@
       "Bash(xargs grep:*)",
       "Bash(npx tsc:*)",
       "Bash(xargs wc *)",
-      "Bash(sort -k9)"
+      "Bash(sort -k9)",
+      "Bash(grep -r \"useReport\\\\|fetchReport\\\\|getReport\" \"d:/ZueTech/banker-dashboard-app/app\" --include=\"*.ts\" --include=\"*.tsx\" ! -path \"*/.next/*\")"
     ]
   }
 }
