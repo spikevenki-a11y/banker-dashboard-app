@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import pool from "@/lib/connection/db"
+import { checkDayEndRestriction } from "@/lib/dayend-check"
 
 // GET: Fetch all loan applications
 export async function GET(request: NextRequest) {
@@ -109,6 +110,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = JSON.parse(c.value)
     const branchId = session.branch
+    const businessDate: string = session.businessDate
     const body = await request.json()
     console.log("Received loan application data:", body)
 
@@ -131,6 +133,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    const dayendErr = await checkDayEndRestriction(branchId, businessDate)
+    if (dayendErr) return dayendErr
 
     await client.query("BEGIN")
 

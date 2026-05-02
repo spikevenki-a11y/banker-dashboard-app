@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import pool from "@/lib/connection/db"
+import { checkDayEndRestriction } from "@/lib/dayend-check"
 
 export async function POST(req: Request) {
   const c = (await cookies()).get("banker_session")
@@ -11,6 +12,7 @@ export async function POST(req: Request) {
   try {
     const session = JSON.parse(c.value)
     const branchId = session.branch
+    const businessDate: string = session.businessDate
     const { membership_no, scheme_id, opening_date, initial_deposit, nominees } = await req.json()
     const nomineeList: { name: string; relation: string }[] = Array.isArray(nominees)
       ? nominees.slice(0, 4)
@@ -19,6 +21,9 @@ export async function POST(req: Request) {
     if (!membership_no || !scheme_id || !opening_date) {
       return NextResponse.json({ error: "Membership number, scheme, and opening date are required" }, { status: 400 })
     }
+
+    const dayendErr = await checkDayEndRestriction(branchId, businessDate)
+    if (dayendErr) return dayendErr
 
     await client.query("BEGIN")
 

@@ -244,6 +244,8 @@ export async function POST(req: NextRequest) {
       )
       recordsProcessed = 1
     }
+
+    
     // ──────────────────────────────────────────────────────────────────────
 
     // Mark step DONE
@@ -255,7 +257,7 @@ export async function POST(req: NextRequest) {
     )
 
     // If all steps are DONE, mark dayend COMPLETED (DATE_ADVANCE handles it too)
-    if (stepName !== "DATE_ADVANCE") {
+    if (stepName == "DATE_ADVANCE") {
       const checkRes = await client.query(
         `SELECT COUNT(*) AS pending
          FROM dayend_step_log

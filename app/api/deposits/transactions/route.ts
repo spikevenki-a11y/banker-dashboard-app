@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import pool from "@/lib/connection/db"
+import { checkDayEndRestriction } from "@/lib/dayend-check"
 
 export async function GET(request: NextRequest) {
   const c = (await cookies()).get("banker_session")
@@ -168,6 +169,9 @@ export async function POST(request: NextRequest) {
     if (isNaN(amt) || amt <= 0) {
       return NextResponse.json({ error: "Amount must be positive" }, { status: 400 })
     }
+
+    const dayendErr = await checkDayEndRestriction(branchId, businessDate)
+    if (dayendErr) return dayendErr
 
     await client.query("BEGIN")
 
