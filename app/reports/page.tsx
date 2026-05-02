@@ -1,12 +1,12 @@
 "use client"
 
 import { useState, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table"
@@ -18,8 +18,6 @@ import {
   CreditCard,
   PiggyBank,
   DollarSign,
-  AlertCircle,
-  FileBarChart,
   Download,
   Search,
   Printer,
@@ -36,11 +34,9 @@ const reportCategories = [
     color: "text-blue-600",
     bgColor: "bg-blue-50",
     reports: [
-      { name: "Member List Report", description: "Comprehensive list of all members with details" },
-      //{ name: "New Member Registration", description: "Recently registered members" },
-      //{ name: "Active Members Report", description: "Currently active member accounts" },
-      { name: "Inactive Members Report", description: "Dormant and inactive accounts" },
-      { name: "Member KYC Status", description: "KYC verification status of all members" },
+      { name: "Member List Report",    description: "Comprehensive list of all members with details",  href: "/reports/members?type=all" },
+      { name: "Inactive Members Report", description: "Dormant and inactive accounts",                 href: "/reports/members?type=inactive" },
+      { name: "Member KYC Status",     description: "KYC verification status of all members",          href: "/reports/members?type=kyc" },
     ],
   },
   {
@@ -49,12 +45,11 @@ const reportCategories = [
     color: "text-teal-600",
     bgColor: "bg-teal-50",
     reports: [
-      { name: "Savings Account Statement", description: "Detailed account statements with transactions" },
-      { name: "Savings Outstanding Report", description: "Outstanding balance summary of all accounts" },
-      { name: "Deposit Summary", description: "Total deposits by period" },
-      { name: "Withdrawal Summary", description: "Total withdrawals by period" },
-      { name: "Interest Calculation Report", description: "Interest earned and credited details" },
-      { name: "Dormant Accounts", description: "Accounts with no activity" },
+      { name: "Savings Account Statement",  description: "Detailed account statements with transactions", href: "/reports/savings?type=statement" },
+      { name: "Savings Outstanding Report", description: "Outstanding balance summary of all accounts",   href: "/reports/savings?type=outstanding" },
+      { name: "Deposit Summary",            description: "Total deposits by period",                       href: "/reports/savings?type=deposits" },
+      { name: "Withdrawal Summary",         description: "Total withdrawals by period",                    href: "/reports/savings?type=withdrawals" },
+      { name: "Dormant Accounts",           description: "Accounts with no activity in 180+ days",        href: "/reports/savings?type=dormant" },
     ],
   },
   {
@@ -63,11 +58,9 @@ const reportCategories = [
     color: "text-purple-600",
     bgColor: "bg-purple-50",
     reports: [
-      { name: "FD Maturity Report", description: "Upcoming and matured fixed deposits" },
-      { name: "Outstanding FD Report", description: "All currently active fixed deposits" },
-      { name: "FD Interest Report", description: "Interest calculations and payouts" },
-      { name: "FD Closure Report", description: "Closed and premature closure details" },
-      { name: "FD Renewal Report", description: "Renewed fixed deposit details" },
+      { name: "FD Maturity Report",   description: "Upcoming and matured fixed deposits",        href: "/reports/deposits?type=maturity" },
+      { name: "Outstanding FD Report", description: "All currently active fixed deposits",        href: "/reports/deposits?type=outstanding" },
+      { name: "FD Closure Report",    description: "Closed and premature closure details",        href: "/reports/deposits?type=closure" },
     ],
   },
   {
@@ -76,13 +69,10 @@ const reportCategories = [
     color: "text-orange-600",
     bgColor: "bg-orange-50",
     reports: [
-      { name: "Loan Disbursement Report", description: "All disbursed loans by period" },
-      { name: "Loan Outstanding Report", description: "Current outstanding loan balances" },
-      //{ name: "EMI Collection Report", description: "EMI payments collected" },
-      { name: "Overdue Loans Report", description: "Loans with overdue payments" },
-      { name: "Loan Closure Report", description: "Fully repaid and closed loans" },
-      { name: "NPA Report", description: "Non-performing assets analysis" },
-      //{ name: "Loan Application Status", description: "Pending and approved applications" },
+      { name: "Loan Disbursement Report", description: "All disbursed loans by period",           href: "/reports/loans?type=disbursement" },
+      { name: "Loan Outstanding Report",  description: "Current outstanding loan balances",        href: "/reports/loans?type=outstanding" },
+      { name: "Overdue Loans Report",     description: "Loans with overdue payments",              href: "/reports/loans?type=overdue" },
+      { name: "Loan Closure Report",      description: "Fully repaid and closed loans",            href: "/reports/loans?type=closure" },
     ],
   },
   {
@@ -91,12 +81,9 @@ const reportCategories = [
     color: "text-green-600",
     bgColor: "bg-green-50",
     reports: [
-      { name: "Balance Sheet", description: "Assets, liabilities, and equity statement" },
-      { name: "Profit & Loss Statement", description: "Income and expenses summary" },
-      { name: "Cash Flow Statement", description: "Cash inflows and outflows" },
-      { name: "Trial Balance", description: "Debit and credit balance verification" },
-      { name: "Income & Expenditure", description: "Detailed income and expense breakdown" },
-      { name: "Daily Cash Report", description: "Daily cash position and transactions" },
+      { name: "Trial Balance",            description: "Debit and credit balance verification (approved batches)", href: "/reports/financial?type=trial-balance" },
+      { name: "Daily Cash Report",        description: "Cash account transactions by date range",                  href: "/reports/financial?type=cash" },
+      { name: "Transaction Summary",      description: "GL batches grouped by voucher type",                       href: "/reports/financial?type=summary" },
     ],
   },
   {
@@ -105,25 +92,8 @@ const reportCategories = [
     color: "text-indigo-600",
     bgColor: "bg-indigo-50",
     reports: [
-      { name: "Daily Transaction Report", description: "All transactions for the day" },
-      { name: "Print Voucher", description: "Print voucher by date and voucher number" },
-      { name: "Transaction Summary by Type", description: "Grouped by transaction type" },
-      { name: "Branch-wise Transactions", description: "Transactions by branch" },
-      { name: "User Activity Report", description: "Transactions by staff member" },
-      { name: "Failed Transactions", description: "Failed and rejected transactions" },
-    ],
-  },
-  {
-    title: "Compliance & Audit Reports",
-    icon: AlertCircle,
-    color: "text-red-600",
-    bgColor: "bg-red-50",
-    reports: [
-      { name: "Audit Trail Report", description: "System activity and changes log" },
-      { name: "Regulatory Compliance", description: "Compliance with banking regulations" },
-      { name: "KYC Compliance Report", description: "KYC documentation status" },
-      { name: "Large Transaction Report", description: "Transactions above threshold" },
-      { name: "Suspicious Activity Report", description: "Flagged transactions for review" },
+      { name: "Daily Transaction Report", description: "All transactions for the day",             href: "/reports/daily-transactions" },
+      { name: "Print Voucher",            description: "Print voucher by date and voucher number",  href: "" },
     ],
   },
   {
@@ -132,22 +102,8 @@ const reportCategories = [
     color: "text-amber-600",
     bgColor: "bg-amber-50",
     reports: [
-      { name: "Share Register", description: "Member shareholding details" },
-      { name: "Share Transaction Report", description: "Share deposits and withdrawals" },
-      { name: "Dividend Distribution", description: "Dividend calculations and payouts" },
-      { name: "Share Certificate Report", description: "Issued share certificates" },
-    ],
-  },
-  {
-    title: "Custom Reports",
-    icon: FileBarChart,
-    color: "text-slate-600",
-    bgColor: "bg-slate-50",
-    reports: [
-      { name: "Custom Date Range Report", description: "Generate reports for specific periods" },
-      { name: "Branch Performance", description: "Branch-wise performance metrics" },
-      { name: "Age-wise Analysis", description: "Data analysis by time periods" },
-      { name: "Comparative Analysis", description: "Period-over-period comparison" },
+      { name: "Share Register",         description: "Member shareholding details",                 href: "/reports/shares?type=register" },
+      { name: "Share Transaction Report", description: "Share deposits and withdrawals by period",  href: "/reports/shares?type=transactions" },
     ],
   },
 ]
@@ -222,11 +178,7 @@ interface VoucherData {
 }
 
 export default function ReportsPage() {
-  const [selectedReport, setSelectedReport] = useState<{
-    category: string
-    name: string
-    description: string
-  } | null>(null)
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
 
   // Print Voucher state
@@ -238,18 +190,15 @@ export default function ReportsPage() {
   const [pvData, setPvData] = useState<VoucherData | null>(null)
   const printRef = useRef<HTMLDivElement>(null)
 
-  function handleReportClick(report: { name: string; description: string }, category: string) {
+  function handleReportClick(report: { name: string; description: string; href: string }) {
     if (report.name === "Print Voucher") {
       setPrintVoucherOpen(true)
       setPvDate("")
       setPvVoucherNo("")
       setPvError("")
       setPvData(null)
-    } else if (report.name === "Daily Transaction Report") {
-      // Navigate to the dedicated daily transactions page
-      window.location.href = "/reports/daily-transactions"
-    } else {
-      setSelectedReport({ category, name: report.name, description: report.description })
+    } else if (report.href) {
+      router.push(report.href)
     }
   }
 
@@ -391,7 +340,7 @@ export default function ReportsPage() {
                   {category.reports.map((report) => (
                     <button
                       key={report.name}
-                      onClick={() => handleReportClick(report, category.title)}
+                      onClick={() => handleReportClick(report)}
                       className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 text-left transition-colors hover:bg-accent hover:text-accent-foreground"
                     >
                       {report.name === "Print Voucher" ? (
@@ -411,75 +360,6 @@ export default function ReportsPage() {
           ))}
         </div>
       )}
-
-      {/* Generic Report Dialog */}
-      <Dialog open={!!selectedReport} onOpenChange={() => setSelectedReport(null)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="text-balance">{selectedReport?.name}</DialogTitle>
-            <DialogDescription className="text-pretty">{selectedReport?.description}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Report Period</Label>
-              <Select defaultValue="current-month">
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="yesterday">Yesterday</SelectItem>
-                  <SelectItem value="current-week">Current Week</SelectItem>
-                  <SelectItem value="current-month">Current Month</SelectItem>
-                  <SelectItem value="last-month">Last Month</SelectItem>
-                  <SelectItem value="current-quarter">Current Quarter</SelectItem>
-                  <SelectItem value="current-year">Current Year</SelectItem>
-                  <SelectItem value="custom">Custom Date Range</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label>From Date</Label>
-                <Input type="date" defaultValue={new Date().toISOString().split("T")[0]} />
-              </div>
-              <div className="space-y-2">
-                <Label>To Date</Label>
-                <Input type="date" defaultValue={new Date().toISOString().split("T")[0]} />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Report Format</Label>
-              <Select defaultValue="pdf">
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pdf">PDF</SelectItem>
-                  <SelectItem value="excel">Excel (.xlsx)</SelectItem>
-                  <SelectItem value="csv">CSV</SelectItem>
-                  <SelectItem value="print">Print</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2">
-              <input type="checkbox" id="detailed" className="rounded border-input" />
-              <Label htmlFor="detailed" className="text-sm font-normal">
-                Include detailed breakdown
-              </Label>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" className="flex-1 bg-transparent" onClick={() => setSelectedReport(null)}>
-              Cancel
-            </Button>
-            <Button className="flex-1 gap-2">
-              <Download className="h-4 w-4" />
-              Generate Report
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Print Voucher Dialog */}
       <Dialog open={printVoucherOpen} onOpenChange={(open) => { setPrintVoucherOpen(open); if (!open) { setPvData(null); setPvError(""); } }}>
