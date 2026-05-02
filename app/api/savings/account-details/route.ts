@@ -47,11 +47,11 @@ export async function GET(req: NextRequest) {
         c.customer_code,
         c.gender,
         c.email,
-        c.address_line1,
-        c.village,
-        c.district,
-        c.state,
-        c.pincode,
+        a.street,
+        a.village,
+        a.district,
+        a.state,
+        a.pincode,
         m.member_type,
         m.membership_class,
         m.join_date
@@ -59,6 +59,7 @@ export async function GET(req: NextRequest) {
        JOIN savings_schemes ss ON sa.scheme_id = ss.scheme_id AND sa.branch_id = ss.branch_id
        JOIN memberships m ON sa.membership_no = m.membership_no AND sa.branch_id = m.branch_id
        JOIN customers c ON m.customer_code = c.customer_code
+       join customer_address a on a.customer_code = c.customer_code
        WHERE sa.account_number = $1 AND sa.branch_id = $2`,
       [accountNumber, branchId]
     )
