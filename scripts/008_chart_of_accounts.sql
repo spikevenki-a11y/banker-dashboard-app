@@ -86,7 +86,8 @@ INSERT INTO public.chart_of_accounts
 VALUES
 (23080102, 31000000, 'Interest Received',  3, b'1', 30000000, 0, b'1', now(), now()),
 (23080102, 32000000, 'Other Incomes',      3, b'1', 30000000, 0, b'1', now(), now()),
-(23080102, 33000000, 'Provision Released', 3, b'1', 30000000, 0, b'1', now(), now());
+(23080102, 33000000, 'Provision Released', 3, b'1', 30000000, 0, b'1', now(), now()),
+(23080102, 34000000, 'Penal Interest Received', 3, b'1', 30000000, 0, b'1', now(), now());
 
 -- -----------------------------
 -- 4️⃣ Expenses (Parent + Children)
