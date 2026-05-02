@@ -254,7 +254,7 @@ export default function EnrollMemberPage() {
           <CardContent>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
               <div className="space-y-2 md:col-span-1">
-                <Label htmlFor="customer_type_select">Category</Label>
+                <Label htmlFor="customer_type_select">Operation Type</Label>
                 <select
                   id="customer_type_select"
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"

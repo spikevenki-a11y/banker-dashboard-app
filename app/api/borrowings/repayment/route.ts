@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { cookies } from "next/headers"
+import { checkDayEndRestriction } from "@/lib/dayend-check"
 
 // GL account codes
 const INTEREST_PAID_GL = "41000000"   // Interest Paid on Borrowings
@@ -39,6 +40,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    const dayendErr = await checkDayEndRestriction(branchId, businessDate)
+    if (dayendErr) return dayendErr
 
     await client.query("BEGIN")
 
