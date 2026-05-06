@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { cookies } from "next/headers"
+import { checkDayEndRestriction } from "@/lib/dayend-check"
 
 // GET — list purchases (or a single purchase with its line items)
 export async function GET(request: NextRequest) {
@@ -50,8 +51,9 @@ export async function POST(request: NextRequest) {
   const client = await pool.connect()
 
   try {
-    const session  = JSON.parse(c.value)
-    const branchId = session.branch
+    const session      = JSON.parse(c.value)
+    const branchId     = session.branch
+    const businessDate = session.businessDate
 
     const body = await request.json()
     const {
@@ -66,6 +68,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    const dayendErr = await checkDayEndRestriction(branchId, businessDate)
+    if (dayendErr) return dayendErr
 
     await client.query("BEGIN")
 
@@ -198,6 +203,9 @@ export async function PATCH(request: NextRequest) {
     if (!purchase_id) {
       return NextResponse.json({ error: "purchase_id is required" }, { status: 400 })
     }
+
+    const dayendErr = await checkDayEndRestriction(branchId, businessDate)
+    if (dayendErr) return dayendErr
 
     await client.query("BEGIN")
 
