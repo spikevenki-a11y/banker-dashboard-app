@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -23,6 +23,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import {
   ArrowLeft, Search, Loader2, CheckCircle2, Calculator,
   FileText, Users, IndianRupee, Clock, ChevronRight,
+  Upload, ImageIcon, X, Camera, RefreshCw,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 
@@ -268,6 +269,18 @@ export default function LoanApplicationPage() {
   const [goldItems, setGoldItems] = useState<GoldItem[]>([])
   const [goldItemDraft, setGoldItemDraft] = useState<GoldItem>(emptyGoldItem)
 
+  // Gold document uploads (staged before submission)
+  const [goldFiles, setGoldFiles] = useState<File[]>([])
+  const [goldFileCategories, setGoldFileCategories] = useState<Record<number, string>>({})
+  const [goldFileError, setGoldFileError] = useState<string | null>(null)
+  const [goldFilePreviews, setGoldFilePreviews] = useState<string[]>([])
+  const goldFileInputRef = useRef<HTMLInputElement>(null)
+  const [cameraOpen, setCameraOpen] = useState(false)
+  const [cameraFacing, setCameraFacing] = useState<"environment" | "user">("environment")
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+
   const sf = (key: keyof SecurityForm, value: any) =>
     setSecurityForm((prev) => ({ ...prev, [key]: value }))
 
@@ -285,6 +298,99 @@ export default function LoanApplicationPage() {
 
   const handleRemoveGoldItem = (idx: number) =>
     setGoldItems((prev) => prev.filter((_, i) => i !== idx))
+
+  const handleGoldFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(e.target.files || [])
+    setGoldFileError(null)
+    const valid: File[] = []
+    for (const f of selected) {
+      if (f.size > 5 * 1024 * 1024) { setGoldFileError(`"${f.name}" exceeds 5 MB limit`); continue }
+      const ok = ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf"].includes(f.type)
+      if (!ok) { setGoldFileError(`"${f.name}" is not a supported file type`); continue }
+      valid.push(f)
+    }
+    setGoldFiles((prev) => {
+      const combined = [...prev, ...valid]
+      setGoldFilePreviews(combined.map((f) => f.type.startsWith("image/") ? URL.createObjectURL(f) : ""))
+      const cats: Record<number, string> = {}
+      combined.forEach((_, i) => { cats[i] = goldFileCategories[i] || "GOLD_PHOTO" })
+      setGoldFileCategories(cats)
+      return combined
+    })
+    e.target.value = ""
+  }
+
+  const removeGoldFile = (idx: number) => {
+    setGoldFiles((prev) => {
+      const next = prev.filter((_, i) => i !== idx)
+      setGoldFilePreviews(next.map((f) => f.type.startsWith("image/") ? URL.createObjectURL(f) : ""))
+      const cats: Record<number, string> = {}
+      next.forEach((_, i) => { cats[i] = goldFileCategories[i > idx ? i - 1 : i] || "GOLD_PHOTO" })
+      setGoldFileCategories(cats)
+      return next
+    })
+  }
+
+  const openCamera = useCallback(async (facing: "environment" | "user" = cameraFacing) => {
+    setGoldFileError(null)
+    try {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop())
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } },
+      })
+      streamRef.current = stream
+      setCameraOpen(true)
+      // attach stream after modal renders
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          videoRef.current.play()
+        }
+      }, 100)
+    } catch {
+      setGoldFileError("Camera access denied or not available on this device.")
+    }
+  }, [cameraFacing])
+
+  const closeCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop())
+      streamRef.current = null
+    }
+    setCameraOpen(false)
+  }, [])
+
+  const capturePhoto = useCallback(() => {
+    const video = videoRef.current
+    const canvas = canvasRef.current
+    if (!video || !canvas) return
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    canvas.getContext("2d")!.drawImage(video, 0, 0)
+    canvas.toBlob((blob) => {
+      if (!blob) return
+      const fileName = `gold-capture-${Date.now()}.jpg`
+      const file = new File([blob], fileName, { type: "image/jpeg" })
+      const preview = URL.createObjectURL(file)
+      setGoldFiles((prev) => {
+        const combined = [...prev, file]
+        setGoldFilePreviews(combined.map((f) => f.type.startsWith("image/") ? URL.createObjectURL(f) : ""))
+        const cats: Record<number, string> = {}
+        combined.forEach((_, i) => { cats[i] = goldFileCategories[i] || "GOLD_PHOTO" })
+        setGoldFileCategories(cats)
+        return combined
+      })
+      closeCamera()
+    }, "image/jpeg", 0.9)
+  }, [closeCamera, goldFileCategories])
+
+  const flipCamera = useCallback(() => {
+    const next = cameraFacing === "environment" ? "user" : "environment"
+    setCameraFacing(next)
+    openCamera(next)
+  }, [cameraFacing, openCamera])
 
   // ── Effects ────────────────────────────────────────────────────────────────
 
@@ -605,6 +711,20 @@ export default function LoanApplicationPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setCreatedApplicationNo(data.loan_application_id || data.reference_no)
+
+      // Upload gold documents if any files were staged
+      if (isGold && goldFiles.length > 0 && data.loan_application_id) {
+        for (let i = 0; i < goldFiles.length; i++) {
+          try {
+            const fd = new FormData()
+            fd.append("file", goldFiles[i])
+            fd.append("loan_application_id", String(data.loan_application_id))
+            fd.append("document_category", goldFileCategories[i] || "GOLD_PHOTO")
+            await fetch("/api/loans/gold-documents", { method: "POST", body: fd, credentials: "include" })
+          } catch { /* non-critical — application already saved */ }
+        }
+      }
+
       setSuccessOpen(true)
     } catch (e: any) {
       alert("Error: " + e.message)
@@ -992,6 +1112,142 @@ export default function LoanApplicationPage() {
                             <Input className="h-8 text-xs" placeholder="Vault / locker reference" value={securityForm.storage_location} onChange={(e) => sf("storage_location", e.target.value)} />
                           </div>
                         </div>
+
+                        {/* ── Gold Document Upload ──────────────────────────── */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-xs font-semibold text-yellow-800">Gold Documents / Photos</Label>
+                            <div className="flex gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => openCamera()}
+                                className="flex items-center gap-1 text-xs text-yellow-700 border border-yellow-300 bg-yellow-50 hover:bg-yellow-100 rounded px-2 py-1"
+                              >
+                                <Camera className="h-3 w-3" />
+                                Capture
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => goldFileInputRef.current?.click()}
+                                className="flex items-center gap-1 text-xs text-yellow-700 border border-yellow-300 bg-yellow-50 hover:bg-yellow-100 rounded px-2 py-1"
+                              >
+                                <Upload className="h-3 w-3" />
+                                Upload
+                              </button>
+                            </div>
+                          </div>
+
+                          <input
+                            ref={goldFileInputRef}
+                            type="file"
+                            accept="image/*,.pdf"
+                            multiple
+                            className="hidden"
+                            onChange={handleGoldFilesSelected}
+                          />
+                          <canvas ref={canvasRef} className="hidden" />
+
+                          {goldFileError && (
+                            <p className="text-xs text-red-500">{goldFileError}</p>
+                          )}
+
+                          {goldFiles.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-yellow-300 bg-yellow-50/50 py-6 text-yellow-600">
+                              <ImageIcon className="h-8 w-8 mb-1 opacity-50" />
+                              <p className="text-xs">No files added. Capture with camera or upload files.</p>
+                              <p className="text-xs opacity-70 mt-0.5">JPEG, PNG, WebP or PDF · Max 5 MB each</p>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-2 gap-2">
+                              {goldFiles.map((file, idx) => (
+                                <div key={idx} className="relative rounded-lg border border-yellow-200 bg-white p-2 flex gap-2 items-start">
+                                  <div className="flex-shrink-0 h-14 w-14 rounded overflow-hidden bg-yellow-50 flex items-center justify-center border border-yellow-100">
+                                    {goldFilePreviews[idx] ? (
+                                      <img src={goldFilePreviews[idx]} alt={file.name} className="h-full w-full object-cover" />
+                                    ) : (
+                                      <FileText className="h-6 w-6 text-yellow-400" />
+                                    )}
+                                  </div>
+                                  <div className="flex-1 min-w-0 space-y-1">
+                                    <p className="text-xs font-medium truncate">{file.name}</p>
+                                    <p className="text-[10px] text-muted-foreground">{(file.size / 1024).toFixed(0)} KB</p>
+                                    <Select
+                                      value={goldFileCategories[idx] || "GOLD_PHOTO"}
+                                      onValueChange={(v) => setGoldFileCategories((prev) => ({ ...prev, [idx]: v }))}
+                                    >
+                                      <SelectTrigger className="h-6 text-[10px] px-2">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="GOLD_PHOTO">Gold Photo</SelectItem>
+                                        <SelectItem value="WEIGHT_CERTIFICATE">Weight Certificate</SelectItem>
+                                        <SelectItem value="APPRAISAL_REPORT">Appraisal Report</SelectItem>
+                                        <SelectItem value="OTHER">Other</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeGoldFile(idx)}
+                                    className="absolute top-1 right-1 text-red-400 hover:text-red-600"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* ── Camera Overlay ───────────────────────────────────── */}
+                        {cameraOpen && (
+                          <div className="fixed inset-0 z-50 flex flex-col bg-black">
+                            {/* Top bar */}
+                            <div className="flex items-center justify-between px-4 py-3 bg-black/80">
+                              <span className="text-white text-sm font-medium">Capture Gold Photo</span>
+                              <div className="flex gap-3">
+                                <button
+                                  type="button"
+                                  onClick={flipCamera}
+                                  className="text-white/80 hover:text-white"
+                                  title="Flip camera"
+                                >
+                                  <RefreshCw className="h-5 w-5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={closeCamera}
+                                  className="text-white/80 hover:text-white"
+                                >
+                                  <X className="h-5 w-5" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Video feed */}
+                            <div className="flex-1 flex items-center justify-center overflow-hidden">
+                              <video
+                                ref={videoRef}
+                                autoPlay
+                                playsInline
+                                muted
+                                className="max-h-full max-w-full object-contain"
+                              />
+                            </div>
+
+                            {/* Bottom bar */}
+                            <div className="flex items-center justify-center py-6 bg-black/80">
+                              <button
+                                type="button"
+                                onClick={capturePhoto}
+                                className="h-16 w-16 rounded-full border-4 border-white bg-white/20 hover:bg-white/30 flex items-center justify-center"
+                                title="Take photo"
+                              >
+                                <Camera className="h-7 w-7 text-white" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
 

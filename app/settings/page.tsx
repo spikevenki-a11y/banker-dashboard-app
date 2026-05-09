@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Settings, Users, BookOpen, Percent, FileSpreadsheet } from "lucide-react"
+import { Settings, Users, BookOpen, Percent, FileSpreadsheet, ShieldCheck } from "lucide-react"
 import { DashboardWrapper } from "../_components/dashboard-wrapper"
 
 const settingsCards = [
@@ -51,6 +51,15 @@ const settingsCards = [
     color: "text-indigo-600",
     bgColor: "bg-indigo-50",
     href: "/settings/chart-of-accounts",
+  },
+  {
+    id: "security",
+    title: "Security",
+    description: "Manage two-factor authentication and account security preferences",
+    icon: ShieldCheck,
+    color: "text-violet-600",
+    bgColor: "bg-violet-50",
+    href: "/settings/security",
   },
 ]
 

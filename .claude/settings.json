@@ -10,7 +10,11 @@
       "Bash(xargs wc *)",
       "Bash(sort -k9)",
       "Bash(grep -r \"useReport\\\\|fetchReport\\\\|getReport\" \"d:/ZueTech/banker-dashboard-app/app\" --include=\"*.ts\" --include=\"*.tsx\" ! -path \"*/.next/*\")",
-      "Bash(grep -E \"\\\\.\\(ts|tsx|js\\)$\")"
+      "Bash(grep -E \"\\\\.\\(ts|tsx|js\\)$\")",
+      "Bash(grep -E \"\\\\.\\(ts|tsx|sql\\)$\")",
+      "Bash(npm install *)",
+      "Bash(grep -E \"^otplib$|^qrcode$\")",
+      "Bash(pnpm add *)"
     ]
   }
 }
