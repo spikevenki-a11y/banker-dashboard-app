@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { cookies } from "next/headers"
+import { checkDayEndRestriction } from "@/lib/dayend-check"
 
 const PROFIT_ON_SALE_GL = "31900000"  // Income: Profit on Asset Sale
 const LOSS_ON_SALE_GL   = "43090000"  // Expense: Loss on Asset Disposal
@@ -63,6 +64,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    const dayendErr = await checkDayEndRestriction(branchId, businessDate)
+    if (dayendErr) return dayendErr
 
     // Load asset unit
     const { rows: [asset] } = await client.query(

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import pool from '@/lib/connection/db'
+import { checkDayEndRestriction } from "@/lib/dayend-check"
 
 export async function GET(request: NextRequest) {
   try {
@@ -69,6 +70,9 @@ export async function POST(request: NextRequest) {
     if (!voucher_type || !["CASH", "TRANSFER"].includes(voucher_type)) {
       return NextResponse.json({ error: "Valid voucher type (CASH/TRANSFER) is required" }, { status: 400 })
     }
+
+    const dayendErr = await checkDayEndRestriction(session.branch, businessDate)
+    if (dayendErr) return dayendErr
 
     await client.query("BEGIN")
 
