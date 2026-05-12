@@ -107,7 +107,7 @@ export async function POST(req: Request) {
     /* ---------------- GL BATCH ---------------- */
     console.log('selectedBatch', selectedBatch);
     console.log('batchId', batchId);
-    if (selectedBatch && selectedBatch == 0) {
+    if (!selectedBatch && selectedBatch === 0) {
       await client.query(`
         INSERT INTO gl_batches (
           business_date,
