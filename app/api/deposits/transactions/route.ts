@@ -54,35 +54,32 @@ export async function GET(request: NextRequest) {
 
     const account = accountRows[0]
 
-    // Get transaction history from gl_batch_lines where the deposit GL is referenced
-    const depositGl = account.deposit_gl_account
+    // Get transaction history from deposit_transactions
     const { rows: transactions } = await pool.query(
       `SELECT
-        gbl.id,
-        gbl.business_date AS transaction_date,
-        gbl.debit_amount,
-        gbl.credit_amount,
-        gbl.narration,
-        gbl.voucher_id AS voucher_no,
-        gbl.batch_id AS gl_batch_id,
-        gbl.created_at,
-        gb.status AS batch_status,
-        gb.voucher_type
-      FROM gl_batch_lines gbl
-      LEFT JOIN gl_batches gb ON gb.branch_id = gbl.branch_id AND gb.batch_id = gbl.batch_id
-      WHERE gbl.ref_account_id = $1
-        AND gbl.branch_id = $2
-        AND gbl.accountcode = $3
-      ORDER BY gbl.business_date DESC, gbl.created_at DESC
-      LIMIT $4 OFFSET $5`,
-      [String(accountNumber), branchId, depositGl, limit, offset]
+        dt.id,
+        dt.transaction_date,
+        dt.transaction_type,
+        dt.voucher_type,
+        dt.debit_amount,
+        dt.credit_amount,
+        dt.running_balance,
+        dt.narration,
+        dt.voucher_no,
+        dt.gl_batch_id,
+        dt.created_at,
+        gb.status AS batch_status
+      FROM deposit_transactions dt
+      LEFT JOIN gl_batches gb ON gb.branch_id = dt.branch_id AND gb.batch_id = dt.gl_batch_id
+      WHERE dt.account_number = $1 AND dt.branch_id = $2
+      ORDER BY dt.transaction_date DESC, dt.created_at DESC
+      LIMIT $3 OFFSET $4`,
+      [String(accountNumber), branchId, limit, offset]
     )
 
     const { rows: countResult } = await pool.query(
-      `SELECT COUNT(*) as total
-      FROM gl_batch_lines
-      WHERE ref_account_id = $1 AND branch_id = $2 AND accountcode = $3`,
-      [String(accountNumber), branchId, depositGl]
+      `SELECT COUNT(*) as total FROM deposit_transactions WHERE account_number = $1 AND branch_id = $2`,
+      [String(accountNumber), branchId]
     )
 
     // Fetch RD installment details if it's a recurring deposit
@@ -373,6 +370,26 @@ export async function POST(request: NextRequest) {
     //    WHERE accountnumber = $2 AND branch_id = $3`,
     //   [newBalance, accountNumber, branchId]
     // )
+
+    // Record deposit transaction in module table
+    await client.query(
+      `INSERT INTO deposit_transactions (
+         branch_id, account_number,
+         transaction_date, value_date,
+         transaction_type, voucher_type,
+         debit_amount, credit_amount, running_balance,
+         narration, voucher_no, gl_batch_id,
+         status, created_by
+       ) VALUES ($1,$2,$3,$3,'DEPOSIT',$4,0,$5,$6,$7,$8,$9,'PENDING',$10)`,
+      [
+        branchId, String(accountNumber),
+        businessDate,
+        voucherType,
+        amt, newBalance,
+        txnNarration, voucherNo, batchId,
+        session.userId,
+      ]
+    )
 
     // If RD, update paid installments count and mark selected installments as paid
     if (account.deposittype === "R" || account.deposittype === "RECURING" || account.deposittype === "RECURRING") {
