@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   ArrowLeft,
   Search,
@@ -32,6 +34,8 @@ import {
   TrendingUp,
   TrendingDown,
   Banknote,
+  Pencil,
+  CheckCircle2,
 } from "lucide-react"
 
 type MemberData = {
@@ -112,6 +116,135 @@ export default function ViewMemberPage() {
   const [accountSummary, setAccountSummary] = useState<AccountSummary | null>(null)
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(false)
   const [accountsLoaded, setAccountsLoaded] = useState(false)
+
+  const [editOpen, setEditOpen] = useState(false)
+  const [editSection, setEditSection] = useState<"personal" | "address" | "kyc" | "membership">("personal")
+  const [editForm, setEditForm] = useState<any>({})
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
+
+  const openEdit = (member: MemberData) => {
+    setEditForm({
+      // personal
+      full_name: member.full_name || "",
+      father_name: member.father_name || "",
+      spouse_name: member.spouse_name || "",
+      date_of_birth: member.date_of_birth || "",
+      gender: member.gender || "",
+      mobile_no: member.mobile_no || "",
+      email: member.email || "",
+      occupation: "",
+      marital_status: "",
+      blood_group: "",
+      // address
+      house_no: member.house_no || "",
+      street: member.street || "",
+      village: member.village || "",
+      thaluk: member.thaluk || "",
+      district: member.district || "",
+      state: member.state || "",
+      pincode: member.pincode || "",
+      phone_no: member.phone_no || "",
+      // kyc
+      pan_no: member.pan_no || "",
+      ration_no: member.ration_no || "",
+      driving_license_no: member.driving_license_no || "",
+      // membership
+      ledger_folio_number: member.ledger_folio_number || "",
+      board_resolution_number: member.board_resolution_number || "",
+      boardresolutiondate: member.boardresolutiondate || "",
+    })
+    setEditSection("personal")
+    setSaveSuccess(false)
+    setEditOpen(true)
+  }
+
+  const ef = (key: string, value: string) => setEditForm((prev: any) => ({ ...prev, [key]: value }))
+
+  const handleEditSave = async () => {
+    if (!selectedMember) return
+    setIsSaving(true)
+    setSaveSuccess(false)
+    try {
+      const res = await fetch("/api/members/profile", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          membership_no: selectedMember.membership_no,
+          personal: {
+            full_name: editForm.full_name,
+            father_name: editForm.father_name,
+            spouse_name: editForm.spouse_name,
+            date_of_birth: editForm.date_of_birth,
+            gender: editForm.gender,
+            mobile_no: editForm.mobile_no,
+            email: editForm.email,
+            occupation: editForm.occupation,
+            marital_status: editForm.marital_status,
+            blood_group: editForm.blood_group,
+          },
+          address: {
+            house_no: editForm.house_no,
+            street: editForm.street,
+            village: editForm.village,
+            thaluk: editForm.thaluk,
+            district: editForm.district,
+            state: editForm.state,
+            pincode: editForm.pincode,
+            phone_no: editForm.phone_no,
+          },
+          kyc: {
+            pan_no: editForm.pan_no,
+            ration_no: editForm.ration_no,
+            driving_license_no: editForm.driving_license_no,
+          },
+          membership: {
+            ledger_folio_number: editForm.ledger_folio_number,
+            board_resolution_number: editForm.board_resolution_number,
+            boardresolutiondate: editForm.boardresolutiondate,
+          },
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Update failed")
+      setSaveSuccess(true)
+      // Reflect changes locally
+      setSelectedMember((prev) =>
+        prev
+          ? {
+              ...prev,
+              full_name: editForm.full_name,
+              father_name: editForm.father_name,
+              spouse_name: editForm.spouse_name,
+              date_of_birth: editForm.date_of_birth,
+              gender: editForm.gender,
+              mobile_no: editForm.mobile_no,
+              email: editForm.email,
+              house_no: editForm.house_no,
+              street: editForm.street,
+              village: editForm.village,
+              thaluk: editForm.thaluk,
+              district: editForm.district,
+              state: editForm.state,
+              pincode: editForm.pincode,
+              phone_no: editForm.phone_no,
+              pan_no: editForm.pan_no,
+              ration_no: editForm.ration_no,
+              driving_license_no: editForm.driving_license_no,
+              ledger_folio_number: editForm.ledger_folio_number,
+              board_resolution_number: editForm.board_resolution_number,
+              boardresolutiondate: editForm.boardresolutiondate,
+            }
+          : prev
+      )
+      setTimeout(() => setEditOpen(false), 1200)
+    } catch (err: any) {
+      alert(err.message)
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   const handleSearch = async () => {
     setIsSearching(true)
@@ -274,16 +407,22 @@ export default function ViewMemberPage() {
                 <ArrowLeft className="h-3.5 w-3.5" />
                 Back to results
               </Button>
-              <Badge
-                variant={selectedMember.status?.toUpperCase() === "ACTIVE" ? "default" : "secondary"}
-                className={
-                  selectedMember.status?.toUpperCase() === "ACTIVE"
-                    ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-                    : "bg-gray-100 text-gray-600"
-                }
-              >
-                {selectedMember.status || "---"}
-              </Badge>
+              <div className="flex items-center gap-3">
+                <Badge
+                  variant={selectedMember.status?.toUpperCase() === "ACTIVE" ? "default" : "secondary"}
+                  className={
+                    selectedMember.status?.toUpperCase() === "ACTIVE"
+                      ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                      : "bg-gray-100 text-gray-600"
+                  }
+                >
+                  {selectedMember.status || "---"}
+                </Badge>
+                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => openEdit(selectedMember)}>
+                  <Pencil className="h-3.5 w-3.5" />
+                  Edit
+                </Button>
+              </div>
             </div>
 
             {/* Member Summary Header */}
@@ -735,6 +874,228 @@ export default function ViewMemberPage() {
           </Card>
         )}
       </div>
+
+      {/* ── Edit Member Dialog ───────────────────────────────────────── */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-4 w-4" />
+              Edit Member — {selectedMember?.membership_no}
+            </DialogTitle>
+          </DialogHeader>
+
+          {/* Section tabs */}
+          <div className="flex gap-1 border-b shrink-0">
+            {(
+              [
+                { key: "personal", label: "Personal" },
+                { key: "address", label: "Address" },
+                { key: "kyc", label: "KYC" },
+                { key: "membership", label: "Membership" },
+              ] as const
+            ).map((s) => (
+              <button
+                key={s.key}
+                onClick={() => setEditSection(s.key)}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  editSection === s.key
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Section content */}
+          <div className="overflow-y-auto flex-1 px-1 py-2">
+            {editSection === "personal" && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Full Name *</Label>
+                  <Input value={editForm.full_name} onChange={(e) => ef("full_name", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Father Name</Label>
+                  <Input value={editForm.father_name} onChange={(e) => ef("father_name", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Spouse Name</Label>
+                  <Input value={editForm.spouse_name} onChange={(e) => ef("spouse_name", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Date of Birth</Label>
+                  <Input type="date" value={editForm.date_of_birth} onChange={(e) => ef("date_of_birth", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Gender</Label>
+                  <Select value={editForm.gender} onValueChange={(v) => ef("gender", v)}>
+                    <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="others">Others</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Mobile No</Label>
+                  <Input value={editForm.mobile_no} onChange={(e) => ef("mobile_no", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Email</Label>
+                  <Input type="email" value={editForm.email} onChange={(e) => ef("email", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Occupation</Label>
+                  <Input value={editForm.occupation} onChange={(e) => ef("occupation", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Marital Status</Label>
+                  <Select value={editForm.marital_status} onValueChange={(v) => ef("marital_status", v)}>
+                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="single">Single</SelectItem>
+                      <SelectItem value="married">Married</SelectItem>
+                      <SelectItem value="widowed">Widowed</SelectItem>
+                      <SelectItem value="divorced">Divorced</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Blood Group</Label>
+                  <Select value={editForm.blood_group} onValueChange={(v) => ef("blood_group", v)}>
+                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectContent>
+                      {["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"].map((g) => (
+                        <SelectItem key={g} value={g}>{g}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            {editSection === "address" && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">House No</Label>
+                  <Input value={editForm.house_no} onChange={(e) => ef("house_no", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Street</Label>
+                  <Input value={editForm.street} onChange={(e) => ef("street", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Village</Label>
+                  <Input value={editForm.village} onChange={(e) => ef("village", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Taluk</Label>
+                  <Input value={editForm.thaluk} onChange={(e) => ef("thaluk", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">District</Label>
+                  <Input value={editForm.district} onChange={(e) => ef("district", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">State</Label>
+                  <Input value={editForm.state} onChange={(e) => ef("state", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Pincode</Label>
+                  <Input maxLength={6} value={editForm.pincode} onChange={(e) => ef("pincode", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Phone No</Label>
+                  <Input value={editForm.phone_no} onChange={(e) => ef("phone_no", e.target.value)} />
+                </div>
+              </div>
+            )}
+
+            {editSection === "kyc" && (
+              <div className="space-y-4">
+                <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                  Aadhaar number cannot be modified after enrollment.
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Aadhaar No</Label>
+                    <Input
+                      value={selectedMember?.aadhaar_no ? `${selectedMember.aadhaar_no.slice(0, 4)} ${selectedMember.aadhaar_no.slice(4, 8)} ${selectedMember.aadhaar_no.slice(8)}` : "---"}
+                      disabled
+                      className="font-mono bg-muted/50"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">PAN No</Label>
+                    <Input
+                      className="font-mono uppercase"
+                      maxLength={10}
+                      value={editForm.pan_no}
+                      onChange={(e) => ef("pan_no", e.target.value.toUpperCase())}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Ration Card No</Label>
+                    <Input value={editForm.ration_no} onChange={(e) => ef("ration_no", e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Driving License No</Label>
+                    <Input
+                      className="uppercase"
+                      value={editForm.driving_license_no}
+                      onChange={(e) => ef("driving_license_no", e.target.value.toUpperCase())}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {editSection === "membership" && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Membership No</Label>
+                  <Input value={selectedMember?.membership_no || ""} disabled className="font-mono bg-muted/50" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Membership Class</Label>
+                  <Input value={selectedMember?.membership_class || ""} disabled className="bg-muted/50" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Ledger Folio No</Label>
+                  <Input value={editForm.ledger_folio_number} onChange={(e) => ef("ledger_folio_number", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Board Resolution No</Label>
+                  <Input value={editForm.board_resolution_number} onChange={(e) => ef("board_resolution_number", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Board Resolution Date</Label>
+                  <Input type="date" value={editForm.boardresolutiondate} onChange={(e) => ef("boardresolutiondate", e.target.value)} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="shrink-0 pt-2 border-t">
+            {saveSuccess && (
+              <span className="flex items-center gap-1.5 text-sm text-emerald-600 mr-auto">
+                <CheckCircle2 className="h-4 w-4" /> Saved successfully
+              </span>
+            )}
+            <Button variant="outline" onClick={() => setEditOpen(false)} disabled={isSaving}>
+              Cancel
+            </Button>
+            <Button onClick={handleEditSave} disabled={isSaving} className="gap-2">
+              {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+              {isSaving ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardWrapper>
   )
 }

@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(node -e ' *)",
-      "Bash(pnpm tsc *)"
+      "Bash(pnpm tsc *)",
+      "Bash(Get-ChildItem -Path \"d:\\\\ZueTech\\\\banker-dashboard-app\\\\app\\\\api\" -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Sort-Object)"
     ]
   }
 }

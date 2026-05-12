@@ -2,6 +2,93 @@ import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import pool from "@/lib/connection/db"
 
+export async function PUT(req: NextRequest) {
+  const c = (await cookies()).get("banker_session")
+  if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const client = await pool.connect()
+  try {
+    const session = JSON.parse(c.value)
+    const branchId = session.branch
+    const body = await req.json()
+    const { membership_no, personal, address, kyc, membership } = body
+
+    if (!membership_no) {
+      return NextResponse.json({ error: "membership_no is required" }, { status: 400 })
+    }
+
+    const { rows: [mem] } = await client.query(
+      `SELECT customer_code FROM memberships WHERE membership_no = $1 AND branch_id = $2`,
+      [membership_no, branchId]
+    )
+    if (!mem) return NextResponse.json({ error: "Member not found" }, { status: 404 })
+    const { customer_code } = mem
+
+    await client.query("BEGIN")
+
+    // Update core customer fields
+    await client.query(
+      `UPDATE customers SET
+         full_name = $1, father_name = $2, spouse_name = $3,
+         date_of_birth = $4, gender = $5, mobile_no = $6, email = $7,
+         occupation = $8, marital_status = $9, blood_group = $10,
+         updated_at = NOW()
+       WHERE customer_code = $11`,
+      [
+        personal.full_name || null, personal.father_name || null, personal.spouse_name || null,
+        personal.date_of_birth || null, personal.gender || null, personal.mobile_no || null,
+        personal.email || null, personal.occupation || null, personal.marital_status || null,
+        personal.blood_group || null, customer_code,
+      ]
+    )
+
+    // Upsert address
+    await client.query(
+      `INSERT INTO customer_address (customer_code, house_no, street, village, thaluk, district, state, pincode, phone_no)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       ON CONFLICT (customer_code) DO UPDATE SET
+         house_no = EXCLUDED.house_no, street = EXCLUDED.street, village = EXCLUDED.village,
+         thaluk = EXCLUDED.thaluk, district = EXCLUDED.district, state = EXCLUDED.state,
+         pincode = EXCLUDED.pincode, phone_no = EXCLUDED.phone_no`,
+      [
+        customer_code, address.house_no || null, address.street || null, address.village || null,
+        address.thaluk || null, address.district || null, address.state || null,
+        address.pincode || null, address.phone_no || null,
+      ]
+    )
+
+    // Upsert KYC (excluding aadhaar — immutable)
+    await client.query(
+      `INSERT INTO customer_kycdetails (customer_code, pan_no, ration_no, driving_license_no)
+       VALUES ($1,$2,$3,$4)
+       ON CONFLICT (customer_code) DO UPDATE SET
+         pan_no = EXCLUDED.pan_no, ration_no = EXCLUDED.ration_no,
+         driving_license_no = EXCLUDED.driving_license_no, updated_at = NOW()`,
+      [customer_code, kyc.pan_no || null, kyc.ration_no || null, kyc.driving_license_no || null]
+    )
+    
+    // Update membership-level fields
+    await client.query(
+      `UPDATE memberships SET
+         ledger_folio_number = $1, board_resolution_number = $2, boardresolutiondate = $3
+       WHERE membership_no = $4 AND branch_id = $5`,
+      [
+        membership.ledger_folio_number || null, membership.board_resolution_number || null,
+        membership.boardresolutiondate || null, membership_no, branchId,
+      ]
+    )
+
+    await client.query("COMMIT")
+    return NextResponse.json({ success: true })
+  } catch (err: any) {
+    await client.query("ROLLBACK")
+    console.error("Member profile PUT error:", err)
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  } finally {
+    client.release()
+  }
+}
+
 export async function GET(req: NextRequest) {
   const c = (await cookies()).get("banker_session")
   if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

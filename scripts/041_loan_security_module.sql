@@ -470,3 +470,42 @@ SELECT
 FROM  loan_securities ls
 JOIN  security_gold_details gd ON gd.security_id = ls.id
 WHERE ls.is_deleted = FALSE;
+
+
+CREATE TABLE public.loan_gold_documents (
+    id UUID NOT NULL DEFAULT gen_random_uuid(),
+
+    branch_id            INT     NOT NULL,
+    loan_application_id BIGINT NOT NULL,
+
+    file_name TEXT NOT NULL,
+    file_type VARCHAR(100),
+    file_size BIGINT,
+
+    storage_path TEXT NOT NULL,
+    public_url TEXT,
+
+    document_category VARCHAR(100),
+
+    uploaded_by UUID,
+
+    is_active BOOLEAN DEFAULT true,
+
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(),
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now(),
+
+    CONSTRAINT loan_gold_documents_pkey
+        PRIMARY KEY (id),
+
+    CONSTRAINT loan_gold_documents_loan_application_fkey
+        FOREIGN KEY (loan_application_id)
+        REFERENCES public.loan_applications(loan_application_id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+
+    CONSTRAINT loan_gold_documents_branch_fkey
+        FOREIGN KEY (branch_id)
+        REFERENCES public.branchparameters(branch_id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
+);

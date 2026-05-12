@@ -392,7 +392,27 @@ export async function POST(request: NextRequest) {
     //    WHERE accountnumber = $2 AND branch_id = $3`,
     //   [businessDate, accountNumber, branchId]
     // )
-    
+
+    // Record closure in module transaction table
+    await client.query(
+      `INSERT INTO deposit_transactions (
+         branch_id, account_number,
+         transaction_date, value_date,
+         transaction_type, voucher_type,
+         debit_amount, credit_amount, running_balance,
+         narration, voucher_no, gl_batch_id,
+         status, created_by
+       ) VALUES ($1,$2,$3,$3,'CLOSURE',$4,$5,0,0,$6,$7,$8,'PENDING',$9)`,
+      [
+        branchId, String(accountNumber),
+        businessDate,
+        voucherType,
+        currentBalance,
+        closureNarration, voucherNo, batchId,
+        session.userId,
+      ]
+    )
+
     await client.query("COMMIT")
 
     const fmt = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" })
