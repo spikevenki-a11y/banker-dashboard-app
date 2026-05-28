@@ -142,11 +142,13 @@ function MembersReportContent() {
                         <TableHeader>
                           <TableRow>
                             <TableHead className="text-xs">Membership No</TableHead>
+                            <TableHead className="text-xs">Ledger Folio Number</TableHead>
                             <TableHead className="text-xs">Full Name</TableHead>
                             <TableHead className="text-xs">Father Name</TableHead>
                             <TableHead className="text-xs">Mobile</TableHead>
                             <TableHead className="text-xs">Type</TableHead>
                             <TableHead className="text-xs">Class</TableHead>
+                            <TableHead className="text-xs">Balance</TableHead>
                             <TableHead className="text-xs">Status</TableHead>
                             <TableHead className="text-xs">Join Date</TableHead>
                             {activeTab === "inactive" && <TableHead className="text-xs">Close Date</TableHead>}
@@ -156,11 +158,13 @@ function MembersReportContent() {
                           {rows.map((r, i) => (
                             <TableRow key={i}>
                               <TableCell className="font-mono text-xs">{r.membership_no}</TableCell>
+                              <TableCell className="text-xs font-medium">{r.ledger_folio_number}</TableCell>
                               <TableCell className="text-xs font-medium">{r.full_name}</TableCell>
                               <TableCell className="text-xs text-muted-foreground">{r.father_name || "—"}</TableCell>
                               <TableCell className="text-xs">{r.mobile_no || "—"}</TableCell>
                               <TableCell className="text-xs">{r.member_type}</TableCell>
                               <TableCell className="text-xs">{r.membership_class}</TableCell>
+                              <TableCell className="text-xs">{r.share_balance}</TableCell>
                               <TableCell>
                                 <Badge variant="outline" className={`text-[10px] ${r.status === "ACTIVE" ? "border-teal-300 text-teal-700" : "border-red-300 text-red-700"}`}>
                                   {r.status}

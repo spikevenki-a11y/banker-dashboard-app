@@ -44,37 +44,62 @@ export async function PUT(req: NextRequest) {
 
     // Upsert address
     await client.query(
-      `INSERT INTO customer_address (customer_code, house_no, street, village, thaluk, district, state, pincode, phone_no)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-       ON CONFLICT (customer_code) DO UPDATE SET
-         house_no = EXCLUDED.house_no, street = EXCLUDED.street, village = EXCLUDED.village,
-         thaluk = EXCLUDED.thaluk, district = EXCLUDED.district, state = EXCLUDED.state,
-         pincode = EXCLUDED.pincode, phone_no = EXCLUDED.phone_no`,
+      `UPDATE customer_address
+      SET
+        house_no = $2,
+        street = $3,
+        village = $4,
+        thaluk = $5,
+        district = $6,
+        state = $7,
+        pincode = $8,
+        phone_no = $9
+      WHERE customer_code = $1`,
       [
-        customer_code, address.house_no || null, address.street || null, address.village || null,
-        address.thaluk || null, address.district || null, address.state || null,
-        address.pincode || null, address.phone_no || null,
+        customer_code,
+        address.house_no || null,
+        address.street || null,
+        address.village || null,
+        address.thaluk || null,
+        address.district || null,
+        address.state || null,
+        address.pincode || null,
+        address.phone_no || null,
       ]
     )
 
     // Upsert KYC (excluding aadhaar — immutable)
     await client.query(
-      `INSERT INTO customer_kycdetails (customer_code, pan_no, ration_no, driving_license_no)
-       VALUES ($1,$2,$3,$4)
-       ON CONFLICT (customer_code) DO UPDATE SET
-         pan_no = EXCLUDED.pan_no, ration_no = EXCLUDED.ration_no,
-         driving_license_no = EXCLUDED.driving_license_no, updated_at = NOW()`,
-      [customer_code, kyc.pan_no || null, kyc.ration_no || null, kyc.driving_license_no || null]
+      `UPDATE customer_kycdetails
+      SET
+        pan_no = $2,
+        ration_no = $3,
+        driving_license_no = $4,
+        updated_at = NOW()
+      WHERE customer_code = $1`,
+      [
+        customer_code,
+        kyc.pan_no ?? null,
+        kyc.ration_no ?? null,
+        kyc.driving_license_no ?? null
+      ]
     )
     
     // Update membership-level fields
     await client.query(
-      `UPDATE memberships SET
-         ledger_folio_number = $1, board_resolution_number = $2, boardresolutiondate = $3
-       WHERE membership_no = $4 AND branch_id = $5`,
+      `UPDATE memberships
+      SET
+        ledger_folio_number = $1,
+        board_resolution_number = $2,
+        board_resolution_date = $3
+      WHERE membership_no = $4
+        AND branch_id = $5`,
       [
-        membership.ledger_folio_number || null, membership.board_resolution_number || null,
-        membership.boardresolutiondate || null, membership_no, branchId,
+        membership.ledger_folio_number ?? null,
+        membership.board_resolution_number ?? null,
+        membership.board_resolution_date ?? null,
+        membership_no,
+        branchId,
       ]
     )
 
