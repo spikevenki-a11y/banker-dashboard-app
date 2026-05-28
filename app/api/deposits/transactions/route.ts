@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
         accountStatus: account.accountstatus,
         schemeId: account.schemeid,
         schemeName: account.scheme_name || "N/A",
-        depositGlAccount: depositGl,
+        depositGlAccount: account.depositGl,
         // Type-specific
         depositAmount: account.depositamount ,
         periodMonths: account.periodmonths,

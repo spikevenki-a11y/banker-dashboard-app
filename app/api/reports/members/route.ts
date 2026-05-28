@@ -15,7 +15,8 @@ export async function GET(req: NextRequest) {
     const toDate = url.searchParams.get("to_date") || ""
 
     const baseSelect = `
-      SELECT m.membership_no, m.member_type, m.membership_class, m.status,
+      SELECT m.membership_no, m.member_type, m.membership_class, m.status,s.share_balance,
+            m.ledger_folio_number,
              TO_CHAR(m.join_date, 'YYYY-MM-DD') AS join_date,
              TO_CHAR(m.close_date, 'YYYY-MM-DD') AS close_date,
              c.full_name, c.father_name, c.mobile_no,
@@ -23,6 +24,7 @@ export async function GET(req: NextRequest) {
              c.gender
       FROM memberships m
       JOIN customers c ON c.customer_code = m.customer_code
+      join member_shares s on s.membership_no = m.membership_no and s.status = 'ACTIVE'
       WHERE m.branch_id = $1
     `
 
