@@ -19,72 +19,72 @@ export async function POST(req: Request) {
 
     // Lookup customer by Aadhaar
     console.log("Membership lookup with body:", body)
-    const { rows2 } = await pool.query(
-      `
-      select 
-            m.customer_code,
-            m.membership_class,
-            m.member_type,
-            m.membership_no,
-            m.ledger_folio_number ,
-            m.board_resolution_number,
+    // const { rowsa } = await pool.query(
+    //   `
+    //   select 
+    //         m.customer_code,
+    //         m.membership_class,
+    //         m.member_type,
+    //         m.membership_no,
+    //         m.ledger_folio_number ,
+    //         m.board_resolution_number,
             
-            TO_CHAR(m.join_date, 'YYYY-MM-DD') AS boardResolutionDate ,
-            m.status,
+    //         TO_CHAR(m.join_date, 'YYYY-MM-DD') AS boardResolutionDate ,
+    //         m.status,
 
-            c.full_name ,
-            c.father_name,
-            c.gender,
-            TO_CHAR(c.date_of_birth, 'YYYY-MM-DD') AS date_of_birth,
-            c.customer_type,
-            c.spouse_name,
-            c.mobile_no,
-            c.email,
+    //         c.full_name ,
+    //         c.father_name,
+    //         c.gender,
+    //         TO_CHAR(c.date_of_birth, 'YYYY-MM-DD') AS date_of_birth,
+    //         c.customer_type,
+    //         c.spouse_name,
+    //         c.mobile_no,
+    //         c.email,
 
-            -- Address
-            ca.house_no,
-            ca.street,
-            ca.village,
-            ca.thaluk,
-            ca.district,
-            ca.state,
-            ca.pincode,
-            ca.email,
-            ca.phone_no,
+    //         -- Address
+    //         ca.house_no,
+    //         ca.street,
+    //         ca.village,
+    //         ca.thaluk,
+    //         ca.district,
+    //         ca.state,
+    //         ca.pincode,
+    //         ca.email,
+    //         ca.phone_no,
 
-            -- KYC
-            ck.aadhaar_no,
-            ck.pan_no,
-            ck.ration_no,
-            ck.driving_license_no
-
-
+    //         -- KYC
+    //         ck.aadhaar_no,
+    //         ck.pan_no,
+    //         ck.ration_no,
+    //         ck.driving_license_no
 
 
-        from memberships m 
 
-        left join customers c 
-            on c.customer_code = m.customer_code
 
-        left join customer_address ca
-            on ca.customer_code = m.customer_code
+    //     from memberships m 
+
+    //     left join customers c 
+    //         on c.customer_code = m.customer_code
+
+    //     left join customer_address ca
+    //         on ca.customer_code = m.customer_code
             
-        left join customer_kycdetails ck
-            on ck.customer_code = m.customer_code
+    //     left join customer_kycdetails ck
+    //         on ck.customer_code = m.customer_code
 
-        where m.branch_id = 23108001
-            and  m.status = 'ACTIVE'
-            and (
-                ck.aadhaar_no like '%' || $1 || '%'
-                and ca.phone_no like '%' || $2 || '%'
-                and c.father_name like '%' || $3 || '%'
-                and m.ledger_folio_number like '%' || $4 || '%'
-                and c.full_name like '%' || $5 || '%'
-            )
+    //     where m.branch_id = $1
+    //         and  m.status = 'ACTIVE'
+    //         and (
+    //             ck.aadhaar_no like '%' || $2 || '%'
+    //             and ca.phone_no like '%' || $3 || '%'
+    //             and c.father_name like '%' || $4 || '%'
+    //             and m.ledger_folio_number like '%' || $4 || '%'
+    //             and c.full_name like '%' || $5 || '%'
+    //         )
 
-    `,
-      [body.aadhaar_number, body.phone_number, body.father_name, body.ledger_folio_number, body.member_name],
-    )
+    // `,
+    //   [branchId,body.aadhaar_number, body.phone_number, body.father_name, body.ledger_folio_number, body.member_name],
+    // )
 
     let query = 
       `
@@ -107,6 +107,7 @@ export async function POST(req: Request) {
             c.spouse_name,
             c.mobile_no,
             c.email,
+            c.caste_category,
 
             -- Address
             ca.house_no,

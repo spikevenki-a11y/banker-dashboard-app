@@ -47,11 +47,26 @@ export async function GET(request: Request) {
       [branchId]
     )
 
+    const maturedDepositsResult = await client.query(
+      `SELECT COALESCE(SUM(clearbalance), 0) as total_deposits 
+      FROM deposit_account 
+      WHERE branch_id = $1 AND accountstatus = 5`,
+      [branchId]
+    )
+
     // Get fixed deposits count
     const fdResult = await client.query(
       `SELECT COUNT(*) as fd_count 
       FROM deposit_account 
-      WHERE branch_id = $1 AND accountstatus = 1 AND deposittype = 'FD'`,
+      WHERE branch_id = $1 AND accountstatus = 1 AND deposittype = 'TERM'`,
+      [branchId]
+    )
+    
+    // Get fixed deposits count
+    const mfdResult = await client.query(
+      `SELECT COUNT(*) as fd_count 
+      FROM deposit_account 
+      WHERE branch_id = $1 AND accountstatus = 5 AND deposittype = 'TERM'`,
       [branchId]
     )
 
@@ -85,19 +100,24 @@ export async function GET(request: Request) {
     const activeLoans = parseInt(loansResult.rows[0]?.active_loans || "0")
     const totalSavings = parseFloat(savingsResult.rows[0]?.total_savings || "0")
     const totalDeposits = parseFloat(depositsResult.rows[0]?.total_deposits || "0")
+    const totalMFD = parseFloat(maturedDepositsResult.rows[0]?.total_deposits || "0")
     const fdCount = parseInt(fdResult.rows[0]?.fd_count || "0")
+    const mfdCount = parseInt(mfdResult.rows[0]?.fd_count || "0")
     const totalShares = parseFloat(shareResult.rows[0]?.total_shares || "0")
     const todayTransactions = parseInt(todayTransactionsResult.rows[0]?.today_transactions || "0")
     const pendingVouchers = parseInt(pendingVouchersResult.rows[0]?.pending_vouchers || "0")
 
     const totalDepositsAmount = totalSavings + totalDeposits
-
+    console.log("Dashboard mfd stats "+totalMFD + " and count "+mfdCount)
     return NextResponse.json({
       totalMembers,
       activeMembers,
       activeLoans,
       totalDeposits: totalDepositsAmount,
       fdCount,
+      mfdCount,
+      totalMFD,
+      totalFD: totalDeposits,
       totalShares,
       todayTransactions,
       pendingVouchers,

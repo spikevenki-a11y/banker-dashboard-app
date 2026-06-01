@@ -36,9 +36,12 @@ import {
   Banknote,
   Pencil,
   CheckCircle2,
+  Book,
 } from "lucide-react"
+import { Ledger } from "next/font/google"
 
 type MemberData = {
+  caste_category: string
   customer_code: string
   membership_class: string
   member_type: string
@@ -135,7 +138,9 @@ export default function ViewMemberPage() {
       email: member.email || "",
       occupation: "",
       marital_status: "",
+      caste: "",
       blood_group: "",
+      caste_category: member.caste_category || "",
       // address
       house_no: member.house_no || "",
       street: member.street || "",
@@ -183,6 +188,7 @@ export default function ViewMemberPage() {
             occupation: editForm.occupation,
             marital_status: editForm.marital_status,
             blood_group: editForm.blood_group,
+            caste_category: editForm.caste_category,
           },
           address: {
             house_no: editForm.house_no,
@@ -535,6 +541,7 @@ export default function ViewMemberPage() {
                     <DetailField icon={Mail} label="Email" value={selectedMember.email} />
                     <DetailField icon={FileText} label="Board Resolution No." value={selectedMember.board_resolution_number} />
                     <DetailField icon={Calendar} label="Board Resolution Date" value={selectedMember.boardresolutiondate} />
+                    <DetailField icon={Book} label="Caste" value={selectedMember.caste_category} />
                   </div>
                 )}
 
@@ -971,6 +978,19 @@ export default function ViewMemberPage() {
                     <SelectContent>
                       {["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"].map((g) => (
                         <SelectItem key={g} value={g}>{g}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Caste</Label>
+                  <Select value={editForm.caste_category} onValueChange={(v) => ef("caste_category", v)}>
+                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectContent>
+                      {["arasiyal vathi", "asrasu uliyar ", "panakkarar", "emali", "komali", "velaikkaran", "adimaikal", "kooli"].map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {c}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

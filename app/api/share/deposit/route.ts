@@ -114,7 +114,7 @@ export async function POST(req: Request) {
           branch_id,
           batch_id,
           voucher_id,
-          voucher_type,
+          voucher_type,   
           maker_id,
           status
         ) VALUES (

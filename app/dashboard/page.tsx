@@ -29,6 +29,9 @@ interface DashboardStats {
   activeLoans: number
   totalDeposits: number
   fdCount: number
+  mfdCount: number
+  totalMFD: number
+  totalFD: number
   totalShares: number
   todayTransactions: number
   pendingVouchers: number
@@ -64,7 +67,7 @@ export default function DashboardPage() {
 
   const fetchActivities = useCallback(async () => {
     try {
-      const res = await fetch("/api/dashboard/activities?branchId=1&limit=10", { credentials: "include" })
+      const res = await fetch(`/api/dashboard/activities?branchId=${user?.branch}&limit=100`, { credentials: "include" })
       if (res.ok) {
         const data = await res.json()
         setActivities(data)
@@ -78,7 +81,7 @@ export default function DashboardPage() {
 
   const fetchStats = useCallback(async () => {
     try {
-      const res = await fetch("/api/dashboard/stats?branchId=1", { credentials: "include" })
+      const res = await fetch(`/api/dashboard/stats?branchId=${user?.branch}`, { credentials: "include" })
       if (res.ok) {
         const data = await res.json()
         setStats(data)
@@ -139,8 +142,8 @@ export default function DashboardPage() {
     },
     {
       title: "Fixed Deposits",
-      value: stats?.fdCount?.toString() || "0",
-      subtitle: "Active FDs",
+      value: `${stats?.totalFD || 0} / ${stats?.totalMFD || 0}`,
+      subtitle: "Active FD - "+stats?.fdCount?.toString()+" / MFD - "+ stats?.mfdCount?.toString(),
       icon: FileText,
       color: "text-orange-600",
       bgColor: "bg-orange-50",

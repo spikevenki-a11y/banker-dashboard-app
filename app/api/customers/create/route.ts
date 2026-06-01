@@ -55,8 +55,9 @@ export async function POST(req: Request) {
         mobile_no,
         alt_mobile_no,
         email,
-        customer_type
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+        customer_type,
+        caste_category
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
     `,
       [
         code,
@@ -68,6 +69,7 @@ export async function POST(req: Request) {
         body.alt_phone || null,
         body.email,
         body.customer_type,
+        body.caste_category || null
       ]
     )
 
