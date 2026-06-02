@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
       disbursement_amount,
       disbursement_mode, // 'CASH' or 'TRANSFER'
       narration,
+      appraiser_charge,
     } = body
 
     if (!loan_application_id || !disbursement_amount || !disbursement_mode) {
@@ -132,6 +133,60 @@ export async function POST(request: NextRequest) {
       narration || "Loan Disbursement",
       session.userId
     ])
+
+    // Appraiser charge GL entries
+    if (appraiser_charge && appraiser_charge.charge_amount > 0) {
+      const chargeAmt = parseFloat(appraiser_charge.charge_amount)
+      const receiveAccount = appraiser_charge.receive_account_number || '23100000'
+
+      if (appraiser_charge.payment_mode === 'CASH') {
+        // Separate cash voucher: DR Cash, CR Appraiser Receive Account
+        const { rows: [chargeBatch] } = await client.query(`
+          UPDATE gl_batch_sequences SET last_batch_id = last_batch_id + 1
+          WHERE branch_id = $1 RETURNING last_batch_id
+        `, [branchId])
+        const chargeBatchId = chargeBatch.last_batch_id
+
+        const { rows: [chargeVoucher] } = await client.query(`
+          INSERT INTO voucher_sequences (branch_id, business_date, last_voucher_no)
+          VALUES ($1, $2, 1)
+          ON CONFLICT (branch_id, business_date)
+          DO UPDATE SET last_voucher_no = voucher_sequences.last_voucher_no + 1
+          RETURNING last_voucher_no
+        `, [branchId, businessDate])
+        const chargeVoucherNo = chargeVoucher.last_voucher_no
+
+        await client.query(`
+          INSERT INTO gl_batches (business_date, branch_id, batch_id, voucher_id, voucher_type, maker_id, status)
+          VALUES ($1, $2, $3, $4, 'CASH', $5, 'PENDING')
+        `, [businessDate, branchId, chargeBatchId, chargeVoucherNo, session.userId])
+
+        // DR Cash (income)
+        await client.query(`
+          INSERT INTO gl_batch_lines (branch_id, batch_id, business_date, accountcode, ref_account_id, debit_amount, credit_amount, voucher_id, narration, created_by)
+          VALUES ($1, $2, $3, '23100000', '0', $4, 0, $5, $6, $7)
+        `, [branchId, chargeBatchId, businessDate, chargeAmt, chargeVoucherNo, `Appraiser charge - ${app.reference_no}`, session.userId])
+
+        // CR Appraiser Receive Account
+        await client.query(`
+          INSERT INTO gl_batch_lines (branch_id, batch_id, business_date, accountcode, ref_account_id, debit_amount, credit_amount, voucher_id, narration, created_by)
+          VALUES ($1, $2, $3, $4, '0', 0, $5, $6, $7, $8)
+        `, [branchId, chargeBatchId, businessDate, receiveAccount, chargeAmt, chargeVoucherNo, `Appraiser charge - ${app.reference_no}`, session.userId])
+
+      } else {
+        // ADJUST_WITH_LOAN: add CR Appraiser Account to existing batch (reduces cash paid to member)
+        await client.query(`
+          INSERT INTO gl_batch_lines (branch_id, batch_id, business_date, accountcode, ref_account_id, debit_amount, credit_amount, voucher_id, narration, created_by)
+          VALUES ($1, $2, $3, $4, '0', 0, $5, $6, $7, $8)
+        `, [branchId, batchId, businessDate, receiveAccount, chargeAmt, voucherNo, `Appraiser charge adjusted - ${app.reference_no}`, session.userId])
+
+        // Offset the cash line: additional CR on cash account to net down member payout
+        await client.query(`
+          INSERT INTO gl_batch_lines (branch_id, batch_id, business_date, accountcode, ref_account_id, debit_amount, credit_amount, voucher_id, narration, created_by)
+          VALUES ($1, $2, $3, '23100000', '0', $4, 0, $5, $6, $7)
+        `, [branchId, batchId, businessDate, chargeAmt, voucherNo, `Appraiser charge offset - ${app.reference_no}`, session.userId])
+      }
+    }
 
     // Insert loan transaction
     await client.query(`

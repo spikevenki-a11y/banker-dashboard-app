@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
     let query = `
       SELECT * FROM loan_schemes 
-      WHERE (branch_id = $1 OR branch_id = 23108001)
+      WHERE branch_id = $1
     `
     const params: any[] = [branchId]
 

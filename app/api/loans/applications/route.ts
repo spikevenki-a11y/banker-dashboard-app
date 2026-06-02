@@ -49,6 +49,10 @@ export async function GET(request: NextRequest) {
         lscheme.minimum_period_months,
         lscheme.maximum_period_months,
         lscheme.loan_gl_account,
+        lscheme.appraiser_charge_allowed,
+        lscheme.appraiser_charge_code,
+        lscheme.appraiser_name as scheme_appraiser_name,
+        lscheme.appraiser_amount_receive_account_number,
         m.customer_code,
         c.full_name as member_name,
         c.mobile_no

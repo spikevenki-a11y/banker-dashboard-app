@@ -82,6 +82,10 @@ type SanctionedLoan = {
   emi_amount: number
   sanction_date: string
   application_status: string
+  appraiser_charge_allowed: boolean
+  appraiser_charge_code: string | null
+  scheme_appraiser_name: string | null
+  appraiser_amount_receive_account_number: string | null
 }
 
 function formatCurrency(val: number | string) {
@@ -115,6 +119,12 @@ export default function LoanDisbursementPage() {
   const [selectedBatch, setSelectedBatch] = useState<number>(0)
   const [isBatchPopupOpen, setIsBatchPopupOpen] = useState(false)
   const [incompleteBatches, setIncompleteBatches] = useState<any[]>([])
+
+  // Appraiser charge
+  const [appraiserCharge, setAppraiserCharge] = useState({
+    appraiser_name: "", charge_amount: "", charge_date: "", invoice_no: "", charge_remarks: "", payment_mode: "CASH",
+  })
+  const ac = (key: string, value: string) => setAppraiserCharge((prev) => ({ ...prev, [key]: value }))
 
   // Submit state
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -155,7 +165,11 @@ export default function LoanDisbursementPage() {
         tenure_months: parseInt(app.sanctioned_tenure) || 0,
         emi_amount: parseFloat(app.emi_amount) || 0,
         sanction_date: app.sanction_date,
-        application_status: app.application_status
+        application_status: app.application_status,
+        appraiser_charge_allowed: app.appraiser_charge_allowed || false,
+        appraiser_charge_code: app.appraiser_charge_code || null,
+        scheme_appraiser_name: app.scheme_appraiser_name || null,
+        appraiser_amount_receive_account_number: app.appraiser_amount_receive_account_number || null,
       }))
 
       setSanctionedLoans(formatted)
@@ -179,6 +193,24 @@ export default function LoanDisbursementPage() {
     fetchSanctionedLoans()
   }, [fetchSanctionedLoans])
 
+  // Auto-calculate appraiser charge from slab when disbursement amount changes
+  useEffect(() => {
+    if (!selectedLoan?.appraiser_charge_allowed || !selectedLoan?.appraiser_charge_code || !disbursementAmount) return
+    const amount = Number(disbursementAmount)
+    if (!amount || amount <= 0) return
+    fetch(
+      `/api/loans/appraiser-charge?loan_amount=${amount}&appraisal_master_id=${selectedLoan.appraiser_charge_code}`,
+      { credentials: "include" }
+    )
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.charge_amount !== null && data.charge_amount !== undefined) {
+          setAppraiserCharge((prev) => ({ ...prev, charge_amount: String(data.charge_amount) }))
+        }
+      })
+      .catch(() => {/* silent */})
+  }, [disbursementAmount, selectedLoan])
+
   // Select loan for disbursement
   const selectLoanForDisbursement = (loan: SanctionedLoan) => {
     setSelectedLoan(loan)
@@ -187,6 +219,10 @@ export default function LoanDisbursementPage() {
     setNarration("")
     setSelectedBatch(0)
     setFormError("")
+    setAppraiserCharge({
+      appraiser_name: loan.scheme_appraiser_name || "",
+      charge_amount: "", charge_date: "", invoice_no: "", charge_remarks: "", payment_mode: "CASH",
+    })
   }
 
   // Load incomplete batches for transfer mode
@@ -250,7 +286,16 @@ export default function LoanDisbursementPage() {
           disbursement_amount: parseFloat(disbursementAmount),
           disbursement_mode: disbursementMode,
           narration: narration || "Loan Disbursement",
-          selectedBatch: selectedBatch
+          selectedBatch: selectedBatch,
+          appraiser_charge: selectedLoan!.appraiser_charge_allowed && appraiserCharge.charge_amount ? {
+            appraiser_name: appraiserCharge.appraiser_name || null,
+            charge_amount: Number(appraiserCharge.charge_amount),
+            charge_date: appraiserCharge.charge_date || null,
+            invoice_no: appraiserCharge.invoice_no || null,
+            charge_remarks: appraiserCharge.charge_remarks || null,
+            payment_mode: appraiserCharge.payment_mode,
+            receive_account_number: selectedLoan!.appraiser_amount_receive_account_number || null,
+          } : null,
         })
       })
 
@@ -300,6 +345,7 @@ export default function LoanDisbursementPage() {
     setNarration("")
     setSelectedBatch(0)
     setFormError("")
+    setAppraiserCharge({ appraiser_name: "", charge_amount: "", charge_date: "", invoice_no: "", charge_remarks: "", payment_mode: "CASH" })
   }
 
   return (
@@ -626,6 +672,92 @@ export default function LoanDisbursementPage() {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Appraiser Charge Details */}
+                {selectedLoan.appraiser_charge_allowed && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Receipt className="h-4 w-4 text-orange-500" />
+                        Appraiser Charge Details
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {selectedLoan.appraiser_amount_receive_account_number && (
+                        <div className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                          Charge credited to account:{" "}
+                          <span className="font-semibold text-foreground">
+                            {selectedLoan.appraiser_amount_receive_account_number}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Payment Mode */}
+                      <div className="space-y-2">
+                        <Label>Payment Mode</Label>
+                        <Select value={appraiserCharge.payment_mode} onValueChange={(v) => ac("payment_mode", v)}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="CASH">
+                              <div className="flex items-center gap-2"><Banknote className="h-4 w-4" />Cash</div>
+                            </SelectItem>
+                            <SelectItem value="ADJUST_WITH_LOAN">
+                              <div className="flex items-center gap-2"><CreditCard className="h-4 w-4" />Adjust with Loan</div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          {appraiserCharge.payment_mode === "CASH"
+                            ? "A separate cash voucher will be created for this charge."
+                            : "Charge is deducted from disbursement; member receives net amount."}
+                        </p>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>Appraiser Name</Label>
+                          <Input
+                            placeholder="Enter appraiser name"
+                            value={appraiserCharge.appraiser_name}
+                            onChange={(e) => ac("appraiser_name", e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="flex items-center gap-1">
+                            Charge Amount (₹)
+                            {appraiserCharge.charge_amount && (
+                              <span className="text-[10px] font-normal text-teal-600">(slab auto-calculated)</span>
+                            )}
+                          </Label>
+                          <Input
+                            type="number"
+                            placeholder="0.00"
+                            value={appraiserCharge.charge_amount}
+                            onChange={(e) => ac("charge_amount", e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Invoice / Receipt No</Label>
+                          <Input
+                            placeholder="Enter invoice or receipt number"
+                            value={appraiserCharge.invoice_no}
+                            onChange={(e) => ac("invoice_no", e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Remarks</Label>
+                          <Input
+                            placeholder="Optional remarks"
+                            value={appraiserCharge.charge_remarks}
+                            onChange={(e) => ac("charge_remarks", e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Footer Actions */}
                 <div className="flex items-center justify-end gap-3 pb-6">

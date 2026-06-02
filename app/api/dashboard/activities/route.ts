@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
+import { cookies } from "next/headers"
 
 export async function GET(request: Request) {
   try {
+    const c = (await cookies()).get("banker_session")
+    const session = JSON.parse(c.value)
+    const branchId = session.branch
+
     const { searchParams } = new URL(request.url)
-    const branchId = searchParams.get("branchId") || "1"
+    const branch_Id = searchParams.get("branchId") || "1"
     const limit = searchParams.get("limit") || "10"
 
     // Get recent activities from multiple transaction tables

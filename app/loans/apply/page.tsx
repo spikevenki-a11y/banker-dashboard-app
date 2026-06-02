@@ -242,6 +242,7 @@ export default function LoanApplicationPage() {
   const [guarantorMembership, setGuarantorMembership] = useState("")
   const [remarks, setRemarks] = useState("")
 
+
   // EMI calculation
   const [emiSchedule, setEmiSchedule] = useState<EMISchedule[]>([])
   const [isCalculating, setIsCalculating] = useState(false)
