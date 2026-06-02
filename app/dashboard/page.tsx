@@ -57,8 +57,10 @@ const loanData = [
 
 export default function DashboardPage() {
   const router = useRouter()
+  const PAGE_SIZE = 10
   const [activities, setActivities] = useState<Activity[]>([])
   const [activitiesLoading, setActivitiesLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [statsLoading, setStatsLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -71,6 +73,7 @@ export default function DashboardPage() {
       if (res.ok) {
         const data = await res.json()
         setActivities(data)
+        setCurrentPage(1)
       }
     } catch (error) {
       console.error("Error fetching activities:", error)
@@ -300,9 +303,11 @@ export default function DashboardPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Recent Activities</CardTitle>
-          <Badge variant="outline" className="text-xs">
-            Last 10 transactions
-          </Badge>
+          {!activitiesLoading && activities.length > 0 && (
+            <Badge variant="outline" className="text-xs">
+              {activities.length} record{activities.length !== 1 ? "s" : ""}
+            </Badge>
+          )}
         </CardHeader>
         <CardContent>
           {activitiesLoading ? (
@@ -324,49 +329,103 @@ export default function DashboardPage() {
               <p className="text-muted-foreground">No recent activities found</p>
               <p className="text-sm text-muted-foreground/70">Transactions will appear here once recorded</p>
             </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Member</TableHead>
-                  <TableHead>Action</TableHead>
-                  <TableHead>Module</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {activities.map((activity) => (
-                  <TableRow key={activity.id}>
-                    <TableCell className="font-medium">{activity.member}</TableCell>
-                    <TableCell>{activity.action}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-xs capitalize">
-                        {activity.module}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-mono">{activity.amount}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">{activity.time}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={activity.status === "completed" || activity.status === "active" ? "default" : "secondary"}
-                        className={
-                          activity.status === "completed" || activity.status === "active"
-                            ? "bg-teal-100 text-teal-700"
-                            : activity.status === "pending"
-                            ? "bg-amber-100 text-amber-700"
-                            : "bg-orange-100 text-orange-700"
-                        }
-                      >
-                        {activity.status}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+          ) : (() => {
+            const totalPages = Math.ceil(activities.length / PAGE_SIZE)
+            const paged = activities.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+            return (
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Member</TableHead>
+                      <TableHead>Action</TableHead>
+                      <TableHead>Module</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead>Time</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paged.map((activity) => (
+                      <TableRow key={activity.id}>
+                        <TableCell className="font-medium">{activity.member}</TableCell>
+                        <TableCell>{activity.action}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs capitalize">
+                            {activity.module}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-mono">{activity.amount}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">{activity.time}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={activity.status === "completed" || activity.status === "active" ? "default" : "secondary"}
+                            className={
+                              activity.status === "completed" || activity.status === "active"
+                                ? "bg-teal-100 text-teal-700"
+                                : activity.status === "pending"
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-orange-100 text-orange-700"
+                            }
+                          >
+                            {activity.status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+
+                {/* Pagination controls */}
+                <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+                  <span>
+                    Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, activities.length)} of {activities.length}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                      className="h-7 px-2 text-xs"
+                    >
+                      «
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => p - 1)}
+                      disabled={currentPage === 1}
+                      className="h-7 px-2 text-xs"
+                    >
+                      ‹ Prev
+                    </Button>
+                    <span className="px-3 py-1 rounded border bg-muted text-xs font-medium">
+                      {currentPage} / {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => p + 1)}
+                      disabled={currentPage === totalPages}
+                      className="h-7 px-2 text-xs"
+                    >
+                      Next ›
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                      className="h-7 px-2 text-xs"
+                    >
+                      »
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )
+          })()}
         </CardContent>
       </Card>
       </DashboardWrapper>
