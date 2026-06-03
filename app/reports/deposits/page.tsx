@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, Suspense } from "react"
+import { useState, useRef, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -9,8 +9,11 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableFooter, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ArrowLeft, Printer, Loader2, Search, PiggyBank } from "lucide-react"
+import { ArrowLeft, Printer, Loader2, Search, PiggyBank, FileDown } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
+import { useBranchInfo } from "../_components/use-branch-info"
+import { openPrintWindow } from "../_components/open-print-window"
+import { downloadPdf } from "../_components/download-pdf"
 
 const fmt = (n: number | string | null | undefined) =>
   `₹${Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -42,8 +45,12 @@ function DepositsReportContent() {
   const [error, setError] = useState("")
   const [fetched, setFetched] = useState(false)
   const printRef = useRef<HTMLDivElement>(null)
+  const branchInfo = useBranchInfo()
+  const openTabRef = useRef(false)
+  const [pdfLoading, setPdfLoading] = useState(false)
 
   async function fetchReport(tab = activeTab) {
+    openTabRef.current = false
     setLoading(true); setError(""); setRows([]); setSummary(null); setFetched(false)
     try {
       const p = new URLSearchParams({ type: tab })
@@ -54,29 +61,41 @@ function DepositsReportContent() {
       if (!res.ok) { setError(data.error || "Failed to load report"); return }
       setRows(data.rows || [])
       setSummary(data.summary || null)
+      openTabRef.current = true
       setFetched(true)
     } catch { setError("Network error. Please try again.") }
     finally { setLoading(false) }
   }
 
   function handleTabChange(val: string) {
+    openTabRef.current = false
     setActiveTab(val); setRows([]); setSummary(null); setFetched(false); setError("")
   }
 
   function handlePrint() {
     if (!printRef.current) return
-    const win = window.open("", "_blank", "width=1100,height=700")
-    if (!win) return
     const title = TABS.find(t => t.value === activeTab)?.label || "FD Report"
-    win.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>
-      *{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;padding:20px;font-size:12px}
-      h1{font-size:16px;font-weight:bold}h2{font-size:12px;color:#555;margin:4px 0 10px}
-      table{width:100%;border-collapse:collapse;margin-top:8px}
-      th,td{border:1px solid #ccc;padding:5px 8px;font-size:11px}th{background:#f0f0f0;font-weight:600}
-      tfoot td{font-weight:bold;background:#f0f0f0}.text-right{text-align:right}
-    </style></head><body>${printRef.current.innerHTML}</body></html>`)
-    win.document.close(); win.focus(); setTimeout(() => win.print(), 400)
+    const dateRange = [fromDate && fmtDate(fromDate), toDate && fmtDate(toDate)].filter(Boolean).join(" to ")
+    openPrintWindow(title, dateRange, branchInfo, printRef.current.innerHTML)
   }
+
+  async function handleDownloadPdf() {
+    if (!printRef.current) return
+    setPdfLoading(true)
+    try {
+      const title = TABS.find(t => t.value === activeTab)?.label || "FD Report"
+      const dateRange = [fromDate && fmtDate(fromDate), toDate && fmtDate(toDate)].filter(Boolean).join(" to ")
+      await downloadPdf(title, dateRange, branchInfo, printRef.current.innerHTML)
+    } finally { setPdfLoading(false) }
+  }
+
+  useEffect(() => {
+    if (!openTabRef.current || !fetched || !printRef.current || rows.length === 0) return
+    openTabRef.current = false
+    const title = TABS.find(t => t.value === activeTab)?.label || "FD Report"
+    const dateRange = [fromDate && fmtDate(fromDate), toDate && fmtDate(toDate)].filter(Boolean).join(" to ")
+    openPrintWindow(title, dateRange, branchInfo, printRef.current.innerHTML, false)
+  }, [fetched, rows]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <DashboardWrapper>
@@ -119,9 +138,15 @@ function DepositsReportContent() {
                   Generate Report
                 </Button>
                 {fetched && rows.length > 0 && (
-                  <Button variant="outline" onClick={handlePrint} className="gap-2 bg-transparent ml-auto">
-                    <Printer className="h-4 w-4" /> Print
-                  </Button>
+                  <div className="ml-auto flex gap-2">
+                    <Button variant="outline" onClick={handlePrint} className="gap-2 bg-transparent">
+                      <Printer className="h-4 w-4" /> Print
+                    </Button>
+                    <Button variant="outline" onClick={handleDownloadPdf} disabled={pdfLoading} className="gap-2 bg-transparent">
+                      {pdfLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                      {pdfLoading ? "Generating..." : "Download PDF"}
+                    </Button>
+                  </div>
                 )}
               </div>
               {error && <p className="mt-2 text-sm text-destructive">{error}</p>}

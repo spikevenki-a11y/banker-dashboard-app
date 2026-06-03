@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -14,14 +14,19 @@ import {
   ArrowLeft,
   Download,
   FileSpreadsheet,
+  FileDown,
   Loader2,
   ChevronLeft,
   ChevronRight,
   Search,
   Calendar,
   RefreshCw,
+  Printer,
 } from "lucide-react"
 import Link from "next/link"
+import { useBranchInfo } from "../_components/use-branch-info"
+import { openPrintWindow } from "../_components/open-print-window"
+import { downloadPdf } from "../_components/download-pdf"
 
 interface Transaction {
   id: string
@@ -66,6 +71,9 @@ export default function DailyTransactionsReportPage() {
   })
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [pdfLoading, setPdfLoading] = useState(false)
+  const printRef = useRef<HTMLDivElement>(null)
+  const branchInfo = useBranchInfo()
 
   // Filters
   const today = new Date().toISOString().split("T")[0]
@@ -117,6 +125,25 @@ export default function DailyTransactionsReportPage() {
     if (newPage >= 1 && newPage <= pagination.totalPages) {
       fetchTransactions(newPage)
     }
+  }
+
+  function handlePrint() {
+    if (!printRef.current) return
+    const dateRange = fromDate === toDate
+      ? formatDate(fromDate)
+      : `${formatDate(fromDate)} to ${formatDate(toDate)}`
+    openPrintWindow("Daily Transaction Report", dateRange, branchInfo, printRef.current.innerHTML)
+  }
+
+  async function handleDownloadPdf() {
+    if (!printRef.current) return
+    setPdfLoading(true)
+    try {
+      const dateRange = fromDate === toDate
+        ? formatDate(fromDate)
+        : `${formatDate(fromDate)} to ${formatDate(toDate)}`
+      await downloadPdf("Daily Transaction Report", dateRange, branchInfo, printRef.current.innerHTML)
+    } finally { setPdfLoading(false) }
   }
 
   const formatCurrency = (amount: number) => {
@@ -365,6 +392,14 @@ export default function DailyTransactionsReportPage() {
             </div>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" className="bg-transparent gap-2" onClick={handlePrint} disabled={loading || transactions.length === 0}>
+              <Printer className="h-4 w-4" />
+              Print
+            </Button>
+            <Button variant="outline" className="bg-transparent gap-2" onClick={handleDownloadPdf} disabled={pdfLoading || loading || transactions.length === 0}>
+              {pdfLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+              {pdfLoading ? "Generating..." : "Download PDF"}
+            </Button>
             <Button variant="outline" className="bg-transparent gap-2" onClick={exportToCSV} disabled={exporting || loading}>
               {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               Export CSV
@@ -529,7 +564,7 @@ export default function DailyTransactionsReportPage() {
               </div>
             ) : (
               <>
-                <div className="rounded-md border">
+                <div ref={printRef} className="rounded-md border">
                   <Table>
                     <TableHeader>
                       <TableRow>
