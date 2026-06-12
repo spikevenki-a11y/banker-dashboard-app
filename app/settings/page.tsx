@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Settings, Users, BookOpen, Percent, FileSpreadsheet, ShieldCheck } from "lucide-react"
+import { Settings, Users, BookOpen, Percent, FileSpreadsheet, ShieldCheck, Terminal } from "lucide-react"
 import { DashboardWrapper } from "../_components/dashboard-wrapper"
 
 const settingsCards = [
@@ -60,6 +60,15 @@ const settingsCards = [
     color: "text-violet-600",
     bgColor: "bg-violet-50",
     href: "/settings/security",
+  },
+  {
+    id: "admin-console",
+    title: "Admin Console",
+    description: "Access advanced administrative tools, system diagnostics, and backend controls",
+    icon: Terminal,
+    color: "text-slate-600",
+    bgColor: "bg-slate-100",
+    href: "/settings/admin-console",
   },
 ]
 
