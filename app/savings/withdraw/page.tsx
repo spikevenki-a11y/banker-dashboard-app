@@ -108,6 +108,21 @@ export default function WithdrawPage() {
   const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null)
   const [searchError, setSearchError] = useState("")
 
+  // Membership number lookup
+  type MemberAccount = {
+    account_number: string
+    available_balance: number
+    account_status: string
+    opening_date: string
+    scheme_name: string
+    interest_rate: number
+  }
+  const [membershipNo, setMembershipNo] = useState("")
+  const [isMemberSearching, setIsMemberSearching] = useState(false)
+  const [memberAccounts, setMemberAccounts] = useState<MemberAccount[]>([])
+  const [selectedMemberAccount, setSelectedMemberAccount] = useState("")
+  const [memberSearchError, setMemberSearchError] = useState("")
+
   // Transaction form
   const [amount, setAmount] = useState("")
   const [narration, setNarration] = useState("")
@@ -175,16 +190,13 @@ export default function WithdrawPage() {
     }
   }
 
-  const handleAccountSearch = async () => {
-    if (!accountNumber.trim()) return
-
+  const loadAccount = async (accNo: string) => {
     setIsSearching(true)
     setSearchError("")
     setAccountInfo(null)
     setTransactions([])
-
     try {
-      const res = await fetch(`/api/savings/account-details?account_number=${encodeURIComponent(accountNumber.trim())}`, {
+      const res = await fetch(`/api/savings/account-details?account_number=${encodeURIComponent(accNo)}`, {
         credentials: "include",
       })
       const data = await res.json()
@@ -201,11 +213,57 @@ export default function WithdrawPage() {
     }
   }
 
+  const handleAccountSearch = async () => {
+    if (!accountNumber.trim()) return
+    await loadAccount(accountNumber.trim())
+  }
+
   // Auto-load account on blur
   const handleAccountBlur = () => {
     if (accountNumber.trim() && !accountInfo && !isSearching) {
       handleAccountSearch()
     }
+  }
+
+  const handleMemberLookup = async () => {
+    if (!membershipNo.trim()) return
+    setIsMemberSearching(true)
+    setMemberSearchError("")
+    setMemberAccounts([])
+    setSelectedMemberAccount("")
+    setAccountInfo(null)
+    setAccountNumber("")
+    setSearchError("")
+    setTransactions([])
+    try {
+      const res = await fetch(`/api/savings/by-member?membership_no=${encodeURIComponent(membershipNo.trim())}`, {
+        credentials: "include",
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        setMemberSearchError(data.error || "Lookup failed.")
+        return
+      }
+      const accounts: MemberAccount[] = data.accounts || []
+      if (accounts.length === 0) {
+        setMemberSearchError("No savings accounts found for this membership number.")
+      } else if (accounts.length === 1) {
+        setAccountNumber(accounts[0].account_number)
+        loadAccount(accounts[0].account_number)
+      } else {
+        setMemberAccounts(accounts)
+      }
+    } catch {
+      setMemberSearchError("Failed to lookup membership number. Please try again.")
+    } finally {
+      setIsMemberSearching(false)
+    }
+  }
+
+  const handleMemberAccountSelect = (accNo: string) => {
+    setSelectedMemberAccount(accNo)
+    setAccountNumber(accNo)
+    loadAccount(accNo)
   }
 
   // Popup advanced search
@@ -242,6 +300,9 @@ export default function WithdrawPage() {
 
   const handleSelectAccount = (result: SearchResult) => {
     setAccountNumber(result.account_number)
+    setMemberAccounts([])
+    setSelectedMemberAccount("")
+    setMemberSearchError("")
     setSearchDialogOpen(false)
     setSearchMemberNo("")
     setSearchMemberName("")
@@ -249,25 +310,7 @@ export default function WithdrawPage() {
     setSearchAadhaar("")
     setSearchContact("")
     setSearchResults([])
-    // Trigger account load
-    setIsSearching(true)
-    setSearchError("")
-    setAccountInfo(null)
-    setTransactions([])
-    fetch(`/api/savings/account-details?account_number=${encodeURIComponent(result.account_number)}`, {
-      credentials: "include",
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.account) {
-          setAccountInfo(data.account)
-          fetchTransactions(data.account.account_number)
-        } else {
-          setSearchError(data.error || "Account not found.")
-        }
-      })
-      .catch(() => setSearchError("Failed to load account."))
-      .finally(() => setIsSearching(false))
+    loadAccount(result.account_number)
   }
 
   const availableBalance = accountInfo ? Number(accountInfo.available_balance) : 0
@@ -348,6 +391,10 @@ export default function WithdrawPage() {
     setAccountNumber("")
     setAccountInfo(null)
     setSearchError("")
+    setMembershipNo("")
+    setMemberAccounts([])
+    setSelectedMemberAccount("")
+    setMemberSearchError("")
     setAmount("")
     setNarration("")
     setVoucherType("")
@@ -393,13 +440,80 @@ export default function WithdrawPage() {
                       </div>
                       <div>
                         <CardTitle className="text-lg">Account Information</CardTitle>
-                        <CardDescription>Search for the savings account by account number</CardDescription>
+                        <CardDescription>Search by membership number or enter the account number directly</CardDescription>
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    {/* Membership number lookup */}
                     <div className="space-y-2">
-                      <Label htmlFor="account-no">Account Number *</Label>
+                      <Label htmlFor="membership-no">Membership Number</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="membership-no"
+                          placeholder="Enter membership number"
+                          value={membershipNo}
+                          onChange={(e) => {
+                            setMembershipNo(e.target.value)
+                            if (memberAccounts.length > 0) {
+                              setMemberAccounts([])
+                              setSelectedMemberAccount("")
+                            }
+                            setMemberSearchError("")
+                          }}
+                          onBlur={() => { if (membershipNo.trim() && !isMemberSearching) handleMemberLookup() }}
+                          onKeyDown={(e) => e.key === "Enter" && handleMemberLookup()}
+                          className="flex-1"
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={handleMemberLookup}
+                          disabled={isMemberSearching || !membershipNo.trim()}
+                          className="gap-2 bg-transparent"
+                        >
+                          {isMemberSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
+                          Lookup
+                        </Button>
+                      </div>
+                      {isMemberSearching && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Looking up accounts...
+                        </div>
+                      )}
+                      {memberSearchError && <p className="text-sm text-red-500">{memberSearchError}</p>}
+                      {memberAccounts.length > 1 && (
+                        <div className="space-y-1.5">
+                          <Label htmlFor="member-account-select" className="text-xs text-muted-foreground">
+                            {memberAccounts.length} accounts found — select one to continue
+                          </Label>
+                          <Select value={selectedMemberAccount} onValueChange={handleMemberAccountSelect}>
+                            <SelectTrigger id="member-account-select">
+                              <SelectValue placeholder="Choose a savings account..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {memberAccounts.map((acc) => (
+                                <SelectItem key={acc.account_number} value={acc.account_number}>
+                                  <span className="font-mono">{acc.account_number}</span>
+                                  <span className="ml-2 text-muted-foreground">— {acc.scheme_name}</span>
+                                  <span className="ml-2 text-teal-600">₹{Number(acc.available_balance).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                                  <span className="ml-2 text-xs text-muted-foreground">({acc.account_status})</span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 border-t" />
+                      <span className="text-xs text-muted-foreground">or</span>
+                      <div className="flex-1 border-t" />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="account-no">Account Number</Label>
                       <div className="flex gap-2">
                         <Input
                           id="account-no"
@@ -410,6 +524,11 @@ export default function WithdrawPage() {
                             if (accountInfo) {
                               setAccountInfo(null)
                               setSearchError("")
+                            }
+                            if (memberAccounts.length > 0) {
+                              setMemberAccounts([])
+                              setSelectedMemberAccount("")
+                              setMemberSearchError("")
                             }
                           }}
                           onBlur={handleAccountBlur}

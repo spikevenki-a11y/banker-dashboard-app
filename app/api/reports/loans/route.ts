@@ -13,6 +13,8 @@ export async function GET(req: NextRequest) {
     const type = url.searchParams.get("type") || "outstanding"
     const fromDate = url.searchParams.get("from_date") || ""
     const toDate = url.searchParams.get("to_date") || ""
+    const reportDate = url.searchParams.get("report_date") || ""
+    const schemeId = url.searchParams.get("scheme_id") || ""
 
     const baseFrom = `
       FROM loan_applications la
@@ -27,6 +29,16 @@ export async function GET(req: NextRequest) {
     let summary: any = null
 
     if (type === "outstanding") {
+      const params: any[] = [branchId]
+      let outWhere = " AND la.application_status = 'ACTIVE'"
+      if (reportDate) {
+        params.push(reportDate)
+        outWhere += ` AND la.application_date::date <= $${params.length}`
+      }
+      if (schemeId && schemeId !== "all") {
+        params.push(schemeId)
+        outWhere += ` AND la.scheme_id::int = $${params.length}`
+      }
       const result = await pool.query(
         `SELECT la.loan_application_id, la.membership_no, la.application_status,
                 la.applied_loan_amount, COALESCE(la.loan_outstanding, 0) AS loan_outstanding,
@@ -34,9 +46,9 @@ export async function GET(req: NextRequest) {
                 lsd.sanctioned_amount, lsd.interest_rate, la.loan_tenure_months,
                 lsd.payment_amount AS emi_amount,
                 ls.scheme_name, c.full_name, c.mobile_no
-         ${baseFrom} AND la.application_status = 'ACTIVE'
+         ${baseFrom}${outWhere}
          ORDER BY la.loan_outstanding DESC NULLS LAST`,
-        [branchId]
+        params
       )
       rows = result.rows
       summary = {

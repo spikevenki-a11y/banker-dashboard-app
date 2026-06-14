@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowLeft, Printer, Loader2, Search, Wallet, FileDown } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { useBranchInfo } from "../_components/use-branch-info"
@@ -35,6 +36,9 @@ function SavingsReportContent() {
   const [fromDate, setFromDate] = useState("")
   const [toDate, setToDate] = useState("")
   const [accountNumber, setAccountNumber] = useState("")
+  const [reportDate, setReportDate] = useState("")
+  const [schemeId, setSchemeId] = useState("")
+  const [schemes, setSchemes] = useState<{ scheme_id: number; scheme_name: string }[]>([])
   const [rows, setRows] = useState<any[]>([])
   const [summary, setSummary] = useState<any>(null)
   const [loading, setLoading] = useState(false)
@@ -44,6 +48,13 @@ function SavingsReportContent() {
   const branchInfo = useBranchInfo()
   const openTabRef = useRef(false)
   const [pdfLoading, setPdfLoading] = useState(false)
+
+  useEffect(() => {
+    fetch("/api/savings/schemes", { credentials: "include" })
+      .then(r => r.json())
+      .then(d => { if (d.schemes) setSchemes(d.schemes) })
+      .catch(() => {})
+  }, [])
 
   async function fetchReport(tab = activeTab) {
     if (tab === "statement" && !accountNumber.trim()) {
@@ -56,6 +67,10 @@ function SavingsReportContent() {
       if (fromDate) p.set("from_date", fromDate)
       if (toDate)   p.set("to_date", toDate)
       if (tab === "statement") p.set("account_number", accountNumber.trim())
+      if (tab === "outstanding") {
+        if (reportDate) p.set("report_date", reportDate)
+        if (schemeId && schemeId !== "all") p.set("scheme_id", schemeId)
+      }
       const res = await fetch(`/api/reports/savings?${p}`, { credentials: "include" })
       const data = await res.json()
       if (!res.ok) { setError(data.error || "Failed to load report"); return }
@@ -70,13 +85,26 @@ function SavingsReportContent() {
   function handleTabChange(val: string) {
     openTabRef.current = false
     setActiveTab(val); setRows([]); setSummary(null); setFetched(false); setError("")
+    setReportDate(""); setSchemeId("")
+  }
+
+  function getDateRangeLabel() {
+    if (activeTab === "outstanding") {
+      const parts: string[] = []
+      if (reportDate) parts.push(`As of: ${fmtDate(reportDate)}`)
+      const schemeName = schemeId && schemeId !== "all"
+        ? schemes.find(s => String(s.scheme_id) === schemeId)?.scheme_name
+        : undefined
+      if (schemeName) parts.push(`Scheme: ${schemeName}`)
+      return parts.join("  ·  ")
+    }
+    return [fromDate && fmtDate(fromDate), toDate && fmtDate(toDate)].filter(Boolean).join(" to ")
   }
 
   function handlePrint() {
     if (!printRef.current) return
     const title = TABS.find(t => t.value === activeTab)?.label || "Savings Report"
-    const dateRange = [fromDate && fmtDate(fromDate), toDate && fmtDate(toDate)].filter(Boolean).join(" to ")
-    openPrintWindow(title, dateRange, branchInfo, printRef.current.innerHTML)
+    openPrintWindow(title, getDateRangeLabel(), branchInfo, printRef.current.innerHTML)
   }
 
   async function handleDownloadPdf() {
@@ -84,8 +112,7 @@ function SavingsReportContent() {
     setPdfLoading(true)
     try {
       const title = TABS.find(t => t.value === activeTab)?.label || "Savings Report"
-      const dateRange = [fromDate && fmtDate(fromDate), toDate && fmtDate(toDate)].filter(Boolean).join(" to ")
-      await downloadPdf(title, dateRange, branchInfo, printRef.current.innerHTML)
+      await downloadPdf(title, getDateRangeLabel(), branchInfo, printRef.current.innerHTML)
     } finally { setPdfLoading(false) }
   }
 
@@ -93,8 +120,7 @@ function SavingsReportContent() {
     if (!openTabRef.current || !fetched || !printRef.current || rows.length === 0) return
     openTabRef.current = false
     const title = TABS.find(t => t.value === activeTab)?.label || "Savings Report"
-    const dateRange = [fromDate && fmtDate(fromDate), toDate && fmtDate(toDate)].filter(Boolean).join(" to ")
-    openPrintWindow(title, dateRange, branchInfo, printRef.current.innerHTML, false)
+    openPrintWindow(title, getDateRangeLabel(), branchInfo, printRef.current.innerHTML, false)
   }, [fetched, rows]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const tabLabel = TABS.find(t => t.value === activeTab)?.label || ""
@@ -120,6 +146,28 @@ function SavingsReportContent() {
           <Card className="mt-4">
             <CardContent className="pt-4">
               <div className="flex flex-wrap items-end gap-4">
+                {activeTab === "outstanding" && (
+                  <>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Report Date</Label>
+                      <Input type="date" value={reportDate} onChange={e => setReportDate(e.target.value)} className="w-40" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Scheme</Label>
+                      <Select value={schemeId} onValueChange={setSchemeId}>
+                        <SelectTrigger className="w-52">
+                          <SelectValue placeholder="All Schemes" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Schemes</SelectItem>
+                          {schemes.map(s => (
+                            <SelectItem key={s.scheme_id} value={String(s.scheme_id)}>{s.scheme_name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
                 {activeTab === "statement" && (
                   <div className="space-y-1">
                     <Label className="text-xs">Account Number *</Label>
@@ -175,6 +223,7 @@ function SavingsReportContent() {
               <CardContent>
                 <div ref={printRef}>
                   <h1>{tabLabel}</h1>
+                  {getDateRangeLabel() && <h2>{getDateRangeLabel()}</h2>}
                   {summary?.account && (
                     <div className="summary">
                       {[

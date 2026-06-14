@@ -108,6 +108,21 @@ export default function ViewModifyAccountPage() {
   const [isSearching, setIsSearching] = useState(false)
   const [account, setAccount] = useState<AccountDetails | null>(null)
   const [searchError, setSearchError] = useState("")
+
+  // Membership number lookup
+  type MemberAccount = {
+    account_number: string
+    available_balance: number
+    account_status: string
+    opening_date: string
+    scheme_name: string
+    interest_rate: number
+  }
+  const [membershipNo, setMembershipNo] = useState("")
+  const [isMemberSearching, setIsMemberSearching] = useState(false)
+  const [memberAccounts, setMemberAccounts] = useState<MemberAccount[]>([])
+  const [selectedMemberAccount, setSelectedMemberAccount] = useState("")
+  const [memberSearchError, setMemberSearchError] = useState("")
   const [isEditing, setIsEditing] = useState(false)
   const [editStatus, setEditStatus] = useState("")
   const [isSaving, setIsSaving] = useState(false)
@@ -283,6 +298,46 @@ export default function ViewModifyAccountPage() {
     }
   }
 
+  const handleMemberLookup = async () => {
+    if (!membershipNo.trim()) return
+    setIsMemberSearching(true)
+    setMemberSearchError("")
+    setMemberAccounts([])
+    setSelectedMemberAccount("")
+    setAccount(null)
+    setAccountNumber("")
+    setSearchError("")
+    try {
+      const res = await fetch(`/api/savings/by-member?membership_no=${encodeURIComponent(membershipNo.trim())}`, {
+        credentials: "include",
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        setMemberSearchError(data.error || "Lookup failed.")
+        return
+      }
+      const accounts: MemberAccount[] = data.accounts || []
+      if (accounts.length === 0) {
+        setMemberSearchError("No savings accounts found for this membership number.")
+      } else if (accounts.length === 1) {
+        setAccountNumber(accounts[0].account_number)
+        handleSearch(accounts[0].account_number)
+      } else {
+        setMemberAccounts(accounts)
+      }
+    } catch {
+      setMemberSearchError("Failed to lookup membership number. Please try again.")
+    } finally {
+      setIsMemberSearching(false)
+    }
+  }
+
+  const handleMemberAccountSelect = (accNo: string) => {
+    setSelectedMemberAccount(accNo)
+    setAccountNumber(accNo)
+    handleSearch(accNo)
+  }
+
   // Popup advanced search
   const handlePopupSearch = async () => {
     if (!searchMemberNo.trim() && !searchMemberName.trim() && !searchFatherName.trim() && !searchAadhaar.trim() && !searchContact.trim()) return
@@ -317,15 +372,16 @@ export default function ViewModifyAccountPage() {
 
   const handleSelectAccount = (result: SearchResult) => {
     setAccountNumber(result.account_number)
+    setMemberAccounts([])
+    setSelectedMemberAccount("")
+    setMemberSearchError("")
     setSearchDialogOpen(false)
-    // Reset popup fields
     setSearchMemberNo("")
     setSearchMemberName("")
     setSearchFatherName("")
     setSearchAadhaar("")
     setSearchContact("")
     setSearchResults([])
-    // Load the selected account
     handleSearch(result.account_number)
   }
 
@@ -377,41 +433,115 @@ export default function ViewModifyAccountPage() {
 
             {/* Search Card */}
             <Card className="mb-6">
-              <CardContent className="p-6">
-                <div className="flex items-end gap-4">
-                  <div className="flex-1 space-y-2">
-                    <Label htmlFor="account-search">Account Number</Label>
+              <CardContent className="p-6 space-y-4">
+                {/* Membership number lookup */}
+                <div className="space-y-2">
+                  <Label htmlFor="membership-no">Membership Number</Label>
+                  <div className="flex gap-2">
                     <Input
-                      id="account-search"
-                      placeholder="Enter savings account number"
-                      value={accountNumber}
+                      id="membership-no"
+                      placeholder="Enter membership number"
+                      value={membershipNo}
                       onChange={(e) => {
-                        setAccountNumber(e.target.value)
-                        if (account) {
-                          setAccount(null)
-                          setSearchError("")
+                        setMembershipNo(e.target.value)
+                        if (memberAccounts.length > 0) {
+                          setMemberAccounts([])
+                          setSelectedMemberAccount("")
                         }
+                        setMemberSearchError("")
                       }}
-                      onBlur={handleAccountBlur}
-                      onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                      onBlur={() => { if (membershipNo.trim() && !isMemberSearching) handleMemberLookup() }}
+                      onKeyDown={(e) => e.key === "Enter" && handleMemberLookup()}
+                      className="flex-1"
                     />
+                    <Button
+                      variant="outline"
+                      onClick={handleMemberLookup}
+                      disabled={isMemberSearching || !membershipNo.trim()}
+                      className="gap-2 bg-transparent"
+                    >
+                      {isMemberSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
+                      Lookup
+                    </Button>
                   </div>
-                  <Button
-                    variant="outline"
-                    onClick={() => setSearchDialogOpen(true)}
-                    className="gap-2 bg-transparent"
-                  >
-                    <Search className="h-4 w-4" />
-                    Search
-                  </Button>
+                  {isMemberSearching && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Looking up accounts...
+                    </div>
+                  )}
+                  {memberSearchError && <p className="text-sm text-red-500">{memberSearchError}</p>}
+                  {memberAccounts.length > 1 && (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="member-account-select" className="text-xs text-muted-foreground">
+                        {memberAccounts.length} accounts found — select one to continue
+                      </Label>
+                      <Select value={selectedMemberAccount} onValueChange={handleMemberAccountSelect}>
+                        <SelectTrigger id="member-account-select">
+                          <SelectValue placeholder="Choose a savings account..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {memberAccounts.map((acc) => (
+                            <SelectItem key={acc.account_number} value={acc.account_number}>
+                              <span className="font-mono">{acc.account_number}</span>
+                              <span className="ml-2 text-muted-foreground">— {acc.scheme_name}</span>
+                              <span className="ml-2 text-teal-600">₹{Number(acc.available_balance).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                              <span className="ml-2 text-xs text-muted-foreground">({acc.account_status})</span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
-                {isSearching && (
-                  <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Loading account details...
+
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 border-t" />
+                  <span className="text-xs text-muted-foreground">or</span>
+                  <div className="flex-1 border-t" />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-end gap-4">
+                    <div className="flex-1 space-y-2">
+                      <Label htmlFor="account-search">Account Number</Label>
+                      <Input
+                        id="account-search"
+                        placeholder="Enter savings account number"
+                        value={accountNumber}
+                        onChange={(e) => {
+                          setAccountNumber(e.target.value)
+                          if (account) {
+                            setAccount(null)
+                            setSearchError("")
+                          }
+                          if (memberAccounts.length > 0) {
+                            setMemberAccounts([])
+                            setSelectedMemberAccount("")
+                            setMemberSearchError("")
+                          }
+                        }}
+                        onBlur={handleAccountBlur}
+                        onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                      />
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => setSearchDialogOpen(true)}
+                      className="gap-2 bg-transparent"
+                    >
+                      <Search className="h-4 w-4" />
+                      Search
+                    </Button>
                   </div>
-                )}
-                {searchError && <p className="mt-3 text-sm text-red-500">{searchError}</p>}
+                  {isSearching && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Loading account details...
+                    </div>
+                  )}
+                  {searchError && <p className="text-sm text-red-500">{searchError}</p>}
+                </div>
               </CardContent>
             </Card>
 
