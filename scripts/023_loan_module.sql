@@ -93,7 +93,8 @@ CREATE TABLE loan_transaction_details (
     loan_account_no VARCHAR(30) NOT NULL,
     transaction_type VARCHAR(30), 
     
-    credit_amount NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+    credit_principal_amount NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+    credit_interest_amount NUMERIC(12,2) NOT NULL DEFAULT 0.00,
     debit_amount NUMERIC(12,2) NOT NULL DEFAULT 0.00,
     balance_after_transaction DECIMAL(15,2),
 

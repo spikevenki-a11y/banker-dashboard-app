@@ -88,7 +88,8 @@ type LoanTransaction = {
   loan_account_no: string
   transaction_type: string
   debit_amount: number
-  credit_amount: number
+  credit_principal_amount: number
+  credit_interest_amount: number
   balance_after_transaction: number
   remarks: string
 }

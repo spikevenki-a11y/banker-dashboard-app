@@ -87,7 +87,8 @@ type Transaction = {
   voucher_no: number
   transaction_type: string
   debit_amount: number
-  credit_amount: number
+  credit_principal_amount: number
+  credit_interest_amount: number
   balance_after_transaction: number
   remarks: string
 }
@@ -272,7 +273,9 @@ function LoanCollectionContent() {
           payment_amount: collectionAmount,
           payment_mode: paymentMode,
           installment_numbers: selectedInstallments.length > 0 ? selectedInstallments : undefined,
-          narration: narration
+          narration: narration,
+          principal_amount: pNum > 0 || iNum > 0 ? pNum : undefined,
+          interest_amount: pNum > 0 || iNum > 0 ? iNum : undefined,
         })
       })
 
@@ -748,7 +751,8 @@ function LoanCollectionContent() {
                               <TableHead>Voucher</TableHead>
                               <TableHead>Type</TableHead>
                               <TableHead>Debit</TableHead>
-                              <TableHead>Credit</TableHead>
+                              <TableHead>Principal</TableHead>
+                              <TableHead>Interest</TableHead>
                               <TableHead>Balance</TableHead>
                             </TableRow>
                           </TableHeader>
@@ -764,7 +768,10 @@ function LoanCollectionContent() {
                                   {parseFloat(txn.debit_amount?.toString()) > 0 ? formatCurrency(txn.debit_amount) : '---'}
                                 </TableCell>
                                 <TableCell className="text-teal-600">
-                                  {parseFloat(txn.credit_amount?.toString()) > 0 ? formatCurrency(txn.credit_amount) : '---'}
+                                  {parseFloat(txn.credit_principal_amount?.toString()) > 0 ? formatCurrency(txn.credit_principal_amount) : '---'}
+                                </TableCell>
+                                <TableCell className="text-teal-600">
+                                  {parseFloat(txn.credit_interest_amount?.toString()) > 0 ? formatCurrency(txn.credit_interest_amount) : '---'}
                                 </TableCell>
                                 <TableCell className="font-mono">{formatCurrency(txn.balance_after_transaction)}</TableCell>
                               </TableRow>

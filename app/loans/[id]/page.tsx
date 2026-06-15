@@ -59,7 +59,8 @@ type LoanTransaction = {
   loan_account_no: string
   transaction_type: string
   debit_amount: number
-  credit_amount: number
+  credit_principal_amount: number
+  credit_interest_amount: number
   balance_after_transaction: number
   remarks: string
 }
@@ -851,7 +852,8 @@ export default function LoanDetailsPage() {
                               <TableHead>Voucher No</TableHead>
                               <TableHead>Type</TableHead>
                               <TableHead>Debit</TableHead>
-                              <TableHead>Credit</TableHead>
+                              <TableHead>Principal</TableHead>
+                              <TableHead>Interest</TableHead>
                               <TableHead>Balance</TableHead>
                               <TableHead>Remarks</TableHead>
                             </TableRow>
@@ -863,7 +865,8 @@ export default function LoanDetailsPage() {
                                 <TableCell className="font-mono">{txn.voucher_no}</TableCell>
                                 <TableCell className="font-medium">{txn.transaction_type}</TableCell>
                                 <TableCell>{txn.debit_amount > 0 ? formatCurrency(txn.debit_amount) : "---"}</TableCell>
-                                <TableCell>{txn.credit_amount > 0 ? formatCurrency(txn.credit_amount) : "---"}</TableCell>
+                                <TableCell className="text-teal-600">{txn.credit_principal_amount > 0 ? formatCurrency(txn.credit_principal_amount) : "---"}</TableCell>
+                                <TableCell className="text-teal-600">{txn.credit_interest_amount > 0 ? formatCurrency(txn.credit_interest_amount) : "---"}</TableCell>
                                 <TableCell className="font-mono font-semibold">
                                   {formatCurrency(txn.balance_after_transaction)}
                                 </TableCell>
