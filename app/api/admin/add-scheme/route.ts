@@ -143,7 +143,7 @@ export async function POST(req: NextRequest) {
            minimum_period_days, maximum_period_days,
            installment_frequency, minimum_installment_amount, maximum_installment_amount,
            penal_rate, collection_frequency, agent_commission_percent,
-           interest_code, interest_rate, interest_frequency,
+           interest_policy_id, interest_rate, interest_frequency,
            interest_calculation_method, compounding_frequency, interest_rounding,
            minimum_interest_payable,
            premature_closure_allowed, premature_penal_rate,

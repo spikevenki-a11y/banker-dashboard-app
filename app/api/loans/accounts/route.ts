@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status")
     const membershipNo = searchParams.get("membershipNo")
     const loanAccountNo = searchParams.get("loanAccountNo")
+    const applicationId = searchParams.get("applicationId")
 
     let query = `
       SELECT 
@@ -60,6 +61,11 @@ export async function GET(request: NextRequest) {
     if (loanAccountNo) {
       params.push(loanAccountNo)
       query += ` AND ltd.loan_account_no = $${params.length}`
+    }
+
+    if (applicationId) {
+      params.push(applicationId)
+      query += ` AND la.loan_application_id = $${params.length}`
     }
 
     query += ` ORDER BY la.updated_at DESC`

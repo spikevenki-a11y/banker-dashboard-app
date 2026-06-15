@@ -25,6 +25,7 @@ ADD COLUMN loan_outstanding NUMERIC(15, 2);
 CREATE TABLE loan_sanction_details (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     sanction_id BIGINT ,
+    branch_id INT,
     loan_application_id BIGINT NOT NULL,
     sanctioned_amount DECIMAL(15,2),
     sanction_date DATE,

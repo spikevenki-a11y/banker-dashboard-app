@@ -13,6 +13,8 @@ export async function GET(req: NextRequest) {
     const type = url.searchParams.get("type") || "outstanding"
     const fromDate = url.searchParams.get("from_date") || ""
     const toDate = url.searchParams.get("to_date") || ""
+    const reportDate = url.searchParams.get("report_date") || ""
+    const schemeId = url.searchParams.get("scheme_id") || ""
 
     const baseSelect = `
       SELECT da.accountnumber::text AS account_number,
@@ -45,8 +47,11 @@ export async function GET(req: NextRequest) {
       if (fromDate) { params.push(fromDate); dateWhere += ` AND tdd.maturitydate >= $${params.length}` }
       if (toDate)   { params.push(toDate);   dateWhere += ` AND tdd.maturitydate <= $${params.length}` }
       if (!fromDate && !toDate) {
-        // Default: next 90 days
         dateWhere = " AND tdd.maturitydate BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '90 days'"
+      }
+      if (schemeId && schemeId !== "all") {
+        params.push(schemeId)
+        dateWhere += ` AND da.schemeid::int = $${params.length}`
       }
       const result = await pool.query(
         `${baseSelect} AND da.accountstatus = 1${dateWhere} ORDER BY tdd.maturitydate ASC`,
@@ -60,9 +65,21 @@ export async function GET(req: NextRequest) {
       }
 
     } else if (type === "outstanding") {
+      const params: any[] = [branchId]
+      let outWhere = " AND da.accountstatus = 1"
+      if (reportDate) {
+        params.push(reportDate)
+        outWhere += ` AND da.accountopendate::date <= $${params.length}`
+        params.push(reportDate)
+        outWhere += ` AND (tdd.maturitydate IS NULL OR tdd.maturitydate::date >= $${params.length})`
+      }
+      if (schemeId && schemeId !== "all") {
+        params.push(schemeId)
+        outWhere += ` AND da.schemeid::int = $${params.length}`
+      }
       const result = await pool.query(
-        `${baseSelect} AND da.accountstatus = 1 ORDER BY da.accountopendate DESC`,
-        [branchId]
+        `${baseSelect}${outWhere} ORDER BY da.accountopendate DESC`,
+        params
       )
       rows = result.rows
       summary = {

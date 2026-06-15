@@ -23,13 +23,11 @@ export async function GET(req: NextRequest) {
 
   try {
     const { rows } = await pool.query(
-      `SELECT branch_id, accountcode, accountname, accounttypecode,
+      `SELECT accountcode, accountname, accounttypecode,
               isledger, parentaccountcode, accountbalance, isactive,
               createddate, modifieddate
-       FROM chart_of_accounts
-       WHERE branch_id = $1
-       ORDER BY accountcode ASC`,
-      [branchId]
+       FROM chart_of_accounts_master
+       ORDER BY accountcode ASC`
     )
 
     // Map account type codes to labels

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableFooter, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowLeft, Printer, Loader2, Search, PiggyBank, FileDown } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { useBranchInfo } from "../_components/use-branch-info"
@@ -39,6 +40,9 @@ function DepositsReportContent() {
   const [activeTab, setActiveTab] = useState(searchParams.get("type") || "maturity")
   const [fromDate, setFromDate] = useState("")
   const [toDate, setToDate] = useState("")
+  const [reportDate, setReportDate] = useState("")
+  const [schemeId, setSchemeId] = useState("")
+  const [schemes, setSchemes] = useState<{ scheme_id: number; scheme_name: string }[]>([])
   const [rows, setRows] = useState<any[]>([])
   const [summary, setSummary] = useState<any>(null)
   const [loading, setLoading] = useState(false)
@@ -49,6 +53,13 @@ function DepositsReportContent() {
   const openTabRef = useRef(false)
   const [pdfLoading, setPdfLoading] = useState(false)
 
+  useEffect(() => {
+    fetch("/api/deposits/schemes", { credentials: "include" })
+      .then(r => r.json())
+      .then(d => { if (d.schemes) setSchemes(d.schemes) })
+      .catch(() => {})
+  }, [])
+
   async function fetchReport(tab = activeTab) {
     openTabRef.current = false
     setLoading(true); setError(""); setRows([]); setSummary(null); setFetched(false)
@@ -56,6 +67,10 @@ function DepositsReportContent() {
       const p = new URLSearchParams({ type: tab })
       if (fromDate) p.set("from_date", fromDate)
       if (toDate)   p.set("to_date", toDate)
+      if (tab === "outstanding" && reportDate) p.set("report_date", reportDate)
+      if ((tab === "maturity" || tab === "outstanding") && schemeId && schemeId !== "all") {
+        p.set("scheme_id", schemeId)
+      }
       const res = await fetch(`/api/reports/deposits?${p}`, { credentials: "include" })
       const data = await res.json()
       if (!res.ok) { setError(data.error || "Failed to load report"); return }
@@ -70,13 +85,33 @@ function DepositsReportContent() {
   function handleTabChange(val: string) {
     openTabRef.current = false
     setActiveTab(val); setRows([]); setSummary(null); setFetched(false); setError("")
+    setReportDate(""); setSchemeId("")
+  }
+
+  function getDateRangeLabel() {
+    const schemeName = schemeId && schemeId !== "all"
+      ? schemes.find(s => String(s.scheme_id) === schemeId)?.scheme_name
+      : undefined
+    if (activeTab === "outstanding") {
+      const parts: string[] = []
+      if (reportDate) parts.push(`As of: ${fmtDate(reportDate)}`)
+      if (schemeName) parts.push(`Scheme: ${schemeName}`)
+      return parts.join("  ·  ")
+    }
+    if (activeTab === "maturity") {
+      const parts: string[] = [
+        [fromDate && fmtDate(fromDate), toDate && fmtDate(toDate)].filter(Boolean).join(" to ")
+      ].filter(Boolean)
+      if (schemeName) parts.push(`Scheme: ${schemeName}`)
+      return parts.join("  ·  ")
+    }
+    return [fromDate && fmtDate(fromDate), toDate && fmtDate(toDate)].filter(Boolean).join(" to ")
   }
 
   function handlePrint() {
     if (!printRef.current) return
     const title = TABS.find(t => t.value === activeTab)?.label || "FD Report"
-    const dateRange = [fromDate && fmtDate(fromDate), toDate && fmtDate(toDate)].filter(Boolean).join(" to ")
-    openPrintWindow(title, dateRange, branchInfo, printRef.current.innerHTML)
+    openPrintWindow(title, getDateRangeLabel(), branchInfo, printRef.current.innerHTML)
   }
 
   async function handleDownloadPdf() {
@@ -84,8 +119,7 @@ function DepositsReportContent() {
     setPdfLoading(true)
     try {
       const title = TABS.find(t => t.value === activeTab)?.label || "FD Report"
-      const dateRange = [fromDate && fmtDate(fromDate), toDate && fmtDate(toDate)].filter(Boolean).join(" to ")
-      await downloadPdf(title, dateRange, branchInfo, printRef.current.innerHTML)
+      await downloadPdf(title, getDateRangeLabel(), branchInfo, printRef.current.innerHTML)
     } finally { setPdfLoading(false) }
   }
 
@@ -93,8 +127,7 @@ function DepositsReportContent() {
     if (!openTabRef.current || !fetched || !printRef.current || rows.length === 0) return
     openTabRef.current = false
     const title = TABS.find(t => t.value === activeTab)?.label || "FD Report"
-    const dateRange = [fromDate && fmtDate(fromDate), toDate && fmtDate(toDate)].filter(Boolean).join(" to ")
-    openPrintWindow(title, dateRange, branchInfo, printRef.current.innerHTML, false)
+    openPrintWindow(title, getDateRangeLabel(), branchInfo, printRef.current.innerHTML, false)
   }, [fetched, rows]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
@@ -132,6 +165,44 @@ function DepositsReportContent() {
                 )}
                 {activeTab === "maturity" && !fromDate && !toDate && (
                   <p className="text-xs text-muted-foreground self-end pb-2">Defaults to next 90 days</p>
+                )}
+                {activeTab === "maturity" && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Scheme</Label>
+                    <Select value={schemeId} onValueChange={setSchemeId}>
+                      <SelectTrigger className="w-52">
+                        <SelectValue placeholder="All Schemes" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Schemes</SelectItem>
+                        {schemes.map(s => (
+                          <SelectItem key={s.scheme_id} value={String(s.scheme_id)}>{s.scheme_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {activeTab === "outstanding" && (
+                  <>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Report Date</Label>
+                      <Input type="date" value={reportDate} onChange={e => setReportDate(e.target.value)} className="w-40" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Scheme</Label>
+                      <Select value={schemeId} onValueChange={setSchemeId}>
+                        <SelectTrigger className="w-52">
+                          <SelectValue placeholder="All Schemes" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Schemes</SelectItem>
+                          {schemes.map(s => (
+                            <SelectItem key={s.scheme_id} value={String(s.scheme_id)}>{s.scheme_name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
                 )}
                 <Button onClick={() => fetchReport()} disabled={loading} className="gap-2">
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
@@ -172,7 +243,7 @@ function DepositsReportContent() {
               <CardContent>
                 <div ref={printRef}>
                   <h1>{TABS.find(t => t.value === activeTab)?.label}</h1>
-                  <h2>{fromDate ? `From: ${fmtDate(fromDate)}` : ""}{toDate ? ` To: ${fmtDate(toDate)}` : ""}</h2>
+                  <h2>{getDateRangeLabel() || (activeTab === "maturity" && !fromDate && !toDate ? "Next 90 Days" : "")}</h2>
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>

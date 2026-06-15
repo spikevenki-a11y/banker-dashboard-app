@@ -15,11 +15,23 @@ export async function GET(req: NextRequest) {
     const fromDate = url.searchParams.get("from_date") || ""
     const toDate = url.searchParams.get("to_date") || ""
     const accountNumber = url.searchParams.get("account_number") || ""
+    const reportDate = url.searchParams.get("report_date") || ""
+    const schemeId = url.searchParams.get("scheme_id") || ""
 
     let rows: any[]
     let summary: any = null
 
     if (type === "outstanding") {
+      const params: any[] = [branchId]
+      let outWhere = " AND sa.account_status = 'ACTIVE'"
+      if (reportDate) {
+        params.push(reportDate)
+        outWhere += ` AND sa.opening_date::date <= $${params.length}`
+      }
+      if (schemeId && schemeId !== "all") {
+        params.push(schemeId)
+        outWhere += ` AND sa.scheme_id = $${params.length}`
+      }
       const result = await pool.query(
         `SELECT sa.account_number, sa.available_balance, sa.account_status,
                 TO_CHAR(sa.opening_date, 'YYYY-MM-DD') AS opening_date,
@@ -29,9 +41,9 @@ export async function GET(req: NextRequest) {
          JOIN savings_schemes ss ON ss.scheme_id = sa.scheme_id AND ss.branch_id = sa.branch_id
          JOIN memberships m ON m.membership_no::text = sa.membership_no::text AND m.branch_id = sa.branch_id
          JOIN customers c ON c.customer_code = m.customer_code
-         WHERE sa.branch_id = $1 AND sa.account_status = 'ACTIVE'
+         WHERE sa.branch_id = $1${outWhere}
          ORDER BY sa.available_balance DESC`,
-        [branchId]
+        params
       )
       rows = result.rows
       const totalBalance = rows.reduce((s, r) => s + Number(r.available_balance || 0), 0)
