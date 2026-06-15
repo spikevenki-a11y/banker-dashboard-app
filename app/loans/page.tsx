@@ -29,7 +29,7 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Plus, Search, Eye, CreditCard, AlertCircle, CheckCircle, Clock, Trash2, X, Loader2, Ban, Wallet } from "lucide-react"
+import { Plus, Search, Eye, CreditCard, AlertCircle, CheckCircle, Clock, Trash2, X, Loader2, Ban, Wallet, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Progress } from "@/components/ui/progress"
 import { DashboardWrapper } from "../_components/dashboard-wrapper"
@@ -118,9 +118,14 @@ export default function LoansPage() {
   
   // Main list state
   const [searchQuery, setSearchQuery] = useState("")
+  const [appliedSearch, setAppliedSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [loans, setLoans] = useState<LoanApplication[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50)
+  const [total, setTotal] = useState(0)
+  const [loanStats, setLoanStats] = useState<any>(null)
   const [schemes, setSchemes] = useState<LoanScheme[]>([])
   
   // Dialog states
@@ -188,20 +193,23 @@ export default function LoansPage() {
       setIsLoading(true)
       const params = new URLSearchParams()
       if (statusFilter !== "all") params.append("status", statusFilter)
-      
-      console.log("Fetching loans with params:", params.toString())
+      if (appliedSearch) params.append("search", appliedSearch)
+      params.append("limit", String(pageSize))
+      params.append("offset", String((page - 1) * pageSize))
+
       const res = await fetch(`/api/loans/applications?${params}`)
       const data = await res.json()
-      console.log("Fetched loans data:", data)
 
       if (data.error) throw new Error(data.error)
       setLoans(data.applications || [])
+      setTotal(data.total || 0)
+      if (data.stats) setLoanStats(data.stats)
     } catch (error: any) {
       console.error("Failed to fetch loans:", error)
     } finally {
       setIsLoading(false)
     }
-  }, [statusFilter])
+  }, [statusFilter, appliedSearch, page, pageSize])
 
   // Fetch schemes
   const fetchSchemes = useCallback(async () => {
@@ -218,6 +226,17 @@ export default function LoansPage() {
     fetchLoans()
     fetchSchemes()
   }, [fetchLoans, fetchSchemes])
+
+  // Search/filter handlers
+  const handleSearch = () => {
+    setAppliedSearch(searchQuery)
+    setPage(1)
+  }
+
+  const handleStatusChange = (v: string) => {
+    setStatusFilter(v)
+    setPage(1)
+  }
 
   // Search members
   const searchMembers = async () => {
@@ -527,22 +546,7 @@ export default function LoansPage() {
     setIsCollectionOpen(true)
   }
 
-  // Filter loans
-  const filteredLoans = loans.filter((loan) => {
-    const matchesSearch =
-      loan.reference_no?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      loan.member_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      loan.membership_no?.toString().includes(searchQuery)
-    const matchesStatus = statusFilter === "all" || loan.application_status?.toUpperCase() === statusFilter.toUpperCase()
-    return matchesSearch && matchesStatus
-  })
-
-  // Stats
-  const totalLoans = loans.reduce((sum, loan) => sum + (parseFloat(loan.applied_loan_amount?.toString()) || 0), 0)
-  const pendingLoans = loans.filter((loan) => loan.application_status === "PENDING")
-  const sanctionedLoans = loans.filter((loan) => loan.application_status === "SANCTIONED")
-  const activeLoans = loans.filter((loan) => loan.application_status === "ACTIVE")
-  const overdueLoans = loans.filter((loan) => loan.application_status === "OVERDUE")
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   const getStatusBadge = (status: string) => {
     const statusColors: Record<string, string> = {
@@ -587,8 +591,8 @@ export default function LoansPage() {
                   </div>
                   <div className="mt-4">
                     <h3 className="text-sm font-medium text-muted-foreground">Total Loans</h3>
-                    <p className="mt-1 text-2xl font-bold text-foreground">{formatCurrency(totalLoans)}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">{loans.length} Applications</p>
+                    <p className="mt-1 text-2xl font-bold text-foreground">{formatCurrency(loanStats?.total_amount || 0)}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{loanStats?.total_count || 0} Applications</p>
                   </div>
                 </CardContent>
               </Card>
@@ -602,10 +606,8 @@ export default function LoansPage() {
                   </div>
                   <div className="mt-4">
                     <h3 className="text-sm font-medium text-muted-foreground">Pending Applications</h3>
-                    <p className="mt-1 text-2xl font-bold text-foreground">{pendingLoans.length}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {formatCurrency(pendingLoans.reduce((s, l) => s + (parseFloat(l.applied_loan_amount?.toString()) || 0), 0))}
-                    </p>
+                    <p className="mt-1 text-2xl font-bold text-foreground">{loanStats?.pending_count || 0}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{formatCurrency(loanStats?.pending_amount || 0)}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -619,10 +621,8 @@ export default function LoansPage() {
                   </div>
                   <div className="mt-4">
                     <h3 className="text-sm font-medium text-muted-foreground">Sanctioned</h3>
-                    <p className="mt-1 text-2xl font-bold text-foreground">{sanctionedLoans.length}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {formatCurrency(sanctionedLoans.reduce((s, l) => s + (parseFloat(l.sanctioned_amount?.toString()) || 0), 0))}
-                    </p>
+                    <p className="mt-1 text-2xl font-bold text-foreground">{loanStats?.sanctioned_count || 0}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{formatCurrency(loanStats?.sanctioned_amount || 0)}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -636,7 +636,7 @@ export default function LoansPage() {
                   </div>
                   <div className="mt-4">
                     <h3 className="text-sm font-medium text-muted-foreground">Active / Overdue</h3>
-                    <p className="mt-1 text-2xl font-bold text-foreground">{activeLoans.length} / {overdueLoans.length}</p>
+                    <p className="mt-1 text-2xl font-bold text-foreground">{loanStats?.active_count || 0} / {loanStats?.overdue_count || 0}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -649,14 +649,19 @@ export default function LoansPage() {
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
-                      placeholder="Search by reference no, member name, or ID..."
+                      placeholder="Search by loan ID, member name, or membership no... (Enter to search)"
                       className="pl-10"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                     />
                   </div>
                   <div className="flex gap-2">
-                    <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); }}>
+                    <Button variant="outline" onClick={handleSearch} className="gap-2">
+                      <Search className="h-4 w-4" />
+                      Search
+                    </Button>
+                    <Select value={statusFilter} onValueChange={handleStatusChange}>
                       <SelectTrigger className="w-[180px]">
                         <SelectValue placeholder="Filter by status" />
                       </SelectTrigger>
@@ -681,12 +686,13 @@ export default function LoansPage() {
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   </div>
-                ) : filteredLoans.length === 0 ? (
+                ) : loans.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
                     <CreditCard className="h-12 w-12 mb-2" />
                     <p>No loan applications found</p>
                   </div>
                 ) : (
+                  <>
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -702,7 +708,7 @@ export default function LoansPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredLoans.map((loan) => (
+                      {loans.map((loan) => (
                         <TableRow key={loan.id}>
                           <TableCell className="font-mono font-medium">{loan.loan_application_id}</TableCell>
                           <TableCell>
@@ -781,6 +787,43 @@ export default function LoansPage() {
                       ))}
                     </TableBody>
                   </Table>
+                  <div className="flex items-center justify-between border-t pt-4 mt-2">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>Rows per page:</span>
+                      <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1) }}>
+                        <SelectTrigger className="h-8 w-20">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="25">25</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                          <SelectItem value="100">100</SelectItem>
+                          <SelectItem value="200">200</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span className="ml-2">
+                        {total === 0
+                          ? "No records"
+                          : `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} of ${total}`}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPage(1)} disabled={page === 1}>
+                        <ChevronsLeft className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPage((p) => p - 1)} disabled={page === 1}>
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <span className="px-3 text-sm">Page {page} of {totalPages}</span>
+                      <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPage((p) => p + 1)} disabled={page >= totalPages}>
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPage(totalPages)} disabled={page >= totalPages}>
+                        <ChevronsRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  </>
                 )}
               </CardContent>
             </Card>

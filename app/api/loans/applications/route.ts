@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     const includeSecurity = searchParams.get("include_security") === "true"
     const limit = parseInt(searchParams.get("limit") || "50")
     const offset = parseInt(searchParams.get("offset") || "0")
+    const search = searchParams.get("search") || ""
 
     // If fetching single application with security details
     if (applicationId && includeSecurity) {
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
         c.full_name as member_name,
         c.mobile_no
       FROM loan_applications la
-      LEFT JOIN loan_sanction_details ls ON la.loan_application_id = ls.loan_application_id
+      LEFT JOIN loan_sanction_details ls ON la.loan_application_id = ls.loan_application_id and la.branch_id = ls.branch_id
       LEFT JOIN loan_schemes lscheme ON la.scheme_id = lscheme.scheme_id
       LEFT JOIN memberships m ON la.membership_no = CAST(m.membership_no AS VARCHAR)
       LEFT JOIN customers c ON m.customer_code = c.customer_code
@@ -75,28 +76,60 @@ export async function GET(request: NextRequest) {
       query += ` AND la.membership_no = $${params.length}`
     }
 
+    if (search) {
+      params.push(`%${search}%`)
+      const sIdx = params.length
+      query += ` AND (c.full_name ILIKE $${sIdx} OR la.membership_no::text ILIKE $${sIdx} OR la.loan_application_id::text ILIKE $${sIdx})`
+    }
+
     query += ` ORDER BY la.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`
     params.push(limit, offset)
 
     const { rows: applications } = await pool.query(query, params)
 
-    // Get total count
-    let countQuery = `SELECT COUNT(*) as total FROM loan_applications WHERE branch_id = $1`
+    let countQuery = `
+      SELECT COUNT(*) as total
+      FROM loan_applications la
+      LEFT JOIN memberships m ON la.membership_no = CAST(m.membership_no AS VARCHAR)
+      LEFT JOIN customers c ON m.customer_code = c.customer_code
+      WHERE la.branch_id = $1
+    `
     const countParams: any[] = [branchId]
-    
     if (status && status !== "all") {
       countParams.push(status.toUpperCase())
-      countQuery += ` AND application_status = $${countParams.length}`
+      countQuery += ` AND la.application_status = $${countParams.length}`
+    }
+    if (membershipNo) {
+      countParams.push(membershipNo)
+      countQuery += ` AND la.membership_no = $${countParams.length}`
+    }
+    if (search) {
+      countParams.push(`%${search}%`)
+      const sIdx = countParams.length
+      countQuery += ` AND (c.full_name ILIKE $${sIdx} OR la.membership_no::text ILIKE $${sIdx} OR la.loan_application_id::text ILIKE $${sIdx})`
     }
 
-    const { rows: countResult } = await pool.query(countQuery, countParams)
-
-    console.log(`Fetched ${applications.length} loan applications (Total: ${countResult[0]?.total || 0})`)
-    console.log("Sample application data:", applications)
+    const [{ rows: countResult }, { rows: statsRows }] = await Promise.all([
+      pool.query(countQuery, countParams),
+      pool.query(
+        `SELECT
+          COUNT(*) as total_count,
+          COUNT(*) FILTER (WHERE application_status = 'PENDING') as pending_count,
+          COUNT(*) FILTER (WHERE application_status = 'SANCTIONED') as sanctioned_count,
+          COUNT(*) FILTER (WHERE application_status = 'ACTIVE') as active_count,
+          COUNT(*) FILTER (WHERE application_status = 'OVERDUE') as overdue_count,
+          COALESCE(SUM(applied_loan_amount), 0) as total_amount,
+          COALESCE(SUM(applied_loan_amount) FILTER (WHERE application_status = 'PENDING'), 0) as pending_amount,
+          COALESCE(SUM(applied_loan_amount) FILTER (WHERE application_status = 'SANCTIONED'), 0) as sanctioned_amount
+         FROM loan_applications WHERE branch_id = $1`,
+        [branchId]
+      ),
+    ])
 
     return NextResponse.json({
       applications,
       total: parseInt(countResult[0]?.total || "0"),
+      stats: statsRows[0] || null,
     })
   } catch (error: any) {
     console.error("Failed to fetch loan applications:", error)

@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -101,8 +101,10 @@ function formatDate(d: string) {
   return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
 }
 
-export default function LoanCollectionPage() {
+function LoanCollectionContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const applicationId = searchParams.get("applicationId")
 
   // Account lookup
   const [loanAccountNo, setLoanAccountNo] = useState("")
@@ -118,6 +120,8 @@ export default function LoanCollectionPage() {
 
   // Collection form
   const [amount, setAmount] = useState("")
+  const [principalAmount, setPrincipalAmount] = useState("")
+  const [interestAmount, setInterestAmount] = useState("")
   const [paymentMode, setPaymentMode] = useState<"CASH" | "TRANSFER">("CASH")
   const [narration, setNarration] = useState("")
   const [selectedInstallments, setSelectedInstallments] = useState<number[]>([])
@@ -127,6 +131,63 @@ export default function LoanCollectionPage() {
   const [successOpen, setSuccessOpen] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
   const [formError, setFormError] = useState("")
+
+  const applyAccountData = (acc: any, fallbackAccNo: string) => {
+    const resolvedAccNo = acc.loan_account_no || fallbackAccNo
+    setLoanAccountNo(resolvedAccNo)
+    setAccountInfo({
+      loan_account_no: resolvedAccNo,
+      reference_no: acc.reference_no,
+      membership_no: acc.membership_no,
+      member_name: acc.member_name,
+      mobile_no: acc.mobile_no,
+      scheme_name: acc.scheme_name,
+      sanctioned_amount: parseFloat(acc.sanctioned_amount) || 0,
+      interest_rate: parseFloat(acc.interest_rate) || 0,
+      emi_amount: parseFloat(acc.emi_amount) || 0,
+      outstanding_balance: parseFloat(acc.outstanding_balance) || 0,
+      paid_installments: parseInt(acc.paid_installments) || 0,
+      total_installments: parseInt(acc.total_installments) || 0,
+      overdue_installments: parseInt(acc.overdue_installments) || 0,
+      application_status: acc.application_status,
+    })
+    setAmount(acc.emi_amount?.toString() || "")
+    return resolvedAccNo
+  }
+
+  // Auto-load when navigated from loans list with applicationId
+  useEffect(() => {
+    if (!applicationId) return
+    ;(async () => {
+      setIsSearching(true)
+      setSearchError("")
+      setAccountInfo(null)
+      setEmiSchedule([])
+      setTransactions([])
+      try {
+        const accRes = await fetch(
+          `/api/loans/accounts?applicationId=${encodeURIComponent(applicationId)}`,
+          { credentials: "include" }
+        )
+        const accData = await accRes.json()
+        if (accData.error) throw new Error(accData.error)
+        if (accData.accounts?.length > 0) {
+          const resolvedAccNo = applyAccountData(accData.accounts[0], "")
+          if (resolvedAccNo) {
+            await fetchLoanDetails(resolvedAccNo)
+          } else {
+            setSearchError("Loan account number not available. The loan may not have been fully disbursed.")
+          }
+        } else {
+          setSearchError("Loan account not found. The loan may not have been disbursed yet.")
+        }
+      } catch (e: any) {
+        setSearchError(e.message || "Failed to load loan account")
+      } finally {
+        setIsSearching(false)
+      }
+    })()
+  }, [applicationId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Search loan account
   const searchLoanAccount = async () => {
@@ -142,36 +203,17 @@ export default function LoanCollectionPage() {
     setTransactions([])
 
     try {
-      // Get loan account details
-      const accRes = await fetch(`/api/loans/accounts?loanAccountNo=${encodeURIComponent(loanAccountNo.trim())}`)
+      const accRes = await fetch(
+        `/api/loans/accounts?loanAccountNo=${encodeURIComponent(loanAccountNo.trim())}`,
+        { credentials: "include" }
+      )
       const accData = await accRes.json()
 
       if (accData.error) throw new Error(accData.error)
 
       if (accData.accounts && accData.accounts.length > 0) {
-        const acc = accData.accounts[0]
-        setAccountInfo({
-          loan_account_no: acc.loan_account_no || loanAccountNo,
-          reference_no: acc.reference_no,
-          membership_no: acc.membership_no,
-          member_name: acc.member_name,
-          mobile_no: acc.mobile_no,
-          scheme_name: acc.scheme_name,
-          sanctioned_amount: parseFloat(acc.sanctioned_amount) || 0,
-          interest_rate: parseFloat(acc.interest_rate) || 0,
-          emi_amount: parseFloat(acc.emi_amount) || 0,
-          outstanding_balance: parseFloat(acc.outstanding_balance) || 0,
-          paid_installments: parseInt(acc.paid_installments) || 0,
-          total_installments: parseInt(acc.total_installments) || 0,
-          overdue_installments: parseInt(acc.overdue_installments) || 0,
-          application_status: acc.application_status
-        })
-
-        // Set default collection amount as EMI
-        setAmount(acc.emi_amount?.toString() || "")
-
-        // Fetch EMI schedule and transactions
-        await fetchLoanDetails(acc.loan_account_no || loanAccountNo)
+        const resolvedAccNo = applyAccountData(accData.accounts[0], loanAccountNo.trim())
+        await fetchLoanDetails(resolvedAccNo)
       } else {
         setSearchError("Loan account not found")
       }
@@ -213,6 +255,11 @@ export default function LoanCollectionPage() {
       return
     }
 
+    if (breakupError) {
+      setFormError(breakupError)
+      return
+    }
+
     setIsSubmitting(true)
     setFormError("")
 
@@ -240,8 +287,10 @@ export default function LoanCollectionPage() {
       )
       setSuccessOpen(true)
 
-      // Reset form and refresh data
+      // Reset form — clear breakup fields so the emiSchedule effect recalculates after refresh
       setAmount(accountInfo.emi_amount.toString())
+      setPrincipalAmount("")
+      setInterestAmount("")
       setNarration("")
       setSelectedInstallments([])
       await fetchLoanDetails(accountInfo.loan_account_no)
@@ -269,13 +318,99 @@ export default function LoanCollectionPage() {
     )
   }
 
-  // Calculate selected amount
-  const calculateSelectedAmount = () => {
-    if (selectedInstallments.length === 0) return 0
-    return emiSchedule
-      .filter(e => selectedInstallments.includes(e.installment_no))
-      .reduce((sum, e) => sum + parseFloat(e.total_installment?.toString() || '0'), 0)
+  // Mirror the API's interest-first allocation to estimate the breakup for a given total
+  const calculateBreakup = (totalAmt: number): { principal: number; interest: number } => {
+    const pending = emiSchedule
+      .filter(e => e.payment_status !== "PAID")
+      .sort((a, b) => a.installment_no - b.installment_no)
+    let remaining = totalAmt
+    let principal = 0
+    let interest = 0
+    for (const inst of pending) {
+      if (remaining <= 0) break
+      const instTotal   = parseFloat(inst.total_installment?.toString()  || "0")
+      const instPrincipal = parseFloat(inst.principal_amount?.toString() || "0")
+      const instInterest  = parseFloat(inst.interest_amount?.toString()  || "0")
+      if (remaining >= instTotal) {
+        principal += instPrincipal
+        interest  += instInterest
+        remaining -= instTotal
+      } else {
+        const interestPortion  = Math.min(remaining, instInterest)
+        const principalPortion = remaining - interestPortion
+        interest  += interestPortion
+        principal += principalPortion
+        remaining = 0
+      }
+    }
+    return { principal, interest }
   }
+
+  // When user types in the total amount field
+  const handleAmountChange = (val: string) => {
+    setAmount(val)
+    if (selectedInstallments.length > 0) return // breakup controlled by selection
+    const amt = parseFloat(val) || 0
+    if (amt > 0 && emiSchedule.length > 0) {
+      const { principal, interest } = calculateBreakup(amt)
+      setPrincipalAmount(principal.toFixed(2))
+      setInterestAmount(interest.toFixed(2))
+    } else {
+      setPrincipalAmount("")
+      setInterestAmount("")
+    }
+  }
+
+  // When user edits principal → recalculate total
+  const handlePrincipalChange = (val: string) => {
+    setPrincipalAmount(val)
+    const p = parseFloat(val) || 0
+    const i = parseFloat(interestAmount) || 0
+    setAmount((p + i).toFixed(2))
+  }
+
+  // When user edits interest → recalculate total
+  const handleInterestChange = (val: string) => {
+    setInterestAmount(val)
+    const p = parseFloat(principalAmount) || 0
+    const i = parseFloat(val) || 0
+    setAmount((p + i).toFixed(2))
+  }
+
+  // When installment selection changes, sync all three fields from the selection
+  useEffect(() => {
+    if (selectedInstallments.length === 0) return
+    const selected = emiSchedule.filter(e => selectedInstallments.includes(e.installment_no))
+    const p = selected.reduce((s, e) => s + parseFloat(e.principal_amount?.toString() || "0"), 0)
+    const i = selected.reduce((s, e) => s + parseFloat(e.interest_amount?.toString()  || "0"), 0)
+    setAmount((p + i).toFixed(2))
+    setPrincipalAmount(p.toFixed(2))
+    setInterestAmount(i.toFixed(2))
+  }, [selectedInstallments, emiSchedule])
+
+  // When the EMI schedule first loads, auto-calculate breakup for the default amount
+  useEffect(() => {
+    if (emiSchedule.length === 0 || !amount || principalAmount || interestAmount) return
+    const amt = parseFloat(amount) || 0
+    if (amt > 0) {
+      const { principal, interest } = calculateBreakup(amt)
+      setPrincipalAmount(principal.toFixed(2))
+      setInterestAmount(interest.toFixed(2))
+    }
+  }, [emiSchedule]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Derived breakup validation (no extra state needed)
+  const pNum = parseFloat(principalAmount) || 0
+  const iNum = parseFloat(interestAmount) || 0
+  const aNum = parseFloat(amount) || 0
+  const breakupError =
+    principalAmount !== "" && interestAmount !== ""
+      ? pNum < 0 || iNum < 0
+        ? "Principal and Interest cannot be negative"
+        : Math.abs(aNum - (pNum + iNum)) > 0.01
+        ? `Total mismatch: ₹${(pNum + iNum).toFixed(2)} ≠ Collection Amount ₹${aNum.toFixed(2)}`
+        : ""
+      : ""
 
   return (
     <DashboardWrapper>
@@ -420,15 +555,12 @@ export default function LoanCollectionPage() {
                         <Label>Collection Amount *</Label>
                         <Input
                           type="number"
+                          min="0"
+                          step="0.01"
                           placeholder="Enter amount"
                           value={amount}
-                          onChange={(e) => setAmount(e.target.value)}
+                          onChange={(e) => handleAmountChange(e.target.value)}
                         />
-                        {selectedInstallments.length > 0 && (
-                          <p className="text-xs text-muted-foreground">
-                            Selected EMIs total: {formatCurrency(calculateSelectedAmount())}
-                          </p>
-                        )}
                       </div>
                       <div className="space-y-2">
                         <Label>Payment Mode *</Label>
@@ -443,6 +575,48 @@ export default function LoanCollectionPage() {
                         </Select>
                       </div>
                     </div>
+
+                    {/* Principal / Interest breakup */}
+                    {(principalAmount !== "" || interestAmount !== "") && (
+                      <div className="rounded-lg border bg-muted/40 p-3 space-y-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Amount Breakup
+                        </p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label htmlFor="principal-amt" className="text-xs">Principal</Label>
+                            <Input
+                              id="principal-amt"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={principalAmount}
+                              onChange={(e) => handlePrincipalChange(e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="interest-amt" className="text-xs">Interest</Label>
+                            <Input
+                              id="interest-amt"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={interestAmount}
+                              onChange={(e) => handleInterestChange(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                        {breakupError ? (
+                          <p className="text-xs text-destructive">{breakupError}</p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            Principal + Interest = {formatCurrency(pNum + iNum)}
+                          </p>
+                        )}
+                      </div>
+                    )}
 
                     <div className="space-y-2">
                       <Label>Narration</Label>
@@ -461,9 +635,13 @@ export default function LoanCollectionPage() {
                       <Button
                         variant="outline"
                         onClick={() => {
-                          setAmount(accountInfo.emi_amount.toString())
+                          const defaultAmt = accountInfo.emi_amount
+                          setAmount(defaultAmt.toString())
                           setNarration("")
                           setSelectedInstallments([])
+                          const { principal, interest } = calculateBreakup(defaultAmt)
+                          setPrincipalAmount(principal.toFixed(2))
+                          setInterestAmount(interest.toFixed(2))
                         }}
                       >
                         Reset
@@ -598,6 +776,14 @@ export default function LoanCollectionPage() {
                   </CardContent>
                 </Card>
               </>
+            ) : isSearching ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-16">
+                  <Loader2 className="h-12 w-12 animate-spin text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold text-muted-foreground">Loading loan account...</h3>
+                  <p className="text-sm text-muted-foreground">Fetching loan details, please wait</p>
+                </CardContent>
+              </Card>
             ) : (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-16">
@@ -629,5 +815,19 @@ export default function LoanCollectionPage() {
         </AlertDialog>
       </div>
     </DashboardWrapper>
+  )
+}
+
+export default function LoanCollectionPage() {
+  return (
+    <Suspense fallback={
+      <DashboardWrapper>
+        <div className="flex min-h-screen items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </DashboardWrapper>
+    }>
+      <LoanCollectionContent />
+    </Suspense>
   )
 }
