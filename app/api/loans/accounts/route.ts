@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
         c.full_name as member_name,
         c.mobile_no,
         ltd.loan_account_no,
-        (SELECT COALESCE(SUM(credit_amount), 0) FROM loan_transaction_details WHERE loan_account_no = ltd.loan_account_no AND transaction_type = 'REPAYMENT') as total_paid,
+        (SELECT COALESCE(SUM(credit_principal_amount + credit_interest_amount), 0) FROM loan_transaction_details WHERE loan_account_no = ltd.loan_account_no AND transaction_type = 'REPAYMENT') as total_paid,
         (SELECT balance_after_transaction FROM loan_transaction_details WHERE loan_account_no = ltd.loan_account_no ORDER BY created_at DESC LIMIT 1) as outstanding_balance,
         (SELECT COUNT(*) FROM loan_repayment_schedule_details WHERE loan_account_no = ltd.loan_account_no AND payment_status = 'PAID') as paid_installments,
         (SELECT COUNT(*) FROM loan_repayment_schedule_details WHERE loan_account_no = ltd.loan_account_no) as total_installments,

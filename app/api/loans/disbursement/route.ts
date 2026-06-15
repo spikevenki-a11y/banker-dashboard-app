@@ -188,13 +188,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Insert loan transaction
+    // Insert loan transaction (disbursement has no credit — only debit)
     await client.query(`
       INSERT INTO loan_transaction_details (
         transaction_date, branch_id, voucher_no, loan_account_no,
-        transaction_type, debit_amount, credit_amount,
+        transaction_type, debit_amount, credit_principal_amount, credit_interest_amount,
         balance_after_transaction, reference_no, remarks, created_at
-      ) VALUES ($1, $2, $3, $4, 'DISBURSEMENT', $5, 0, $5, $6, $7, NOW())
+      ) VALUES ($1, $2, $3, $4, 'DISBURSEMENT', $5, 0, 0, $5, $6, $7, NOW())
     `, [
       businessDate, branchId, voucherNo, loanAccountNo,
       disbursement_amount, app.reference_no, narration || 'Loan Disbursement'

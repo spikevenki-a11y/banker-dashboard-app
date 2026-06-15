@@ -80,6 +80,8 @@ export async function POST(request: NextRequest) {
       payment_mode, // 'CASH' or 'TRANSFER'
       installment_numbers, // Array of installment numbers to pay
       narration,
+      principal_amount, // Optional: explicit principal breakup from UI
+      interest_amount,  // Optional: explicit interest breakup from UI
     } = body
 
     if (!loan_account_no || !payment_amount || !payment_mode) {
@@ -87,6 +89,17 @@ export async function POST(request: NextRequest) {
         { error: "Loan account, amount, and payment mode are required" },
         { status: 400 }
       )
+    }
+
+    // Validate explicit breakup if provided
+    if (principal_amount !== undefined && interest_amount !== undefined) {
+      const sum = parseFloat(principal_amount) + parseFloat(interest_amount)
+      if (Math.abs(sum - parseFloat(payment_amount)) > 0.01) {
+        return NextResponse.json(
+          { error: "Principal + Interest must equal total payment amount" },
+          { status: 400 }
+        )
+      }
     }
 
     const dayendErr = await checkDayEndRestriction(branchId, businessDate)
@@ -217,6 +230,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Use UI-provided breakup if supplied and valid, otherwise use schedule-derived totals
+    const finalPrincipalPaid =
+      principal_amount !== undefined ? parseFloat(principal_amount) : totalPrincipalPaid
+    const finalInterestPaid =
+      interest_amount !== undefined ? parseFloat(interest_amount) : totalInterestPaid
+
     // GL Entries
     // Debit Cash/Bank (Asset increases)
     const cashGlAccount = payment_mode === 'CASH' ? '23100000' : '11100000'
@@ -237,7 +256,7 @@ export async function POST(request: NextRequest) {
     ])
 
     // Credit Loan GL (principal - Asset decreases)
-    if (totalPrincipalPaid > 0) {
+    if (finalPrincipalPaid > 0) {
       await client.query(`
         INSERT INTO gl_batch_lines (
           branch_id, batch_id, business_date,
@@ -248,7 +267,7 @@ export async function POST(request: NextRequest) {
       `, [
         branchId, batchId, businessDate,
         loanGL, loan_account_no,
-        totalPrincipalPaid,
+        finalPrincipalPaid,
         voucherNo,
         "Principal Repayment",
         session.userId
@@ -256,7 +275,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Credit Interest Income GL
-    if (totalInterestPaid > 0) {
+    if (finalInterestPaid > 0) {
       await client.query(`
         INSERT INTO gl_batch_lines (
           branch_id, batch_id, business_date,
@@ -267,43 +286,43 @@ export async function POST(request: NextRequest) {
       `, [
         branchId, batchId, businessDate,
         interestGL, loan_account_no,
-        totalInterestPaid,
+        finalInterestPaid,
         voucherNo,
         "Interest Receipt",
         session.userId
       ])
     }
 
-    // Get current balance
+    // Get current balance (tracks remaining principal only)
     const { rows: balanceRows } = await client.query(
-      `SELECT COALESCE(balance_after_transaction, 0) as balance 
-       FROM loan_transaction_details 
-       WHERE loan_account_no = $1 
+      `SELECT COALESCE(balance_after_transaction, 0) as balance
+       FROM loan_transaction_details
+       WHERE loan_account_no = $1
        ORDER BY created_at DESC LIMIT 1`,
       [loan_account_no]
     )
     const currentBalance = parseFloat(balanceRows[0]?.balance || '0')
-    const newBalance = currentBalance - totalPrincipalPaid
+    const newBalance = currentBalance - finalPrincipalPaid
 
-    // Insert loan transaction
+    // Insert loan transaction with split principal and interest
     await client.query(`
       INSERT INTO loan_transaction_details (
         transaction_date, branch_id, voucher_no, loan_account_no,
-        transaction_type, debit_amount, credit_amount,
+        transaction_type, debit_amount, credit_principal_amount, credit_interest_amount,
         balance_after_transaction, remarks, created_at
-      ) VALUES ($1, $2, $3, $4, 'REPAYMENT', 0, $5, $6, $7, NOW())
+      ) VALUES ($1, $2, $3, $4, 'REPAYMENT', 0, $5, $6, $7, $8, NOW())
     `, [
       businessDate, branchId, voucherNo, loan_account_no,
-      payment_amount, newBalance, narration || `Repayment - EMI ${paidInstallments.join(',')}`
+      finalPrincipalPaid, finalInterestPaid,
+      newBalance, narration || `Repayment - EMI ${paidInstallments.join(',')}`
     ])
 
-    // update loan application outstanding balance
-    
-      await client.query(`
-      UPDATE loan_applications 
-      SET loan_outstanding = loan_outstanding - $1, updated_at = NOW() 
+    // Update loan outstanding balance (principal only — interest is income, not principal reduction)
+    await client.query(`
+      UPDATE loan_applications
+      SET loan_outstanding = loan_outstanding - $1, updated_at = NOW()
       WHERE loan_application_id = $2
-    `, [payment_amount, loanApplicationId])
+    `, [finalPrincipalPaid, loanApplicationId])
 
     // Check if loan is fully paid
     const { rows: pendingCheck } = await client.query(
@@ -331,8 +350,8 @@ export async function POST(request: NextRequest) {
       message: "Repayment recorded successfully",
       voucher_no: voucherNo,
       batch_id: batchId,
-      principal_paid: totalPrincipalPaid,
-      interest_paid: totalInterestPaid,
+      principal_paid: finalPrincipalPaid,
+      interest_paid: finalInterestPaid,
       installments_paid: paidInstallments,
       outstanding_balance: newBalance,
       loan_status: parseInt(pendingCheck[0].pending) === 0 ? 'CLOSED' : 'ACTIVE'

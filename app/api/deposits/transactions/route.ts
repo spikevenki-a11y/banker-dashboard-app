@@ -71,14 +71,14 @@ export async function GET(request: NextRequest) {
         gb.status AS batch_status
       FROM deposit_transactions dt
       LEFT JOIN gl_batches gb ON gb.branch_id = dt.branch_id AND gb.batch_id = dt.gl_batch_id
-      WHERE dt.account_number = $1 AND dt.branch_id = $2
+      WHERE dt.account_id = (select id from deposit_account where accountnumber = $1) AND dt.branch_id = $2
       ORDER BY dt.transaction_date DESC, dt.created_at DESC
       LIMIT $3 OFFSET $4`,
       [String(accountNumber), branchId, limit, offset]
     )
 
     const { rows: countResult } = await pool.query(
-      `SELECT COUNT(*) as total FROM deposit_transactions WHERE account_number = $1 AND branch_id = $2`,
+      `SELECT COUNT(*) as total FROM deposit_transactions WHERE account_id = (select id from deposit_account where accountnumber = $1)  AND branch_id = $2`,
       [String(accountNumber), branchId]
     )
 
