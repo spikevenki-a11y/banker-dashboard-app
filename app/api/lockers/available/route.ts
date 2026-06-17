@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     }
 
     const { rows } = await pool.query(
-      `SELECT l.id, l.locker_no, l.location, l.status,
+      `SELECT l.id, l.locker_no, l.status,
               lt.locker_type_id AS type_id, lt.type_name, lt.dimensions, lt.annual_rent
        FROM lockers l
        JOIN locker_types lt ON lt.locker_type_id = l.locker_type_id

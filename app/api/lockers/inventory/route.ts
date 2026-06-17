@@ -15,7 +15,6 @@ export async function GET() {
          l.id,
          l.locker_no,
          l.status,
-         l.location,
          lt.locker_type_id AS type_id,
          lt.type_name,
          lt.dimensions,
