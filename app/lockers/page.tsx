@@ -21,7 +21,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Plus, Search, Loader2, AlertCircle, Lock, LockOpen, KeyRound,
-  LayoutGrid, Banknote, UserCheck, Settings2, X,
+  LayoutGrid, Banknote, UserCheck, Settings2, X, Grid3X3,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 
@@ -65,6 +65,9 @@ type LockerType = {
   type_name: string
   dimensions: string | null
   annual_rent: number
+  no_of_lockers: number
+  no_of_rows: number
+  no_of_cabinets: number
 }
 
 type ListStats = {
@@ -134,6 +137,8 @@ export default function LockersPage() {
   const [newTypeName, setNewTypeName] = useState("")
   const [newTypeDimensions, setNewTypeDimensions] = useState("")
   const [newTypeRent, setNewTypeRent] = useState("")
+  const [newTypeRows, setNewTypeRows] = useState("")
+  const [newTypeCabinets, setNewTypeCabinets] = useState("")
   const [addTypeSubmitting, setAddTypeSubmitting] = useState(false)
   const [addTypeError, setAddTypeError] = useState("")
 
@@ -252,7 +257,13 @@ export default function LockersPage() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type_name: newTypeName, dimensions: newTypeDimensions, annual_rent: newTypeRent }),
+        body: JSON.stringify({
+          type_name: newTypeName,
+          dimensions: newTypeDimensions,
+          annual_rent: newTypeRent,
+          no_of_rows: newTypeRows,
+          no_of_cabinets: newTypeCabinets,
+        }),
       })
       const data = await res.json()
       if (data.success) {
@@ -260,7 +271,10 @@ export default function LockersPage() {
         setNewTypeName("")
         setNewTypeDimensions("")
         setNewTypeRent("")
+        setNewTypeRows("")
+        setNewTypeCabinets("")
         fetchLockerTypes()
+        fetchInventory()
       } else {
         setAddTypeError(data.error || "Failed to create type")
       }
@@ -320,10 +334,20 @@ export default function LockersPage() {
             <h1 className="text-3xl font-bold tracking-tight text-foreground">Lockers</h1>
             <p className="text-muted-foreground">Manage locker allocation, deposits, and inventory</p>
           </div>
-          <Button onClick={() => router.push("/lockers/create-deposit")} className="gap-2 bg-amber-600 hover:bg-amber-700 text-white">
-            <Plus className="h-4 w-4" />
-            Create Deposit
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => router.push("/lockers/allocation")}
+              className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50"
+            >
+              <Grid3X3 className="h-4 w-4" />
+              Visual Allocation
+            </Button>
+            <Button onClick={() => router.push("/lockers/create-deposit")} className="gap-2 bg-amber-600 hover:bg-amber-700 text-white">
+              <Plus className="h-4 w-4" />
+              Create Deposit
+            </Button>
+          </div>
         </div>
 
         {/* Stats cards */}
@@ -701,14 +725,22 @@ export default function LockersPage() {
         </Dialog>
 
         {/* ── Manage Types Dialog ───────────────────────────────── */}
-        <Dialog open={addTypeOpen} onOpenChange={setAddTypeOpen}>
+        <Dialog open={addTypeOpen} onOpenChange={(open) => {
+          setAddTypeOpen(open)
+          if (!open) {
+            setNewTypeName(""); setNewTypeDimensions(""); setNewTypeRent("")
+            setNewTypeRows(""); setNewTypeCabinets(""); setAddTypeError("")
+          }
+        }}>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Settings2 className="h-5 w-5 text-amber-600" />
-                Add Locker Type
+                Create Locker Type
               </DialogTitle>
-              <DialogDescription>Define a new locker size/category with its annual rent.</DialogDescription>
+              <DialogDescription>
+                Define a new locker size/category. Lockers are auto-generated from the row and cabinet configuration.
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-2">
               <div className="space-y-2">
@@ -734,18 +766,69 @@ export default function LockersPage() {
                 <Input
                   id="new-type-rent"
                   type="number"
+                  min="0"
                   placeholder="0"
                   value={newTypeRent}
                   onChange={(e) => setNewTypeRent(e.target.value)}
                 />
               </div>
+
+              {/* Locker generation config */}
+              <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 space-y-3">
+                <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">
+                  Auto-Generate Lockers
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="new-type-rows" className="text-xs">Number of Rows</Label>
+                    <Input
+                      id="new-type-rows"
+                      type="number"
+                      min="0"
+                      placeholder="e.g. 3"
+                      value={newTypeRows}
+                      onChange={(e) => setNewTypeRows(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="new-type-cabinets" className="text-xs">Cabinets per Row</Label>
+                    <Input
+                      id="new-type-cabinets"
+                      type="number"
+                      min="0"
+                      placeholder="e.g. 5"
+                      value={newTypeCabinets}
+                      onChange={(e) => setNewTypeCabinets(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                </div>
+                {(parseInt(newTypeRows) > 0 && parseInt(newTypeCabinets) > 0) ? (
+                  <div className="flex items-center gap-1.5 rounded-md bg-teal-50 border border-teal-200 px-3 py-2 text-xs text-teal-800">
+                    <Grid3X3 className="h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      {parseInt(newTypeRows)} rows × {parseInt(newTypeCabinets)} cabinets ={" "}
+                      <strong>{parseInt(newTypeRows) * parseInt(newTypeCabinets)} lockers</strong> will be auto-created
+                    </span>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Leave rows/cabinets blank to skip auto-generation and add lockers manually.
+                  </p>
+                )}
+              </div>
+
               {lockerTypes.length > 0 && (
                 <div className="rounded-lg border border-border bg-muted/50 p-3">
                   <p className="mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Existing Types</p>
                   {lockerTypes.map((t) => (
                     <div key={t.id} className="flex justify-between py-1 text-sm">
                       <span className="font-medium">{t.type_name}</span>
-                      <span className="text-muted-foreground">{fmt(t.annual_rent)}/yr</span>
+                      <span className="text-muted-foreground">
+                        {t.no_of_lockers > 0 ? `${t.no_of_lockers} lockers · ` : ""}
+                        {fmt(t.annual_rent)}/yr
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -760,7 +843,9 @@ export default function LockersPage() {
                 className="bg-amber-600 hover:bg-amber-700 text-white"
               >
                 {addTypeSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Add Type
+                {parseInt(newTypeRows) > 0 && parseInt(newTypeCabinets) > 0
+                  ? `Create & Generate ${parseInt(newTypeRows) * parseInt(newTypeCabinets)} Lockers`
+                  : "Create Type"}
               </Button>
             </DialogFooter>
           </DialogContent>

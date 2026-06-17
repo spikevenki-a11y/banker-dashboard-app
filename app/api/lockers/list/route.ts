@@ -43,7 +43,6 @@ export async function GET(req: NextRequest) {
          c.full_name AS member_name,
          l.id        AS locker_id,
          l.locker_no,
-         l.location  AS locker_location,
          lt.type_name AS locker_type,
          lt.annual_rent
        FROM locker_deposits ld
