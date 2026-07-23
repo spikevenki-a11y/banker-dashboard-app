@@ -11,8 +11,8 @@ CREATE TABLE config_locker (
         REFERENCES branchparameters(branch_id),
 
     -- Locker Type Reference
-    locker_type_master_id UUID NOT NULL
-        REFERENCES locker_type_master(id),
+    locker_type_id UUID NOT NULL
+        REFERENCES locker_types(id),
 
     -- Financial Rules
     annual_rent NUMERIC(12,2) NOT NULL,              -- yearly rent
@@ -45,7 +45,7 @@ CREATE TABLE config_locker (
 
     -- Constraints
     CONSTRAINT uq_locker_config_branch_type_active
-        UNIQUE (branch_id, locker_type_master_id, is_active),
+        UNIQUE (branch_id, locker_type_id, is_active),
 
     CONSTRAINT chk_locker_period
         CHECK (
@@ -95,4 +95,4 @@ CREATE INDEX idx_config_locker_active
     ON config_locker(is_active);
 
 CREATE INDEX idx_config_locker_type
-    ON config_locker(locker_type_master_id);
+    ON config_locker(locker_type_id);

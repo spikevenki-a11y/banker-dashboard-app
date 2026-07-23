@@ -11,6 +11,7 @@ export async function GET() {
     role: u.role,
     branch: u.branch,
     initials: u.fullName.split(" ").map((n: any[]) => n[0]).join("").toUpperCase(),
-    businessDate: u.businessDate
+    businessDate: u.businessDate,
+    branch_name: u.branch_name
   })
 }

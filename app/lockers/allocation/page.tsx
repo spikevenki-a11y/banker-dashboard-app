@@ -15,8 +15,11 @@ import { Skeleton } from "@/components/ui/skeleton"
 import {
   ArrowLeft, Search, Lock, LockOpen, Loader2, AlertCircle, CheckCircle2,
   RefreshCw, LayoutGrid, Layers, User, Calendar, Banknote,
-  KeyRound, Wrench, ChevronRight, X, Info, Filter,
+  KeyRound, Wrench, ChevronRight, X, Info, Filter, CreditCard,
+  AlertTriangle, ShieldAlert,
 } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -321,7 +324,7 @@ function StatCard({
 
 // ─── Detail Panel ─────────────────────────────────────────────────────────────
 
-function DetailPanel({ locker, onAssign }: { locker: LockerItem | null; onAssign: () => void }) {
+function DetailPanel({ locker, onAssign, onBreak }: { locker: LockerItem | null; onAssign: () => void; onBreak: () => void }) {
   if (!locker) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 py-16 text-center">
@@ -439,6 +442,17 @@ function DetailPanel({ locker, onAssign }: { locker: LockerItem | null; onAssign
         </div>
       )}
 
+      {locker.status === "ALLOCATED" && (
+        <Button
+          variant="outline"
+          className="w-full gap-2 border-red-300 text-red-700 hover:bg-red-50 hover:border-red-400"
+          onClick={onBreak}
+        >
+          <AlertTriangle className="h-4 w-4" />
+          Break / Force Open
+        </Button>
+      )}
+
       {locker.status === "RESERVED" && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
           <p className="text-xs font-semibold text-amber-700 mb-1">This locker is reserved</p>
@@ -552,6 +566,336 @@ function MemberSearchDialog({
   )
 }
 
+// ─── Locker Deposit Transaction Window ───────────────────────────────────────
+
+type DepositWindowResult = {
+  account_number: string
+  deposit_id: string
+  expiry_date: string
+  voucher_no: number
+  batch_id: number
+}
+
+function LockerDepositWindow({
+  open,
+  locker,
+  member,
+  assignedDate,
+  periodYears,
+  onClose,
+  onAllDone,
+}: {
+  open: boolean
+  locker: LockerItem | null
+  member: MemberResult | null
+  assignedDate: string
+  periodYears: string
+  onClose: () => void
+  onAllDone: () => void
+}) {
+  const [depositAmount, setDepositAmount]   = useState("")
+  const [interestRate, setInterestRate]     = useState("")
+  const [nomineeName, setNomineeName]       = useState("")
+  const [nomineeRelation, setNomineeRelation] = useState("")
+  const [voucherType, setVoucherType]       = useState<"CASH" | "TRANSFER" | "">("")
+  const [selectedBatch, setSelectedBatch]   = useState<number>(0)
+  const [narration, setNarration]           = useState("")
+  const [batchPopupOpen, setBatchPopupOpen] = useState(false)
+  const [incompleteBatches, setIncompleteBatches] = useState<any[]>([])
+  const [submitting, setSubmitting]         = useState(false)
+  const [submitError, setSubmitError]       = useState("")
+  const [result, setResult]                 = useState<DepositWindowResult | null>(null)
+
+  useEffect(() => {
+    if (open) {
+      setDepositAmount(""); setInterestRate(""); setNomineeName(""); setNomineeRelation("")
+      setVoucherType(""); setSelectedBatch(0); setNarration("")
+      setSubmitError(""); setResult(null)
+    }
+  }, [open])
+
+  const fetchBatches = async () => {
+    try {
+      const res = await fetch("/api/fas/incomplete-batches", { credentials: "include" })
+      const data = await res.json()
+      if (res.ok && data.data) setIncompleteBatches(data.data)
+    } catch {}
+  }
+
+  const handleSubmit = async () => {
+    if (!locker || !member || !depositAmount || !voucherType) return
+    setSubmitting(true)
+    setSubmitError("")
+    try {
+      const res = await fetch("/api/lockers/create-deposit", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          membership_no: member.membership_no,
+          deposit_amount: Number(depositAmount),
+          interest_rate: Number(interestRate) || 0,
+          opening_date: assignedDate,
+          period_years: Number(periodYears) || 1,
+          nominee_name: nomineeName || null,
+          nominee_relation: nomineeRelation || null,
+          locker_id: locker.id,
+          voucher_type: voucherType,
+          selected_batch: selectedBatch,
+          narration: narration || `Locker Deposit - ${locker.locker_no}`,
+          already_allocated: true,
+        }),
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        setResult({
+          account_number: data.account_number,
+          deposit_id: data.deposit_id,
+          expiry_date: data.expiry_date,
+          voucher_no: data.voucher_no,
+          batch_id: data.batch_id,
+        })
+      } else {
+        setSubmitError(data.error || "Failed to create deposit account.")
+      }
+    } catch {
+      setSubmitError("Network error. Please try again.")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (!locker || !member) return null
+
+  const annualInterest = (() => {
+    const amt = Number(depositAmount) || 0
+    const rate = Number(interestRate) || 0
+    return amt > 0 && rate > 0 ? (amt * rate) / 100 : null
+  })()
+
+  return (
+    <>
+      {/* GL Batch Selection Dialog */}
+      <Dialog open={batchPopupOpen} onOpenChange={setBatchPopupOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Select Incomplete GL Batch</DialogTitle>
+            <DialogDescription>Select an existing batch or create a new one</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[400px] overflow-y-auto">
+            {incompleteBatches.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                No incomplete batches found. A new batch will be created.
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Batch ID</TableHead>
+                    <TableHead>Total Debit</TableHead>
+                    <TableHead>Total Credit</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {incompleteBatches.map((b) => (
+                    <TableRow key={b.batch_id}>
+                      <TableCell className="font-mono">{b.batch_id}</TableCell>
+                      <TableCell>{fmt(b.total_debit)}</TableCell>
+                      <TableCell>{fmt(b.total_credit)}</TableCell>
+                      <TableCell className="text-right">
+                        <Button size="sm" variant="outline"
+                          onClick={() => { setSelectedBatch(b.batch_id); setBatchPopupOpen(false) }}>
+                          Select
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setSelectedBatch(0); setBatchPopupOpen(false) }}>
+              New Batch
+            </Button>
+            <Button variant="outline" onClick={() => setBatchPopupOpen(false)}>Cancel</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Deposit Transaction Window */}
+      <Dialog open={open} onOpenChange={(v) => { if (!v && !result) onClose() }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-amber-600" />
+              Locker Deposit Transaction Window
+            </DialogTitle>
+            {!result && (
+              <DialogDescription>
+                Create a deposit account for Locker <span className="font-mono font-semibold">{locker.locker_no}</span> — {member.full_name}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+
+          {!result ? (
+            <div className="space-y-4">
+              {/* Summary info */}
+              <div className="rounded-lg border bg-muted/40 divide-y text-sm">
+                {[
+                  ["Member", member.full_name],
+                  ["Membership No", member.membership_no],
+                  ["Locker", locker.locker_no],
+                  ["Annual Rent", fmt(locker.annual_rent)],
+                  ["Opening Date", fmtDate(assignedDate)],
+                  ["Period", `${periodYears} Year${Number(periodYears) > 1 ? "s" : ""}`],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex justify-between px-3 py-2">
+                    <span className="text-muted-foreground">{label}</span>
+                    <span className={`font-medium font-${label === "Membership No" || label === "Locker" ? "mono text-xs" : "sans"}`}>{value}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Deposit & Interest */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Deposit Amount (₹) *</Label>
+                  <Input type="number" min="0" placeholder="Enter amount"
+                    value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Interest Rate (% p.a.)</Label>
+                  <Input type="number" step="0.01" placeholder="e.g. 6.00"
+                    value={interestRate} onChange={(e) => setInterestRate(e.target.value)} />
+                </div>
+              </div>
+
+              {annualInterest !== null && (
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  Annual interest: <span className="font-semibold">{fmt(annualInterest)}</span>
+                  {" "}(acts as locker rent)
+                </div>
+              )}
+
+              {/* Nominee */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Nominee Name</Label>
+                  <Input placeholder="Optional" value={nomineeName}
+                    onChange={(e) => setNomineeName(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Relationship</Label>
+                  <Select value={nomineeRelation} onValueChange={setNomineeRelation}>
+                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectContent>
+                      {["Father","Mother","Spouse","Son","Daughter","Brother","Sister","Other"].map((r) => (
+                        <SelectItem key={r} value={r}>{r}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Voucher type */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Voucher Type *</Label>
+                  <Select value={voucherType} onValueChange={(v) => {
+                    setVoucherType(v as "CASH" | "TRANSFER")
+                    if (v !== "TRANSFER") setSelectedBatch(0)
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CASH">Cash</SelectItem>
+                      <SelectItem value="TRANSFER">Transfer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {voucherType === "TRANSFER" && (
+                  <div className="space-y-1.5">
+                    <Label>GL Batch ID</Label>
+                    <div className="flex gap-2">
+                      <Input readOnly value={selectedBatch && selectedBatch !== 0 ? String(selectedBatch) : "New Batch"} />
+                      <Button variant="outline" onClick={() => { fetchBatches(); setBatchPopupOpen(true) }}>
+                        Select
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Narration */}
+              <div className="space-y-1.5">
+                <Label>Narration</Label>
+                <Input placeholder={`Locker Deposit - ${locker.locker_no}`}
+                  value={narration} onChange={(e) => setNarration(e.target.value)} />
+              </div>
+
+              {submitError && (
+                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3">
+                  <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+                  <p className="text-xs text-red-700">{submitError}</p>
+                </div>
+              )}
+
+              <DialogFooter>
+                <Button variant="outline" onClick={onClose} disabled={submitting}>Skip</Button>
+                <Button
+                  onClick={handleSubmit}
+                  disabled={submitting || !depositAmount || !voucherType}
+                  className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white"
+                >
+                  {submitting ? (
+                    <><Loader2 className="h-4 w-4 animate-spin" /> Creating…</>
+                  ) : (
+                    <><CheckCircle2 className="h-4 w-4" /> Create Deposit Account</>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            /* ── Success state ── */
+            <div className="space-y-4 py-2 text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100">
+                <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-lg font-bold">Deposit Account Created!</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Locker deposit account opened and linked to{" "}
+                  <span className="font-mono font-semibold">{locker.locker_no}</span>.
+                </p>
+              </div>
+              <div className="rounded-xl border bg-muted/40 divide-y text-sm text-left">
+                {[
+                  ["Account Number", result.account_number],
+                  ["Locker", locker.locker_no],
+                  ["Member", member.full_name],
+                  ["Voucher No", String(result.voucher_no)],
+                  ["Expiry Date", fmtDate(result.expiry_date)],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex justify-between px-4 py-2.5">
+                    <span className="text-muted-foreground">{label}</span>
+                    <span className="font-medium font-mono text-xs">{value}</span>
+                  </div>
+                ))}
+              </div>
+              <DialogFooter className="justify-center">
+                <Button onClick={onAllDone} className="bg-amber-600 hover:bg-amber-700 text-white">
+                  Done
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
 // ─── Assignment Wizard ────────────────────────────────────────────────────────
 
 type WizardStep = 1 | 2 | 3 | 4 | 5
@@ -579,6 +923,7 @@ function AssignmentWizard({
   const [submitError, setSubmitError]   = useState("")
   const [result, setResult]             = useState<{ expiry_date: string; locker_no: string } | null>(null)
   const [availabilityWarning, setAvailabilityWarning] = useState("")
+  const [depositWindowOpen, setDepositWindowOpen] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -656,6 +1001,7 @@ function AssignmentWizard({
         }),
       })
       const data = await res.json()
+      console.log("Allocation response:", data)
       if (data.success) {
         setResult({ expiry_date: data.expiry_date, locker_no: data.locker_no })
         setStep(5)
@@ -678,6 +1024,16 @@ function AssignmentWizard({
         open={memberPickerOpen}
         onClose={() => setMemberPickerOpen(false)}
         onSelect={(m) => { setMember(m); setMemberSearch(m.membership_no); setMemberError("") }}
+      />
+
+      <LockerDepositWindow
+        open={depositWindowOpen}
+        locker={locker}
+        member={member}
+        assignedDate={assignedDate}
+        periodYears={periodYears}
+        onClose={() => setDepositWindowOpen(false)}
+        onAllDone={() => { setDepositWindowOpen(false); onSuccess(); onClose() }}
       />
 
       <Dialog open={open} onOpenChange={(v) => { if (!v && step < 5) onClose() }}>
@@ -902,7 +1258,7 @@ function AssignmentWizard({
             </div>
           )}
 
-          {/* Step 5 — Success */}
+          {/* Step 5 — Success + prompt to create deposit account */}
           {step === 5 && result && (
             <div className="space-y-4 py-2 text-center">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100">
@@ -923,6 +1279,431 @@ function AssignmentWizard({
                   <span className="text-muted-foreground">Expires On</span>
                   <span className="font-medium text-orange-600">{fmtDate(result.expiry_date)}</span>
                 </div>
+              </div>
+
+              {/* Deposit account creation prompt */}
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-left">
+                <p className="text-sm font-semibold text-amber-800 flex items-center gap-1.5">
+                  <CreditCard className="h-4 w-4" />
+                  Create Locker Deposit Account
+                </p>
+                <p className="text-xs text-amber-700 mt-1 leading-relaxed">
+                  Open a deposit account linked to this locker. Interest earned acts as the annual rent collection.
+                </p>
+              </div>
+
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => { onSuccess(); onClose() }}>
+                  Skip
+                </Button>
+                <Button
+                  onClick={() => setDepositWindowOpen(true)}
+                  className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white"
+                >
+                  <CreditCard className="h-4 w-4" />
+                  Create Deposit Account
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
+// ─── Break Locker Wizard ─────────────────────────────────────────────────────
+
+const BREAK_REASONS = [
+  "Lost Master Key",
+  "Key Damaged / Broken",
+  "Emergency Access Required",
+  "Court Order / Legal Requirement",
+  "Customer Request",
+  "Other",
+]
+
+type BreakStep = 1 | 2 | 3 | 4
+type BreakResult = { break_event_id: string; locker_no: string; voucher_no: number | null; batch_id: number | null }
+
+function BreakLockerWizard({
+  open, locker, onClose, onSuccess,
+}: {
+  open: boolean
+  locker: LockerItem | null
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const [step, setStep]               = useState<BreakStep>(1)
+  const [reason, setReason]           = useState("")
+  const [customReason, setCustomReason] = useState("")
+  const [breakingCharge, setBreakingCharge] = useState("")
+  const [voucherType, setVoucherType] = useState<"CASH" | "TRANSFER" | "">("")
+  const [selectedBatch, setSelectedBatch] = useState<number>(0)
+  const [remarks, setRemarks]         = useState("")
+  const [batchPopupOpen, setBatchPopupOpen] = useState(false)
+  const [incompleteBatches, setIncompleteBatches] = useState<any[]>([])
+  const [submitting, setSubmitting]   = useState(false)
+  const [submitError, setSubmitError] = useState("")
+  const [result, setResult]           = useState<BreakResult | null>(null)
+
+  useEffect(() => {
+    if (open) {
+      setStep(1); setReason(""); setCustomReason(""); setBreakingCharge("")
+      setVoucherType(""); setSelectedBatch(0); setRemarks("")
+      setSubmitError(""); setResult(null)
+    }
+  }, [open])
+
+  const charge = Number(breakingCharge) || 0
+  const effectiveReason = reason === "Other" ? customReason.trim() : reason
+
+  const fetchBatches = async () => {
+    try {
+      const res = await fetch("/api/fas/incomplete-batches", { credentials: "include" })
+      const data = await res.json()
+      if (res.ok && data.data) setIncompleteBatches(data.data)
+    } catch {}
+  }
+
+  const handleBreak = async () => {
+    if (!locker || !effectiveReason) return
+    setSubmitting(true)
+    setSubmitError("")
+    try {
+      const res = await fetch("/api/lockers/break-locker", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          locker_id: locker.id,
+          reason: effectiveReason,
+          breaking_charge: charge,
+          voucher_type: charge > 0 ? voucherType : null,
+          selected_batch: selectedBatch,
+          remarks: remarks || null,
+        }),
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        setResult({ break_event_id: data.break_event_id, locker_no: data.locker_no, voucher_no: data.voucher_no, batch_id: data.batch_id })
+        setStep(4)
+      } else {
+        setSubmitError(data.error || "Break locker failed.")
+      }
+    } catch {
+      setSubmitError("Network error. Please try again.")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (!locker) return null
+
+  return (
+    <>
+      {/* GL Batch Selection Dialog */}
+      <Dialog open={batchPopupOpen} onOpenChange={setBatchPopupOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Select Incomplete GL Batch</DialogTitle>
+            <DialogDescription>Select an existing batch or create a new one</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[400px] overflow-y-auto">
+            {incompleteBatches.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                No incomplete batches. A new batch will be created.
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Batch ID</TableHead>
+                    <TableHead>Total Debit</TableHead>
+                    <TableHead>Total Credit</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {incompleteBatches.map((b) => (
+                    <TableRow key={b.batch_id}>
+                      <TableCell className="font-mono">{b.batch_id}</TableCell>
+                      <TableCell>{fmt(b.total_debit)}</TableCell>
+                      <TableCell>{fmt(b.total_credit)}</TableCell>
+                      <TableCell className="text-right">
+                        <Button size="sm" variant="outline"
+                          onClick={() => { setSelectedBatch(b.batch_id); setBatchPopupOpen(false) }}>
+                          Select
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setSelectedBatch(0); setBatchPopupOpen(false) }}>New Batch</Button>
+            <Button variant="outline" onClick={() => setBatchPopupOpen(false)}>Cancel</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={open} onOpenChange={(v) => { if (!v && step < 4) onClose() }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-700">
+              <ShieldAlert className="h-5 w-5" />
+              Break / Force Open Locker
+            </DialogTitle>
+            {step < 4 && (
+              <DialogDescription>
+                Step {step} of 3 —{" "}
+                {step === 1 ? "Confirm Action" : step === 2 ? "Break Details" : "Review & Confirm"}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+
+          {step < 4 && (
+            <div className="flex gap-1">
+              {([1, 2, 3] as const).map((s) => (
+                <div key={s} className={`h-1 flex-1 rounded-full transition-colors ${step >= s ? "bg-red-500" : "bg-muted"}`} />
+              ))}
+            </div>
+          )}
+
+          {/* ── Step 1: Warning ── */}
+          {step === 1 && (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-3">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-semibold text-red-800">This action is irreversible</p>
+                    <p className="text-xs text-red-700 mt-1 leading-relaxed">
+                      Breaking this locker will permanently close the assignment and deposit account.
+                      The locker will be placed under maintenance and unavailable for reallocation until maintenance is completed.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border bg-muted/40 divide-y text-sm">
+                <div className="flex justify-between px-4 py-2.5">
+                  <span className="text-muted-foreground">Locker</span>
+                  <span className="font-bold font-mono">{locker.locker_no}</span>
+                </div>
+                <div className="flex justify-between px-4 py-2.5">
+                  <span className="text-muted-foreground">Type</span>
+                  <span className="font-medium">{locker.type_name}</span>
+                </div>
+                <div className="flex justify-between px-4 py-2.5">
+                  <span className="text-muted-foreground">Member</span>
+                  <span className="font-medium">{locker.member_name || "—"}</span>
+                </div>
+                <div className="flex justify-between px-4 py-2.5">
+                  <span className="text-muted-foreground">Membership No</span>
+                  <span className="font-mono text-xs">{locker.membership_no || "—"}</span>
+                </div>
+                <div className="flex justify-between px-4 py-2.5">
+                  <span className="text-muted-foreground">Assigned On</span>
+                  <span>{fmtDate(locker.assigned_date)}</span>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-800 space-y-1">
+                <p className="font-semibold">What will happen:</p>
+                <ul className="list-disc pl-4 space-y-0.5">
+                  <li>Locker status → MAINTENANCE (unavailable)</li>
+                  <li>Current assignment will be closed</li>
+                  <li>Associated deposit account will be closed</li>
+                  <li>Breaking charge (if any) posted to GL</li>
+                  <li>Audit record created with user, date &amp; reason</li>
+                </ul>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={onClose}>Cancel</Button>
+                <Button onClick={() => setStep(2)} className="gap-1.5 bg-red-600 hover:bg-red-700 text-white">
+                  <ChevronRight className="h-4 w-4" /> Proceed
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+
+          {/* ── Step 2: Break Details ── */}
+          {step === 2 && (
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label>Reason for Breaking *</Label>
+                <Select value={reason} onValueChange={setReason}>
+                  <SelectTrigger><SelectValue placeholder="Select reason…" /></SelectTrigger>
+                  <SelectContent>
+                    {BREAK_REASONS.map((r) => (
+                      <SelectItem key={r} value={r}>{r}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {reason === "Other" && (
+                <div className="space-y-1.5">
+                  <Label>Specify Reason *</Label>
+                  <Input
+                    placeholder="Describe the reason…"
+                    value={customReason}
+                    onChange={(e) => setCustomReason(e.target.value)}
+                  />
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <Label>Breaking Charge (₹)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  placeholder="0 — leave blank to waive"
+                  value={breakingCharge}
+                  onChange={(e) => setBreakingCharge(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">Leave as 0 to waive the breaking charge.</p>
+              </div>
+
+              {charge > 0 && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>Voucher Type *</Label>
+                    <Select value={voucherType} onValueChange={(v) => {
+                      setVoucherType(v as "CASH" | "TRANSFER")
+                      if (v !== "TRANSFER") setSelectedBatch(0)
+                    }}>
+                      <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="CASH">Cash</SelectItem>
+                        <SelectItem value="TRANSFER">Transfer</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {voucherType === "TRANSFER" && (
+                    <div className="space-y-1.5">
+                      <Label>GL Batch</Label>
+                      <div className="flex gap-2">
+                        <Input readOnly value={selectedBatch && selectedBatch !== 0 ? String(selectedBatch) : "New Batch"} />
+                        <Button variant="outline" onClick={() => { fetchBatches(); setBatchPopupOpen(true) }}>
+                          Select
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <Label>Remarks</Label>
+                <Textarea
+                  placeholder="Additional notes or observations…"
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
+                  rows={2}
+                />
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
+                <Button
+                  disabled={!reason || (reason === "Other" && !customReason.trim()) || (charge > 0 && !voucherType)}
+                  onClick={() => setStep(3)}
+                  className="gap-1.5 bg-red-600 hover:bg-red-700 text-white"
+                >
+                  Review <ChevronRight className="h-4 w-4" />
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+
+          {/* ── Step 3: Review ── */}
+          {step === 3 && (
+            <div className="space-y-4">
+              <div className="rounded-xl border bg-muted/40 divide-y text-sm">
+                {[
+                  ["Locker", locker.locker_no],
+                  ["Member", locker.member_name || "—"],
+                  ["Membership No", locker.membership_no || "—"],
+                  ["Reason", effectiveReason],
+                  ["Breaking Charge", charge > 0 ? fmt(charge) : "Waived"],
+                  ...(charge > 0 ? [["Voucher Type", voucherType]] : []),
+                  ...(remarks ? [["Remarks", remarks]] : []),
+                ].map(([label, value]) => (
+                  <div key={label} className="flex items-start justify-between px-4 py-2.5 gap-3">
+                    <span className="text-muted-foreground shrink-0">{label}</span>
+                    <span className="font-medium text-right break-words max-w-[200px]">{value}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-red-800 space-y-1">
+                <p className="font-semibold flex items-center gap-1">
+                  <AlertTriangle className="h-3.5 w-3.5" /> After confirmation:
+                </p>
+                <ul className="list-disc pl-4 space-y-0.5">
+                  <li>Locker <strong>{locker.locker_no}</strong> → MAINTENANCE</li>
+                  <li>Assignment closed for <strong>{locker.member_name}</strong></li>
+                  <li>Deposit account closed</li>
+                  {charge > 0 && <li>Breaking charge {fmt(charge)} posted via {voucherType}</li>}
+                  <li>Audit trail entry created</li>
+                </ul>
+              </div>
+
+              {submitError && (
+                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3">
+                  <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+                  <p className="text-xs text-red-700">{submitError}</p>
+                </div>
+              )}
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setStep(2)} disabled={submitting}>Back</Button>
+                <Button
+                  onClick={handleBreak}
+                  disabled={submitting}
+                  className="gap-1.5 bg-red-600 hover:bg-red-700 text-white"
+                >
+                  {submitting ? (
+                    <><Loader2 className="h-4 w-4 animate-spin" /> Breaking…</>
+                  ) : (
+                    <><ShieldAlert className="h-4 w-4" /> Confirm Break Locker</>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+
+          {/* ── Step 4: Result ── */}
+          {step === 4 && result && (
+            <div className="space-y-4 py-2 text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-orange-100">
+                <CheckCircle2 className="h-8 w-8 text-orange-600" />
+              </div>
+              <div>
+                <p className="text-lg font-bold">Locker Break Recorded</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Locker <span className="font-mono font-bold">{result.locker_no}</span> has been set to maintenance.
+                  The assignment and deposit account have been closed.
+                </p>
+              </div>
+              <div className="rounded-xl border bg-muted/40 divide-y text-sm text-left">
+                {[
+                  ["Break Event ID", result.break_event_id.slice(0, 8) + "…"],
+                  ["Locker", result.locker_no],
+                  ...(result.voucher_no ? [["Voucher No", String(result.voucher_no)]] : []),
+                  ...(result.batch_id   ? [["Batch ID",   String(result.batch_id)]]   : []),
+                  ["New Status", "MAINTENANCE"],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex justify-between px-4 py-2.5">
+                    <span className="text-muted-foreground">{label}</span>
+                    <span className="font-medium font-mono text-xs">{value}</span>
+                  </div>
+                ))}
               </div>
               <DialogFooter className="justify-center">
                 <Button onClick={() => { onSuccess(); onClose() }} className="bg-amber-600 hover:bg-amber-700 text-white">
@@ -958,6 +1739,7 @@ export default function LockerAllocationPage() {
 
   const [selectedLocker, setSelectedLocker] = useState<LockerItem | null>(null)
   const [wizardOpen, setWizardOpen]         = useState(false)
+  const [breakWizardOpen, setBreakWizardOpen] = useState(false)
 
   const fetchGrid = useCallback(async (overrides?: Record<string, string>) => {
     setLoading(true)
@@ -1217,7 +1999,11 @@ export default function LockerAllocationPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <DetailPanel locker={selectedLocker} onAssign={() => setWizardOpen(true)} />
+                <DetailPanel
+                  locker={selectedLocker}
+                  onAssign={() => setWizardOpen(true)}
+                  onBreak={() => setBreakWizardOpen(true)}
+                />
               </CardContent>
             </Card>
           </div>
@@ -1229,6 +2015,16 @@ export default function LockerAllocationPage() {
         locker={selectedLocker}
         onClose={() => setWizardOpen(false)}
         onSuccess={handleWizardSuccess}
+      />
+
+      <BreakLockerWizard
+        open={breakWizardOpen}
+        locker={selectedLocker}
+        onClose={() => setBreakWizardOpen(false)}
+        onSuccess={() => {
+          setSelectedLocker(null)
+          fetchGrid()
+        }}
       />
     </DashboardWrapper>
   )

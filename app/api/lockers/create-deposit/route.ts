@@ -23,6 +23,7 @@ export async function POST(req: Request) {
       voucher_type,
       selected_batch,
       narration,
+      already_allocated,
     } = await req.json()
 
     if (!membership_no || !deposit_amount || !opening_date) {
@@ -54,8 +55,8 @@ export async function POST(req: Request) {
     openDate.setFullYear(openDate.getFullYear() + years)
     const expiryDate = openDate.toISOString().split("T")[0]
 
-    // If a locker was selected, verify it is available
-    if (locker_id) {
+    // If a locker was selected, verify it is available (skip when locker is pre-allocated via allocation wizard)
+    if (locker_id && !already_allocated) {
       const lockerCheck = await client.query(
         `SELECT id, status FROM lockers WHERE id = $1 AND branch_id = $2`,
         [locker_id, branchId]
@@ -89,8 +90,8 @@ export async function POST(req: Request) {
       ]
     )
 
-    // Mark locker as ALLOCATED
-    if (locker_id) {
+    // Mark locker as ALLOCATED (skip when already allocated via allocation wizard)
+    if (locker_id && !already_allocated) {
       await client.query(`UPDATE lockers SET status = 'ALLOCATED' WHERE id = $1`, [locker_id])
     }
 

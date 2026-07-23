@@ -18,10 +18,29 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Plus, Search, Loader2, AlertCircle, Lock, LockOpen, KeyRound,
   LayoutGrid, Banknote, UserCheck, Settings2, X, Grid3X3,
+  MoreHorizontal, Eye, RefreshCw, XCircle, CalendarDays, User,
+  CreditCard, Calendar,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 
@@ -150,6 +169,20 @@ export default function LockersPage() {
   const [assignSubmitting, setAssignSubmitting] = useState(false)
   const [assignError, setAssignError] = useState("")
   const [availableLoading, setAvailableLoading] = useState(false)
+
+  // View Details dialog
+  const [viewDeposit, setViewDeposit] = useState<LockerDeposit | null>(null)
+
+  // Renew dialog
+  const [renewDeposit, setRenewDeposit] = useState<LockerDeposit | null>(null)
+  const [renewYears, setRenewYears] = useState("1")
+  const [renewSubmitting, setRenewSubmitting] = useState(false)
+  const [renewError, setRenewError] = useState("")
+
+  // Close Account dialog
+  const [closeDeposit, setCloseDeposit] = useState<LockerDeposit | null>(null)
+  const [closeSubmitting, setCloseSubmitting] = useState(false)
+  const [closeError, setCloseError] = useState("")
 
   const fetchDeposits = useCallback(async () => {
     setListLoading(true)
@@ -325,6 +358,57 @@ export default function LockersPage() {
     }
   }
 
+  const handleRenew = async () => {
+    if (!renewDeposit) return
+    setRenewSubmitting(true)
+    setRenewError("")
+    try {
+      const res = await fetch("/api/lockers/renew-deposit", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deposit_id: renewDeposit.id, additional_years: Number(renewYears) }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setRenewDeposit(null)
+        fetchDeposits()
+      } else {
+        setRenewError(data.error || "Failed to renew account")
+      }
+    } catch {
+      setRenewError("Network error. Please try again.")
+    } finally {
+      setRenewSubmitting(false)
+    }
+  }
+
+  const handleCloseAccount = async () => {
+    if (!closeDeposit) return
+    setCloseSubmitting(true)
+    setCloseError("")
+    try {
+      const res = await fetch("/api/lockers/close-deposit", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deposit_id: closeDeposit.id }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setCloseDeposit(null)
+        fetchDeposits()
+        fetchInventory()
+      } else {
+        setCloseError(data.error || "Failed to close account")
+      }
+    } catch {
+      setCloseError("Network error. Please try again.")
+    } finally {
+      setCloseSubmitting(false)
+    }
+  }
+
   return (
     <DashboardWrapper>
       <div className="space-y-6">
@@ -472,7 +556,7 @@ export default function LockersPage() {
                         <TableHead>Opening</TableHead>
                         <TableHead>Expiry</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Action</TableHead>
+                        <TableHead className="w-12"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -510,17 +594,58 @@ export default function LockersPage() {
                             <StatusBadge status={dep.status} />
                           </TableCell>
                           <TableCell>
-                            {dep.status === "ACTIVE" && !dep.locker_id && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="gap-1.5 text-xs h-7 text-amber-700 border-amber-300 hover:bg-amber-50"
-                                onClick={() => openAssignDialog(dep)}
-                              >
-                                <Lock className="h-3 w-3" />
-                                Assign
-                              </Button>
-                            )}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 data-[state=open]:bg-muted">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                  <span className="sr-only">Actions</span>
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48">
+                                {/* View Details — always available */}
+                                <DropdownMenuItem onClick={() => setViewDeposit(dep)}>
+                                  <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
+                                  View Details
+                                </DropdownMenuItem>
+
+                                {dep.status === "ACTIVE" && (
+                                  <>
+                                    <DropdownMenuSeparator />
+
+                                    {/* Assign Locker — only if none linked */}
+                                    {!dep.locker_id && (
+                                      <DropdownMenuItem onClick={() => openAssignDialog(dep)}>
+                                        <Lock className="mr-2 h-4 w-4 text-amber-600" />
+                                        Assign Locker
+                                      </DropdownMenuItem>
+                                    )}
+
+                                    {/* Renew Account */}
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        setRenewDeposit(dep)
+                                        setRenewYears("1")
+                                        setRenewError("")
+                                      }}
+                                    >
+                                      <RefreshCw className="mr-2 h-4 w-4 text-blue-600" />
+                                      Renew Account
+                                    </DropdownMenuItem>
+
+                                    <DropdownMenuSeparator />
+
+                                    {/* Close Account — destructive */}
+                                    <DropdownMenuItem
+                                      className="text-destructive focus:text-destructive"
+                                      onClick={() => { setCloseDeposit(dep); setCloseError("") }}
+                                    >
+                                      <XCircle className="mr-2 h-4 w-4" />
+                                      Close Account
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -850,6 +975,282 @@ export default function LockersPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* ── View Details Dialog ──────────────────────────────── */}
+        <Dialog open={!!viewDeposit} onOpenChange={(v) => { if (!v) setViewDeposit(null) }}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Eye className="h-5 w-5 text-amber-600" />
+                Locker Deposit Account Details
+              </DialogTitle>
+              <DialogDescription>
+                Account <span className="font-mono font-semibold">{viewDeposit?.account_number}</span>
+              </DialogDescription>
+            </DialogHeader>
+
+            {viewDeposit && (
+              <div className="space-y-4">
+                {/* Member info */}
+                <div className="rounded-lg border bg-muted/40 overflow-hidden">
+                  <div className="flex items-center gap-2 px-4 py-2.5 border-b bg-muted/60">
+                    <User className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Member</span>
+                  </div>
+                  <div className="divide-y">
+                    {[
+                      ["Name", viewDeposit.member_name],
+                      ["Membership No", viewDeposit.membership_no],
+                    ].map(([label, value]) => (
+                      <div key={label} className="flex justify-between px-4 py-2.5 text-sm">
+                        <span className="text-muted-foreground">{label}</span>
+                        <span className="font-medium font-mono text-xs">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Deposit info */}
+                <div className="rounded-lg border bg-muted/40 overflow-hidden">
+                  <div className="flex items-center gap-2 px-4 py-2.5 border-b bg-muted/60">
+                    <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Deposit Account</span>
+                  </div>
+                  <div className="divide-y">
+                    {[
+                      ["Account Number", viewDeposit.account_number],
+                      ["Deposit Amount", fmt(viewDeposit.deposit_amount)],
+                      ["Interest Rate", `${viewDeposit.interest_rate}% p.a.`],
+                      ["Period", `${viewDeposit.period_years} Year${viewDeposit.period_years !== 1 ? "s" : ""}`],
+                      ["Opening Date", viewDeposit.opening_date || "—"],
+                      ["Expiry Date", viewDeposit.expiry_date || "—"],
+                      ["Status", viewDeposit.status],
+                    ].map(([label, value]) => (
+                      <div key={label} className="flex justify-between px-4 py-2.5 text-sm">
+                        <span className="text-muted-foreground">{label}</span>
+                        <span className={`font-medium ${label === "Status" ? (viewDeposit.status === "ACTIVE" ? "text-teal-700" : "text-rose-600") : ""}`}>
+                          {value}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Locker info */}
+                <div className="rounded-lg border bg-muted/40 overflow-hidden">
+                  <div className="flex items-center gap-2 px-4 py-2.5 border-b bg-muted/60">
+                    <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Locker</span>
+                  </div>
+                  {viewDeposit.locker_no ? (
+                    <div className="divide-y">
+                      {[
+                        ["Locker No", viewDeposit.locker_no],
+                        ["Type", viewDeposit.locker_type || "—"],
+                        ["Annual Rent", viewDeposit.annual_rent != null ? fmt(viewDeposit.annual_rent) : "—"],
+                        ["Location", viewDeposit.locker_location || "—"],
+                      ].map(([label, value]) => (
+                        <div key={label} className="flex justify-between px-4 py-2.5 text-sm">
+                          <span className="text-muted-foreground">{label}</span>
+                          <span className="font-medium">{value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1 py-5 text-center">
+                      <LockOpen className="h-6 w-6 text-muted-foreground/40" />
+                      <p className="text-sm text-muted-foreground">No locker assigned yet</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Nominee */}
+                {(viewDeposit.nominee_name || viewDeposit.nominee_relation) && (
+                  <div className="rounded-lg border bg-muted/40 overflow-hidden">
+                    <div className="flex items-center gap-2 px-4 py-2.5 border-b bg-muted/60">
+                      <User className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Nominee</span>
+                    </div>
+                    <div className="divide-y">
+                      {[
+                        ["Name", viewDeposit.nominee_name || "—"],
+                        ["Relation", viewDeposit.nominee_relation || "—"],
+                      ].map(([label, value]) => (
+                        <div key={label} className="flex justify-between px-4 py-2.5 text-sm">
+                          <span className="text-muted-foreground">{label}</span>
+                          <span className="font-medium">{value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <DialogFooter>
+              {viewDeposit?.status === "ACTIVE" && !viewDeposit.locker_id && (
+                <Button
+                  variant="outline"
+                  className="mr-auto gap-1.5 text-amber-700 border-amber-300 hover:bg-amber-50"
+                  onClick={() => { setViewDeposit(null); openAssignDialog(viewDeposit) }}
+                >
+                  <Lock className="h-4 w-4" /> Assign Locker
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => setViewDeposit(null)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* ── Renew Account Dialog ──────────────────────────────── */}
+        <Dialog
+          open={!!renewDeposit}
+          onOpenChange={(v) => { if (!v) { setRenewDeposit(null); setRenewError("") } }}
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <RefreshCw className="h-5 w-5 text-blue-600" />
+                Renew Account
+              </DialogTitle>
+              <DialogDescription>
+                Extend the expiry date of account{" "}
+                <span className="font-mono font-semibold">{renewDeposit?.account_number}</span>.
+              </DialogDescription>
+            </DialogHeader>
+
+            {renewDeposit && (
+              <div className="space-y-4 py-1">
+                <div className="rounded-lg border bg-muted/40 divide-y text-sm">
+                  {[
+                    ["Member", renewDeposit.member_name],
+                    ["Current Expiry", renewDeposit.expiry_date || "—"],
+                    ["Current Period", `${renewDeposit.period_years} Year${renewDeposit.period_years !== 1 ? "s" : ""}`],
+                  ].map(([label, value]) => (
+                    <div key={label} className="flex justify-between px-4 py-2.5">
+                      <span className="text-muted-foreground">{label}</span>
+                      <span className="font-medium">{value}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Extend Period By</Label>
+                  <Select value={renewYears} onValueChange={setRenewYears}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {["1", "2", "3", "5"].map((y) => (
+                        <SelectItem key={y} value={y}>{y} Year{Number(y) > 1 ? "s" : ""}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {renewDeposit.expiry_date && (
+                  <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+                    <CalendarDays className="h-4 w-4 text-blue-600 shrink-0" />
+                    <div className="text-sm">
+                      <span className="text-blue-700">New expiry: </span>
+                      <span className="font-semibold text-blue-900">
+                        {(() => {
+                          const base = new Date(renewDeposit.expiry_date) > new Date()
+                            ? new Date(renewDeposit.expiry_date)
+                            : new Date()
+                          base.setFullYear(base.getFullYear() + Number(renewYears))
+                          return base.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                        })()}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {renewError && (
+                  <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3">
+                    <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+                    <p className="text-xs text-red-700">{renewError}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setRenewDeposit(null); setRenewError("") }} disabled={renewSubmitting}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleRenew}
+                disabled={renewSubmitting}
+                className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {renewSubmitting ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Renewing…</>
+                ) : (
+                  <><RefreshCw className="h-4 w-4" /> Confirm Renewal</>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* ── Close Account Confirmation ────────────────────────── */}
+        <AlertDialog open={!!closeDeposit} onOpenChange={(v) => { if (!v) { setCloseDeposit(null); setCloseError("") } }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                <XCircle className="h-5 w-5" />
+                Close Locker Account
+              </AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-3 pt-1">
+                  <p>
+                    Are you sure you want to close account{" "}
+                    <span className="font-mono font-semibold">{closeDeposit?.account_number}</span>?
+                    This action cannot be undone.
+                  </p>
+                  {closeDeposit && (
+                    <div className="rounded-lg border bg-muted/40 divide-y text-sm">
+                      {[
+                        ["Member", closeDeposit.member_name],
+                        ["Deposit Amount", fmt(closeDeposit.deposit_amount)],
+                        closeDeposit.locker_no
+                          ? ["Locker", `${closeDeposit.locker_no} (will be released)`]
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .map(([label, value]) => (
+                          <div key={label} className="flex justify-between px-3 py-2">
+                            <span className="text-muted-foreground">{label}</span>
+                            <span className="font-medium">{value}</span>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                  {closeError && (
+                    <p className="text-sm text-destructive">{closeError}</p>
+                  )}
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setCloseError("")} disabled={closeSubmitting}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => { e.preventDefault(); handleCloseAccount() }}
+                disabled={closeSubmitting}
+                className="bg-destructive hover:bg-destructive/90 text-white gap-1.5"
+              >
+                {closeSubmitting ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Closing…</>
+                ) : (
+                  "Close Account"
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* ── Assign Locker Dialog ──────────────────────────────── */}
         <Dialog open={assignOpen} onOpenChange={setAssignOpen}>

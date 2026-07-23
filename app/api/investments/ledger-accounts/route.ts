@@ -8,6 +8,7 @@ export async function GET() {
     if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     const session = JSON.parse(c.value)
     const branchId = session.branch
+    console.log("Investment Ledger Accounts GET request for branch:", branchId)
 
     // Ledger accounts under Investments (parent 22000000)
     const result = await pool.query(
