@@ -60,7 +60,7 @@ CREATE INDEX idx_lockers_branch ON lockers(branch_id);
 CREATE INDEX idx_lockers_status ON lockers(status);
 
 -- Locker deposit accounts (security deposit; interest earned = annual locker rent)
-/*CREATE TABLE locker_deposits (
+CREATE TABLE locker_deposits (
     id               UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
     account_number   VARCHAR(20)   NOT NULL UNIQUE,
     branch_id        INTEGER       NOT NULL,
@@ -86,42 +86,37 @@ INSERT INTO deposit_schemes (
     branch_id,scheme_id,scheme_name,scheme_description,deposit_type,minimum_period_months,maximum_period_months,installment_frequency,minimum_installment_amount,maximum_installment_amount,penal_rate,interest_rate,interest_code,interest_frequency,interest_calculation_method,compounding_frequency,premature_closure_allowed,premature_penal_rate,tds_applicable,deposit_gl_account,interest_payable_gl_account,interest_expense_gl_account
 ) VALUES (
     23108001,24001,'Locker Deposit','Locker Deposit lockers','LOCKER',12,120,'YEARLY',500.00,100000.00,2.00,7.00,0,'ON_MATURITY','COMPOUND','QUARTERLY',true,1.00,true,'12203000','0',    '41203000'
-); */
-
-CREATE TABLE locker_assignments (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    branch_id      INTEGER     NOT NULL,
-
-    locker_id UUID NOT NULL
-        REFERENCES lockers(id),
-
-    membership_no numeric(12) NOT NULL,
-
-    assigned_date DATE NOT NULL,
-
-    expiry_date DATE NOT NULL,
-
-    annual_rent NUMERIC(12,2) NOT NULL,
-
-    deposit_amount NUMERIC(12,2) DEFAULT 0,
-
-    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE'
-        CHECK (
-            status IN (
-                'ACTIVE',
-                'EXPIRED',
-                'CLOSED',
-                'CANCELLED'
-            )
-        ),
-
-    created_by uuid,
-
-    created_at TIMESTAMP DEFAULT now(),
-
-    updated_at TIMESTAMP DEFAULT now()
-);
-
+); 
+create table public.locker_assignments (
+  id uuid not null default gen_random_uuid (),
+  locker_id uuid not null,
+  membership_no numeric not null,
+  assigned_date date not null,
+  expiry_date date not null,
+  annual_rent numeric(12, 2) not null,
+  deposit_amount numeric(12, 2) null default 0,
+  status character varying(20) not null default 'ACTIVE'::character varying,
+  created_by uuid null,
+  created_at timestamp without time zone null default now(),
+  updated_at timestamp without time zone null default now(),
+  branch_id integer null,
+  constraint locker_assignments_pkey primary key (id),
+  constraint locker_assignments_locker_id_fkey foreign KEY (locker_id) references lockers (id),
+  constraint locker_assignments_status_check check (
+    (
+      (status)::text = any (
+        (
+          array[
+            'ACTIVE'::character varying,
+            'EXPIRED'::character varying,
+            'CLOSED'::character varying,
+            'CANCELLED'::character varying
+          ]
+        )::text[]
+      )
+    )
+  )
+) TABLESPACE pg_default;
 
 CREATE TABLE locker_reservations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -175,34 +170,32 @@ CREATE TABLE locker_maintenance (
     created_at TIMESTAMP DEFAULT now()
 );
 
-CREATE TABLE locker_assignment_history (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-    branch_id      INTEGER     NOT NULL,
-
-    locker_id UUID NOT NULL,
-
-    membership_no numeric(12) NOT NULL,
-
-    assigned_date DATE,
-
-    released_date DATE,
-
-    annual_rent NUMERIC(12,2),
-
-    deposit_amount NUMERIC(12,2),
-
-    action VARCHAR(20)
-        CHECK (
-            action IN (
-                'ASSIGNED',
-                'RENEWED',
-                'TRANSFERRED',
-                'RELEASED'
-            )
-        ),
-
-    performed_by uuid,
-
-    created_at TIMESTAMP DEFAULT now()
-);
+create table public.locker_assignment_history (
+  id uuid not null default gen_random_uuid (),
+  locker_id uuid not null,
+  membership_no numeric not null,
+  assigned_date date null,
+  released_date date null,
+  annual_rent numeric(12, 2) null,
+  deposit_amount numeric(12, 2) null,
+  action character varying(20) null,
+  performed_by uuid null,
+  created_at timestamp without time zone null default now(),
+  branch_id numeric not null,
+  constraint locker_assignment_history_pkey primary key (id),
+  constraint locker_assignment_history_action_check check (
+    (
+      (action)::text = any (
+        (
+          array[
+            'ASSIGNED'::character varying,
+            'RENEWED'::character varying,
+            'TRANSFERRED'::character varying,
+            'RELEASED'::character varying
+          ]
+        )::text[]
+      )
+    )
+  )
+) TABLESPACE pg_default;

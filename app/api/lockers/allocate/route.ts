@@ -9,7 +9,8 @@ export async function POST(req: NextRequest) {
   const client = await pool.connect()
   try {
     const session = JSON.parse(c.value)
-    const userId = session.user_id || null
+    const userId = session.userId 
+    const branchid = session.branch 
 
     const { locker_id, membership_no, period_years = 1, deposit_amount = 0, assigned_date } = await req.json()
 
@@ -63,8 +64,8 @@ export async function POST(req: NextRequest) {
     // Create the assignment record
     const { rows: assignRows } = await client.query(
       `INSERT INTO locker_assignments
-         (locker_id, membership_no, assigned_date, expiry_date, annual_rent, deposit_amount, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+         (locker_id, membership_no, assigned_date, expiry_date, annual_rent, deposit_amount, created_by,branch_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING id`,
       [
         locker_id,
@@ -74,8 +75,11 @@ export async function POST(req: NextRequest) {
         locker.annual_rent,
         Number(deposit_amount),
         userId,
+        branchid,
       ]
     )
+
+    console.log(`Assignment created with ID ${assignRows[0].id}`)
 
     // Mark locker as allocated
     await client.query(
@@ -86,8 +90,8 @@ export async function POST(req: NextRequest) {
     // Write audit history
     await client.query(
       `INSERT INTO locker_assignment_history
-         (locker_id, membership_no, assigned_date, annual_rent, deposit_amount, action, performed_by)
-       VALUES ($1, $2, $3, $4, $5, 'ASSIGNED', $6)`,
+         (locker_id, membership_no, assigned_date, annual_rent, deposit_amount, action, performed_by,branch_id)
+       VALUES ($1, $2, $3, $4, $5, 'ASSIGNED', $6, $7)`,
       [
         locker_id,
         membership_no,
@@ -95,6 +99,7 @@ export async function POST(req: NextRequest) {
         locker.annual_rent,
         Number(deposit_amount),
         userId,
+        branchid,
       ]
     )
 
@@ -108,6 +113,7 @@ export async function POST(req: NextRequest) {
       annual_rent: locker.annual_rent,
     })
   } catch (error: any) {
+    console.error("Error during locker allocation:", error)
     await client.query("ROLLBACK")
     return NextResponse.json({ error: error.message }, { status: 500 })
   } finally {

@@ -17,6 +17,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Username and password required" }, { status: 400 })
 
       console.log("[v0] Login attempt for username:", username)
+
     const { data: user } = await supabase
       .from("users")
       .select("id, username, password, full_name, role, is_active, branch, two_factor_enabled, two_factor_secret")
@@ -147,7 +148,8 @@ export async function POST(request: Request) {
         branch: user.branch,
         branch_name: user.branch,
         businessDate: day!.business_date, 
-        // businessDate: new Date().toISOString().split("T")[0], // Placeholder for business date,
+        // businessDate: new Date().toISOString().split("T")[0], 
+        // Placeholder for business date,
       })
     if(s){
       return res

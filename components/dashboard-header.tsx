@@ -43,7 +43,7 @@ export function DashboardHeader() {
         </div>
         {identity && (
           <div className="ml-4 flex items-center gap-2 rounded-md bg-primary/10 px-3 py-1">
-            <span className="text-xs font-medium text-primary">{identity.branch}</span>
+            <span className="text-xs font-medium text-primary">{identity.branch_name}</span>
           </div>
         )}
 
