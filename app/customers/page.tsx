@@ -42,6 +42,7 @@ interface Customer {
   qualification: string
   qualification_details: string
   anual_income: string
+  dccb_account_number: string
   board_resolution_number: string
   board_resolution_date: string
   ledger_folio_number: string
@@ -74,7 +75,7 @@ const initialCustomer: Customer = {
   full_name: "", father_name: "", spouse_name: "",
   gender: "male", marital_status: "single", blood_group: "A+",
   dob: "", age: "", religion: "", caste_category: "",
-  occupation: "", qualification: "", qualification_details: "", anual_income: "",
+  occupation: "", qualification: "", qualification_details: "", anual_income: "", dccb_account_number: "",
   board_resolution_number: "", board_resolution_date: "", ledger_folio_number: "",
   house_no: "", street: "", village: "", taluk: "", district: "", state: "", pin_code: "",
   phone: "", alt_phone: "", email: "",
@@ -224,25 +225,32 @@ function UploadZone({
 }
 
 function AddressSection({
-  prefix, title, values, onChange, sideAction,
+  prefix, title, values, onChange, sideAction, disabled,
 }: {
   prefix: string
   title: string
   values: Record<string, string>
   onChange: (k: string, v: string) => void
   sideAction?: React.ReactNode
+  disabled?: boolean
 }) {
-  const f = (key: string) => ({ value: values[key] ?? "", onChange: (e: React.ChangeEvent<HTMLInputElement>) => onChange(key, e.target.value) })
+  const f = (key: string) => ({
+    value: values[key] ?? "",
+    disabled,
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => onChange(key, e.target.value),
+  })
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="space-y-5">
+      <div className="flex min-h-[1.75rem] items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
-          <MapPin className="h-3.5 w-3.5 text-amber-500" />
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-amber-50 text-amber-600">
+            <MapPin className="h-3.5 w-3.5" />
+          </div>
           <span className="text-sm font-semibold text-foreground">{title}</span>
         </div>
         {sideAction}
       </div>
-      <FormRow cols={4}>
+      <FormRow cols={2}>
         <Field id={`${prefix}house_no`} label="House / Door No.">
           <Input id={`${prefix}house_no`} placeholder="e.g. 12A" {...f("house_no")} />
         </Field>
@@ -263,11 +271,13 @@ function AddressSection({
         </Field>
         <Field id={`${prefix}pin_code`} label="PIN Code">
           <Input id={`${prefix}pin_code`} placeholder="6-digit PIN" maxLength={6}
+            disabled={disabled}
             value={values["pin_code"] ?? ""}
             onChange={(e) => onChange("pin_code", e.target.value.replace(/\D/g, ""))} />
         </Field>
         <Field id={`${prefix}phone`} label="Phone">
           <Input id={`${prefix}phone`} placeholder="10-digit mobile" maxLength={10}
+            disabled={disabled}
             value={values["phone"] ?? ""}
             onChange={(e) => onChange("phone", e.target.value.replace(/\D/g, ""))} />
         </Field>
@@ -300,6 +310,17 @@ export default function CustomerPage() {
   const [isSuccessOpen, setIsSuccessOpen] = useState(false)
   const [createdCustomer, setCreatedCustomer] = useState<CreatedCustomer | null>(null)
 
+  const [isEnrollOpen, setIsEnrollOpen] = useState(false)
+  const [enrollForm, setEnrollForm] = useState({
+    member_type: "member",
+    board_resolution_number: "",
+    board_resolution_date: "",
+    ledger_folio_number: "",
+  })
+  const [isEnrolling, setIsEnrolling] = useState(false)
+  const [enrollError, setEnrollError] = useState<string | null>(null)
+  const [enrolledMembership, setEnrolledMembership] = useState<{ membership_no: string } | null>(null)
+
   useEffect(() => {
     if (!photo) return
     const url = URL.createObjectURL(photo)
@@ -317,8 +338,25 @@ export default function CustomerPage() {
   const up = (patch: Partial<Customer>) => setC((prev) => ({ ...prev, ...patch }))
 
   const computedAge = c.dob
-    ? new Date().getFullYear() - new Date(c.dob).getFullYear()
-    : null
+  ? (() => {
+      const today = new Date();
+      const dob = new Date(c.dob);
+
+      let age = today.getFullYear() - dob.getFullYear();
+
+      const hasHadBirthdayThisYear =
+        today.getMonth() > dob.getMonth() ||
+        (today.getMonth() === dob.getMonth() &&
+          today.getDate() >= dob.getDate());
+
+      if (!hasHadBirthdayThisYear) {
+        age--;
+      }
+
+      return age;
+    })()
+  : null;
+
 
   const formatAadhar = (v: string) => v.replace(/(\d{4})(?=\d)/g, "$1 ").slice(0, 14)
 
@@ -375,10 +413,47 @@ export default function CustomerPage() {
     }
   }
 
-  const handleNavigateToEnroll = () => {
-    if (createdCustomer) router.push(`/members/enroll?aadhaar=${createdCustomer.aadhar_id}`)
+  const handleOpenEnroll = () => {
+    if (!createdCustomer) return
+    setEnrollForm({
+      member_type: "member",
+      board_resolution_number: "",
+      board_resolution_date: "",
+      ledger_folio_number: "",
+    })
+    setEnrolledMembership(null)
+    setEnrollError(null)
     setIsSuccessOpen(false)
-    setCreatedCustomer(null)
+    setIsEnrollOpen(true)
+  }
+
+  const canEnrollSubmit = !isEnrolling && enrollForm.member_type.length > 0
+
+  const handleEnrollSubmit = async () => {
+    if (!createdCustomer?.customer_code) return
+    setIsEnrolling(true)
+    setEnrollError(null)
+    try {
+      const res = await fetch("/api/memberships/create", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer_code: createdCustomer.customer_code,
+          member_type: enrollForm.member_type,
+          board_resolution_number: enrollForm.board_resolution_number || null,
+          board_resolution_date: enrollForm.board_resolution_date || null,
+          ledger_folio_number: enrollForm.ledger_folio_number || null,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to enroll member")
+      setEnrolledMembership({ membership_no: data.membership_no })
+    } catch (e: any) {
+      setEnrollError(e.message)
+    } finally {
+      setIsEnrolling(false)
+    }
   }
 
   // ─── Permanent address from current ──────────────────────────────────────
@@ -393,6 +468,23 @@ export default function CustomerPage() {
     permanant_pin_code: c.pin_code,
     permanant_phone:    c.phone,
   })
+
+  // Keep Permanent Address synchronized while the user edits Current Address
+  useEffect(() => {
+    if (!sameAsPermanent) return
+    setC((prev) => ({
+      ...prev,
+      permanant_house_no: prev.house_no,
+      permanant_street:   prev.street,
+      permanant_village:  prev.village,
+      permanant_taluk:    prev.taluk,
+      permanant_district: prev.district,
+      permanant_state:    prev.state,
+      permanant_pin_code: prev.pin_code,
+      permanant_phone:    prev.phone,
+    }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sameAsPermanent, c.house_no, c.street, c.village, c.taluk, c.district, c.state, c.pin_code, c.phone])
 
   return (
     <DashboardWrapper>
@@ -631,94 +723,112 @@ export default function CustomerPage() {
                   </FormRow>
                 </FieldGroup>
 
+                <FieldGroup title="Bank Account Details">
+                  <FormRow cols={3}>
+                    <Field id="dccb_account_number" label="DCCB Account Number">
+                      <Input
+                        id="dccb_account_number" placeholder="Enter DCCB Account Number"
+                        value={c.dccb_account_number}
+                        onChange={(e) => up({ dccb_account_number: e.target.value })}
+                      />
+                    </Field>
+                  </FormRow>
+                </FieldGroup>
+
               </div>
             )}
 
             {/* ───────── ADDRESS ───────── */}
             {activeTab === "address" && (
-              <div className="divide-y">
+              <div className="p-6">
+                <div className="grid grid-cols-1 min-[1200px]:grid-cols-2 gap-5 min-[1200px]:gap-6 items-start">
 
-                {/* Current address */}
-                <div className="p-6 space-y-5">
-                  <AddressSection
-                    prefix="cur_"
-                    title="Current Address"
-                    values={{
-                      house_no: c.house_no, street: c.street, village: c.village,
-                      taluk: c.taluk, district: c.district, state: c.state,
-                      pin_code: c.pin_code, phone: c.phone,
-                    }}
-                    onChange={(k, v) => up({ [k]: v } as any)}
-                  />
+                  {/* Current address card */}
+                  <Card className="border shadow-sm">
+                    <CardContent className="p-4 sm:p-5 lg:p-6 space-y-6">
+                      <AddressSection
+                        prefix="cur_"
+                        title="Current Address"
+                        values={{
+                          house_no: c.house_no, street: c.street, village: c.village,
+                          taluk: c.taluk, district: c.district, state: c.state,
+                          pin_code: c.pin_code, phone: c.phone,
+                        }}
+                        onChange={(k, v) => up({ [k]: v } as any)}
+                      />
 
-                  {/* Contact row */}
-                  <FormRow cols={3}>
-                    <Field id="phone" label="Mobile Number" required>
-                      <div className="relative">
-                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                        <Input
-                          id="phone" className="pl-8" placeholder="10-digit mobile"
-                          maxLength={10} value={c.phone}
-                          onChange={(e) => up({ phone: e.target.value.replace(/\D/g, "") })}
-                        />
-                      </div>
-                    </Field>
-                    <Field id="alt_phone" label="Alternate Mobile" hint={altPhoneError ?? undefined}>
-                      <div className="relative">
-                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                        <Input
-                          id="alt_phone"
-                          className={["pl-8", altPhoneError ? "border-destructive focus-visible:ring-destructive" : ""].join(" ")}
-                          placeholder="Optional"
-                          maxLength={10} value={c.alt_phone}
-                          onChange={(e) => up({ alt_phone: e.target.value.replace(/\D/g, "") })}
-                        />
-                      </div>
-                    </Field>
-                    <Field id="email" label="Email Address">
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                        <Input
-                          id="nc_email" type="email" className="pl-8"
-                          placeholder="john.doe@email.com"
-                          value={c.email}
-                          onChange={(e) => up({ email: e.target.value })}
-                        />
-                      </div>
-                    </Field>
-                  </FormRow>
+                      <div className="h-px bg-border" />
+
+                      {/* Contact details */}
+                      <FormRow cols={2}>
+                        <Field id="phone" label="Mobile Number" required>
+                          <div className="relative">
+                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                            <Input
+                              id="phone" className="pl-8" placeholder="10-digit mobile"
+                              maxLength={10} value={c.phone}
+                              onChange={(e) => up({ phone: e.target.value.replace(/\D/g, "") })}
+                            />
+                          </div>
+                        </Field>
+                        <Field id="alt_phone" label="Alternate Mobile" hint={altPhoneError ?? undefined}>
+                          <div className="relative">
+                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                            <Input
+                              id="alt_phone"
+                              className={["pl-8", altPhoneError ? "border-destructive focus-visible:ring-destructive" : ""].join(" ")}
+                              placeholder="Optional"
+                              maxLength={10} value={c.alt_phone}
+                              onChange={(e) => up({ alt_phone: e.target.value.replace(/\D/g, "") })}
+                            />
+                          </div>
+                        </Field>
+                        <Field id="email" label="Email Address">
+                          <div className="relative">
+                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                            <Input
+                              id="nc_email" type="email" className="pl-8"
+                              placeholder="john.doe@email.com"
+                              value={c.email}
+                              onChange={(e) => up({ email: e.target.value })}
+                            />
+                          </div>
+                        </Field>
+                      </FormRow>
+                    </CardContent>
+                  </Card>
+
+                  {/* Permanent address card */}
+                  <Card className="border shadow-sm">
+                    <CardContent className="p-4 sm:p-5 lg:p-6 space-y-6">
+                      <AddressSection
+                        prefix="perm_"
+                        title="Permanent Address"
+                        disabled={sameAsPermanent}
+                        values={{
+                          house_no: c.permanant_house_no, street: c.permanant_street,
+                          village: c.permanant_village, taluk: c.permanant_taluk,
+                          district: c.permanant_district, state: c.permanant_state,
+                          pin_code: c.permanant_pin_code, phone: c.permanant_phone,
+                        }}
+                        onChange={(k, v) => up({ [`permanant_${k}`]: v } as any)}
+                        sideAction={
+                          <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50/60 px-2.5 py-1.5">
+                            <Checkbox
+                              id="same_as_permanent"
+                              checked={sameAsPermanent}
+                              onCheckedChange={(checked: boolean) => setSameAsPermanent(checked)}
+                            />
+                            <Label htmlFor="same_as_permanent" className="cursor-pointer text-xs font-medium text-amber-800">
+                              Same as Current Address
+                            </Label>
+                          </div>
+                        }
+                      />
+                    </CardContent>
+                  </Card>
+
                 </div>
-
-                {/* Permanent address */}
-                <div className="p-6 space-y-5">
-                  <AddressSection
-                    prefix="perm_"
-                    title="Permanent Address"
-                    values={{
-                      house_no: c.permanant_house_no, street: c.permanant_street,
-                      village: c.permanant_village, taluk: c.permanant_taluk,
-                      district: c.permanant_district, state: c.permanant_state,
-                      pin_code: c.permanant_pin_code, phone: c.permanant_phone,
-                    }}
-                    onChange={(k, v) => up({ [`permanant_${k}`]: v } as any)}
-                    sideAction={
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          id="same_as_permanent"
-                          checked={sameAsPermanent}
-                          onCheckedChange={(checked: boolean) => {
-                            setSameAsPermanent(checked)
-                            if (checked) copyCurrent()
-                          }}
-                        />
-                        <Label htmlFor="same_as_permanent" className="cursor-pointer text-xs text-muted-foreground">
-                          Same as current address
-                        </Label>
-                      </div>
-                    }
-                  />
-                </div>
-
               </div>
             )}
 
@@ -904,14 +1014,143 @@ export default function CustomerPage() {
               Close
             </Button>
             <Button
-              onClick={handleNavigateToEnroll}
-              disabled={!createdCustomer?.aadhar_id}
+              onClick={handleOpenEnroll}
+              disabled={!createdCustomer?.customer_code}
               className="gap-2 bg-amber-600 hover:bg-amber-700 text-white"
             >
               <UserPlus className="h-4 w-4" />
               Enroll as Member
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Enroll as Member dialog ── */}
+      <Dialog
+        open={isEnrollOpen}
+        onOpenChange={(open) => {
+          setIsEnrollOpen(open)
+          if (!open) {
+            setEnrolledMembership(null)
+            setEnrollError(null)
+            setCreatedCustomer(null)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          {!enrolledMembership ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>Enroll as Member</DialogTitle>
+                <DialogDescription>
+                  Create a membership for {createdCustomer?.full_name} using the customer just registered.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-1">
+                <Field id="enroll_member_type" label="Account Type" required>
+                  <Select
+                    value={enrollForm.member_type}
+                    onValueChange={(v) => setEnrollForm((p) => ({ ...p, member_type: v }))}
+                  >
+                    <SelectTrigger id="enroll_member_type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="member">Member</SelectItem>
+                      <SelectItem value="associate">Nominal Member</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+
+                <FormRow cols={2}>
+                  <Field id="enroll_board_resolution_number" label="Board Resolution Number">
+                    <Input
+                      id="enroll_board_resolution_number"
+                      placeholder="e.g. BR/2026/014"
+                      value={enrollForm.board_resolution_number}
+                      onChange={(e) => setEnrollForm((p) => ({ ...p, board_resolution_number: e.target.value }))}
+                    />
+                  </Field>
+                  <Field id="enroll_board_resolution_date" label="Board Resolution Date">
+                    <Input
+                      id="enroll_board_resolution_date"
+                      type="date"
+                      value={enrollForm.board_resolution_date}
+                      onChange={(e) => setEnrollForm((p) => ({ ...p, board_resolution_date: e.target.value }))}
+                    />
+                  </Field>
+                </FormRow>
+
+                <Field id="enroll_ledger_folio_number" label="Ledger Folio Number">
+                  <Input
+                    id="enroll_ledger_folio_number"
+                    placeholder="e.g. LF-1029"
+                    value={enrollForm.ledger_folio_number}
+                    onChange={(e) => setEnrollForm((p) => ({ ...p, ledger_folio_number: e.target.value }))}
+                  />
+                </Field>
+
+                {enrollError && (
+                  <p className="text-sm text-destructive">{enrollError}</p>
+                )}
+              </div>
+
+              <DialogFooter className="mt-2 gap-2 sm:justify-between">
+                <Button variant="outline" onClick={() => setIsEnrollOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleEnrollSubmit}
+                  disabled={!canEnrollSubmit}
+                  className="gap-2 bg-amber-600 hover:bg-amber-700 text-white min-w-[150px]"
+                >
+                  {isEnrolling
+                    ? <><span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Enrolling…</>
+                    : <><Check className="h-3.5 w-3.5" /> Create Member</>
+                  }
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <div className="flex items-start gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                    <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+                  </div>
+                  <div className="pt-0.5">
+                    <DialogTitle className="text-lg">Member Enrolled!</DialogTitle>
+                    <DialogDescription className="mt-0.5">
+                      Membership number{" "}
+                      <span className="font-semibold text-foreground">{enrolledMembership.membership_no}</span>{" "}
+                      has been created.
+                    </DialogDescription>
+                  </div>
+                </div>
+              </DialogHeader>
+
+              <DialogFooter className="mt-4 gap-2 sm:justify-between">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsEnrollOpen(false)
+                    setEnrolledMembership(null)
+                    setCreatedCustomer(null)
+                    router.push("/members")
+                  }}
+                >
+                  Close
+                </Button>
+                <Button
+                  onClick={() => router.push(`/members/share-deposit?memberNo=${enrolledMembership.membership_no}`)}
+                  className="gap-2 bg-amber-600 hover:bg-amber-700 text-white"
+                >
+                  Share Deposit
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </DashboardWrapper>
