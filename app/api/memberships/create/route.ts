@@ -9,7 +9,13 @@ export async function POST(req: Request) {
   }
 
   const u = JSON.parse(c.value)
-  const { customer_code, member_type } = await req.json()
+  const {
+    customer_code,
+    member_type,
+    board_resolution_number,
+    board_resolution_date,
+    ledger_folio_number,
+  } = await req.json()
 
   /* -------------------- PERMISSION CHECK -------------------- */
   const { rowCount: perm } = await pool.query(
@@ -106,16 +112,22 @@ export async function POST(req: Request) {
         member_type,
         membership_no,
         join_date,
-        status
+        status,
+        board_resolution_number,
+        board_resolution_date,
+        ledger_folio_number
       )
-      VALUES ($1,$2,$3,'INDIVIDUAL',$4,now(),'ACTIVE')
+      VALUES ($1,$2,$3,'INDIVIDUAL',$4,now(),'ACTIVE',$5,$6,$7)
       RETURNING id
       `,
       [
         customer_code,
         u.branch,
         membershipClass,
-        membershipNo
+        membershipNo,
+        board_resolution_number || null,
+        board_resolution_date || null,
+        ledger_folio_number || null,
       ]
     )
 

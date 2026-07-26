@@ -1,4 +1,3 @@
-
 create table public.customers (
   id uuid not null default gen_random_uuid (),
   customer_code character(8) not null,
@@ -18,6 +17,10 @@ create table public.customers (
   occupation character varying null,
   qualification character varying null,
   qualification_details character varying null,
+  alt_mobile_no character varying(15) null,
+  mobile_no character varying(15) null,
+  branch_id numeric null,
+  dccbaccountnumber text null,
   constraint customers_pkey primary key (id),
   constraint customers_customer_code_key unique (customer_code),
   constraint customers_gender_check check (

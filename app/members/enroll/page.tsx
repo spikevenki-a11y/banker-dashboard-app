@@ -302,6 +302,7 @@ export default function EnrollMemberPage() {
                     id="customer_type"
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     value={newMember.customer_type}
+                    disabled={true}
                     onChange={(e) => setNewMember({ ...newMember, customer_type: e.target.value })}
                   >
                     <option value="">Select Category</option>
