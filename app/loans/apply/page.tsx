@@ -285,6 +285,14 @@ export default function LoanApplicationPage() {
   const sf = (key: keyof SecurityForm, value: any) =>
     setSecurityForm((prev) => ({ ...prev, [key]: value }))
 
+  // Gold Details date fields default to the branch business date, editable afterwards
+  const defaultSecurityForm = (): SecurityForm => ({
+    ...emptySecurityForm,
+    appraisal_date: applicationDate,
+    gold_rate_date: applicationDate,
+    valuation_date: applicationDate,
+  })
+
   const sfDraft = (key: keyof GoldItem, value: string) =>
     setGoldItemDraft((prev) => ({ ...prev, [key]: value }))
 
@@ -463,7 +471,15 @@ export default function LoanApplicationPage() {
     try {
       const res = await fetch("/api/fas/get-login-date", { credentials: "include" })
       const data = await res.json()
-      if (data.businessDate) setApplicationDate(data.businessDate)
+      if (data.businessDate) {
+        setApplicationDate(data.businessDate)
+        setSecurityForm((prev) => ({
+          ...prev,
+          appraisal_date: prev.appraisal_date || data.businessDate,
+          gold_rate_date: prev.gold_rate_date || data.businessDate,
+          valuation_date: prev.valuation_date || data.businessDate,
+        }))
+      }
     } catch { /* silent */ }
   }
 
@@ -1080,7 +1096,7 @@ export default function LoanApplicationPage() {
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs">Rate Date</Label>
-                            <Input className="h-8 text-xs" type="date" value={securityForm.gold_rate_date} onChange={(e) => sf("gold_rate_date", e.target.value)} />
+                            <Input className="h-8 text-xs" type="date" value={applicationDate} disabled onChange={(e) => sf("gold_rate_date", e.target.value)} />
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs">Market Value (₹)</Label>
@@ -1106,7 +1122,7 @@ export default function LoanApplicationPage() {
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1">
                             <Label className="text-xs">Appraisal Date</Label>
-                            <Input className="h-8 text-xs" type="date" value={securityForm.appraisal_date} onChange={(e) => sf("appraisal_date", e.target.value)} />
+                            <Input className="h-8 text-xs" type="date" value={applicationDate} disabled onChange={(e) => sf("appraisal_date", e.target.value)} />
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs">Storage Location</Label>
@@ -1698,7 +1714,7 @@ export default function LoanApplicationPage() {
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs">Valuation Date</Label>
-                            <Input className="h-8 text-xs" type="date" value={securityForm.valuation_date} onChange={(e) => sf("valuation_date", e.target.value)} />
+                            <Input className="h-8 text-xs" type="date" value={applicationDate} disabled onChange={(e) => sf("valuation_date", e.target.value)} />
                           </div>
                         </div>
 

@@ -18,7 +18,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Camera, PenTool, ArrowLeft, ArrowUpCircle } from "lucide-react"
+import {
+  Camera, PenTool, ArrowLeft, ArrowUpCircle, Search, User, MapPin,
+  ShieldCheck, Building2, CheckCircle2, AlertCircle, Pencil, Phone,
+} from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 
 type NewMemberForm = {
@@ -54,6 +57,91 @@ type NewMemberForm = {
   boardResolutionNumber?: string
   boardResolutionDate?: string
   ledgerFolioNumber?: string
+}
+
+// ─── Sub-components (match the visual language of the Create Customer screen) ──
+
+function FieldGroup({ title, icon: Icon, children }: { title: string; icon?: React.ElementType; children: React.ReactNode }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        {Icon && <Icon className="h-3.5 w-3.5 text-amber-500" />}
+        <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70">
+          {title}
+        </span>
+        <div className="flex-1 h-px bg-border" />
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function FormRow({ children, cols = 4 }: { children: React.ReactNode; cols?: number }) {
+  const colMap: Record<number, string> = {
+    2: "grid-cols-1 sm:grid-cols-2",
+    3: "grid-cols-1 sm:grid-cols-3",
+    4: "grid-cols-2 sm:grid-cols-4",
+    5: "grid-cols-2 sm:grid-cols-5",
+  }
+  return (
+    <div className={`grid gap-4 ${colMap[cols] ?? colMap[4]}`}>
+      {children}
+    </div>
+  )
+}
+
+function Field({
+  id, label, required, hint, className, children,
+}: {
+  id?: string; label: string; required?: boolean; hint?: string; className?: string; children: React.ReactNode
+}) {
+  return (
+    <div className={`space-y-1.5 ${className ?? ""}`}>
+      <Label htmlFor={id} className="text-sm font-medium">
+        {label}
+        {required && <span className="ml-0.5 text-destructive">*</span>}
+      </Label>
+      {children}
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+    </div>
+  )
+}
+
+function UploadZone({
+  preview, icon: Icon, label, sublabel, onChange,
+}: {
+  preview: string | null; icon: React.ElementType; label: string; sublabel: string; onChange: (f: File) => void
+}) {
+  return (
+    <label className="group cursor-pointer">
+      <input type="file" accept="image/*" hidden
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) onChange(f) }} />
+      <div className="relative flex flex-col items-center gap-2">
+        <div className={[
+          "relative h-24 w-24 overflow-hidden rounded-xl border-2 border-dashed transition-all",
+          "group-hover:border-amber-400 group-hover:shadow-md",
+          preview ? "border-amber-300 bg-amber-50/30" : "border-muted-foreground/25 bg-muted/30",
+        ].join(" ")}>
+          {preview ? (
+            <img src={preview} alt={label} className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 text-muted-foreground/50 group-hover:text-amber-500 transition-colors">
+              <Icon className="h-7 w-7" />
+              <span className="text-[9px] font-medium uppercase tracking-wide">{sublabel}</span>
+            </div>
+          )}
+          {preview && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Pencil className="h-4 w-4 text-white" />
+            </div>
+          )}
+        </div>
+        <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+          {label}
+        </span>
+      </div>
+    </label>
+  )
 }
 
 export default function EnrollMemberPage() {
@@ -232,86 +320,99 @@ export default function EnrollMemberPage() {
 
   return (
     <DashboardWrapper>
-      <div className="flex flex-col gap-6">
-        {/* Header */}
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push("/members")}>
+      <div className="flex flex-col gap-5 max-w-5xl mx-auto">
+
+        {/* ── Page header ── */}
+        <div className="flex items-start gap-3">
+          <Button variant="ghost" size="icon" onClick={() => router.push("/members")} className="mt-0.5 shrink-0">
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Enroll New Member</h1>
-            <p className="text-sm text-muted-foreground">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl font-bold tracking-tight leading-tight">Enroll New Member</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
               Search by Aadhaar to enroll an existing customer as a member
             </p>
           </div>
         </div>
 
-        {/* Search Section */}
+        {/* ── Customer Lookup ── */}
         <Card>
           <CardHeader className="pb-4">
-            <CardTitle className="text-base">Customer Lookup</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Search className="h-4 w-4 text-amber-500" />
+              Customer Lookup
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
-              <div className="space-y-2 md:col-span-1">
-                <Label htmlFor="customer_type_select">Operation Type</Label>
+              <Field id="customer_type_select" label="Operation Type" className="md:col-span-1">
                 <select
                   id="customer_type_select"
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  className="flex h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] md:text-sm"
                 >
                   <option value="">Select Category</option>
                   <option value="individual">Individual</option>
                   <option value="organization">Organization</option>
                 </select>
-              </div>
-              <div className="space-y-2 md:col-span-4">
-                <Label htmlFor="aadhaar">Aadhaar Card Number *</Label>
+              </Field>
+              <Field id="aadhaar" label="Aadhaar Card Number" required className="md:col-span-4">
                 <div className="flex gap-2">
-                  <Input
-                    id="aadhaar"
-                    placeholder="Enter 12-digit Aadhaar number"
-                    maxLength={12}
-                    value={newMember.aadhaar_no}
-                    onChange={(e) => {
-                      const value = e.target.value.replace(/\D/g, "")
-                      setNewMember({ ...newMember, aadhaar_no: value })
-                    }}
-                  />
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input
+                      id="aadhaar"
+                      className="pl-8"
+                      placeholder="Enter 12-digit Aadhaar number"
+                      maxLength={12}
+                      value={newMember.aadhaar_no}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, "")
+                        setNewMember({ ...newMember, aadhaar_no: value })
+                      }}
+                    />
+                  </div>
                   <Button
                     onClick={handleAadhaarSearch}
                     disabled={isSearching || newMember.aadhaar_no.length !== 12}
-                    className="shrink-0"
+                    className="shrink-0 gap-1.5 bg-amber-600 hover:bg-amber-700 text-white"
                   >
-                    {isSearching ? "Searching..." : "Search"}
+                    {isSearching
+                      ? <><span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Searching…</>
+                      : <><Search className="h-3.5 w-3.5" /> Search</>
+                    }
                   </Button>
                 </div>
-              </div>
+              </Field>
             </div>
           </CardContent>
         </Card>
 
-        {/* Member Info */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-              {/* Left: Type and Account */}
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="customer_type">Customer Type</Label>
-                  <select
-                    id="customer_type"
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        {/* ── Member snapshot ── */}
+        <Card className="overflow-hidden">
+          <div className="h-1.5 w-full bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600" />
+          <CardContent className="p-5">
+            <div className="flex flex-col grid gap-5 sm:flex-row sm:items-start sm:gap-6 lg:grid-cols-3">
+
+
+              {/* Identity fields */}
+              <div className="flex-1 grid grid-cols-2 col-span-2 gap-4 sm:grid-cols-2 lg:grid-cols-2">
+                <Field id="customer_type" label="Customer Type">
+                  <Select
                     value={newMember.customer_type}
                     disabled={true}
-                    onChange={(e) => setNewMember({ ...newMember, customer_type: e.target.value })}
+                    onValueChange={(value) => setNewMember({ ...newMember, customer_type: value })}
                   >
-                    <option value="">Select Category</option>
-                    <option value="individual">Individual</option>
-                    <option value="organization">Organization</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Account Type</Label>
+                    <SelectTrigger id="customer_type" className="w-full">
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="individual">Individual</SelectItem>
+                      <SelectItem value="organization">Organization</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+
+                <Field label="Account Type">
                   <Select
                     value={newMember.member_type}
                     onValueChange={(value) => setNewMember({ ...newMember, member_type: value })}
@@ -324,91 +425,71 @@ export default function EnrollMemberPage() {
                       <SelectItem value="associate">Nominal Member</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-              </div>
+                </Field>
 
-              {/* Middle: Name fields */}
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Full Name *</Label>
+                <Field id="name" label="Full Name" required>
                   <Input
                     id="name"
                     placeholder="Full Name"
                     value={newMember.full_name}
                     onChange={(e) => setNewMember({ ...newMember, full_name: e.target.value })}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="father_name">Father Name *</Label>
+                </Field>
+
+                <Field id="father_name" label="Father's Name" required>
                   <Input
                     id="father_name"
                     placeholder="Father's Name"
                     value={newMember.father_name}
                     onChange={(e) => setNewMember({ ...newMember, father_name: e.target.value })}
                   />
-                </div>
+                </Field>
               </div>
-
-              {/* Right: Photo & Signature */}
-              <div className="flex gap-6 items-start justify-center">
-                <label className="cursor-pointer">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    hidden
-                    onChange={(e) => setPhoto(e.target.files?.[0] || null)}
-                  />
-                  <div className="h-28 w-28 border-2 border-dashed rounded-lg flex items-center justify-center hover:bg-muted transition overflow-hidden">
-                    {photoPreview ? (
-                      <img src={photoPreview} alt="Photo Preview" className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex flex-col items-center gap-1 text-muted-foreground">
-                        <Camera className="h-6 w-6" />
-                        <span className="text-xs">Photo</span>
-                      </div>
-                    )}
-                  </div>
-                </label>
-
-                <label className="cursor-pointer">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    hidden
-                    onChange={(e) => setSignature(e.target.files?.[0] || null)}
-                  />
-                  <div className="h-28 w-28 border-2 border-dashed rounded-lg flex items-center justify-center hover:bg-muted transition overflow-hidden bg-card">
-                    {signaturePreview ? (
-                      <img src={signaturePreview} alt="Signature Preview" className="h-full w-full object-contain" />
-                    ) : (
-                      <div className="flex flex-col items-center gap-1 text-muted-foreground">
-                        <PenTool className="h-6 w-6" />
-                        <span className="text-xs">Signature</span>
-                      </div>
-                    )}
-                  </div>
-                </label>
+              
+              {/* Upload zones */}
+              <div className="flex justify-end gap-5 sm:gap-4 shrink-0 space-y-2 col-span-1">
+                <UploadZone
+                  preview={photoPreview}
+                  icon={Camera}
+                  label="Photo"
+                  sublabel="Upload"
+                  onChange={(f) => setPhoto(f)}
+                />
+                <UploadZone
+                  preview={signaturePreview}
+                  icon={PenTool}
+                  label="Signature"
+                  sublabel="Upload"
+                  onChange={(f) => setSignature(f)}
+                />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Tabs Section */}
+        {/* ── Tabs ── */}
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="p-0">
             <Tabs defaultValue="personal" className="w-full">
-              <TabsList className="grid grid-cols-3 w-full max-w-md">
-                <TabsTrigger value="personal">Personal Details</TabsTrigger>
-                <TabsTrigger value="address">Address</TabsTrigger>
-                <TabsTrigger value="kyc">KYC Details</TabsTrigger>
-              </TabsList>
+              <div className="border-b px-6 pt-5">
+                <TabsList className="grid w-full max-w-md grid-cols-3 mb-5">
+                  <TabsTrigger value="personal" className="gap-1.5 data-[state=active]:text-amber-700">
+                    <User className="h-3.5 w-3.5" /> Personal Details
+                  </TabsTrigger>
+                  <TabsTrigger value="address" className="gap-1.5 data-[state=active]:text-amber-700">
+                    <MapPin className="h-3.5 w-3.5" /> Address
+                  </TabsTrigger>
+                  <TabsTrigger value="kyc" className="gap-1.5 data-[state=active]:text-amber-700">
+                    <ShieldCheck className="h-3.5 w-3.5" /> KYC Details
+                  </TabsTrigger>
+                </TabsList>
+              </div>
 
               {/* PERSONAL DETAILS TAB */}
-              <TabsContent value="personal">
-                <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <div className="space-y-2">
-                      <Label>Date of Birth</Label>
+              <TabsContent value="personal" className="p-6 space-y-8 mt-0">
+                <FieldGroup title="Basic Information" icon={User}>
+                  <FormRow cols={3}>
+                    <Field label="Date of Birth">
                       <Input
                         value={newMember.date_of_birth}
                         type="date"
@@ -416,9 +497,8 @@ export default function EnrollMemberPage() {
                         readOnly={fieldsReadOnly}
                         className={fieldsReadOnly ? "bg-muted" : ""}
                       />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Gender</Label>
+                    </Field>
+                    <Field label="Gender">
                       <Select
                         value={newMember.gender}
                         onValueChange={(value) => setNewMember({ ...newMember, gender: value })}
@@ -432,118 +512,130 @@ export default function EnrollMemberPage() {
                           <SelectItem value="others">Others</SelectItem>
                         </SelectContent>
                       </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Spouse Name</Label>
+                    </Field>
+                    <Field label="Spouse Name">
                       <Input
                         value={newMember.spouseName}
                         onChange={(e) => setNewMember({ ...newMember, spouseName: e.target.value })}
                         readOnly={fieldsReadOnly}
                         className={fieldsReadOnly ? "bg-muted" : ""}
                       />
-                    </div>
-                  </div>
+                    </Field>
+                  </FormRow>
+                </FieldGroup>
 
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <div className="space-y-2">
-                      <Label>Board Resolution Number</Label>
+                <FieldGroup title="Board Resolution & Ledger">
+                  <FormRow cols={3}>
+                    <Field label="Board Resolution Number">
                       <Input
                         value={newMember.boardResolutionNumber}
                         onChange={(e) => setNewMember({ ...newMember, boardResolutionNumber: e.target.value })}
                         className={fieldsReadOnly ? "bg-muted" : ""}
                       />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Board Resolution Date</Label>
+                    </Field>
+                    <Field label="Board Resolution Date">
                       <Input
                         type="date"
                         value={newMember.boardResolutionDate}
                         onChange={(e) => setNewMember({ ...newMember, boardResolutionDate: e.target.value })}
                         className={fieldsReadOnly ? "bg-muted" : ""}
                       />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Ledger Folio Number</Label>
+                    </Field>
+                    <Field label="Ledger Folio Number">
                       <Input
                         value={newMember.ledgerFolioNumber}
                         onChange={(e) => setNewMember({ ...newMember, ledgerFolioNumber: e.target.value })}
                         className={fieldsReadOnly ? "bg-muted" : ""}
                       />
-                    </div>
-                  </div>
-                </div>
+                    </Field>
+                  </FormRow>
+                </FieldGroup>
               </TabsContent>
 
               {/* ADDRESS TAB */}
-              <TabsContent value="address">
-                <div className="py-4 space-y-2">
-                  <Label htmlFor="address">Address</Label>
-                  <Input
-                    id="address"
-                    placeholder="123 Main St, City, State ZIP"
-                    value={newMember.address}
-                    onChange={(e) => setNewMember({ ...newMember, address: e.target.value })}
-                    readOnly={fieldsReadOnly}
-                    className={fieldsReadOnly ? "bg-muted" : ""}
-                  />
-                </div>
-                
-                  <div className="space-y-2">
-                    <Label>Mobile Number</Label>
-                    <Input
-                      value ={newMember.phone}
-                      readOnly={fieldsReadOnly}
-                      className={fieldsReadOnly ? "bg-muted" : ""}
-                    />
-                  </div>
+              <TabsContent value="address" className="p-6 mt-0">
+                <FieldGroup title="Address & Contact" icon={MapPin}>
+                  <FormRow cols={3}>
+                    <Field id="address" label="Address" className="sm:col-span-2">
+                      <Input
+                        id="address"
+                        placeholder="123 Main St, City, State ZIP"
+                        value={newMember.address}
+                        onChange={(e) => setNewMember({ ...newMember, address: e.target.value })}
+                        readOnly={fieldsReadOnly}
+                        className={fieldsReadOnly ? "bg-muted" : ""}
+                      />
+                    </Field>
+                    <Field label="Mobile Number">
+                      <div className="relative">
+                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                        <Input
+                          className={`pl-8 ${fieldsReadOnly ? "bg-muted" : ""}`}
+                          value={newMember.phone}
+                          readOnly={fieldsReadOnly}
+                        />
+                      </div>
+                    </Field>
+                  </FormRow>
+                </FieldGroup>
               </TabsContent>
 
               {/* KYC TAB */}
-              <TabsContent value="kyc">
-                <div className="grid grid-cols-1 gap-4 py-4 md:grid-cols-4">
-                  <div className="space-y-2">
-                    <Label>Aadhar no</Label>
-                    <Input
-                      value ={newMember.aadhaar_no}
-                      onChange={(e) => setNewMember({ ...newMember, id_type: e.target.value })}
-                      readOnly={fieldsReadOnly}
-                      className={fieldsReadOnly ? "bg-muted" : ""}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>pan_no</Label>
-                    <Input
-                      value ={newMember.pan_no}
-                      onChange={(e) => setNewMember({ ...newMember, id_number: e.target.value })}
-                      readOnly={fieldsReadOnly}
-                      className={fieldsReadOnly ? "bg-muted" : ""}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>driving_license_no</Label>
-                    <Input
-                      value ={newMember.driving_license_no}
-                      onChange={(e) => setNewMember({ ...newMember, id_number: e.target.value })}
-                      readOnly={fieldsReadOnly}
-                      className={fieldsReadOnly ? "bg-muted" : ""}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>ration_no</Label>
-                    <Input
-                      value ={newMember.ration_no}
-                      onChange={(e) => setNewMember({ ...newMember, id_number: e.target.value })}
-                      readOnly={fieldsReadOnly}
-                      className={fieldsReadOnly ? "bg-muted" : ""}
-                    />
-                  </div>
-                </div>
+              <TabsContent value="kyc" className="p-6 mt-0">
+                <FieldGroup title="KYC Documents" icon={ShieldCheck}>
+                  <FormRow cols={4}>
+                    <Field label="Aadhaar Number">
+                      <div className="relative">
+                        <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                        <Input
+                          className={`pl-8 ${fieldsReadOnly ? "bg-muted" : ""}`}
+                          value={newMember.aadhaar_no}
+                          onChange={(e) => setNewMember({ ...newMember, id_type: e.target.value })}
+                          readOnly={fieldsReadOnly}
+                        />
+                      </div>
+                    </Field>
+                    <Field label="PAN Number">
+                      <div className="relative">
+                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                        <Input
+                          className={`pl-8 ${fieldsReadOnly ? "bg-muted" : ""}`}
+                          value={newMember.pan_no}
+                          onChange={(e) => setNewMember({ ...newMember, id_number: e.target.value })}
+                          readOnly={fieldsReadOnly}
+                        />
+                      </div>
+                    </Field>
+                    <Field label="Driving License Number">
+                      <div className="relative">
+                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                        <Input
+                          className={`pl-8 ${fieldsReadOnly ? "bg-muted" : ""}`}
+                          value={newMember.driving_license_no}
+                          onChange={(e) => setNewMember({ ...newMember, id_number: e.target.value })}
+                          readOnly={fieldsReadOnly}
+                        />
+                      </div>
+                    </Field>
+                    <Field label="Ration Card Number">
+                      <div className="relative">
+                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                        <Input
+                          className={`pl-8 ${fieldsReadOnly ? "bg-muted" : ""}`}
+                          value={newMember.ration_no}
+                          onChange={(e) => setNewMember({ ...newMember, id_number: e.target.value })}
+                          readOnly={fieldsReadOnly}
+                        />
+                      </div>
+                    </Field>
+                  </FormRow>
+                </FieldGroup>
               </TabsContent>
             </Tabs>
           </CardContent>
         </Card>
 
-        {/* Footer Actions */}
+        {/* ── Footer actions ── */}
         <div className="flex items-center justify-end gap-3 pb-6">
           <Button
             variant="outline"
@@ -555,29 +647,45 @@ export default function EnrollMemberPage() {
           <Button
             onClick={handleEnrollMember}
             disabled={isSubmitting || memberFieldsReadOnly || !newMember.full_name}
+            className="gap-2 bg-amber-600 hover:bg-amber-700 text-white min-w-[150px]"
           >
-            {isSubmitting ? "Creating..." : "Create Member"}
+            {isSubmitting
+              ? <><span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Creating…</>
+              : "Create Member"
+            }
           </Button>
         </div>
       </div>
 
       {/* Customer Not Found Dialog */}
       <AlertDialog open={isCustomerNotFoundOpen} onOpenChange={setIsCustomerNotFoundOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Customer Not Found</AlertDialogTitle>
-            <AlertDialogDescription>
-              This member is not a registered customer yet. Please create a customer and try again.
-            </AlertDialogDescription>
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100">
+                <AlertCircle className="h-6 w-6 text-amber-600" />
+              </div>
+              <div className="pt-0.5">
+                <AlertDialogTitle className="text-lg">Customer Not Found</AlertDialogTitle>
+                <AlertDialogDescription className="mt-0.5">
+                  This member is not a registered customer yet. Please create a customer and try again.
+                </AlertDialogDescription>
+              </div>
+            </div>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setIsCustomerNotFoundOpen(false)}>Close</AlertDialogAction>
+          <AlertDialogFooter className="mt-2 gap-2 sm:justify-between">
+            <AlertDialogAction
+              onClick={() => setIsCustomerNotFoundOpen(false)}
+              className="bg-transparent border border-input hover:bg-accent hover:text-accent-foreground text-foreground"
+            >
+              Close
+            </AlertDialogAction>
             <AlertDialogAction
               onClick={() => {
                 setIsCustomerNotFoundOpen(false)
                 router.push("/customers")
               }}
-              className="bg-primary"
+              className="bg-amber-600 hover:bg-amber-700 text-white"
             >
               Create Customer
             </AlertDialogAction>
@@ -587,35 +695,34 @@ export default function EnrollMemberPage() {
 
       {/* Success Dialog */}
       <AlertDialog open={isSuccessDialogOpen} onOpenChange={setIsSuccessDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-green-600">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-6 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              Member Created Successfully!
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-base">
-              <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4">
-                <p className="text-sm text-green-700">New member has been enrolled with the following details:</p>
-                <p className="mt-2 text-lg font-semibold text-green-800">
-                  {"Member No: "}<span className="font-mono">{createdMemberNo}</span>
-                </p>
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                <CheckCircle2 className="h-6 w-6 text-emerald-600" />
               </div>
-            </AlertDialogDescription>
+              <div className="pt-0.5">
+                <AlertDialogTitle className="text-lg">Member Created Successfully!</AlertDialogTitle>
+                <AlertDialogDescription className="mt-0.5">
+                  New member has been enrolled in the system.
+                </AlertDialogDescription>
+              </div>
+            </div>
           </AlertDialogHeader>
-          <AlertDialogFooter className="flex gap-2 sm:justify-end">
+
+          <div className="rounded-xl border overflow-hidden">
+            <div className="bg-muted/40 px-4 py-2.5 border-b">
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Membership Information
+              </p>
+            </div>
+            <div className="flex items-center justify-between px-4 py-2.5 text-sm">
+              <span className="text-muted-foreground">Member No</span>
+              <span className="font-mono font-semibold">{createdMemberNo}</span>
+            </div>
+          </div>
+
+          <AlertDialogFooter className="mt-2 gap-2 sm:justify-between">
             <AlertDialogAction
               onClick={() => {
                 setIsSuccessDialogOpen(false)
@@ -630,9 +737,9 @@ export default function EnrollMemberPage() {
                 setIsSuccessDialogOpen(false)
                 router.push(`/members/share-deposit?memberNo=${createdMemberNo}`)
               }}
-              className="bg-teal-600 hover:bg-teal-700 text-white"
+              className="gap-2 bg-amber-600 hover:bg-amber-700 text-white"
             >
-              <ArrowUpCircle className="mr-2 h-4 w-4" />
+              <ArrowUpCircle className="h-4 w-4" />
               Share Deposit
             </AlertDialogAction>
           </AlertDialogFooter>

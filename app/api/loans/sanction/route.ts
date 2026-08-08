@@ -103,15 +103,16 @@ export async function POST(request: NextRequest) {
       const sanctionId = seqResult[0].next_id
 
       // Insert sanction details
+      console.log("Inserting sanction details ")
       await client.query(
         `INSERT INTO loan_sanction_details (
           sanction_id, loan_application_id, sanctioned_amount, sanction_date,
           interest_rate, loan_tenure_months, payment_amount, moratorium_period,
-          sanction_status, approved_by, remarks, created_at,repayment_type,number_of_installments,installment_start_date
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'SANCTIONED', $9, $10, NOW(), $11, $12, $13)`,
+          sanction_status, approved_by, remarks, created_at,repayment_type,number_of_installments,installment_start_date,branch_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'SANCTIONED', $9, $10, NOW(), $11, $12, $13, $14)`,
         [
           sanctionId, loan_application_id, sanctioned_amount, businessDate,
-          interest_rate, loan_tenure_months, emiAmount, moratorium_period || 0, session.userId, remarks || '', repayment_type, number_of_installments, installment_start_date
+          interest_rate, loan_tenure_months, emiAmount, moratorium_period || 0, session.userId, remarks || '', repayment_type, number_of_installments, installment_start_date, session.branch
         ]
       )
 
@@ -147,9 +148,9 @@ export async function POST(request: NextRequest) {
       await client.query(
         `INSERT INTO loan_sanction_details (
           sanction_id, loan_application_id, sanction_date,
-          sanction_status, approved_by, remarks, created_at
-        ) VALUES ($1, $2, CURRENT_DATE, 'REJECTED', $3, $4, NOW())`,
-        [sanctionId, loan_application_id, session.userId, remarks]
+          sanction_status, approved_by, remarks, created_at,branch_id
+        ) VALUES ($1, $2, CURRENT_DATE, 'REJECTED', $3, $4, NOW(), $5)`,
+        [sanctionId, loan_application_id, session.userId, remarks, session.branch]
       )
 
       // Update application status
