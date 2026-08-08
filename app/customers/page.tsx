@@ -523,23 +523,6 @@ export default function CustomerPage() {
           <CardContent className="p-5">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-6">
 
-              {/* Upload zones */}
-              <div className="flex gap-5 sm:flex-col sm:gap-4 shrink-0">
-                <UploadZone
-                  preview={photoPreview}
-                  icon={Camera}
-                  label="Photo"
-                  sublabel="Upload"
-                  onChange={(f) => setPhoto(f)}
-                />
-                <UploadZone
-                  preview={signaturePreview}
-                  icon={PenTool}
-                  label="Signature"
-                  sublabel="Upload"
-                  onChange={(f) => setSignature(f)}
-                />
-              </div>
 
               {/* Identity fields */}
               <div className="flex-1 grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -575,6 +558,24 @@ export default function CustomerPage() {
                     onChange={(e) => up({ father_name: e.target.value })}
                   />
                 </Field>
+              </div>
+              
+              {/* Upload zones */}
+              <div className="flex gap-5 sm:gap-4 shrink-0 space-y-2">
+                <UploadZone
+                  preview={photoPreview}
+                  icon={Camera}
+                  label="Photo"
+                  sublabel="Upload"
+                  onChange={(f) => setPhoto(f)}
+                />
+                <UploadZone
+                  preview={signaturePreview}
+                  icon={PenTool}
+                  label="Signature"
+                  sublabel="Upload"
+                  onChange={(f) => setSignature(f)}
+                />
               </div>
             </div>
           </CardContent>
@@ -670,9 +671,13 @@ export default function CustomerPage() {
                         <SelectTrigger id="caste_category"><SelectValue placeholder="Select" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="General">General</SelectItem>
-                          <SelectItem value="OBC">OBC</SelectItem>
+                          <SelectItem value="BC">BC</SelectItem>
+                          <SelectItem value="DNC">DNC</SelectItem>
+                          <SelectItem value="MBC">MBC</SelectItem>
+                          <SelectItem value="OC">OC</SelectItem>
                           <SelectItem value="SC">SC</SelectItem>
                           <SelectItem value="ST">ST</SelectItem>
+                          <SelectItem value="N/A">N/A</SelectItem>
                         </SelectContent>
                       </Select>
                     </Field>
@@ -688,11 +693,25 @@ export default function CustomerPage() {
                       </Select>
                     </Field>
                     <Field id="occupation" label="Occupation">
-                      <Input
+                      {/* <Input
                         id="occupation" placeholder="e.g. Farmer"
                         value={c.occupation}
                         onChange={(e) => up({ occupation: e.target.value })}
-                      />
+                      /> */}
+                      <Select value={c.occupation} onValueChange={(v) => up({ occupation: v })}>
+                        <SelectTrigger id="occupation"><SelectValue placeholder="Select" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Farmer">Farmer</SelectItem>
+                          <SelectItem value="Cooperative">Cooperative</SelectItem>
+                          <SelectItem value="Goverment/Public Sector">Goverment/Public Sector</SelectItem>
+                          <SelectItem value="Private Sector Job">Private Sector Job</SelectItem>
+                          <SelectItem value="Professional">Professional</SelectItem>
+                          <SelectItem value="Self Employed / Business">Self Employed / Business</SelectItem>
+                          <SelectItem value="Student">Student</SelectItem>
+                          <SelectItem value="Others">Others</SelectItem>
+                          <SelectItem value="N/A">N/A</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </Field>
                   </FormRow>
                 </FieldGroup>

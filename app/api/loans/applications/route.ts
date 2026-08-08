@@ -22,15 +22,15 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || ""
 
     // If fetching single application with security details
-    if (applicationId && includeSecurity) {
-      const { rows: securities } = await pool.query(
-        `SELECT security_id, security_type, security_description, security_value, document_reference
-         FROM loan_security_details WHERE loan_application_id = $1
-         ORDER BY security_id`,
-        [applicationId]
-      )
-      return NextResponse.json({ securities })
-    }
+    // if (applicationId && includeSecurity) {
+    //   const { rows: securities } = await pool.query(
+    //     `SELECT security_id, security_type, security_description, security_value, document_reference
+    //      FROM loan_security_details WHERE loan_application_id = $1
+    //      ORDER BY security_id`,
+    //     [applicationId]
+    //   )
+    //   return NextResponse.json({ securities })
+    // }
 
     let query = `
       SELECT 
