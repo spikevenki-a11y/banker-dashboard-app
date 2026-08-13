@@ -31,15 +31,15 @@ export async function PUT(req: NextRequest) {
       `UPDATE customers SET
          full_name = $1, father_name = $2, spouse_name = $3,
          date_of_birth = $4, gender = $5, mobile_no = $6, email = $7,
-         occupation = $8, marital_status = $9, blood_group = $10,
-         caste_category = $11,
+         occupation = $8, marital_status = $9,
+         caste_category = $10,
          updated_at = NOW()
-       WHERE customer_code = $12`,
+       WHERE customer_code = $11`,
       [
         personal.full_name || null, personal.father_name || null, personal.spouse_name || null,
         personal.date_of_birth || null, personal.gender || null, personal.mobile_no || null,
         personal.email || null, personal.occupation || null, personal.marital_status || null,
-        personal.blood_group || null, personal.caste_category || null, customer_code,
+        personal.caste_category || null, customer_code,
       ]
     )
 

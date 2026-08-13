@@ -139,7 +139,7 @@ export default function ViewMemberPage() {
       occupation: "",
       marital_status: "",
       caste: "",
-      blood_group: "",
+      // blood_group: "",
       caste_category: member.caste_category || "",
       // address
       house_no: member.house_no || "",
@@ -187,7 +187,7 @@ export default function ViewMemberPage() {
             email: editForm.email,
             occupation: editForm.occupation,
             marital_status: editForm.marital_status,
-            blood_group: editForm.blood_group,
+            // blood_group: editForm.blood_group,
             caste_category: editForm.caste_category,
           },
           address: {
@@ -971,7 +971,7 @@ export default function ViewMemberPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1.5">
+                {/* <div className="space-y-1.5">
                   <Label className="text-xs">Blood Group</Label>
                   <Select value={editForm.blood_group} onValueChange={(v) => ef("blood_group", v)}>
                     <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
@@ -981,7 +981,7 @@ export default function ViewMemberPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
+                </div> */}
                 <div className="space-y-1.5">
                   <Label className="text-xs">Caste</Label>
                   <Select value={editForm.caste_category} onValueChange={(v) => ef("caste_category", v)}>

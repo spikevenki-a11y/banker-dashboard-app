@@ -31,21 +31,21 @@ export default function ConfigurationsPage() {
   const [isLoading, setIsLoading] = useState(true)
 
   const transformConfigResponse = (apiData: any[]) => {
-  return apiData.map((section) => ({
-    id: section.id,
-    title: section.title,
-    description: section.description,
-    icon: iconMap[section.icon] ?? Users, // fallback
-    color: section.color,
-    bgColor: section.bgColor,
-    settings: section.settings.map((s: any) => ({
-      settingId: s.settingId,   // 🔑 REQUIRED
-      label: s.label,
-      value: s.value,
-      type: s.type,
-    })),
-  }))
-}
+    return apiData.map((section) => ({
+      id: section.id,
+      title: section.title,
+      description: section.description,
+      icon: iconMap[section.icon] ?? Users, // fallback
+      color: section.color,
+      bgColor: section.bgColor,
+      settings: section.settings.map((s: any) => ({
+        settingId: s.settingId,   // 🔑 REQUIRED
+        label: s.label,
+        value: s.value,
+        type: s.type,
+      })),
+    }))
+  }
   
   const filteredSections = configSections.filter((section) => {
     const searchLower = searchQuery.toLowerCase()
@@ -62,13 +62,15 @@ useEffect(() => {
     setIsLoading(true)
 
     try {
-      const [uiRes, shareRes] = await Promise.all([
+      const [uiRes, shareRes, assetsRes] = await Promise.all([
         fetch("/api/configs", { credentials: "include" }),
         fetch("/api/configs/share", { credentials: "include" }),
+        fetch("/api/configs/assets", { credentials: "include" }),
       ])
 
       const uiData = await uiRes.json()
       const shareJson = await shareRes.json()
+      const assetsJson = await assetsRes.json()
 
       let sections = transformConfigResponse(uiData)
 
@@ -84,6 +86,24 @@ useEffect(() => {
               value:
                 shareJson.data[s.settingId] !== undefined
                   ? shareJson.data[s.settingId]
+                  : s.value,
+            })),
+          }
+        })
+      }
+
+      // Merge asset config values into UI settings
+      if (assetsJson?.success) {
+        sections = sections.map((section) => {
+          if (section.id !== "assets") return section
+
+          return {
+            ...section,
+            settings: section.settings.map((s: any) => ({
+              ...s,
+              value:
+                assetsJson.data[s.settingId] !== undefined
+                  ? assetsJson.data[s.settingId]
                   : s.value,
             })),
           }
