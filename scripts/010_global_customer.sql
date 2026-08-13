@@ -12,7 +12,7 @@ create table public.customers (
   customer_type text not null,
   spouse_name character varying null,
   marital_status character varying null,
-  blood_group character varying null,
+  -- blood_group character varying null,
   caste_category character varying null,
   occupation character varying null,
   qualification character varying null,

@@ -58,7 +58,7 @@ type MemberProfile = {
   customer_type: string
   spouse_name: string
   marital_status: string
-  blood_group: string
+  // blood_group: string
   occupation: string
   mobile_no: string
   customer_email: string
@@ -892,7 +892,7 @@ const getLogindate = async () => {
                                 ["Gender",          viewMemberProfile.gender ? viewMemberProfile.gender.charAt(0).toUpperCase() + viewMemberProfile.gender.slice(1) : "---"],
                                 ["Mobile",          viewMemberProfile.mobile_no || "---"],
                                 ["Email",           viewMemberProfile.customer_email || "---"],
-                                ["Blood Group",     viewMemberProfile.blood_group || "---"],
+                                // ["Blood Group",     viewMemberProfile.blood_group || "---"],
                                 ["Marital Status",  viewMemberProfile.marital_status || "---"],
                                 ["Spouse Name",     viewMemberProfile.spouse_name || "---"],
                                 ["Occupation",      viewMemberProfile.occupation || "---"],

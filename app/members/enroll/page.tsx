@@ -328,7 +328,7 @@ export default function EnrollMemberPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-bold tracking-tight leading-tight">Enroll New Member</h1>
+            <h1 className="text-2xl font-bold tracking-tight leading-tight"> Register a new Membership details</h1>
             <p className="text-sm text-muted-foreground mt-0.5">
               Search by Aadhaar to enroll an existing customer as a member
             </p>
@@ -412,21 +412,7 @@ export default function EnrollMemberPage() {
                   </Select>
                 </Field>
 
-                <Field label="Account Type">
-                  <Select
-                    value={newMember.member_type}
-                    onValueChange={(value) => setNewMember({ ...newMember, member_type: value })}
-                  >
-                    <SelectTrigger className={`${memberFieldsReadOnly ? "bg-muted" : ""} w-full`}>
-                      <SelectValue placeholder="Select account type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="member">Member</SelectItem>
-                      <SelectItem value="associate">Nominal Member</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-
+                
                 <Field id="name" label="Full Name" required>
                   <Input
                     id="name"
@@ -435,6 +421,22 @@ export default function EnrollMemberPage() {
                     onChange={(e) => setNewMember({ ...newMember, full_name: e.target.value })}
                   />
                 </Field>
+                <Field label="Account Type">
+                  <Select
+                    value={newMember.member_type}
+                    onValueChange={(value) => setNewMember({ ...newMember, member_type: value })}
+                  >
+                    <SelectTrigger className={`${memberFieldsReadOnly ? "bg-muted" : ""} w-full`} defaultValue={0}>
+                      <SelectValue placeholder="Select account type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0" >Select Account Type</SelectItem>
+                      <SelectItem value="member">Member</SelectItem>
+                      <SelectItem value="associate">Nominal Member</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+
 
                 <Field id="father_name" label="Father's Name" required>
                   <Input

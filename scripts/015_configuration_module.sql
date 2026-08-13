@@ -6,7 +6,8 @@ CREATE TABLE config_sections (
   color VARCHAR(50),
   bg_color VARCHAR(50),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  enabled BOOLEAN NOT NULL DEFAULT TRUE
 );
 
 CREATE TABLE config_settings (
@@ -148,5 +149,66 @@ INSERT INTO config_share (
   0.00,             -- B-Class minimum share balance
   0.00,             -- B-Class maximum share balance
   CURRENT_DATE,     -- Effective from today
+  true              -- Active config
+);
+
+
+
+CREATE TABLE config_assets (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    branch_id BIGINT NOT NULL
+        REFERENCES branchparameters(branch_id),
+
+    -- Depreciation configuration
+    is_depreciation_calculated_based_on_category BOOLEAN NOT NULL DEFAULT false,
+
+    calculate_depreciation_on_current_year_purchase_asset BOOLEAN NOT NULL DEFAULT false,
+
+    calculate_depreciation_on_current_year_sold_asset BOOLEAN NOT NULL DEFAULT false,
+
+    calculate_depreciation_on_current_year_purchase_asset_based_on_purchase_date BOOLEAN NOT NULL DEFAULT false,
+
+    is_depreciation_calculated_based_on_item BOOLEAN NOT NULL DEFAULT false,
+
+    is_depreciation_calculated_based_on_bookvalue BOOLEAN NOT NULL DEFAULT false,
+
+    -- Lifecycle
+    is_active BOOLEAN NOT NULL DEFAULT true,
+
+    created_at TIMESTAMP DEFAULT now(),
+    updated_at TIMESTAMP DEFAULT now(),
+
+    CONSTRAINT uq_assets_config_branch_active
+        UNIQUE (branch_id, is_active)
+);
+
+INSERT INTO config_settings (setting_id, section_id, label, value, type) VALUES
+('is_depreciation_calculated_based_on_category', 'assets', 'Calculate Depreciation Based on Category', 'false', 'boolean'),
+('calculate_depreciation_on_current_year_purchase_asset', 'assets', 'Calculate Depreciation on Current Year Purchased Asset', 'false', 'boolean'),
+('calculate_depreciation_on_current_year_sold_asset', 'assets', 'Calculate Depreciation on Current Year Sold Asset', 'false', 'boolean'),
+('calculate_depreciation_on_current_year_purchase_asset_based_on_purchase_date', 'assets', 'Calculate Depreciation on Purchase Date for Current Year Purchased Asset', 'false', 'boolean'),
+('is_depreciation_calculated_based_on_item', 'assets', 'Calculate Depreciation Based on Item', 'false', 'boolean'),
+('is_depreciation_calculated_based_on_bookvalue', 'assets', 'Calculate Depreciation Based on Book Value', 'false', 'boolean');
+
+INSERT INTO config_assets (
+  branch_id,
+
+  is_depreciation_calculated_based_on_category,
+  calculate_depreciation_on_current_year_purchase_asset,
+  calculate_depreciation_on_current_year_sold_asset,
+  calculate_depreciation_on_current_year_purchase_asset_based_on_purchase_date,
+  is_depreciation_calculated_based_on_item,
+  is_depreciation_calculated_based_on_bookvalue,
+
+  is_active
+) VALUES (
+  2310801,          -- Branch ID
+  false,
+  false,
+  false,
+  false,
+  false,
+  false,
   true              -- Active config
 );

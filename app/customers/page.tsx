@@ -33,7 +33,7 @@ interface Customer {
   spouse_name: string
   gender: string
   marital_status: string
-  blood_group: string
+  // blood_group: string
   dob: string
   age: string
   religion: string
@@ -43,6 +43,7 @@ interface Customer {
   qualification_details: string
   anual_income: string
   dccb_account_number: string
+  dccb_Branch: string
   board_resolution_number: string
   board_resolution_date: string
   ledger_folio_number: string
@@ -73,9 +74,10 @@ interface Customer {
 
 const initialCustomer: Customer = {
   full_name: "", father_name: "", spouse_name: "",
-  gender: "male", marital_status: "single", blood_group: "A+",
+  gender: "male", marital_status: "single", //blood_group: "A+",
   dob: "", age: "", religion: "", caste_category: "",
-  occupation: "", qualification: "", qualification_details: "", anual_income: "", dccb_account_number: "",
+  occupation: "", qualification: "", qualification_details: "", 
+  anual_income: "", dccb_account_number: "", dccb_Branch: "",
   board_resolution_number: "", board_resolution_date: "", ledger_folio_number: "",
   house_no: "", street: "", village: "", taluk: "", district: "", state: "", pin_code: "",
   phone: "", alt_phone: "", email: "",
@@ -291,12 +293,12 @@ function AddressSection({
 export default function CustomerPage() {
   const router = useRouter()
   const [c, setC] = useState<Customer>(initialCustomer)
-  const [castes, setCastes] = useState<{ serial_no: string; caste_name: string }[]>([])
+  // const [castes, setCastes] = useState<{ serial_no: string; caste_name: string }[]>([])
 
   useEffect(() => {
     fetch("/api/customers/caste", { credentials: "include" })
       .then((r) => r.json())
-      .then((d) => { if (d.success) setCastes(d.castes) })
+      // .then((d) => { if (d.success) setCastes(d.castes) })
       .catch(console.error)
   }, [])
 
@@ -632,7 +634,7 @@ export default function CustomerPage() {
                         </SelectContent>
                       </Select>
                     </Field>
-                    <Field id="blood_group" label="Blood Group">
+                    {/* <Field id="blood_group" label="Blood Group">
                       <Select value={c.blood_group} onValueChange={(v) => up({ blood_group: v })}>
                         <SelectTrigger id="blood_group"><SelectValue /></SelectTrigger>
                         <SelectContent>
@@ -641,7 +643,7 @@ export default function CustomerPage() {
                           ))}
                         </SelectContent>
                       </Select>
-                    </Field>
+                    </Field> */}
                   </FormRow>
                 </FieldGroup>
 
@@ -681,7 +683,7 @@ export default function CustomerPage() {
                         </SelectContent>
                       </Select>
                     </Field>
-                    <Field id="caste" label="Caste">
+                    {/* <Field id="caste" label="Caste">
                       <Select value={c.caste as string} onValueChange={(v) => up({ caste: v })}>
                         <SelectTrigger id="caste"><SelectValue placeholder="Select" /></SelectTrigger>
                         <SelectContent>
@@ -691,7 +693,7 @@ export default function CustomerPage() {
                           ))}
                         </SelectContent>
                       </Select>
-                    </Field>
+                    </Field> */}
                     <Field id="occupation" label="Occupation">
                       {/* <Input
                         id="occupation" placeholder="e.g. Farmer"
@@ -719,11 +721,19 @@ export default function CustomerPage() {
                 <FieldGroup title="Education & Income">
                   <FormRow cols={3}>
                     <Field id="qualification" label="Qualification">
-                      <Input
-                        id="qualification" placeholder="e.g. B.Sc"
-                        value={c.qualification}
-                        onChange={(e) => up({ qualification: e.target.value })}
-                      />
+                      <Select value={c.qualification} onValueChange={(v) => up({ qualification: v })}>
+                        <SelectTrigger id="qualification"><SelectValue placeholder="Select" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="No Formal Education">No Formal Education</SelectItem>
+                          <SelectItem value="Higher Secondery">Higher Secondery</SelectItem>
+                          <SelectItem value="SSLC">SSLC</SelectItem>
+                          <SelectItem value="Diploma /ITI">Diploma /ITI</SelectItem>
+                          <SelectItem value="Graduate">Graduate</SelectItem>
+                          <SelectItem value="Post graduate">Post graduate</SelectItem>
+                          <SelectItem value="Professional / Doctoral">Professional / Doctoral</SelectItem>
+                          <SelectItem value="Others">Others</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </Field>
                     <Field id="qualification_details" label="Qualification Details">
                       <Input
@@ -748,7 +758,16 @@ export default function CustomerPage() {
                       <Input
                         id="dccb_account_number" placeholder="Enter DCCB Account Number"
                         value={c.dccb_account_number}
+                        maxLength={9}
                         onChange={(e) => up({ dccb_account_number: e.target.value })}
+                      />
+                    </Field>
+                    
+                    <Field id="dccb_Branch" label="DCCB Branch">
+                      <Input
+                        id="dccb_Branch" placeholder="Enter DCCB Branch"
+                        value={c.dccb_Branch}
+                        onChange={(e) => up({ dccb_Branch: e.target.value })}
                       />
                     </Field>
                   </FormRow>
@@ -864,14 +883,6 @@ export default function CustomerPage() {
 
                   {[
                     {
-                      label: "PAN Card",
-                      icon: Building2,
-                      value: c.pan_card_number,
-                      placeholder: "ABCDE1234F",
-                      onChange: (v: string) => up({ pan_card_number: v.toUpperCase() }),
-                      required: false,
-                    },
-                    {
                       label: "Aadhaar",
                       icon: ShieldCheck,
                       value: c.aadhar_id,
@@ -880,6 +891,14 @@ export default function CustomerPage() {
                       onChange: (v: string) => up({ aadhar_id: v.replace(/\D/g, "").slice(0, 12) }),
                       maxLength: 14,
                       required: true,
+                    },
+                    {
+                      label: "PAN Card",
+                      icon: Building2,
+                      value: c.pan_card_number,
+                      placeholder: "ABCDE1234F",
+                      onChange: (v: string) => up({ pan_card_number: v.toUpperCase() }),
+                      required: false,
                     },
                     {
                       label: "Ration Card",

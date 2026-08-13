@@ -25,6 +25,7 @@ export async function GET() {
         color,
         bg_color
       FROM config_sections
+      where enabled = 'true'
       ORDER BY id
     `)
 
