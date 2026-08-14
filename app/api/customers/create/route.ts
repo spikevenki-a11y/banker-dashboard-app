@@ -121,6 +121,7 @@ export async function POST(req: Request) {
       body.aadhar_id ||
       body.pan_card_number ||
       body.ration_no ||
+      body.ration_card_type ||
       body.driving_license_no ||
       body.voter_id
     ) {
@@ -131,14 +132,16 @@ export async function POST(req: Request) {
           aadhaar_no,
           pan_no,
           ration_no,
+          ration_card_type,
           driving_license_no
-        ) VALUES ($1,$2,$3,$4,$5)
+        ) VALUES ($1,$2,$3,$4,$5,$6)
       `,
         [
           code,
           body.aadhar_id,
           body.pan_card_number,
           body.ration_no,
+          body.ration_card_type || null,
           body.driving_license_no,
         ]
       )
