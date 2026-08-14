@@ -697,7 +697,8 @@ export default function MembersPage() {
                 <p className="text-muted-foreground">
                   {user?.role === "admin"
                     ? "All branches - Manage customer accounts and member operations"
-                    : `${user?.branch || "Your branch"} - Manage customer accounts and member operations`}
+                    : `${user?.branch || "Your branch"} - Manage membership details`}
+                    {/* : `${user?.branch || "Your branch"} - Manage customer accounts and member operations`} */}
                 </p>
               </div>
               <Button onClick={() => router.push("/customers")}
@@ -734,7 +735,7 @@ export default function MembersPage() {
                 </CardHeader>
                 <CardContent>
                   <CardTitle className="text-lg">View Member</CardTitle>
-                  <CardDescription className="mt-1">View Member details</CardDescription>
+                  <CardDescription className="mt-1">View or Modify Member details</CardDescription>
                 </CardContent>
               </Card>
               

@@ -11,6 +11,7 @@ export async function POST(req: Request) {
     const father_name = body.father_name
     const ledger_folio_number = body.ledger_folio_number
     const member_name = body.member_name
+    const membership_no = body.membership_no
 
   try {
   
@@ -145,7 +146,11 @@ export async function POST(req: Request) {
 
     `
     const params: any[] = [branchId]
-    
+
+    if (membership_no) {
+      params.push(membership_no)
+      query += ` AND m.membership_no ilike '%' || $${params.length} || '%'`
+    }
     if (member_name) {
       params.push(member_name)
       query += ` AND c.full_name ilike'%' || $${params.length} || '%'`

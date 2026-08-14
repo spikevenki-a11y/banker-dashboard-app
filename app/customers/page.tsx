@@ -68,6 +68,7 @@ interface Customer {
   pan_card_number: string
   aadhar_id: string
   ration_no: string
+  ration_card_type: string
   voter_id: string
   driving_license_no: string
 }
@@ -84,7 +85,7 @@ const initialCustomer: Customer = {
   permanant_house_no: "", permanant_street: "", permanant_village: "",
   permanant_taluk: "", permanant_district: "", permanant_state: "",
   permanant_pin_code: "", permanant_phone: "",
-  pan_card_number: "", aadhar_id: "", ration_no: "", voter_id: "", driving_license_no: "",
+  pan_card_number: "", aadhar_id: "", ration_no: "", ration_card_type: "", voter_id: "", driving_license_no: "",
   caste: undefined, customer_type: undefined,
 }
 
@@ -909,6 +910,16 @@ export default function CustomerPage() {
                       required: false,
                     },
                     {
+                      label: "Ration Card Type",
+                      icon: Building2,
+                      type: "select" as const,
+                      value: c.ration_card_type,
+                      placeholder: "Select One",
+                      options: ["PHH", "NPHH", "NPHH-S", "NPHH-NC", "PHH AAY", "Others"],
+                      onChange: (v: string) => up({ ration_card_type: v }),
+                      required: false,
+                    },
+                    {
                       label: "Voter ID",
                       icon: Building2,
                       value: c.voter_id,
@@ -924,7 +935,7 @@ export default function CustomerPage() {
                       onChange: (v: string) => up({ driving_license_no: v.toUpperCase() }),
                       required: false,
                     },
-                  ].map(({ label, value, placeholder, display, onChange, maxLength, required }, i) => {
+                  ].map(({ label, value, placeholder, display, onChange, maxLength, required, type, options }, i, arr) => {
                     const entered = (value ?? "").trim().length > 0
                     return (
                       <div
@@ -932,17 +943,30 @@ export default function CustomerPage() {
                         className={[
                           "grid grid-cols-[1fr_2fr_90px] gap-4 items-center px-5 py-3.5 transition-colors",
                           "hover:bg-muted/20",
-                          i < 4 ? "border-b" : "",
+                          i < arr.length - 1 ? "border-b" : "",
                         ].join(" ")}
                       >
                         <span className="text-sm font-medium">{label}</span>
-                        <Input
-                          placeholder={placeholder}
-                          value={display ?? value ?? ""}
-                          maxLength={maxLength}
-                          onChange={(e) => onChange(e.target.value.replace(/\s/g, ""))}
-                          className="h-8 text-sm max-w-xs"
-                        />
+                        {type === "select" ? (
+                          <Select value={value ?? ""} onValueChange={(v) => onChange(v)}>
+                            <SelectTrigger className="h-8 text-sm max-w-xs">
+                              <SelectValue placeholder={placeholder} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {options?.map((opt: string) => (
+                                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Input
+                            placeholder={placeholder}
+                            value={display ?? value ?? ""}
+                            maxLength={maxLength}
+                            onChange={(e) => onChange(e.target.value.replace(/\s/g, ""))}
+                            className="h-8 text-sm max-w-xs"
+                          />
+                        )}
                         <div className="flex justify-center">
                           {entered ? (
                             <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-50 text-[10px] font-semibold">

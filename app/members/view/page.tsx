@@ -37,6 +37,10 @@ import {
   Pencil,
   CheckCircle2,
   Book,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react"
 import { Ledger } from "next/font/google"
 
@@ -92,6 +96,7 @@ type AccountSummary = {
 }
 
 type SearchFields = {
+  membership_no: string
   member_name: string
   father_name: string
   phone_number: string
@@ -103,6 +108,7 @@ export default function ViewMemberPage() {
   const router = useRouter()
   const { user } = useAuth()
   const [searchFields, setSearchFields] = useState<SearchFields>({
+    membership_no: "",
     member_name: "",
     father_name: "",
     phone_number: "",
@@ -113,6 +119,8 @@ export default function ViewMemberPage() {
   const [selectedMember, setSelectedMember] = useState<MemberData | null>(null)
   const [isSearching, setIsSearching] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [activeTab, setActiveTab] = useState<"personal" | "address" | "kyc" | "accounts">("personal")
   const [assets, setAssets] = useState<AccountItem[]>([])
   const [liabilities, setLiabilities] = useState<AccountItem[]>([])
@@ -256,6 +264,7 @@ export default function ViewMemberPage() {
     setIsSearching(true)
     setHasSearched(true)
     setSelectedMember(null)
+    setPage(1)
     try {
       const res = await fetch("/api/memberships/view_member", {
         method: "POST",
@@ -275,6 +284,9 @@ export default function ViewMemberPage() {
       setIsSearching(false)
     }
   }
+
+  const totalPages = Math.max(1, Math.ceil(members.length / pageSize))
+  const paginatedMembers = members.slice((page - 1) * pageSize, page * pageSize)
 
   const handleSelectMember = (member: MemberData) => {
     setSelectedMember(member)
@@ -348,7 +360,16 @@ export default function ViewMemberPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-5 lg:grid-cols-7">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-muted-foreground">Membership No.</Label>
+                <Input
+                  placeholder="Enter membership no."
+                  value={searchFields.membership_no}
+                  onChange={(e) => setSearchFields({ ...searchFields, membership_no: e.target.value })}
+                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                />
+              </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-muted-foreground">Member Name</Label>
                 <Input
@@ -394,6 +415,9 @@ export default function ViewMemberPage() {
                   onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                 />
               </div>
+              <div className="space-y-1.5"></div>
+              <div className="space-y-1.5"></div>
+              <div className="space-y-1.5"></div>
               <div className="flex items-end">
                 <Button onClick={handleSearch} disabled={isSearching} className="w-full gap-2">
                   <Search className="h-4 w-4" />
@@ -801,11 +825,11 @@ export default function ViewMemberPage() {
                         <TableHead className="font-semibold">Aadhaar</TableHead>
                         <TableHead className="font-semibold">Class</TableHead>
                         <TableHead className="font-semibold">Status</TableHead>
-                        <TableHead className="text-right font-semibold">Action</TableHead>
+                        {/* <TableHead className="text-right font-semibold">Action</TableHead> */}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {members.map((member, idx) => (
+                      {paginatedMembers.map((member, idx) => (
                         <TableRow
                           key={`${member.membership_no}-${idx}`}
                           className="cursor-pointer hover:bg-muted/50 transition-colors"
@@ -850,7 +874,7 @@ export default function ViewMemberPage() {
                               {member.status || "---"}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right">
+                          {/* <TableCell className="text-right">
                             <Button
                               size="sm"
                               variant="ghost"
@@ -863,11 +887,52 @@ export default function ViewMemberPage() {
                               <Eye className="h-3.5 w-3.5" />
                               View
                             </Button>
-                          </TableCell>
+                          </TableCell> */}
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
+                  <div className="flex items-center justify-between border-t pt-4 mt-2">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>Rows per page:</span>
+                      <Select
+                        value={String(pageSize)}
+                        onValueChange={(v) => {
+                          setPageSize(Number(v))
+                          setPage(1)
+                        }}
+                      >
+                        <SelectTrigger className="h-8 w-20">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="20">20</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span className="ml-2">
+                        {members.length === 0
+                          ? "No records"
+                          : `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, members.length)} of ${members.length}`}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPage(1)} disabled={page === 1}>
+                        <ChevronsLeft className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPage((p) => p - 1)} disabled={page === 1}>
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <span className="px-3 text-sm">Page {page} of {totalPages}</span>
+                      <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPage((p) => p + 1)} disabled={page >= totalPages}>
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setPage(totalPages)} disabled={page >= totalPages}>
+                        <ChevronsRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-16 text-center">

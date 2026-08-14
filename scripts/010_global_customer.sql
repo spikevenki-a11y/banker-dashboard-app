@@ -75,3 +75,6 @@ where
 create unique INDEX IF not exists unique_dl_no_not_null on public.customer_kycdetails using btree (driving_license_no) TABLESPACE pg_default
 where
   (driving_license_no is not null);
+
+ALTER TABLE public.customer_kycdetails
+ADD COLUMN ration_card_type character varying(20) NULL;
