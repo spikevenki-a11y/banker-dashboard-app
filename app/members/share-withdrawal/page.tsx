@@ -51,8 +51,11 @@ import {
   AlertTriangle,
   Users,
   X,
+  Eye,
+  History,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
+import { ViewMemberPopup } from "@/components/view-member-popup"
 
 type MemberInfo = {
   membership_id: string
@@ -73,6 +76,18 @@ type SearchResult = {
   father_name: string
   phone_no: string
   member_type: string
+}
+
+type ShareTransaction = {
+  id: string
+  voucher_type: string
+  debit_amount: number
+  credit_amount: number
+  business_date: string
+  voucher_no: number
+  gl_batch_id: number
+  status: string
+  narration: string
 }
 
 function formatCurrency(val: number | string) {
@@ -117,11 +132,35 @@ export default function ShareWithdrawalPage() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [isPopupSearching, setIsPopupSearching] = useState(false)
 
+  // View member details popup
+  const [viewMemberOpen, setViewMemberOpen] = useState(false)
+
+  // Transaction history
+  const [transactions, setTransactions] = useState<ShareTransaction[]>([])
+  const [isLoadingTxns, setIsLoadingTxns] = useState(false)
+
+  const fetchTransactions = async (no: string) => {
+    setIsLoadingTxns(true)
+    try {
+      const res = await fetch(
+        `/api/share/transactions?membership_no=${encodeURIComponent(no)}&limit=10`,
+        { credentials: "include" }
+      )
+      const data = await res.json()
+      if (res.ok) setTransactions(data.transactions || [])
+    } catch {
+      // silent
+    } finally {
+      setIsLoadingTxns(false)
+    }
+  }
+
   const fetchMember = async (no: string) => {
     if (!no.trim()) return
     setIsSearching(true)
     setSearchError("")
     setMemberInfo(null)
+    setTransactions([])
     try {
       const res = await fetch(
         `/api/memberships/share_details?membership_no=${encodeURIComponent(no.trim())}`,
@@ -141,6 +180,7 @@ export default function ShareWithdrawalPage() {
         joined_date: data.joined_date || "",
         branch_id: data.branch_id || 0,
       })
+      fetchTransactions(data.membership_no)
     } catch (err: any) {
       setSearchError(err.message || "Failed to fetch member details")
     } finally {
@@ -230,6 +270,7 @@ export default function ShareWithdrawalPage() {
       setSuccessMessage(`Voucher No: ${data.voucher_no} | Amount: ${formatCurrency(amt)} | Status: ${data.status}`)
       setSuccessOpen(true)
       setAmount(""); setNarration(""); setVoucherType(""); setSelectedBatch(0)
+      fetchTransactions(memberInfo.membership_no)
     } catch (e: any) {
       setFormError(e.message || "Share withdrawal failed. Please try again.")
     } finally {
@@ -240,6 +281,7 @@ export default function ShareWithdrawalPage() {
   const handleReset = () => {
     setMemberNo(""); setMemberInfo(null); setSearchError("")
     setAmount(""); setNarration(""); setVoucherType(""); setSelectedBatch(0); setFormError("")
+    setTransactions([])
   }
 
   const isActive = memberInfo?.status?.toUpperCase() === "ACTIVE"
@@ -307,6 +349,17 @@ export default function ShareWithdrawalPage() {
                           <Search className="h-4 w-4" />
                           Search
                         </Button>
+                        {memberInfo && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setViewMemberOpen(true)}
+                            className="gap-2 bg-transparent"
+                          >
+                            <Eye className="h-4 w-4" />
+                            View
+                          </Button>
+                        )}
                       </div>
                       {isSearching && (
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -317,7 +370,7 @@ export default function ShareWithdrawalPage() {
                       {searchError && <p className="text-sm text-red-500">{searchError}</p>}
                     </div>
 
-                    {memberInfo && (
+                    {/* {memberInfo && (
                       <div className={`rounded-lg border p-4 ${isActive ? "border-orange-200 bg-orange-50/50" : "border-amber-200 bg-amber-50/50"}`}>
                         <div className="mb-3 flex items-center gap-2">
                           <CheckCircle2 className={`h-5 w-5 ${isActive ? "text-orange-600" : "text-amber-600"}`} />
@@ -353,7 +406,7 @@ export default function ShareWithdrawalPage() {
                           </div>
                         </div>
                       </div>
-                    )}
+                    )} */}
                   </CardContent>
                 </Card>
 
@@ -459,6 +512,87 @@ export default function ShareWithdrawalPage() {
                     {formError && <p className="text-sm text-red-500">{formError}</p>}
                   </CardContent>
                 </Card>
+
+                {/* Step 3: Recent Transactions */}
+                {memberInfo && (
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100 text-sm font-bold text-orange-700">
+                            3
+                          </div>
+                          <div>
+                            <CardTitle className="text-lg">Recent Transactions</CardTitle>
+                            <CardDescription>Last 10 share withdrawal transactions for this member</CardDescription>
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fetchTransactions(memberInfo.membership_no)}
+                          disabled={isLoadingTxns}
+                          className="bg-transparent"
+                        >
+                          {isLoadingTxns ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <History className="mr-2 h-4 w-4" />}
+                          Refresh
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {isLoadingTxns ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : transactions.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-8 text-center">
+                          <History className="h-8 w-8 text-muted-foreground" />
+                          <p className="mt-2 text-sm text-muted-foreground">No share withdrawal transactions found.</p>
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Date</TableHead>
+                                <TableHead>Voucher</TableHead>
+                                <TableHead>Batch</TableHead>
+                                <TableHead>Narration</TableHead>
+                                <TableHead className="text-right">Amount</TableHead>
+                                <TableHead>Status</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {transactions.map((txn) => (
+                                <TableRow key={txn.id}>
+                                  <TableCell className="whitespace-nowrap text-sm">{formatDate(txn.business_date)}</TableCell>
+                                  <TableCell className="text-sm">
+                                    <Badge variant="outline">{txn.voucher_type || "---"}</Badge>
+                                    {txn.voucher_no ? <span className="ml-1 text-xs text-muted-foreground">#{txn.voucher_no}</span> : null}
+                                  </TableCell>
+                                  <TableCell className="font-mono text-sm">{txn.gl_batch_id || "---"}</TableCell>
+                                  <TableCell className="max-w-[150px] truncate text-sm">{txn.narration || "---"}</TableCell>
+                                  <TableCell className="text-right font-semibold text-orange-600">
+                                    {formatCurrency(txn.credit_amount)}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className={
+                                      txn.status === "COMPLETED" ? "border-teal-300 text-teal-700" :
+                                      txn.status === "REJECTED" ? "border-red-300 text-red-700" :
+                                      "border-amber-300 text-amber-700"
+                                    }>
+                                      {txn.status || "---"}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Action Buttons */}
                 <div className="flex justify-end gap-3">
@@ -823,6 +957,12 @@ export default function ShareWithdrawalPage() {
           </main>
         </div>
       </div>
+
+      <ViewMemberPopup
+        open={viewMemberOpen}
+        onOpenChange={setViewMemberOpen}
+        membershipNo={memberInfo?.membership_no}
+      />
     </DashboardWrapper>
   )
 }

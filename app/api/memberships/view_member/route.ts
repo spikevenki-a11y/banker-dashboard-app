@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     const branchId = session.branch  
 
     // Lookup customer by Aadhaar
-    console.log("Membership lookup with body:", body)
+    // console.log("Membership lookup with body:", body)
     // const { rowsa } = await pool.query(
     //   `
     //   select 
@@ -149,7 +149,7 @@ export async function POST(req: Request) {
 
     if (membership_no) {
       params.push(membership_no)
-      query += ` AND m.membership_no ilike '%' || $${params.length} || '%'`
+      query += ` AND m.membership_no::text ilike '%' || $${params.length} || '%'`
     }
     if (member_name) {
       params.push(member_name)
@@ -171,6 +171,8 @@ export async function POST(req: Request) {
       params.push(ledger_folio_number)
       query += ` AND m.ledger_folio_number ilike '%' || $${params.length} || '%'`
     }
+
+    // console.log("Membership lookup query:", query, "with params:", params)
     const { rows } = await pool.query(query, params)
 
     if (rows.length === 0) {
