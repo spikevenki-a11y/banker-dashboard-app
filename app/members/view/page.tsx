@@ -346,7 +346,8 @@ export default function ViewMemberPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground">View Member</h1>
             <p className="text-sm text-muted-foreground">
-              Search and view member details
+              {/* Search and view member details */}
+              Search, View and Modify Member details
             </p>
           </div>
         </div>
