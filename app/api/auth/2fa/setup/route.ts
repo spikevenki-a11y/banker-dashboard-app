@@ -1,19 +1,11 @@
 export const runtime = "nodejs"
-import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { NextResponse } from "next/server"
+import pool from "@/lib/connection/db"
 import { getSession } from "@/lib/auth/session"
 import { generateSecret, generateURI } from "otplib"
 import QRCode from "qrcode"
 
 const APP_NAME = "Banker Dashboard"
-
-function supabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } }
-  )
-}
 
 // GET — return current 2FA status for logged-in user
 export async function GET() {
@@ -21,13 +13,10 @@ export async function GET() {
     const session = await getSession()
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const supabase = supabaseAdmin()
-
-    const { data: user } = await supabase
-      .from("users")
-      .select("two_factor_enabled")
-      .eq("id", session.userId)
-      .maybeSingle()
+    const { rows: [user] } = await pool.query(
+      `SELECT two_factor_enabled FROM users WHERE id = $1`,
+      [session.userId]
+    )
 
     return NextResponse.json({ enabled: user?.two_factor_enabled ?? false })
   } catch (err) {

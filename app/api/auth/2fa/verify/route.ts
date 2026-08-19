@@ -1,16 +1,8 @@
 export const runtime = "nodejs"
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import pool from "@/lib/connection/db"
 import { verify } from "otplib"
 import { createSession, getPendingTwoFactorSession, clearPendingTwoFactorSession } from "@/lib/auth/session"
-
-function supabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } }
-  )
-}
 
 // POST — verify TOTP during login, then upgrade pending session to a full session
 export async function POST(request: NextRequest) {
@@ -28,12 +20,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Authentication code is required" }, { status: 400 })
     }
 
-    const supabase = supabaseAdmin()
-    const { data: user } = await supabase
-      .from("users")
-      .select("two_factor_secret, two_factor_enabled, is_active")
-      .eq("id", pendingData.userId)
-      .maybeSingle()
+    const { rows: [user] } = await pool.query(
+      `SELECT two_factor_secret, two_factor_enabled, is_active FROM users WHERE id = $1`,
+      [pendingData.userId]
+    )
 
     if (!user || !user.is_active) {
       return NextResponse.json({ error: "Account not found or inactive" }, { status: 401 })

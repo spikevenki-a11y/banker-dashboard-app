@@ -1,15 +1,7 @@
 export const runtime = "nodejs"
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import pool from "@/lib/connection/db"
 import { generateAuthenticationOptions } from "@simplewebauthn/server"
-
-function supabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } }
-  )
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,13 +10,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Username is required" }, { status: 400 })
     }
 
-    const supabase = supabaseAdmin()
-
-    const { data: user } = await supabase
-      .from("users")
-      .select("id, webauthn_enabled, is_active")
-      .eq("username", username)
-      .maybeSingle()
+    const { rows: [user] } = await pool.query(
+      `SELECT id, webauthn_enabled, is_active FROM users WHERE username = $1`,
+      [username]
+    )
 
     if (!user || !user.is_active) {
       return NextResponse.json({ error: "User not found or inactive" }, { status: 404 })
@@ -33,10 +22,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Fingerprint login is not enabled for this account" }, { status: 400 })
     }
 
-    const { data: creds } = await supabase
-      .from("user_webauthn_credentials")
-      .select("credential_id, transports")
-      .eq("user_id", user.id)
+    const { rows: creds } = await pool.query(
+      `SELECT credential_id, transports FROM user_webauthn_credentials WHERE user_id = $1`,
+      [user.id]
+    )
 
     if (!creds || creds.length === 0) {
       return NextResponse.json({ error: "No registered credentials found" }, { status: 400 })
