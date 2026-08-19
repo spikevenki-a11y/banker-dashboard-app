@@ -26,19 +26,6 @@ export async function POST(request: NextRequest) {
       number_of_installments,
       installment_start_date
     } = body
-    console.log("Sanction Request Body:", body)
-    console.log("the data is", {
-      loan_application_id,
-      action,
-      sanctioned_amount,
-      interest_rate,
-      loan_tenure_months,
-      moratorium_period,
-      remarks,
-      repayment_type,
-      number_of_installments,
-      installment_start_date
-    })
 
     if (!loan_application_id || !action) {
       return NextResponse.json(

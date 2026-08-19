@@ -147,7 +147,6 @@ export async function POST(request: NextRequest) {
     const branchId = session.branch
     const businessDate: string = session.businessDate
     const body = await request.json()
-    console.log("Received loan application data:", body)
 
     const {
       membership_no,

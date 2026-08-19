@@ -54,7 +54,6 @@ export async function POST(request: NextRequest) {
       remarks,
       voucher_type,
     } = body
-    console.log("Received sale/disposal data:", body)
 
     if (!asset_detail_id || !disposal_type || !sale_date) {
       return NextResponse.json(
