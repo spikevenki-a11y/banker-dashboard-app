@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       sameSite: "lax",
       path: "/",
-      secure: false,
+      secure: process.env.NODE_ENV === "production",
       maxAge: 60 * 5,
     })
     // Store username temporarily to look up user after auth
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       sameSite: "lax",
       path: "/",
-      secure: false,
+      secure: process.env.NODE_ENV === "production",
       maxAge: 60 * 5,
     })
     return res

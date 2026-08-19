@@ -1,6 +1,6 @@
 export const runtime = "nodejs"
 import { createClient } from "@supabase/supabase-js"
-import { createSession } from "@/lib/auth/session"
+import { createSession, createPendingTwoFactorSession } from "@/lib/auth/session"
 import { NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
 
@@ -16,15 +16,11 @@ export async function POST(request: Request) {
     if (!username || !password)
       return NextResponse.json({ error: "Username and password required" }, { status: 400 })
 
-      console.log("[v0] Login attempt for username:", username)
-
     const { data: user } = await supabase
       .from("users")
       .select("id, username, password, full_name, role, is_active, branch, two_factor_enabled, two_factor_secret")
       .eq("username", username)
       .maybeSingle()
-
-    console.log("[v0] User lookup result:", user)
 
     if (!user || !user.is_active)
       return NextResponse.json({ error: "Invalid username or inactive account" }, { status: 401 })
@@ -82,78 +78,36 @@ export async function POST(request: Request) {
       success: true,
     })
 
-    // If 2FA is enabled, set a short-lived pending cookie and signal the client
+    // If 2FA is enabled, set a short-lived signed pending session and signal the client
     if (user.two_factor_enabled && user.two_factor_secret) {
-      const pendingRes = NextResponse.json({ requiresTwoFactor: true })
-      pendingRes.cookies.set({
-        name: "banker_2fa_pending",
-        value: JSON.stringify({
-          userId: user.id,
-          fullName: user.full_name,
-          role: user.role,
-          branch: user.branch,
-          branch_name: user.branch,
-          businessDate: day!.business_date,
-        }),
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: false,
-        maxAge: 60 * 5, // 5 minutes
-      })
-      return pendingRes
-    }
-
-    // Create secured session
-    // await createSession({
-    //   userId: user.id,
-    //   username: user.username,
-    //   fullName: user.full_name,
-    //   role: user.role,
-    //   branch: user.branch,
-    //   businessDate: new Date().toISOString().split("T")[0], // Placeholder for business date,
-    // })
-
-    // const sessionData = {
-    //   userId: user.id,
-    //   fullName: user.full_name,
-    //   role: user.role,
-    //   branch: user.branch,
-    //   businessDate: new Date().toISOString().split("T")[0], // Placeholder for business date,
-    // }
-
-    // const res = NextResponse.json({
-    //   success: true,
-    //   redirectUrl: user.role === "admin" ? "/admin" : "/dashboard",
-    // })
-    // res.cookies.set("banker_session", JSON.stringify(sessionData), {
-    //   httpOnly: true,
-    //   secure: false,
-    //   sameSite: "strict",
-    //   path: "/",
-    //   domain: "localhost",
-    //   maxAge: 60 * 60 * 24, // 12 hours
-    // })
-
-    // return res
-    const res = NextResponse.json({
-      success: true,
-      redirectUrl: user.role === "admin" ? "/admin" : "/dashboard",
-    })
-
-    const s = createSession(res, {
+      await createPendingTwoFactorSession({
         userId: user.id,
         fullName: user.full_name,
         role: user.role,
         branch: user.branch,
         branch_name: user.branch,
-        businessDate: day!.business_date, 
-        // businessDate: new Date().toISOString().split("T")[0], 
-        // Placeholder for business date,
+        businessDate: day!.business_date,
       })
-    if(s){
-      return res
+      return NextResponse.json({ requiresTwoFactor: true })
     }
+
+    const created = await createSession({
+      userId: user.id,
+      fullName: user.full_name,
+      role: user.role,
+      branch: user.branch,
+      branch_name: user.branch,
+      businessDate: day!.business_date,
+    })
+
+    if (!created) {
+      return NextResponse.json({ error: "Login failed" }, { status: 500 })
+    }
+
+    return NextResponse.json({
+      success: true,
+      redirectUrl: user.role === "admin" ? "/admin" : "/dashboard",
+    })
   } catch (err) {
     console.error("LOGIN ERROR:", err)
     return NextResponse.json({ error: "Login failed" }, { status: 500 })

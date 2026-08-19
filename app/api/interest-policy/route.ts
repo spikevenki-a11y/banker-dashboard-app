@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/connection/db"
-import { cookies } from "next/headers"
+import { getSession } from "@/lib/auth/session"
 
 // GET - List all interest policies with their conditions
 export async function GET(request: NextRequest) {
   try {
-    
-  const c = (await cookies()).get("banker_session")
-  if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { searchParams } = new URL(request.url);
     const productCode = searchParams.get("product_code");
@@ -62,9 +62,9 @@ export async function GET(request: NextRequest) {
 // POST - Create a new interest policy with conditions
 export async function POST(request: NextRequest) {
   try {
-    
-  const c = (await cookies()).get("banker_session")
-  if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
 
     const body = await request.json();

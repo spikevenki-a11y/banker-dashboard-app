@@ -1,13 +1,12 @@
+import { getSession } from "@/lib/auth/session"
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/connection/db"
-import { cookies } from "next/headers"
 
 export async function GET(){
 
   try {
-    const c = (await cookies()).get("banker_session")
-    if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    const session = JSON.parse(c.value)
+    const session = await getSession()
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     const branchId = session.branch
 
     // Fetch ledger accounts for sundry debtors (parent code 25000000)

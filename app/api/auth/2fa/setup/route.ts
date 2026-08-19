@@ -1,7 +1,7 @@
 export const runtime = "nodejs"
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
-import { cookies } from "next/headers"
+import { getSession } from "@/lib/auth/session"
 import { generateSecret, generateURI } from "otplib"
 import QRCode from "qrcode"
 
@@ -18,11 +18,9 @@ function supabaseAdmin() {
 // GET — return current 2FA status for logged-in user
 export async function GET() {
   try {
-    const cookieStore = await cookies()
-    const c = cookieStore.get("banker_session")
-    if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const session = await getSession()
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const session = JSON.parse(c.value)
     const supabase = supabaseAdmin()
 
     const { data: user } = await supabase
@@ -41,11 +39,9 @@ export async function GET() {
 // POST — generate a new TOTP secret + QR code (does NOT save yet)
 export async function POST() {
   try {
-    const cookieStore = await cookies()
-    const c = cookieStore.get("banker_session")
-    if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const session = await getSession()
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const session = JSON.parse(c.value)
     const secret = generateSecret()
     const otpAuthUrl = generateURI({
       label: session.fullName || session.userId,

@@ -1,6 +1,6 @@
+import { getSession } from "@/lib/auth/session"
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/connection/db"
-import { cookies } from "next/headers"
 
 export async function GET(
   request: NextRequest,
@@ -9,9 +9,8 @@ export async function GET(
   const { id } = await params;
 
   try {
-    const c = (await cookies()).get("banker_session")
-    if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    const session = JSON.parse(c.value)
+    const session = await getSession()
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     const branchId = session.branch
 
     const { rows } = await pool.query(
@@ -41,9 +40,8 @@ export async function PUT(
   const { id } = await params;
 
   try {
-    const c = (await cookies()).get("banker_session")
-    if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    const session = JSON.parse(c.value)
+    const session = await getSession()
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     const branchId = session.branch
 
     const body = await request.json();

@@ -92,18 +92,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Branch day not opened" }, { status: 403 })
     }
 
-    const res = NextResponse.json({
-      success: true,
-      redirectUrl: user.role === "admin" ? "/admin" : "/dashboard",
-    })
-
-    createSession(res, {
+    const created = await createSession({
       userId: user.id,
       fullName: user.full_name,
       role: user.role,
       branch: user.branch,
       branch_name: user.branch,
       businessDate: day.business_date,
+    })
+
+    if (!created) {
+      return NextResponse.json({ error: "Login failed" }, { status: 500 })
+    }
+
+    const res = NextResponse.json({
+      success: true,
+      redirectUrl: user.role === "admin" ? "/admin" : "/dashboard",
     })
 
     res.cookies.delete("webauthn_challenge")

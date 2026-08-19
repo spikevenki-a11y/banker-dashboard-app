@@ -1,14 +1,12 @@
+import { getSession } from "@/lib/auth/session"
 import pool from "@/lib/connection/db"
-import { cookies } from "next/headers"
 
 export async function GET() {
   try {
-    const c = (await cookies()).get("banker_session")
-    if (!c) {
+    const session = await getSession()
+    if (!session) {
       return Response.json({ message: "Unauthorized" }, { status: 401 })
     }
-
-    const session = JSON.parse(c.value)
     const branchId = session.branch
 
     const { rows } = await pool.query(

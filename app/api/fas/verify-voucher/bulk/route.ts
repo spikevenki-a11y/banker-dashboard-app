@@ -1,7 +1,7 @@
-import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { PoolClient } from "pg"
+import { getSession } from "@/lib/auth/session"
 
 // ── Core logic extracted so it can run per-batch ─────────────────────────
 async function processBatch(
@@ -228,11 +228,9 @@ async function processBatch(
 // ── Route handler ─────────────────────────────────────────────────────────
 
 export async function POST(req: Request) {
-  const c = (await cookies()).get("banker_session")
-  if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-  const u = JSON.parse(c.value)
-  const branchId: number = u.branch
+  const u = await getSession()
+  if (!u) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const branchId: number = Number(u.branch)
   const userId: string   = u.userId
 
   let body: { batchIds: number[]; action: "APPROVE" | "REJECT" }

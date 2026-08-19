@@ -1,12 +1,10 @@
-import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
+import { getSession } from "@/lib/auth/session"
 
 export async function POST(req: Request) {
-  const c = (await cookies()).get("banker_session")
-  if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-  const u = JSON.parse(c.value)
+  const u = await getSession()
+  if (!u) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const { batchId, action } = await req.json()
 
   if (!batchId || !action) {

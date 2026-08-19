@@ -1,49 +1,67 @@
+import "server-only"
 import { cookies } from "next/headers"
+import { getIronSession, type IronSession } from "iron-session"
 
 const SESSION_COOKIE_NAME = "banker_session"
-const SESSION_MAX_AGE = 60 * 60 * 24 * 7 // 7 days
+
+// Force re-login after this long, regardless of activity.
+const ABSOLUTE_TIMEOUT_MS = 8 * 60 * 60 * 1000 // 8 hours
+// Force re-login after this long of inactivity (sliding window, refreshed on every read).
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000 // 30 minutes
+
+const sessionPassword = process.env.SESSION_SECRET
+if (!sessionPassword || sessionPassword.length < 32) {
+  throw new Error(
+    "SESSION_SECRET environment variable must be set to a random string of at least 32 characters."
+  )
+}
 
 export interface SessionData {
   userId: string
-  username: string
   fullName: string
   role: string
   branch: string
-  businessDate?: string
+  branch_name: string
+  businessDate: string
 }
 
-import { NextResponse } from "next/server"
-
-interface SessionOptions {
-  maxAge?: number // in seconds
+interface SessionRecord extends SessionData {
+  issuedAt: number
+  lastActivity: number
 }
 
-export function createSession(
-  res: NextResponse,
-  data: unknown,
-  options: SessionOptions = {}
-): boolean {
+const sessionOptions = {
+  password: sessionPassword,
+  cookieName: SESSION_COOKIE_NAME,
+  cookieOptions: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
+    path: "/",
+    maxAge: ABSOLUTE_TIMEOUT_MS / 1000,
+  },
+}
+
+async function getIronSessionInstance(): Promise<IronSession<SessionRecord>> {
+  const cookieStore = await cookies()
+  return getIronSession<SessionRecord>(cookieStore, sessionOptions)
+}
+
+// Creates a fresh, signed+encrypted session cookie. Always issues a brand new
+// session (rather than mutating an existing one) so login/2FA-upgrade/re-auth
+// rotate the session identity instead of reusing a pre-auth cookie.
+export async function createSession(data: SessionData): Promise<boolean> {
   try {
-    const maxAge = options.maxAge ?? 60 * 60 * 24 * 7 // 7 days
-    const value = JSON.stringify(data)
+    const session = await getIronSessionInstance()
+    const now = Date.now()
 
-    res.cookies.set({
-      name: "banker_session",
-      value,
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      secure: false, // Set to true in production with HTTPS
-      //secure: process.env.NODE_ENV === "production",
-      maxAge,
-    })
+    // Wipe any stale fields from a previous session before assigning the new ones.
+    for (const key of Object.keys(session) as (keyof SessionRecord)[]) {
+      delete session[key]
+    }
 
-    // ✅ Log cookie data to terminal (server-side)
-    console.log("Cookie created:")
-    console.log("Name:", "banker_session")
-    console.log("Value:", value)
-    console.log("MaxAge:", maxAge)
-
+    Object.assign(session, data, { issuedAt: now, lastActivity: now })
+    await session.save()
     return true
   } catch (error) {
     console.error("Failed to create session:", error)
@@ -51,37 +69,104 @@ export function createSession(
   }
 }
 
-
-// export async function createSession(data: any) {
-//   (await cookies()).set("banker_session", JSON.stringify(data), {
-//     httpOnly: true,
-//     secure: true,
-//     sameSite: "lax",
-//     path: "/",
-//   })
-// }
-
+// Reads and validates the session, enforcing both absolute and idle timeouts
+// server-side (the cookie's own maxAge is only a browser-side hint).
+// On success, slides the idle window forward.
 export async function getSession(): Promise<SessionData | null> {
-  const cookieStore = await cookies()
-  const sessionCookie = cookieStore.get(SESSION_COOKIE_NAME)
-
-  if (!sessionCookie) {
-    return null
-  }
-
   try {
-    const sessionString = Buffer.from(sessionCookie.value, "base64").toString("utf-8")
-    return JSON.parse(sessionString)
+    const session = await getIronSessionInstance()
+    if (!session.userId) return null
+
+    const now = Date.now()
+    if (
+      now - session.issuedAt > ABSOLUTE_TIMEOUT_MS ||
+      now - session.lastActivity > IDLE_TIMEOUT_MS
+    ) {
+      session.destroy()
+      return null
+    }
+
+    session.lastActivity = now
+    await session.save()
+
+    const { issuedAt, lastActivity, ...data } = session
+    return data
   } catch {
     return null
   }
 }
 
-export async function deleteSession() {
-  const cookieStore = await cookies()
-  cookieStore.delete("banker_session")
+export async function destroySession(): Promise<void> {
+  const session = await getIronSessionInstance()
+  session.destroy()
 }
 
-export function destroySession(res: NextResponse) {
-  res.cookies.delete("banker_session")
+// Backwards-compatible alias used by existing call sites.
+export const deleteSession = destroySession
+
+// --- Pending 2FA session -----------------------------------------------
+// Carries the pre-2FA identity between password verification and TOTP
+// verification. Signed the same way as the real session so it can't be
+// forged to skip straight to guessing a victim's TOTP code without ever
+// knowing their password.
+
+const PENDING_2FA_COOKIE_NAME = "banker_2fa_pending"
+const PENDING_2FA_TIMEOUT_MS = 5 * 60 * 1000 // 5 minutes
+
+export interface PendingTwoFactorData {
+  userId: string
+  fullName: string
+  role: string
+  branch: string
+  branch_name: string
+  businessDate: string
+}
+
+interface PendingTwoFactorRecord extends PendingTwoFactorData {
+  issuedAt: number
+}
+
+const pending2faSessionOptions = {
+  password: sessionPassword,
+  cookieName: PENDING_2FA_COOKIE_NAME,
+  cookieOptions: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
+    path: "/",
+    maxAge: PENDING_2FA_TIMEOUT_MS / 1000,
+  },
+}
+
+async function getPending2faIronSession(): Promise<IronSession<PendingTwoFactorRecord>> {
+  const cookieStore = await cookies()
+  return getIronSession<PendingTwoFactorRecord>(cookieStore, pending2faSessionOptions)
+}
+
+export async function createPendingTwoFactorSession(data: PendingTwoFactorData): Promise<void> {
+  const session = await getPending2faIronSession()
+  Object.assign(session, data, { issuedAt: Date.now() })
+  await session.save()
+}
+
+export async function getPendingTwoFactorSession(): Promise<PendingTwoFactorData | null> {
+  try {
+    const session = await getPending2faIronSession()
+    if (!session.userId) return null
+
+    if (Date.now() - session.issuedAt > PENDING_2FA_TIMEOUT_MS) {
+      session.destroy()
+      return null
+    }
+
+    const { issuedAt, ...data } = session
+    return data
+  } catch {
+    return null
+  }
+}
+
+export async function clearPendingTwoFactorSession(): Promise<void> {
+  const session = await getPending2faIronSession()
+  session.destroy()
 }

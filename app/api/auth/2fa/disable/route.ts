@@ -1,7 +1,7 @@
 export const runtime = "nodejs"
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
-import { cookies } from "next/headers"
+import { getSession } from "@/lib/auth/session"
 import { verify } from "otplib"
 
 function supabaseAdmin() {
@@ -15,11 +15,9 @@ function supabaseAdmin() {
 // POST — verify current TOTP, then disable 2FA
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const c = cookieStore.get("banker_session")
-    if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const session = await getSession()
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const session = JSON.parse(c.value)
     const { token } = await request.json()
 
     if (!token) {

@@ -1,9 +1,8 @@
 export const runtime = "nodejs"
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
-import { cookies } from "next/headers"
 import { verify } from "otplib"
-import { createSession } from "@/lib/auth/session"
+import { createSession, getPendingTwoFactorSession, clearPendingTwoFactorSession } from "@/lib/auth/session"
 
 function supabaseAdmin() {
   return createClient(
@@ -13,30 +12,15 @@ function supabaseAdmin() {
   )
 }
 
-// POST — verify TOTP during login, then upgrade pending cookie to full session
+// POST — verify TOTP during login, then upgrade pending session to a full session
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const pending = cookieStore.get("banker_2fa_pending")
-    if (!pending) {
+    const pendingData = await getPendingTwoFactorSession()
+    if (!pendingData) {
       return NextResponse.json(
         { error: "No pending authentication. Please log in again." },
         { status: 401 }
       )
-    }
-
-    let pendingData: {
-      userId: string
-      fullName: string
-      role: string
-      branch: string
-      branch_name: string
-      businessDate: string
-    }
-    try {
-      pendingData = JSON.parse(pending.value)
-    } catch {
-      return NextResponse.json({ error: "Invalid session. Please log in again." }, { status: 401 })
     }
 
     const { token } = await request.json()
@@ -64,13 +48,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid authentication code. Please try again." }, { status: 400 })
     }
 
-    // Upgrade to full session
-    const res = NextResponse.json({
-      success: true,
-      redirectUrl: pendingData.role === "admin" ? "/admin" : "/dashboard",
-    })
-
-    createSession(res, {
+    // Upgrade to a full session, then clear the pending one
+    const created = await createSession({
       userId: pendingData.userId,
       fullName: pendingData.fullName,
       role: pendingData.role,
@@ -78,11 +57,16 @@ export async function POST(request: NextRequest) {
       branch_name: pendingData.branch_name,
       businessDate: pendingData.businessDate,
     })
+    await clearPendingTwoFactorSession()
 
-    // Clear the pending cookie
-    res.cookies.delete("banker_2fa_pending")
+    if (!created) {
+      return NextResponse.json({ error: "Verification failed" }, { status: 500 })
+    }
 
-    return res
+    return NextResponse.json({
+      success: true,
+      redirectUrl: pendingData.role === "admin" ? "/admin" : "/dashboard",
+    })
   } catch (err) {
     console.error("2FA verify error:", err)
     return NextResponse.json({ error: "Verification failed" }, { status: 500 })

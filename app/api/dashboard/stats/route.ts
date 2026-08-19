@@ -1,15 +1,14 @@
+import { getSession } from "@/lib/auth/session"
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
-import { cookies } from "next/headers"
 
 export async function GET(request: Request) {
   
-  const c = (await cookies()).get("banker_session")
-  if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   try {
 
     
-    const session = JSON.parse(c.value)
     const branchId = session.branch
     const { searchParams } = new URL(request.url)
     // const branchId = searchParams.get("branchId") || "1"

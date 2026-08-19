@@ -2,6 +2,7 @@ export const runtime = "nodejs"
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
+import { getSession } from "@/lib/auth/session"
 import { verifyRegistrationResponse } from "@simplewebauthn/server"
 import { isoBase64URL } from "@simplewebauthn/server/helpers"
 
@@ -15,16 +16,15 @@ function supabaseAdmin() {
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const c = cookieStore.get("banker_session")
-    if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const session = await getSession()
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+    const cookieStore = await cookies()
     const challengeCookie = cookieStore.get("webauthn_challenge")
     if (!challengeCookie) {
       return NextResponse.json({ error: "Challenge expired. Please try again." }, { status: 400 })
     }
 
-    const session = JSON.parse(c.value)
     const body = await request.json()
 
     const host = request.headers.get("host") || "localhost"

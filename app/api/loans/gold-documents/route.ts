@@ -1,8 +1,8 @@
 export const runtime = "nodejs"
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
-import { cookies } from "next/headers"
 import pool from "@/lib/connection/db"
+import { getSession } from "@/lib/auth/session"
 
 const BUCKET = "gold-security-docs"
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
@@ -18,10 +18,8 @@ function supabaseAdmin() {
 // POST — upload a gold security document
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const c = cookieStore.get("banker_session")
-    if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    const session = JSON.parse(c.value)
+    const session = await getSession()
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const formData = await request.formData()
     const file = formData.get("file") as File | null
@@ -79,10 +77,8 @@ export async function POST(request: NextRequest) {
 // GET — list gold documents for a loan application
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const c = cookieStore.get("banker_session")
-    if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    const session = JSON.parse(c.value)
+    const session = await getSession()
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const applicationId = request.nextUrl.searchParams.get("loan_application_id")
     if (!applicationId) {

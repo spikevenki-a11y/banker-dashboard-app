@@ -1,11 +1,9 @@
+import { getSession } from "@/lib/auth/session"
 import { NextResponse } from "next/server"
 
-export async function GET(req: Request) {
-  const c = req.headers.get("cookie")
-  console.log("RAW COOKIE:", c)
-
-  const session = c?.match(/banker_session=([^;]+)/)?.[1]
+export async function GET() {
+  const session = await getSession()
   if (!session) return NextResponse.json(null)
 
-  return NextResponse.json(JSON.parse(decodeURIComponent(session)))
+  return NextResponse.json(session)
 }

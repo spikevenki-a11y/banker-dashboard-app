@@ -1,6 +1,6 @@
-import { cookies } from "next/headers"
 import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
+import { getSession } from "@/lib/auth/session"
 
 const STEP_ORDER = [
   "SAVINGS_ACCRUAL",
@@ -14,10 +14,8 @@ const STEP_ORDER = [
 ]
 
 export async function POST(req: NextRequest) {
-  const c = (await cookies()).get("banker_session")
-  if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-  const u = JSON.parse(c.value)
+  const u = await getSession()
+  if (!u) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const branchId = u.branch
   const businessDate: string = u.businessDate
 

@@ -1,15 +1,14 @@
+import { getSession } from "@/lib/auth/session"
 import { NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
 import pool from "@/lib/connection/db"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
 
 // GET: Fetch all loan applications
 export async function GET(request: NextRequest) {
-  const c = (await cookies()).get("banker_session")
-  if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   try {
-    const session = JSON.parse(c.value)
     const branchId = session.branch
 
     const { searchParams } = new URL(request.url)
@@ -139,13 +138,12 @@ export async function GET(request: NextRequest) {
 
 // POST: Create new loan application
 export async function POST(request: NextRequest) {
-  const c = (await cookies()).get("banker_session")
-  if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const client = await pool.connect()
 
   try {
-    const session = JSON.parse(c.value)
     const branchId = session.branch
     const businessDate: string = session.businessDate
     const body = await request.json()
@@ -449,13 +447,12 @@ export async function POST(request: NextRequest) {
 
 // DELETE: Delete a loan application (only pending)
 export async function DELETE(request: NextRequest) {
-  const c = (await cookies()).get("banker_session")
-  if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const client = await pool.connect()
 
   try {
-    const session = JSON.parse(c.value)
     const branchId = session.branch
     const { searchParams } = new URL(request.url)
     const applicationId = searchParams.get("id")
