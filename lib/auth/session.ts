@@ -1,20 +1,9 @@
 import "server-only"
 import { cookies } from "next/headers"
 import { getIronSession, type IronSession } from "iron-session"
+import { SESSION_COOKIE_NAME, ABSOLUTE_TIMEOUT_MS, IDLE_TIMEOUT_MS, getSessionPassword } from "./session-config"
 
-const SESSION_COOKIE_NAME = "banker_session"
-
-// Force re-login after this long, regardless of activity.
-const ABSOLUTE_TIMEOUT_MS = 8 * 60 * 60 * 1000 // 8 hours
-// Force re-login after this long of inactivity (sliding window, refreshed on every read).
-const IDLE_TIMEOUT_MS = 30 * 60 * 1000 // 30 minutes
-
-const sessionPassword = process.env.SESSION_SECRET
-if (!sessionPassword || sessionPassword.length < 32) {
-  throw new Error(
-    "SESSION_SECRET environment variable must be set to a random string of at least 32 characters."
-  )
-}
+const sessionPassword = getSessionPassword()
 
 export interface SessionData {
   userId: string

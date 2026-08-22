@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ArrowLeft, Search, Loader2, CheckCircle2, User, CreditCard, Banknote, Users, X, Eye, MapPin, ShieldCheck, TrendingUp, TrendingDown, UserPlus, Trash2 } from "lucide-react"
+import { ArrowLeft, Search, Loader2, CheckCircle2, User, CreditCard, Banknote, Users, X, Eye, MapPin, ShieldCheck, TrendingUp, TrendingDown, UserPlus, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 
 type MemberInfo = {
@@ -136,9 +136,14 @@ export default function OpenSavingsAccountPage() {
   const [searchMemberNo, setSearchMemberNo] = useState("")
   const [searchMemberName, setSearchMemberName] = useState("")
   const [searchFatherName, setSearchFatherName] = useState("")
+  const [searchPhone, setSearchPhone] = useState("")
   const [searchAadhaar, setSearchAadhaar] = useState("")
+  const [searchLedgerFolio, setSearchLedgerFolio] = useState("")
   const [searchResults, setSearchResults] = useState<MemberInfo[]>([])
   const [isPopupSearching, setIsPopupSearching] = useState(false)
+  const [hasPopupSearched, setHasPopupSearched] = useState(false)
+  const [popupPage, setPopupPage] = useState(1)
+  const [popupPageSize, setPopupPageSize] = useState(10)
 
   // Schemes
   const [schemes, setSchemes] = useState<Scheme[]>([])
@@ -240,9 +245,11 @@ export default function OpenSavingsAccountPage() {
 
   // Popup advanced search
   const handlePopupSearch = async () => {
-    if (!searchMemberNo.trim() && !searchMemberName.trim() && !searchFatherName.trim() && !searchAadhaar.trim()) return
+    if (!searchMemberNo.trim() && !searchMemberName.trim() && !searchFatherName.trim() && !searchPhone.trim() && !searchAadhaar.trim() && !searchLedgerFolio.trim()) return
 
     setIsPopupSearching(true)
+    setHasPopupSearched(true)
+    setPopupPage(1)
     setSearchResults([])
 
     try {
@@ -254,19 +261,38 @@ export default function OpenSavingsAccountPage() {
           memberNumber: searchMemberNo.trim(),
           memberName: searchMemberName.trim(),
           fatherName: searchFatherName.trim(),
+          contactNo: searchPhone.trim(),
           aadhaarNumber: searchAadhaar.trim(),
+          ledgerFolioNumber: searchLedgerFolio.trim(),
         }),
       })
 
       const data = await res.json()
       if (data.success) {
         setSearchResults(data.results || [])
+      } else {
+        setSearchResults([])
       }
     } catch {
-      // silent
+      setSearchResults([])
     } finally {
       setIsPopupSearching(false)
     }
+  }
+
+  const popupTotalPages = Math.max(1, Math.ceil(searchResults.length / popupPageSize))
+  const paginatedSearchResults = searchResults.slice((popupPage - 1) * popupPageSize, popupPage * popupPageSize)
+
+  const resetPopupSearch = () => {
+    setSearchMemberNo("")
+    setSearchMemberName("")
+    setSearchFatherName("")
+    setSearchPhone("")
+    setSearchAadhaar("")
+    setSearchLedgerFolio("")
+    setSearchResults([])
+    setHasPopupSearched(false)
+    setPopupPage(1)
   }
 
   const handleSelectMember = (member: MemberInfo) => {
@@ -274,12 +300,7 @@ export default function OpenSavingsAccountPage() {
     setMembershipNo(member.membership_no)
     setMemberError("")
     setSearchDialogOpen(false)
-    // Reset popup fields
-    setSearchMemberNo("")
-    setSearchMemberName("")
-    setSearchFatherName("")
-    setSearchAadhaar("")
-    setSearchResults([])
+    resetPopupSearch()
   }
 
   const fmt = (n: number) =>
@@ -1134,44 +1155,64 @@ const getLogindate = async () => {
                 </DialogHeader>
 
                 {/* Search Criteria */}
-                <div className="grid grid-cols-2 gap-4 py-2">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 py-2">
                   <div className="space-y-1.5">
-                    <Label htmlFor="search-member-no" className="text-xs">Member Number</Label>
+                    <Label htmlFor="search-member-no" className="text-xs font-medium text-muted-foreground">Membership No.</Label>
                     <Input
                       id="search-member-no"
-                      placeholder="Enter member number"
+                      placeholder="Enter membership no."
                       value={searchMemberNo}
                       onChange={(e) => setSearchMemberNo(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && handlePopupSearch()}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="search-member-name" className="text-xs">Member Name</Label>
+                    <Label htmlFor="search-member-name" className="text-xs font-medium text-muted-foreground">Member Name</Label>
                     <Input
                       id="search-member-name"
-                      placeholder="Enter member name"
+                      placeholder="Enter name"
                       value={searchMemberName}
                       onChange={(e) => setSearchMemberName(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && handlePopupSearch()}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="search-father-name" className="text-xs">Father{"'"}s Name</Label>
+                    <Label htmlFor="search-father-name" className="text-xs font-medium text-muted-foreground">Father Name</Label>
                     <Input
                       id="search-father-name"
-                      placeholder="Enter father's name"
+                      placeholder="Enter father name"
                       value={searchFatherName}
                       onChange={(e) => setSearchFatherName(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && handlePopupSearch()}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="search-aadhaar" className="text-xs">Aadhaar Number</Label>
+                    <Label htmlFor="search-phone" className="text-xs font-medium text-muted-foreground">Phone Number</Label>
+                    <Input
+                      id="search-phone"
+                      placeholder="Enter phone"
+                      value={searchPhone}
+                      onChange={(e) => setSearchPhone(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handlePopupSearch()}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="search-aadhaar" className="text-xs font-medium text-muted-foreground">Aadhaar Number</Label>
                     <Input
                       id="search-aadhaar"
-                      placeholder="Enter Aadhaar number"
+                      placeholder="Enter Aadhaar"
                       value={searchAadhaar}
                       onChange={(e) => setSearchAadhaar(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handlePopupSearch()}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="search-ledger" className="text-xs font-medium text-muted-foreground">Ledger No.</Label>
+                    <Input
+                      id="search-ledger"
+                      placeholder="Enter ledger no."
+                      value={searchLedgerFolio}
+                      onChange={(e) => setSearchLedgerFolio(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && handlePopupSearch()}
                     />
                   </div>
@@ -1181,13 +1222,7 @@ const getLogindate = async () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      setSearchMemberNo("")
-                      setSearchMemberName("")
-                      setSearchFatherName("")
-                      setSearchAadhaar("")
-                      setSearchResults([])
-                    }}
+                    onClick={resetPopupSearch}
                     className="gap-1.5 bg-transparent text-xs"
                   >
                     <X className="h-3 w-3" />
@@ -1196,7 +1231,7 @@ const getLogindate = async () => {
                   <Button
                     size="sm"
                     onClick={handlePopupSearch}
-                    disabled={isPopupSearching || (!searchMemberNo.trim() && !searchMemberName.trim() && !searchFatherName.trim() && !searchAadhaar.trim())}
+                    disabled={isPopupSearching || (!searchMemberNo.trim() && !searchMemberName.trim() && !searchFatherName.trim() && !searchPhone.trim() && !searchAadhaar.trim() && !searchLedgerFolio.trim())}
                     className="gap-2 bg-teal-600 hover:bg-teal-700 text-white"
                   >
                     {isPopupSearching ? (
@@ -1215,10 +1250,16 @@ const getLogindate = async () => {
                       <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                       <span className="ml-2 text-sm text-muted-foreground">Searching members...</span>
                     </div>
+                  ) : hasPopupSearched && searchResults.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <Users className="h-8 w-8 text-muted-foreground/30" />
+                      <p className="mt-2 text-sm font-medium text-muted-foreground">No members found</p>
+                      <p className="mt-1 text-xs text-muted-foreground/70">Try adjusting your search criteria</p>
+                    </div>
                   ) : searchResults.length > 0 ? (
                     <Table>
                       <TableHeader>
-                        <TableRow>
+                        <TableRow className="bg-muted/50">
                           <TableHead className="text-xs">Member No</TableHead>
                           <TableHead className="text-xs">Full Name</TableHead>
                           <TableHead className="text-xs">Father Name</TableHead>
@@ -1228,7 +1269,7 @@ const getLogindate = async () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {searchResults.map((member) => (
+                        {paginatedSearchResults.map((member) => (
                           <TableRow
                             key={member.membership_no}
                             className="cursor-pointer hover:bg-teal-50/50 dark:hover:bg-teal-950/20"
@@ -1260,18 +1301,52 @@ const getLogindate = async () => {
                     <div className="flex flex-col items-center justify-center py-12 text-center">
                       <Users className="h-8 w-8 text-muted-foreground/30" />
                       <p className="mt-2 text-sm text-muted-foreground">
-                        {searchMemberNo || searchMemberName || searchFatherName || searchAadhaar
-                          ? "No members found. Try different search criteria."
-                          : "Enter search criteria and click Search to find members."}
+                        Search by member number, name, father name, phone, Aadhaar, or ledger number
                       </p>
                     </div>
                   )}
                 </div>
 
                 {searchResults.length > 0 && (
-                  <p className="text-xs text-muted-foreground text-right">
-                    {searchResults.length} result{searchResults.length !== 1 ? "s" : ""} found
-                  </p>
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>Rows per page:</span>
+                      <Select
+                        value={String(popupPageSize)}
+                        onValueChange={(v) => {
+                          setPopupPageSize(Number(v))
+                          setPopupPage(1)
+                        }}
+                      >
+                        <SelectTrigger className="h-7 w-16 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="20">20</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span className="ml-2">
+                        {(popupPage - 1) * popupPageSize + 1}–{Math.min(popupPage * popupPageSize, searchResults.length)} of {searchResults.length}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setPopupPage(1)} disabled={popupPage === 1}>
+                        <ChevronsLeft className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setPopupPage((p) => p - 1)} disabled={popupPage === 1}>
+                        <ChevronLeft className="h-3.5 w-3.5" />
+                      </Button>
+                      <span className="px-2 text-xs">Page {popupPage} of {popupTotalPages}</span>
+                      <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setPopupPage((p) => p + 1)} disabled={popupPage >= popupTotalPages}>
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setPopupPage(popupTotalPages)} disabled={popupPage >= popupTotalPages}>
+                        <ChevronsRight className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
                 )}
               </DialogContent>
             </Dialog>

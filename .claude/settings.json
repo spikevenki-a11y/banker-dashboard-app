@@ -14,7 +14,11 @@
       "Bash(grep -E \"\\\\.\\(ts|tsx|sql\\)$\")",
       "Bash(npm install *)",
       "Bash(grep -E \"^otplib$|^qrcode$\")",
-      "Bash(pnpm add *)"
+      "Bash(pnpm add *)",
+      "Bash(curl -s \"http://localhost:3000/loans/apply?step=2\" -D - -o /dev/null)",
+      "Bash(curl -s http://localhost:3000/2fa -D - -o /dev/null)",
+      "Bash(curl -s http://localhost:3000/admin -D - -o /dev/null)",
+      "Bash(curl -s http://localhost:3000/icon.svg -D - -o /dev/null)"
     ]
   }
 }

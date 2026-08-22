@@ -75,7 +75,7 @@ interface Customer {
 
 const initialCustomer: Customer = {
   full_name: "", father_name: "", spouse_name: "",
-  gender: "male", marital_status: "single", //blood_group: "A+",
+  gender: "", marital_status: "", //blood_group: "A+",
   dob: "", age: "", religion: "", caste_category: "",
   occupation: "", qualification: "", qualification_details: "", 
   anual_income: "", dccb_account_number: "", dccb_Branch: "",
@@ -616,7 +616,7 @@ export default function CustomerPage() {
                     </Field>
                     <Field id="gender" label="Gender">
                       <Select value={c.gender} onValueChange={(v) => up({ gender: v })}>
-                        <SelectTrigger id="gender"><SelectValue /></SelectTrigger>
+                        <SelectTrigger id="gender"><SelectValue placeholder="Select" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="male">Male</SelectItem>
                           <SelectItem value="female">Female</SelectItem>
@@ -626,7 +626,7 @@ export default function CustomerPage() {
                     </Field>
                     <Field id="marital_status" label="Marital Status">
                       <Select value={c.marital_status} onValueChange={(v) => up({ marital_status: v })}>
-                        <SelectTrigger id="marital_status"><SelectValue /></SelectTrigger>
+                        <SelectTrigger id="marital_status"><SelectValue placeholder="Select" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="single">Single</SelectItem>
                           <SelectItem value="married">Married</SelectItem>

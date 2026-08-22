@@ -11,12 +11,18 @@ export async function POST(req: Request) {
   try {
     const branchId = session.branch
     const body = await req.json()
-    const { memberNumber, memberName, fatherName, aadhaarNumber, contactNo } = body
+    const { memberNumber, memberName, fatherName, aadhaarNumber, contactNo, ledgerFolioNumber } = body
 
     // Build dynamic query conditions
     const conditions: string[] = ["m.branch_id = $1", "m.status = 'ACTIVE'"]
     const values: (string | number)[] = [branchId]
     let paramIndex = 2
+
+    if (ledgerFolioNumber?.trim()) {
+      conditions.push(`m.ledger_folio_number ILIKE $${paramIndex}`)
+      values.push(`%${ledgerFolioNumber.trim()}%`)
+      paramIndex++
+    }
 
     if (memberNumber?.trim()) {
       conditions.push(`m.membership_no ILIKE $${paramIndex}`)
