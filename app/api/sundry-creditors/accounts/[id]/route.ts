@@ -1,23 +1,18 @@
-import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import pool from "@/lib/connection/db";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient();
   const { id } = await params;
 
   try {
-    const { data, error } = await supabase
-      .from("sundry_creditors")
-      .select("*")
-      .eq("id", id)
-      .single();
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
+    const result = await pool.query(
+      `SELECT * FROM sundry_creditors WHERE id = $1`,
+      [id]
+    );
+    const data = result.rows[0];
 
     if (!data) {
       return NextResponse.json({ error: "Account not found" }, { status: 404 });
@@ -36,7 +31,6 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient();
   const { id } = await params;
 
   try {
@@ -44,22 +38,15 @@ export async function PUT(
     const { account_name, current_balance, description, account_status } =
       body;
 
-    const { data, error } = await supabase
-      .from("sundry_creditors")
-      .update({
-        account_name,
-        current_balance,
-        description,
-        account_status,
-      })
-      .eq("id", id)
-      .select();
+    const result = await pool.query(
+      `UPDATE sundry_creditors
+       SET account_name = $1, current_balance = $2, description = $3, account_status = $4
+       WHERE id = $5
+       RETURNING *`,
+      [account_name, current_balance, description, account_status, id]
+    );
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-
-    return NextResponse.json({ data: data[0] });
+    return NextResponse.json({ data: result.rows[0] });
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to update account" },

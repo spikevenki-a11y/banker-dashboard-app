@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
-import { cookies } from "next/headers"
+import { getSession } from "@/lib/auth/session"
 
 // GET — depreciation master (config list) or history
 export async function GET(request: NextRequest) {
   try {
-    const c = (await cookies()).get("banker_session")
-    if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    const session = JSON.parse(c.value)
+    const session = await getSession()
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     const branchId = session.branch
 
     const { searchParams } = new URL(request.url)
@@ -59,9 +58,8 @@ export async function GET(request: NextRequest) {
 // POST — configure (or update) depreciation for an asset unit
 export async function POST(request: NextRequest) {
   try {
-    const c = (await cookies()).get("banker_session")
-    if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    const session = JSON.parse(c.value)
+    const session = await getSession()
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     const branchId = session.branch
 
     const body = await request.json()

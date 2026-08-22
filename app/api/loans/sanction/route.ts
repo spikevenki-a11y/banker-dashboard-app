@@ -1,16 +1,15 @@
+import { getSession } from "@/lib/auth/session"
 import { NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
 import pool from "@/lib/connection/db"
 
 // POST: Approve or Reject a loan application
 export async function POST(request: NextRequest) {
-  const c = (await cookies()).get("banker_session")
-  if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const client = await pool.connect()
 
   try {
-    const session = JSON.parse(c.value)
     const branchId = session.branch
     const body = await request.json()
     const businessDate = session.businessDate
@@ -27,19 +26,6 @@ export async function POST(request: NextRequest) {
       number_of_installments,
       installment_start_date
     } = body
-    console.log("Sanction Request Body:", body)
-    console.log("the data is", {
-      loan_application_id,
-      action,
-      sanctioned_amount,
-      interest_rate,
-      loan_tenure_months,
-      moratorium_period,
-      remarks,
-      repayment_type,
-      number_of_installments,
-      installment_start_date
-    })
 
     if (!loan_application_id || !action) {
       return NextResponse.json(

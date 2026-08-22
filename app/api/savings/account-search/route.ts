@@ -1,23 +1,28 @@
 import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
 import pool from "@/lib/connection/db"
+import { getSession } from "@/lib/auth/session"
 
 export async function POST(req: Request) {
-  const c = (await cookies()).get("banker_session")
-  if (!c) {
+  const session = await getSession()
+  if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
   try {
-    const session = JSON.parse(c.value)
     const branchId = session.branch
     const body = await req.json()
-    const { memberNumber, memberName, fatherName, aadhaarNumber, contactNo } = body
+    const { accountNumber, memberNumber, memberName, fatherName, aadhaarNumber, contactNo } = body
 
     // Build dynamic query conditions
     const conditions: string[] = ["sa.branch_id = $1"]
     const values: (string | number)[] = [branchId]
     let paramIndex = 2
+
+    if (accountNumber?.trim()) {
+      conditions.push(`sa.account_number ILIKE $${paramIndex}`)
+      values.push(`%${accountNumber.trim()}%`)
+      paramIndex++
+    }
 
     if (memberNumber?.trim()) {
       conditions.push(`CAST(m.membership_no AS TEXT) ILIKE $${paramIndex}`)

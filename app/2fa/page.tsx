@@ -1,19 +1,25 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ShieldCheck, Building2, AlertCircle, Loader2, KeyRound } from "lucide-react"
+import { getSafeRedirect } from "@/lib/safe-redirect"
 
 export default function TwoFactorPage() {
   const [code, setCode] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [from, setFrom] = useState<string | null>(null)
   const router = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    setFrom(new URLSearchParams(window.location.search).get("from"))
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -34,7 +40,7 @@ export default function TwoFactorPage() {
         throw new Error(data.error || "Verification failed")
       }
       window.dispatchEvent(new Event("banker_login"))
-      router.push(data.redirectUrl || "/dashboard")
+      router.push(getSafeRedirect(from, data.redirectUrl || "/dashboard"))
     } catch (err: any) {
       setError(err.message)
       setCode("")

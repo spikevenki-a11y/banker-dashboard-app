@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { cookies } from "next/headers"
+import { getSession } from "@/lib/auth/session"
 
 // GET — list accounts or fetch transaction history
 export async function GET(request: NextRequest) {
   try {
-    const c = (await cookies()).get("banker_session")
-    if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    const session = JSON.parse(c.value)
+    const session = await getSession()
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     const branchId = session.branch
 
     const { searchParams } = new URL(request.url)
@@ -53,13 +53,12 @@ export async function GET(request: NextRequest) {
 
 // POST — open a new bank account (with GL entries)
 export async function POST(request: NextRequest) {
-  const c = (await cookies()).get("banker_session")
-  if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const client = await pool.connect()
 
   try {
-    const session = JSON.parse(c.value)
     const branchId = session.branch
     const userId = session.userId
     const businessDate = session.businessDate
@@ -186,9 +185,8 @@ export async function POST(request: NextRequest) {
 // PATCH — update account details
 export async function PATCH(request: NextRequest) {
   try {
-    const c = (await cookies()).get("banker_session")
-    if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    const session = JSON.parse(c.value)
+    const session = await getSession()
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     const branchId = session.branch
 
     const body = await request.json()

@@ -1,13 +1,13 @@
 // app/api/configs/route.ts
 import pool from "@/lib/connection/db"
-import { cookies } from "next/headers"
+import { getSession } from "@/lib/auth/session"
 
 type SettingValue = string | number | boolean | object | null
 
 export async function GET() {
   try {
     // 🔐 Basic auth check (UI-level protection)
-    const session = (await cookies()).get("banker_session")
+    const session = await getSession()
     if (!session) {
       return Response.json(
         { success: false, message: "Unauthorized" },

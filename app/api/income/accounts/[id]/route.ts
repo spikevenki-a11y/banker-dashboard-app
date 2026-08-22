@@ -1,7 +1,17 @@
+import { getSession } from "@/lib/auth/session"
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import pool from "@/lib/connection/db"
-import { cookies } from "next/headers"
+
+const UPDATABLE_FIELDS = [
+  "account_name",
+  "gl_account_code",
+  "opening_date",
+  "closing_date",
+  "opening_balance",
+  "current_balance",
+  "account_status",
+  "description",
+]
 
 export async function GET(
   request: NextRequest,
@@ -9,9 +19,8 @@ export async function GET(
 ) {
   try {
       
-      const c = (await cookies()).get("banker_session")
-      if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-      const session = JSON.parse(c.value)
+      const session = await getSession()
+      if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
       const branchId = session.branch
       const userId = session.userId
 
@@ -65,18 +74,27 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const supabase = await createClient()
     const accountNumber = params.id
     const body = await request.json()
 
-    const { data: updatedAccount, error } = await supabase
-      .from('income_accounts')
-      .update(body)
-      .eq('account_number', accountNumber)
-      .select()
-      .single()
+    const keys = UPDATABLE_FIELDS.filter((field) => field in body)
+    if (keys.length === 0) {
+      return NextResponse.json({ error: "No fields to update" }, { status: 400 })
+    }
+    const setClause = keys.map((key, i) => `${key} = $${i + 1}`).join(", ")
+    const values = keys.map((key) => body[key])
 
-    if (error) throw error
+    const result = await pool.query(
+      `UPDATE income_accounts SET ${setClause}, updated_at = CURRENT_TIMESTAMP
+       WHERE account_number = $${keys.length + 1}
+       RETURNING *`,
+      [...values, accountNumber]
+    )
+
+    const updatedAccount = result.rows[0]
+    if (!updatedAccount) {
+      return NextResponse.json({ error: "Account not found" }, { status: 404 })
+    }
 
     return NextResponse.json(updatedAccount)
   } catch (error: any) {

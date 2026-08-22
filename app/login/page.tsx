@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { ShieldCheck, Building2, AlertCircle, Loader2, Fingerprint } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useAuth } from "@/lib/auth-context"
+import { getSafeRedirect } from "@/lib/safe-redirect"
 
 const DEMO_USERS = [
   { username: "sldb00011", password: "password123", label: "Staff - Downtown Branch" },
@@ -24,10 +25,17 @@ export default function LoginPage() {
   const [isBiometricLoading, setIsBiometricLoading] = useState(false)
   const [webAuthnSupported, setWebAuthnSupported] = useState(false)
   const { user, isAuthenticated } = useAuth()
+  const [from, setFrom] = useState<string | null>(null)
 
-  if (isAuthenticated) {
-    router.push("/dashboard")
-  }
+  useEffect(() => {
+    setFrom(new URLSearchParams(window.location.search).get("from"))
+  }, [])
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.replace(getSafeRedirect(from, "/dashboard"))
+    }
+  }, [isAuthenticated, from])
 
   useEffect(() => {
     setWebAuthnSupported(
@@ -53,12 +61,12 @@ export default function LoginPage() {
       }
 
       if (data.requiresTwoFactor) {
-        router.push("/2fa")
+        router.push(from ? `/2fa?from=${encodeURIComponent(from)}` : "/2fa")
         return
       }
 
       window.dispatchEvent(new Event("banker_login"))
-      router.push("/dashboard")
+      router.push(getSafeRedirect(from, "/dashboard"))
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred")
     } finally {
@@ -97,7 +105,7 @@ export default function LoginPage() {
       if (!verifyRes.ok) throw new Error(verifyData.error || "Fingerprint verification failed")
 
       window.dispatchEvent(new Event("banker_login"))
-      router.push(verifyData.redirectUrl || "/dashboard")
+      router.push(getSafeRedirect(from, verifyData.redirectUrl || "/dashboard"))
     } catch (err: any) {
       if (err.name === "NotAllowedError") {
         setError("Fingerprint authentication was cancelled or not allowed")

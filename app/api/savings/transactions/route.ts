@@ -1,14 +1,13 @@
+import { getSession } from "@/lib/auth/session"
 import { NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
 import pool from "@/lib/connection/db"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
 
 export async function GET(request: NextRequest) {
-  const c = (await cookies()).get("banker_session")
-  if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   try {
-    const session = JSON.parse(c.value)
     const branchId = session.branch
 
     const { searchParams } = new URL(request.url)
@@ -49,11 +48,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const c = (await cookies()).get("banker_session")
-  if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   try {
-    const session = JSON.parse(c.value)
     const body = await request.json()
     const { accountNumber, transactionType, amount, narration, voucherType, selectedBatch } = body
 

@@ -1,19 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
-import { cookies } from "next/headers"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
+import { getSession } from "@/lib/auth/session"
 
 // GL account codes
 const INTEREST_RECEIVED_GL = "31000000" // Interest Received
 
 export async function POST(request: NextRequest) {
-  const c = (await cookies()).get("banker_session")
-  if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const client = await pool.connect()
 
   try {
-    const session = JSON.parse(c.value)
     const branchId = session.branch
     const userId = session.userId
     const businessDate = session.businessDate

@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
-import { cookies } from "next/headers"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
+import { getSession } from "@/lib/auth/session"
 
 // GET — list purchases (or a single purchase with its line items)
 export async function GET(request: NextRequest) {
   try {
-    const c = (await cookies()).get("banker_session")
-    if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    const session = JSON.parse(c.value)
+    const session = await getSession()
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     const branchId = session.branch
 
     const { searchParams } = new URL(request.url)
@@ -46,12 +45,11 @@ export async function GET(request: NextRequest) {
 
 // POST — create new purchase record (no GL; confirmed via PATCH)
 export async function POST(request: NextRequest) {
-  const c = (await cookies()).get("banker_session")
-  if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const client = await pool.connect()
 
   try {
-    const session      = JSON.parse(c.value)
     const branchId     = session.branch
     const businessDate = session.businessDate
 
@@ -137,12 +135,11 @@ export async function POST(request: NextRequest) {
 
 // DELETE — cancel a pending purchase (only allowed before confirmation)
 export async function DELETE(request: NextRequest) {
-  const c = (await cookies()).get("banker_session")
-  if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const client = await pool.connect()
 
   try {
-    const session  = JSON.parse(c.value)
     const branchId = session.branch
 
     const { purchase_id } = await request.json()
@@ -187,12 +184,11 @@ export async function DELETE(request: NextRequest) {
 
 // PATCH — confirm purchase: create individual asset records + GL entries
 export async function PATCH(request: NextRequest) {
-  const c = (await cookies()).get("banker_session")
-  if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const client = await pool.connect()
 
   try {
-    const session      = JSON.parse(c.value)
     const branchId     = session.branch
     const userId       = session.userId
     const businessDate = session.businessDate

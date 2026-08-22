@@ -1,15 +1,13 @@
-import { cookies } from "next/headers"
+import { getSession } from "@/lib/auth/session"
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 
 export async function GET() {
     console.log("Fetching incomplete batches...")
-  const c = (await cookies()).get("banker_session")
-  if (!c) {
+  const u = await getSession()
+  if (!u) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
-
-  const u = JSON.parse(c.value)
 
   try {
     const { rows } = await pool.query(`

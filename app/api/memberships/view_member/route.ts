@@ -1,10 +1,10 @@
+import { getSession } from "@/lib/auth/session"
 import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
 import pool from "@/lib/connection/db"
 
 export async function POST(req: Request) {
-  const c = (await cookies()).get("banker_session")
-  if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     const body = await req.json()
     const aadhaar_number = body.aadhaar_number
     const phone_number = body.phone_number
@@ -15,7 +15,6 @@ export async function POST(req: Request) {
 
   try {
   
-    const session = JSON.parse(c.value)
     const branchId = session.branch  
 
     // Lookup customer by Aadhaar

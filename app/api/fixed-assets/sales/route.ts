@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
-import { cookies } from "next/headers"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
+import { getSession } from "@/lib/auth/session"
 
 const PROFIT_ON_SALE_GL = "31900000"  // Income: Profit on Asset Sale
 const LOSS_ON_SALE_GL   = "43090000"  // Expense: Loss on Asset Disposal
@@ -9,9 +9,8 @@ const LOSS_ON_SALE_GL   = "43090000"  // Expense: Loss on Asset Disposal
 // GET — list sale/disposal records
 export async function GET(_request: NextRequest) {
   try {
-    const c = (await cookies()).get("banker_session")
-    if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    const session  = JSON.parse(c.value)
+    const session = await getSession()
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     const branchId = session.branch
 
     // Join via asset_id INT (type-level link in schema)
@@ -36,12 +35,11 @@ export async function GET(_request: NextRequest) {
 
 // POST — record asset sale or scrap disposal
 export async function POST(request: NextRequest) {
-  const c = (await cookies()).get("banker_session")
-  if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const client = await pool.connect()
 
   try {
-    const session      = JSON.parse(c.value)
     const branchId     = session.branch
     const userId       = session.userId
     const businessDate = session.businessDate
@@ -56,7 +54,6 @@ export async function POST(request: NextRequest) {
       remarks,
       voucher_type,
     } = body
-    console.log("Received sale/disposal data:", body)
 
     if (!asset_detail_id || !disposal_type || !sale_date) {
       return NextResponse.json(

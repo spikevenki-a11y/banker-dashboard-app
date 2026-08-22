@@ -1,12 +1,10 @@
 import pool from "@/lib/connection/db"
-import { cookies } from "next/headers"
+import { getSession } from "@/lib/auth/session"
 import { NextResponse } from "next/server"
 
 export async function GET() {
-  const c = (await cookies()).get("banker_session")
-  if (!c) return NextResponse.json([])
-
-  const u = JSON.parse(c.value)
+  const session = await getSession()
+  if (!session) return NextResponse.json([])
 
   const { rows } = await pool.query(`
     SELECT m.*
@@ -16,7 +14,7 @@ export async function GET() {
     JOIN staff_role_assignments sra ON sra.role_id = rp.role_id
     WHERE sra.staff_id = $1 AND m.is_active = true
     ORDER BY m.sort_order
-  `, [u.userId])
+  `, [session.userId])
 
   return NextResponse.json(rows)
 }

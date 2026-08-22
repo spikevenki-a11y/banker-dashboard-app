@@ -354,7 +354,7 @@ export default function ViewMemberPage() {
 
         {/* Search Card */}
         <Card>
-          <CardHeader className="pb-4">
+          <CardHeader className="">
             <CardTitle className="flex items-center gap-2 text-base">
               <Search className="h-4 w-4" />
               Search Member
@@ -416,9 +416,9 @@ export default function ViewMemberPage() {
                   onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                 />
               </div>
+              {/* <div className="space-y-1.5"></div>
               <div className="space-y-1.5"></div>
-              <div className="space-y-1.5"></div>
-              <div className="space-y-1.5"></div>
+              <div className="space-y-1.5"></div> */}
               <div className="flex items-end">
                 <Button onClick={handleSearch} disabled={isSearching} className="w-full gap-2">
                   <Search className="h-4 w-4" />

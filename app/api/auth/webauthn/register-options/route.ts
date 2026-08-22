@@ -1,31 +1,19 @@
 export const runtime = "nodejs"
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-import { cookies } from "next/headers"
+import pool from "@/lib/connection/db"
+import { getSession } from "@/lib/auth/session"
 import { generateRegistrationOptions } from "@simplewebauthn/server"
-
-function supabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } }
-  )
-}
 
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const c = cookieStore.get("banker_session")
-    if (!c) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-    const session = JSON.parse(c.value)
-    const supabase = supabaseAdmin()
+    const session = await getSession()
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     // Load existing credentials to exclude them from registration
-    const { data: existingCreds } = await supabase
-      .from("user_webauthn_credentials")
-      .select("credential_id, transports")
-      .eq("user_id", session.userId)
+    const { rows: existingCreds } = await pool.query(
+      `SELECT credential_id, transports FROM user_webauthn_credentials WHERE user_id = $1`,
+      [session.userId]
+    )
 
     const host = request.headers.get("host") || "localhost"
     const rpID = host.split(":")[0]
@@ -54,7 +42,7 @@ export async function GET(request: NextRequest) {
       httpOnly: true,
       sameSite: "lax",
       path: "/",
-      secure: false,
+      secure: process.env.NODE_ENV === "production",
       maxAge: 60 * 5,
     })
     return res

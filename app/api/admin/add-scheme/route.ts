@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
 import pool from "@/lib/connection/db"
-
-async function getSession() {
-  const c = await cookies()
-  const raw = c.get("banker_session")
-  if (!raw) return null
-  try { return JSON.parse(raw.value) } catch { return null }
-}
+import { getSession } from "@/lib/auth/session"
 
 /* ── GET: master schemes + already-imported names ─────────────────── */
 export async function GET(req: NextRequest) {

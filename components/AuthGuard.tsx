@@ -14,7 +14,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     if (isLoading) return        // ⛔ DO NOTHING until auth resolved
 
     if (!user && !PUBLIC.includes(path)) {
-      router.replace("/login")
+      router.replace(`/login?from=${encodeURIComponent(path)}`)
     }
   }, [user, isLoading, path])
 

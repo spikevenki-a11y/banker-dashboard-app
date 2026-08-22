@@ -1,17 +1,20 @@
-import { cookies } from "next/headers"
+import { getSession } from "@/lib/auth/session"
 import { NextResponse } from "next/server"
 
 export async function GET() {
-  const c = (await cookies()).get("banker_session")
-  if (!c) return NextResponse.json(null)
-  const u = JSON.parse(c.value)
-  // console.log("the cookie",u)
+  const session = await getSession()
+  if (!session) return NextResponse.json(null)
+
   return NextResponse.json({
-    name: u.fullName,
-    role: u.role,
-    branch: u.branch,
-    initials: u.fullName.split(" ").map((n: any[]) => n[0]).join("").toUpperCase(),
-    businessDate: u.businessDate,
-    branch_name: u.branch_name
+    name: session.fullName,
+    role: session.role,
+    branch: session.branch,
+    initials: session.fullName
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase(),
+    businessDate: session.businessDate,
+    branch_name: session.branch_name,
   })
 }

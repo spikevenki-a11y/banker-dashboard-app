@@ -337,7 +337,7 @@ export default function EnrollMemberPage() {
 
         {/* ── Customer Lookup ── */}
         <Card>
-          <CardHeader className="pb-4">
+          <CardHeader className="">
             <CardTitle className="flex items-center gap-2 text-base">
               <Search className="h-4 w-4 text-amber-500" />
               Customer Lookup
@@ -390,7 +390,7 @@ export default function EnrollMemberPage() {
         {/* ── Member snapshot ── */}
         <Card className="overflow-hidden">
           <div className="h-1.5 w-full bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600" />
-          <CardContent className="p-5">
+          <CardContent className="">
             <div className="flex flex-col grid gap-5 sm:flex-row sm:items-start sm:gap-6 lg:grid-cols-3">
 
 
