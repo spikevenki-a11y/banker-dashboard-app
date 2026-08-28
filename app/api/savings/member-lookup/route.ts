@@ -17,11 +17,12 @@ export async function POST(req: Request) {
     }
 
     const { rows } = await pool.query(
-      `SELECT m.membership_no, m.member_type, m.status, m.membership_class,
-              c.full_name, c.father_name, c.date_of_birth, 
-              c.customer_code, c.gender
+      `SELECT m.membership_no, m.member_type, m.status, m.membership_class, m.ledger_folio_number,
+              c.full_name, c.father_name, c.date_of_birth, c.mobile_no,
+              c.customer_code, c.gender, ck.aadhaar_no
        FROM memberships m
        JOIN customers c ON m.customer_code = c.customer_code
+       LEFT JOIN customer_kycdetails ck ON ck.customer_code = m.customer_code
        WHERE m.membership_no = $1 AND m.branch_id = $2 AND m.status = 'ACTIVE'`,
       [membership_no, branchId]
     )

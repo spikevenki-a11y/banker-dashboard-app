@@ -3,6 +3,8 @@ import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
 
+const OPERATION_TYPES = ["SINGLE", "EITHER_SURVIVOR", "JOINT_MINOR", "FORMER_SURVIVOR", "LATTER_SURVIVOR"]
+
 export async function POST(req: Request) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -12,13 +14,17 @@ export async function POST(req: Request) {
   try {
     const branchId = session.branch
     const businessDate: string = session.businessDate
-    const { membership_no, scheme_id, opening_date, initial_deposit, nominees } = await req.json()
+    const { membership_no, scheme_id, opening_date, initial_deposit, nominees, ledger_folio_no, is_cheque_required, operation_type } = await req.json()
     const nomineeList: { name: string; relation: string }[] = Array.isArray(nominees)
       ? nominees.slice(0, 4)
       : []
 
     if (!membership_no || !scheme_id || !opening_date) {
       return NextResponse.json({ error: "Membership number, scheme, and opening date are required" }, { status: 400 })
+    }
+
+    if (operation_type && !OPERATION_TYPES.includes(operation_type)) {
+      return NextResponse.json({ error: "Invalid operation type" }, { status: 400 })
     }
 
     const dayendErr = await checkDayEndRestriction(branchId, businessDate)
@@ -53,12 +59,12 @@ export async function POST(req: Request) {
     // Insert savings account
     const insertResult = await client.query(
       `INSERT INTO savings_accounts (
-        account_number, branch_id, membership_no, scheme_id, 
+        account_number, branch_id, membership_no, scheme_id,
         opening_date, interest_rate, available_balance, clear_balance, unclear_balance,
-        account_status, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, 0, 'ACTIVE', NOW(), NOW())
+        account_status, ref_no, is_cheque_required, operation_type, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, 0, 'ACTIVE', $8, $9, $10, NOW(), NOW())
       RETURNING id, account_number`,
-      [accountNumber, branchId, membership_no, scheme_id, opening_date, scheme.interest_rate, initial_deposit || 0]
+      [accountNumber, branchId, membership_no, scheme_id, opening_date, scheme.interest_rate, initial_deposit || 0, ledger_folio_no?.trim() || null, !!is_cheque_required, operation_type || "SINGLE"]
     )
 
     // Insert nominees

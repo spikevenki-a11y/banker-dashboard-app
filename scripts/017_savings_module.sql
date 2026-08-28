@@ -41,23 +41,46 @@ create table savings_schemes (
 INSERT INTO savings_schemes (branch_id,scheme_id,scheme_name,scheme_description,interest_code,savings_gl_account)
 VALUES('2310801','10001','Savings Deposit Individual','Savings Deposit Individual','1001','12101000');
 
-create table savings_accounts (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  branch_id bigint not null references branchparameters(branch_id),
-  scheme_id integer not null references savings_schemes(scheme_id),
+create table public.savings_accounts (
+  id uuid not null default gen_random_uuid (),
+  branch_id bigint not null,
+  scheme_id integer not null,
   opening_date date not null,
-  membership_no bigint not null references memberships(membership_no),
-  account_number varchar(20) unique not null,
+  membership_no bigint not null,
+  account_number character varying(20) not null,
   available_balance numeric(12, 2) not null default 0.00,
   clear_balance numeric(12, 2) not null default 0.00,
   unclear_balance numeric(12, 2) not null default 0.00,
   interest_rate numeric(5, 2) not null default 0.00,
-  last_interest_calculated_date date,
-  account_status varchar(20) not null default 'ACTIVE',
-  account_closed_date date,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  last_interest_calculated_date date null,
+  account_status character varying(20) not null default 'ACTIVE'::character varying,
+  account_closed_date date null,
+  created_at timestamp without time zone null default CURRENT_TIMESTAMP,
+  updated_at timestamp without time zone null default CURRENT_TIMESTAMP,
+  accrued_interest_balance numeric(12, 4) not null default 0,
+  ref_no text null,
+  is_cheque_required boolean not null default false,
+  constraint savings_accounts_pkey primary key (id),
+  constraint savings_accounts_account_number_key unique (account_number),
+  constraint savings_accounts_branch_id_fkey foreign KEY (branch_id) references branchparameters (branch_id),
+  constraint savings_accounts_membership_no_fkey foreign KEY (membership_no) references memberships (membership_no)
+) TABLESPACE pg_default;
+
+ALTER TABLE public.savings_accounts
+ADD COLUMN operation_type varchar(20) NOT NULL DEFAULT 'SINGLE';
+
+ALTER TABLE public.savings_accounts
+ADD CONSTRAINT savings_accounts_operation_type_check
+CHECK (
+  operation_type IN (
+    'SINGLE',
+    'EITHER_SURVIVOR',
+    'JOINT_MINOR',
+    'FORMER_SURVIVOR',
+    'LATTER_SURVIVOR'
+  )
 );
+
 
 INSERT into savings_interest_codes (branch_id, interest_code, interest_description, effective_from, interest_rate)
 VALUES

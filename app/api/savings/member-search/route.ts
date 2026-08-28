@@ -65,6 +65,7 @@ export async function POST(req: Request) {
         m.member_type,
         m.status,
         m.membership_class,
+        m.ledger_folio_number,
         c.full_name,
         c.father_name,
         c.mobile_no,
