@@ -91,11 +91,11 @@ export async function GET(req: NextRequest) {
     }
 
     // Build Assets
-    const assets: any[] = []
+    const liabilities: any[] = []
 
     // Savings
     savingsResult.rows.forEach((row) => {
-      assets.push({
+      liabilities.push({
         account_type: "Savings",
         account_number: row.account_number,
         scheme_name: row.scheme_name || "Savings Account",
@@ -131,7 +131,7 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      assets.push({
+      liabilities.push({
         account_type: type,
         account_number: String(row.accountnumber),
         scheme_name: row.scheme_name || type,
@@ -146,7 +146,7 @@ export async function GET(req: NextRequest) {
 
     // Shares
     sharesResult.rows.forEach((row) => {
-      assets.push({
+      liabilities.push({
         account_type: "Share Capital",
         account_number: `SH-${row.membership_no}`,
         scheme_name: "Member Shares",
@@ -159,13 +159,13 @@ export async function GET(req: NextRequest) {
     })
 
     // Liabilities - Currently loans are not fully implemented, but structure is ready
-    const liabilities: any[] = []
+    const assets: any[] = []
 
     // Summary totals
-    const totalAssets = assets
+    const totalLiabilities = liabilities
       .filter((a) => a.status === "ACTIVE")
       .reduce((sum, a) => sum + a.balance, 0)
-    const totalLiabilities = liabilities
+    const totalAssets = assets
       .filter((l) => l.status === "ACTIVE")
       .reduce((sum, l) => sum + l.balance, 0)
 

@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,12 +39,16 @@ import {
   History,
   Plus,
   Minus,
+  Eye,
+  UserPlus,
+  Trash2,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
+import { ViewMemberPopup } from "@/components/view-member-popup"
 
 type AccountDetails = {
   id: string
@@ -58,6 +63,9 @@ type AccountDetails = {
   last_interest_calculated_date: string | null
   account_status: string
   account_closed_date: string | null
+  ref_no: string | null
+  is_cheque_required: boolean
+  operation_type: string
   created_at: string
   updated_at: string
   scheme_name: string
@@ -85,6 +93,14 @@ type AccountDetails = {
   join_date: string
 }
 
+const OPERATION_TYPES = [
+  { value: "SINGLE", label: "Single" },
+  { value: "EITHER_SURVIVOR", label: "Either or Survivor" },
+  { value: "JOINT_MINOR", label: "Joint (with Minor)" },
+  { value: "FORMER_SURVIVOR", label: "Former or Survivor" },
+  { value: "LATTER_SURVIVOR", label: "Latter or Survivor" },
+]
+
 type Transaction = {
   id: string
   account_number: string
@@ -97,6 +113,14 @@ type Transaction = {
   transaction_date: string
   created_at: string
 }
+
+type Nominee = {
+  name: string
+  relation: string
+}
+
+const NOMINEE_RELATIONS = ["Father", "Mother", "Spouse", "Son", "Daughter", "Brother", "Sister", "Other"]
+const MAX_NOMINEES = 4
 
 export default function ViewModifyAccountPage() {
   const router = useRouter()
@@ -111,9 +135,13 @@ export default function ViewModifyAccountPage() {
   const [searchError, setSearchError] = useState("")
   const [isEditing, setIsEditing] = useState(false)
   const [editStatus, setEditStatus] = useState("")
+  const [editRefNo, setEditRefNo] = useState("")
+  const [editChequeRequired, setEditChequeRequired] = useState(false)
+  const [editOperationType, setEditOperationType] = useState("SINGLE")
   const [isSaving, setIsSaving] = useState(false)
   const [successOpen, setSuccessOpen] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
+  const [viewMemberOpen, setViewMemberOpen] = useState(false)
 
   // Transaction state
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -124,6 +152,16 @@ export default function ViewModifyAccountPage() {
   const [txnReference, setTxnReference] = useState("")
   const [isSubmittingTxn, setIsSubmittingTxn] = useState(false)
   const [txnError, setTxnError] = useState("")
+
+  // Nominee state
+  const [nominees, setNominees] = useState<Nominee[]>([])
+  const [isLoadingNominees, setIsLoadingNominees] = useState(false)
+  const [isEditingNominees, setIsEditingNominees] = useState(false)
+  const [editNomineeList, setEditNomineeList] = useState<Nominee[]>([])
+  const [draftNomineeName, setDraftNomineeName] = useState("")
+  const [draftNomineeRelation, setDraftNomineeRelation] = useState("")
+  const [isSavingNominees, setIsSavingNominees] = useState(false)
+  const [nomineeError, setNomineeError] = useState("")
 
   // Search Savings Account state
   type SearchFields = {
@@ -184,7 +222,11 @@ export default function ViewModifyAccountPage() {
       if (res.ok && data.account) {
         setAccount(data.account)
         setEditStatus(data.account.account_status)
+        setEditRefNo(data.account.ref_no || "")
+        setEditChequeRequired(!!data.account.is_cheque_required)
+        setEditOperationType(data.account.operation_type || "SINGLE")
         fetchTransactions(data.account.account_number)
+        fetchNominees(data.account.account_number)
       } else {
         setSearchError(data.error || "Account not found.")
       }
@@ -207,13 +249,16 @@ export default function ViewModifyAccountPage() {
         body: JSON.stringify({
           account_number: account.account_number,
           account_status: editStatus,
+          ref_no: editRefNo,
+          is_cheque_required: editChequeRequired,
+          operation_type: editOperationType,
         }),
       })
 
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
 
-      setAccount({ ...account, account_status: editStatus })
+      setAccount({ ...account, account_status: editStatus, ref_no: editRefNo, is_cheque_required: editChequeRequired, operation_type: editOperationType })
       setIsEditing(false)
       setSuccessMessage(`The account ${account.account_number} has been updated successfully.`)
       setSuccessOpen(true)
@@ -239,6 +284,82 @@ export default function ViewModifyAccountPage() {
       // silently fail; user can retry
     } finally {
       setIsLoadingTxns(false)
+    }
+  }
+
+  const fetchNominees = async (accNo: string) => {
+    setIsLoadingNominees(true)
+    try {
+      const res = await fetch(`/api/savings/nominees?account_number=${encodeURIComponent(accNo)}`, {
+        credentials: "include",
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        setNominees((data.nominees || []).map((n: any) => ({ name: n.nominee_name, relation: n.relation })))
+      } else {
+        setNominees([])
+      }
+    } catch {
+      setNominees([])
+    } finally {
+      setIsLoadingNominees(false)
+    }
+  }
+
+  const handleEditNomineesStart = () => {
+    setEditNomineeList(nominees.map((n) => ({ ...n })))
+    setDraftNomineeName("")
+    setDraftNomineeRelation("")
+    setNomineeError("")
+    setIsEditingNominees(true)
+  }
+
+  const handleCancelNomineesEdit = () => {
+    setIsEditingNominees(false)
+    setNomineeError("")
+    setDraftNomineeName("")
+    setDraftNomineeRelation("")
+  }
+
+  const handleAddDraftNominee = () => {
+    if (!draftNomineeName.trim() || !draftNomineeRelation) return
+    if (editNomineeList.length >= MAX_NOMINEES) return
+    setEditNomineeList((prev) => [...prev, { name: draftNomineeName.trim(), relation: draftNomineeRelation }])
+    setDraftNomineeName("")
+    setDraftNomineeRelation("")
+  }
+
+  const handleRemoveDraftNominee = (idx: number) => {
+    setEditNomineeList((prev) => prev.filter((_, i) => i !== idx))
+  }
+
+  const handleSaveNominees = async () => {
+    if (!account) return
+
+    setIsSavingNominees(true)
+    setNomineeError("")
+    try {
+      const res = await fetch("/api/savings/nominees", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          account_number: account.account_number,
+          nominees: editNomineeList,
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+
+      setNominees(editNomineeList)
+      setIsEditingNominees(false)
+      setSuccessMessage(`Nominee details for account ${account.account_number} have been updated successfully.`)
+      setSuccessOpen(true)
+    } catch (e: any) {
+      setNomineeError(e.message || "Failed to update nominee details. Please try again.")
+    } finally {
+      setIsSavingNominees(false)
     }
   }
 
@@ -477,7 +598,8 @@ export default function ViewModifyAccountPage() {
                     <TabsList className="grid w-full grid-cols-4">
                       <TabsTrigger value="overview">Account Overview</TabsTrigger>
                       <TabsTrigger value="transactions">Transactions</TabsTrigger>
-                      <TabsTrigger value="member">Member Details</TabsTrigger>
+                      {/* <TabsTrigger value="member">Member Details</TabsTrigger> */}
+                      <TabsTrigger value="nominees">Nominees</TabsTrigger>
                       <TabsTrigger value="scheme">Scheme Details</TabsTrigger>
                     </TabsList>
 
@@ -502,6 +624,9 @@ export default function ViewModifyAccountPage() {
                                 onClick={() => {
                                   setIsEditing(false)
                                   setEditStatus(account.account_status)
+                                  setEditRefNo(account.ref_no || "")
+                                  setEditChequeRequired(!!account.is_cheque_required)
+                                  setEditOperationType(account.operation_type || "SINGLE")
                                 }}
                                 className="bg-transparent"
                               >
@@ -539,9 +664,12 @@ export default function ViewModifyAccountPage() {
                                     </SelectTrigger>
                                     <SelectContent>
                                       <SelectItem value="Active">Active</SelectItem>
+                                      <SelectItem value="Active">Inactive</SelectItem>
                                       <SelectItem value="Dormant">Dormant</SelectItem>
+                                      <SelectItem value="Frozen">Suspended</SelectItem>
                                       <SelectItem value="Frozen">Frozen</SelectItem>
                                       <SelectItem value="Closed">Closed</SelectItem>
+                                      <SelectItem value="Closed">Deceased</SelectItem>
                                     </SelectContent>
                                   </Select>
                                 ) : (
@@ -559,6 +687,61 @@ export default function ViewModifyAccountPage() {
                               <div>
                                 <Label className="text-xs text-muted-foreground">Last Interest Calculated</Label>
                                 <p className="mt-1 text-sm font-medium">{formatDate(account.last_interest_calculated_date)}</p>
+                              </div>
+                              <div>
+                                <Label className="text-xs text-muted-foreground">Operation Type</Label>
+                                {isEditing ? (
+                                  <Select value={editOperationType} onValueChange={setEditOperationType}>
+                                    <SelectTrigger className="mt-1 h-8 w-50">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {OPERATION_TYPES.map((op) => (
+                                        <SelectItem key={op.value} value={op.value}>
+                                          {op.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <p className="mt-1 text-sm font-medium">
+                                    {OPERATION_TYPES.find((op) => op.value === account.operation_type)?.label || account.operation_type || "---"}
+                                  </p>
+                                )}
+                              </div>
+                              <div>
+                                <Label className="text-xs text-muted-foreground">Ledger Folio No</Label>
+                                {isEditing ? (
+                                  <Input
+                                    value={editRefNo}
+                                    onChange={(e) => setEditRefNo(e.target.value)}
+                                    placeholder="Enter ledger folio no."
+                                    className="mt-1 h-8 w-50"
+                                  />
+                                ) : (
+                                  <p className="mt-1 font-mono text-sm font-medium">{account.ref_no || "---"}</p>
+                                )}
+                              </div>
+                              <div>
+                                <Label className="text-xs text-muted-foreground">Cheque Required</Label>
+                                {isEditing ? (
+                                  <div className="mt-1 flex h-8 items-center gap-2">
+                                    <Checkbox
+                                      id="edit-cheque-required"
+                                      checked={editChequeRequired}
+                                      onCheckedChange={(checked) => setEditChequeRequired(checked === true)}
+                                    />
+                                    <Label htmlFor="edit-cheque-required" className="text-sm font-normal cursor-pointer">
+                                      {editChequeRequired ? "Yes" : "No"}
+                                    </Label>
+                                  </div>
+                                ) : (
+                                  <div className="mt-1">
+                                    <Badge variant="outline" className={account.is_cheque_required ? "border-teal-300 text-teal-700" : ""}>
+                                      {account.is_cheque_required ? "Yes" : "No"}
+                                    </Badge>
+                                  </div>
+                                )}
                               </div>
                             </div>
 
@@ -775,7 +958,7 @@ export default function ViewModifyAccountPage() {
                     </TabsContent>
 
                     {/* Member Tab */}
-                    <TabsContent value="member" className="space-y-4 pt-4">
+                    {/* <TabsContent value="member" className="space-y-4 pt-4">
                       <Card>
                         <CardHeader>
                           <CardTitle className="text-lg">Member Information</CardTitle>
@@ -833,7 +1016,7 @@ export default function ViewModifyAccountPage() {
                             </div>
                           </div>
 
-                          {/* Address */}
+                          
                           <div className="mt-6 rounded-lg border bg-muted/30 p-4">
                             <h4 className="mb-3 text-sm font-semibold text-foreground">Address</h4>
                             <p className="text-sm text-foreground leading-relaxed">
@@ -842,6 +1025,142 @@ export default function ViewModifyAccountPage() {
                                 .join(", ") || "---"}
                             </p>
                           </div>
+                        </CardContent>
+                      </Card>
+                    </TabsContent> */}
+
+                    {/* Nominees Tab */}
+                    <TabsContent value="nominees" className="space-y-4 pt-4">
+                      <Card>
+                        <CardHeader className="flex flex-row items-center justify-between">
+                          <div>
+                            <CardTitle className="text-lg">Nominee Details</CardTitle>
+                            <CardDescription>Nominees registered against this account (up to {MAX_NOMINEES})</CardDescription>
+                          </div>
+                          {!isEditingNominees ? (
+                            <Button variant="outline" size="sm" onClick={handleEditNomineesStart} className="bg-transparent">
+                              <Edit3 className="mr-2 h-4 w-4" />
+                              Modify
+                            </Button>
+                          ) : (
+                            <div className="flex gap-2">
+                              <Button variant="outline" size="sm" onClick={handleCancelNomineesEdit} className="bg-transparent">
+                                <X className="mr-2 h-4 w-4" />
+                                Cancel
+                              </Button>
+                              <Button size="sm" onClick={handleSaveNominees} disabled={isSavingNominees} className="bg-teal-600 hover:bg-teal-700 text-white">
+                                {isSavingNominees ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                                Save
+                              </Button>
+                            </div>
+                          )}
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          {isLoadingNominees ? (
+                            <div className="flex items-center justify-center py-10">
+                              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                            </div>
+                          ) : !isEditingNominees ? (
+                            nominees.length > 0 ? (
+                              <div className="rounded-lg border divide-y">
+                                {nominees.map((n, idx) => (
+                                  <div key={idx} className="flex items-center gap-3 px-3 py-2.5">
+                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-teal-100 text-xs font-bold text-teal-700">
+                                      {idx + 1}
+                                    </div>
+                                    <div>
+                                      <p className="text-sm font-medium">{n.name}</p>
+                                      <p className="text-xs text-muted-foreground">{n.relation}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center justify-center py-10 text-center">
+                                <UserPlus className="h-8 w-8 text-muted-foreground/30" />
+                                <p className="mt-2 text-sm text-muted-foreground">No nominees registered for this account.</p>
+                              </div>
+                            )
+                          ) : (
+                            <>
+                              {editNomineeList.length > 0 && (
+                                <div className="rounded-lg border divide-y">
+                                  {editNomineeList.map((n, idx) => (
+                                    <div key={idx} className="flex items-center justify-between px-3 py-2">
+                                      <div className="flex items-center gap-3">
+                                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-teal-100 text-xs font-bold text-teal-700">
+                                          {idx + 1}
+                                        </div>
+                                        <div>
+                                          <p className="text-sm font-medium">{n.name}</p>
+                                          <p className="text-xs text-muted-foreground">{n.relation}</p>
+                                        </div>
+                                      </div>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7 text-muted-foreground hover:text-red-500 hover:bg-red-50"
+                                        onClick={() => handleRemoveDraftNominee(idx)}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {editNomineeList.length === 0 && (
+                                <p className="text-sm text-muted-foreground">No nominees added yet.</p>
+                              )}
+
+                              {editNomineeList.length < MAX_NOMINEES && (
+                                <div className="rounded-lg border border-dashed border-teal-200 bg-teal-50/30 p-4 space-y-3">
+                                  <p className="text-xs font-medium text-teal-700 flex items-center gap-1.5">
+                                    <UserPlus className="h-3.5 w-3.5" />
+                                    Add Nominee
+                                  </p>
+                                  <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1.5">
+                                      <Label className="text-xs">Nominee Name</Label>
+                                      <Input
+                                        value={draftNomineeName}
+                                        onChange={(e) => setDraftNomineeName(e.target.value)}
+                                        placeholder="Enter nominee name"
+                                        onKeyDown={(e) => e.key === "Enter" && handleAddDraftNominee()}
+                                      />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                      <Label className="text-xs">Relationship</Label>
+                                      <Select value={draftNomineeRelation} onValueChange={setDraftNomineeRelation}>
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Select relationship" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {NOMINEE_RELATIONS.map((r) => (
+                                            <SelectItem key={r} value={r}>
+                                              {r}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={handleAddDraftNominee}
+                                    disabled={!draftNomineeName.trim() || !draftNomineeRelation}
+                                    className="gap-1.5 bg-white border-teal-300 text-teal-700 hover:bg-teal-50 hover:text-teal-800"
+                                  >
+                                    <UserPlus className="h-3.5 w-3.5" />
+                                    Add Nominee
+                                  </Button>
+                                </div>
+                              )}
+
+                              {nomineeError && <p className="text-sm text-red-500">{nomineeError}</p>}
+                            </>
+                          )}
                         </CardContent>
                       </Card>
                     </TabsContent>
@@ -904,7 +1223,7 @@ export default function ViewModifyAccountPage() {
                 {/* Right Column - Quick Info Sidebar */}
                 <div className="space-y-6">
                   {/* Account Quick Info */}
-                  <Card>
+                  {/* <Card>
                     <CardHeader className="pb-3">
                       <div className="flex items-center gap-2">
                         <CreditCard className="h-4 w-4 text-muted-foreground" />
@@ -929,7 +1248,7 @@ export default function ViewModifyAccountPage() {
                         <p className="text-sm font-semibold text-teal-600">{account.interest_rate}% p.a.</p>
                       </div>
                     </CardContent>
-                  </Card>
+                  </Card> */}
 
                   {/* Member Quick Info */}
                   <Card>
@@ -937,6 +1256,15 @@ export default function ViewModifyAccountPage() {
                       <div className="flex items-center gap-2">
                         <User className="h-4 w-4 text-muted-foreground" />
                         <CardTitle className="text-sm font-medium">Member Info</CardTitle>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setViewMemberOpen(true)}
+                          className="ml-auto h-7 gap-1.5 text-xs text-teal-600 hover:text-teal-700 hover:bg-teal-50"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          View
+                        </Button>
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -960,7 +1288,7 @@ export default function ViewModifyAccountPage() {
                   </Card>
 
                   {/* Scheme Quick Info */}
-                  <Card>
+                  {/* <Card>
                     <CardHeader className="pb-3">
                       <div className="flex items-center gap-2">
                         <Banknote className="h-4 w-4 text-muted-foreground" />
@@ -981,7 +1309,7 @@ export default function ViewModifyAccountPage() {
                         <p className="text-sm font-medium">{account.interest_frequency || "---"}</p>
                       </div>
                     </CardContent>
-                  </Card>
+                  </Card> */}
                 </div>
                 </div>
               </div>
@@ -1107,6 +1435,13 @@ export default function ViewModifyAccountPage() {
                 </CardContent>
               </Card>
             )}
+
+            {/* View Member Popup */}
+            <ViewMemberPopup
+              open={viewMemberOpen}
+              onOpenChange={setViewMemberOpen}
+              membershipNo={account ? String(account.membership_no) : undefined}
+            />
 
             {/* Success Dialog */}
             <AlertDialog open={successOpen} onOpenChange={setSuccessOpen}>

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   AlertDialog,
@@ -35,6 +36,7 @@ type MemberInfo = {
   aadhaar_no: string
   customer_code: string
   gender: string
+  ledger_folio_number: string
 }
 
 type Nominee = {
@@ -122,6 +124,14 @@ type Scheme = {
   savings_gl_account: number
 }
 
+const OPERATION_TYPES = [
+  { value: "SINGLE", label: "Single" },
+  { value: "EITHER_SURVIVOR", label: "Either or Survivor" },
+  { value: "JOINT_MINOR", label: "Joint (with Minor)" },
+  { value: "FORMER_SURVIVOR", label: "Former or Survivor" },
+  { value: "LATTER_SURVIVOR", label: "Latter or Survivor" },
+]
+
 export default function OpenSavingsAccountPage() {
   const router = useRouter()
 
@@ -153,6 +163,9 @@ export default function OpenSavingsAccountPage() {
   // Form fields
   const [openingDate, setOpeningDate] = useState("")
   const [initialDeposit, setInitialDeposit] = useState("")
+  const [ledgerFolioNo, setLedgerFolioNo] = useState("")
+  const [chequeRequired, setChequeRequired] = useState(false)
+  const [operationType, setOperationType] = useState("SINGLE")
 
   // Nominee list (up to 4) + draft entry
   const MAX_NOMINEES = 4
@@ -357,6 +370,9 @@ export default function OpenSavingsAccountPage() {
           opening_date: openingDate,
           initial_deposit: initialDeposit ? Number(initialDeposit) : 0,
           nominees,
+          ledger_folio_no: ledgerFolioNo.trim(),
+          is_cheque_required: chequeRequired,
+          operation_type: operationType,
         }),
       })
 
@@ -379,6 +395,9 @@ export default function OpenSavingsAccountPage() {
     setSelectedSchemeId("")
     // setOpeningDate(new Date().toISOString().split("T")[0])
     setInitialDeposit("")
+    setLedgerFolioNo("")
+    setChequeRequired(false)
+    setOperationType("SINGLE")
     setNominees([])
     setDraftNomineeName("")
     setDraftNomineeRelation("")
@@ -389,13 +408,13 @@ const getLogindate = async () => {
     const res = await fetch("/api/fas/get-login-date", { credentials: "include" })
     const data = await res.json()
 
-    console.log("logindate =", data)
+    console.log("logindate =", data.businessDate)
 
     if (data.businessDate) {
-      setOpeningDate(data.businessDate)
-      console.log("Updated openingDate-----:", openingDate)
+      const date = data.businessDate.split("T")[0]
+      console.log(date)
+      setOpeningDate(date)
     }
-    console.log("Updated openingDate:", openingDate)
 
   } catch (err) {
     console.error("Failed to fetch date", err)
@@ -476,7 +495,7 @@ const getLogindate = async () => {
                       {memberError && <p className="text-sm text-red-500">{memberError}</p>}
                     </div>
 
-                    {memberInfo && (
+                    {/* {memberInfo && (
                       <div className="rounded-lg border border-teal-200 bg-teal-50/50 p-4">
                         <div className="mb-3 flex items-center gap-2">
                           <CheckCircle2 className="h-5 w-5 text-teal-600" />
@@ -521,7 +540,7 @@ const getLogindate = async () => {
                           </div>
                         </div>
                       </div>
-                    )}
+                    )} */}
                   </CardContent>
                 </Card>
 
@@ -534,7 +553,8 @@ const getLogindate = async () => {
                       </div>
                       <div>
                         <CardTitle className="text-lg">Scheme & Account Details</CardTitle>
-                        <CardDescription>Select a savings scheme and enter account details</CardDescription>
+                        <CardDescription>Select a savings scheme</CardDescription>
+                        {/* <CardDescription>Select a savings scheme and enter account details</CardDescription> */}
                       </div>
                     </div>
                   </CardHeader>
@@ -549,7 +569,8 @@ const getLogindate = async () => {
                           <SelectContent>
                             {schemes.map((scheme) => (
                               <SelectItem key={scheme.scheme_id} value={String(scheme.scheme_id)}>
-                                {scheme.scheme_name} ({scheme.interest_rate}%)
+                                {scheme.scheme_name}
+                                {/* {scheme.scheme_name} ({scheme.interest_rate}%) */}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -569,6 +590,49 @@ const getLogindate = async () => {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
+                        <Label htmlFor="operation-type">Operation Type</Label>
+                        <Select value={operationType} onValueChange={setOperationType}>
+                          <SelectTrigger id="operation-type">
+                            <SelectValue placeholder="Select operation type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {OPERATION_TYPES.map((op) => (
+                              <SelectItem key={op.value} value={op.value}>
+                                {op.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="ledger-folio-no">Ledger Folio No</Label>
+                        <Input
+                          id="ledger-folio-no"
+                          placeholder="Enter ledger folio no."
+                          value={ledgerFolioNo}
+                          onChange={(e) => setLedgerFolioNo(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Cheque Required</Label>
+                        <div className="flex h-9 items-center gap-2 rounded-md border border-input px-3">
+                          <Checkbox
+                            id="cheque-required"
+                            checked={chequeRequired}
+                            onCheckedChange={(checked) => setChequeRequired(checked === true)}
+                          />
+                          <Label htmlFor="cheque-required" className="text-sm font-normal cursor-pointer">
+                            {chequeRequired ? "Yes" : "No"}
+                          </Label>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
                         <Label htmlFor="initial-deposit">Initial Deposit Amount</Label>
                         <Input
                           id="initial-deposit"
@@ -585,7 +649,7 @@ const getLogindate = async () => {
                           {selectedScheme ? `${selectedScheme.interest_rate}% per annum` : "---"}
                         </div>
                       </div>
-                    </div>
+                    </div> */}
                   </CardContent>
                 </Card>
 
@@ -739,6 +803,22 @@ const getLogindate = async () => {
                           <p className="text-xs text-muted-foreground">Type</p>
                           <Badge variant="outline">{memberInfo.member_type}</Badge>
                         </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Father's Name</p>
+                          <p className="text-sm font-semibold">{memberInfo.father_name || "---"}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Aadhaar Number</p>
+                          <p className="text-sm font-mono font-semibold">{memberInfo.aadhaar_no || "---"}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Phone Number</p>
+                          <p className="text-sm font-semibold">{memberInfo.mobile_no || "---"}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Ledger Number</p>
+                          <p className="text-sm font-mono font-semibold">{memberInfo.ledger_folio_number || "---"}</p>
+                        </div>
                       </div>
                     ) : (
                       <p className="text-sm text-muted-foreground">Search a member to see details</p>
@@ -807,6 +887,22 @@ const getLogindate = async () => {
                         <p className="text-sm font-semibold">
                           {initialDeposit ? `₹${Number(initialDeposit).toLocaleString()}` : "₹0"}
                         </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Operation Type</p>
+                        <p className="text-sm font-semibold">
+                          {OPERATION_TYPES.find((op) => op.value === operationType)?.label || "---"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Ledger Folio No</p>
+                        <p className="text-sm font-mono font-semibold">{ledgerFolioNo || "---"}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Cheque Required</p>
+                        <Badge variant="outline" className={chequeRequired ? "border-teal-300 text-teal-700" : ""}>
+                          {chequeRequired ? "Yes" : "No"}
+                        </Badge>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">Nominees</p>
@@ -1382,6 +1478,13 @@ const getLogindate = async () => {
                     className="bg-transparent border border-input hover:bg-accent text-foreground"
                   >
                     Open Another
+                  </AlertDialogAction>
+                  <AlertDialogAction
+                    onClick={() => router.push(`/savings/deposit?account=${encodeURIComponent(createdAccountNo)}`)}
+                    className="gap-1.5 bg-transparent border border-teal-300 text-teal-700 hover:bg-teal-50"
+                  >
+                    <Banknote className="h-4 w-4" />
+                    Deposit
                   </AlertDialogAction>
                   <AlertDialogAction
                     onClick={() => router.push("/savings")}

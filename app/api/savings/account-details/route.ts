@@ -2,6 +2,8 @@ import { getSession } from "@/lib/auth/session"
 import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 
+const OPERATION_TYPES = ["SINGLE", "EITHER_SURVIVOR", "JOINT_MINOR", "FORMER_SURVIVOR", "LATTER_SURVIVOR"]
+
 export async function GET(req: NextRequest) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -30,6 +32,9 @@ export async function GET(req: NextRequest) {
         sa.last_interest_calculated_date,
         sa.account_status,
         sa.account_closed_date,
+        sa.ref_no,
+        sa.is_cheque_required,
+        sa.operation_type,
         sa.created_at,
         sa.updated_at,
         ss.scheme_name,
@@ -82,17 +87,21 @@ export async function PUT(req: NextRequest) {
     const branchId = session.branch
     const body = await req.json()
 
-    const { account_number, account_status } = body
+    const { account_number, account_status, ref_no, is_cheque_required, operation_type } = body
 
     if (!account_number) {
       return NextResponse.json({ error: "Account number is required" }, { status: 400 })
     }
 
+    if (operation_type && !OPERATION_TYPES.includes(operation_type)) {
+      return NextResponse.json({ error: "Invalid operation type" }, { status: 400 })
+    }
+
     const { rowCount } = await pool.query(
-      `UPDATE savings_accounts 
-       SET account_status = $1, updated_at = NOW()
-       WHERE account_number = $2 AND branch_id = $3`,
-      [account_status, account_number, branchId]
+      `UPDATE savings_accounts
+       SET account_status = $1, ref_no = $2, is_cheque_required = $3, operation_type = COALESCE($4, operation_type), updated_at = NOW()
+       WHERE account_number = $5 AND branch_id = $6`,
+      [account_status, ref_no?.trim() || null, !!is_cheque_required, operation_type || null, account_number, branchId]
     )
 
     if (rowCount === 0) {

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -106,9 +106,11 @@ type SearchFields = {
 
 export default function ViewMemberPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const membershipNoFromParams = searchParams.get("membership_no")
   const { user } = useAuth()
   const [searchFields, setSearchFields] = useState<SearchFields>({
-    membership_no: "",
+    membership_no: membershipNoFromParams || "",
     member_name: "",
     father_name: "",
     phone_number: "",
@@ -284,6 +286,48 @@ export default function ViewMemberPage() {
       setIsSearching(false)
     }
   }
+
+  // Auto-load a member when arriving with ?membership_no= (e.g. from Savings > View Account)
+  useEffect(() => {
+    if (!membershipNoFromParams) return
+
+    const loadMemberByMembershipNo = async (no: string) => {
+      setIsSearching(true)
+      setHasSearched(true)
+      setSelectedMember(null)
+      setPage(1)
+      try {
+        const res = await fetch("/api/memberships/view_member", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            membership_no: no,
+            member_name: "",
+            father_name: "",
+            phone_number: "",
+            aadhaar_number: "",
+            ledger_folio_number: "",
+          }),
+        })
+        const data = await res.json()
+        if (res.ok && data.found && data.memberData) {
+          setMembers(data.memberData)
+          if (data.memberData.length === 1) {
+            setSelectedMember(data.memberData[0])
+          }
+        } else {
+          setMembers([])
+        }
+      } catch {
+        setMembers([])
+      } finally {
+        setIsSearching(false)
+      }
+    }
+
+    loadMemberByMembershipNo(membershipNoFromParams)
+  }, [membershipNoFromParams])
 
   const totalPages = Math.max(1, Math.ceil(members.length / pageSize))
   const paginatedMembers = members.slice((page - 1) * pageSize, page * pageSize)

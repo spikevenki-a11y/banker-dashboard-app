@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -100,9 +100,11 @@ function formatDate(d: string) {
 
 export default function DepositPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const accountFromParams = searchParams.get("account")
 
   // Account lookup
-  const [accountNumber, setAccountNumber] = useState("")
+  const [accountNumber, setAccountNumber] = useState(accountFromParams || "")
   const [isSearching, setIsSearching] = useState(false)
   const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null)
   const [searchError, setSearchError] = useState("")
@@ -211,6 +213,13 @@ export default function DepositPage() {
       setIsSearching(false)
     }
   }
+
+  // Auto-load account when arriving with ?account= (e.g. from the account-opened success dialog)
+  useEffect(() => {
+    if (accountFromParams) {
+      loadAccount(accountFromParams)
+    }
+  }, [accountFromParams])
 
   const handleAccountSearch = async () => {
     if (!accountNumber.trim()) return
