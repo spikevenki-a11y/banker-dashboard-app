@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ArrowLeft, Search, Loader2, CheckCircle2, User, CreditCard, Banknote, Users, X, Eye, MapPin, ShieldCheck, TrendingUp, TrendingDown, UserPlus, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react"
+import { ArrowLeft, Search, Loader2, CheckCircle2, User, CreditCard, Banknote, Users, X, Eye, MapPin, ShieldCheck, TrendingUp, TrendingDown, UserPlus, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Home, Camera, PenTool } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 
 type MemberInfo = {
@@ -783,41 +783,70 @@ const getLogindate = async () => {
                 {/* Member Summary */}
                 <Card>
                   <CardHeader className="pb-3">
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <CardTitle className="text-sm font-medium">Member Summary</CardTitle>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        <CardTitle className="text-sm font-medium">Member Summary</CardTitle>
+                      </div>
+                      {memberInfo && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleViewMember}
+                          className="h-7 gap-1.5 text-xs bg-transparent"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          View Member Details
+                        </Button>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent>
                     {memberInfo ? (
-                      <div className="space-y-3">
-                        <div>
-                          <p className="text-xs text-muted-foreground">Name</p>
-                          <p className="text-sm font-semibold">{memberInfo.full_name}</p>
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex-1 space-y-3">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Name</p>
+                            <p className="text-sm font-semibold">{memberInfo.full_name}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Membership No</p>
+                            <p className="text-sm font-mono font-semibold">{memberInfo.membership_no}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Type</p>
+                            <Badge variant="outline">{memberInfo.member_type}</Badge>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Father's Name</p>
+                            <p className="text-sm font-semibold">{memberInfo.father_name || "---"}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Aadhaar Number</p>
+                            <p className="text-sm font-mono font-semibold">{memberInfo.aadhaar_no || "---"}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Phone Number</p>
+                            <p className="text-sm font-semibold">{memberInfo.mobile_no || "---"}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Ledger Number</p>
+                            <p className="text-sm font-mono font-semibold">{memberInfo.ledger_folio_number || "---"}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Membership No</p>
-                          <p className="text-sm font-mono font-semibold">{memberInfo.membership_no}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Type</p>
-                          <Badge variant="outline">{memberInfo.member_type}</Badge>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Father's Name</p>
-                          <p className="text-sm font-semibold">{memberInfo.father_name || "---"}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Aadhaar Number</p>
-                          <p className="text-sm font-mono font-semibold">{memberInfo.aadhaar_no || "---"}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Phone Number</p>
-                          <p className="text-sm font-semibold">{memberInfo.mobile_no || "---"}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Ledger Number</p>
-                          <p className="text-sm font-mono font-semibold">{memberInfo.ledger_folio_number || "---"}</p>
+                        <div className="flex shrink-0 gap-4 sm:flex-col sm:items-end">
+                          <div className="flex flex-col items-center gap-1.5">
+                            <div className="flex h-20 w-20 items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/25 bg-muted/30">
+                              <Camera className="h-6 w-6 text-muted-foreground/50" />
+                            </div>
+                            <span className="text-[11px] font-medium text-muted-foreground">Photo</span>
+                          </div>
+                          <div className="flex flex-col items-center gap-1.5">
+                            <div className="flex h-20 w-20 items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/25 bg-muted/30">
+                              <PenTool className="h-6 w-6 text-muted-foreground/50" />
+                            </div>
+                            <span className="text-[11px] font-medium text-muted-foreground">Signature</span>
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -1361,7 +1390,7 @@ const getLogindate = async () => {
                           <TableHead className="text-xs">Father Name</TableHead>
                           <TableHead className="text-xs">Aadhaar</TableHead>
                           <TableHead className="text-xs">Mobile</TableHead>
-                          <TableHead className="text-xs w-20">Action</TableHead>
+                          {/* <TableHead className="text-xs w-20">Action</TableHead> */}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1376,7 +1405,7 @@ const getLogindate = async () => {
                             <TableCell className="text-xs text-muted-foreground">{member.father_name || "---"}</TableCell>
                             <TableCell className="font-mono text-xs text-muted-foreground">{member.aadhaar_no || "---"}</TableCell>
                             <TableCell className="text-xs text-muted-foreground">{member.mobile_no || "---"}</TableCell>
-                            <TableCell>
+                            {/* <TableCell>
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -1388,7 +1417,7 @@ const getLogindate = async () => {
                               >
                                 Select
                               </Button>
-                            </TableCell>
+                            </TableCell> */}
                           </TableRow>
                         ))}
                       </TableBody>
@@ -1450,7 +1479,15 @@ const getLogindate = async () => {
             {/* Success Dialog */}
             <AlertDialog open={successOpen} onOpenChange={setSuccessOpen}>
               <AlertDialogContent>
-                <AlertDialogHeader>
+                <button
+                  type="button"
+                  onClick={() => router.push("/dashboard")}
+                  className="ring-offset-background focus:ring-ring absolute top-4 right-4 inline-flex items-center gap-1.5 rounded-md border border-input bg-transparent px-2.5 py-1.5 text-xs font-medium text-foreground opacity-80 transition-opacity hover:bg-accent hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden"
+                >
+                  <Home className="h-3.5 w-3.5" />
+                  Home
+                </button>
+                <AlertDialogHeader className="pr-24">
                   <AlertDialogTitle className="flex items-center gap-2 text-teal-600">
                     <CheckCircle2 className="h-6 w-6" />
                     Account Opened Successfully!

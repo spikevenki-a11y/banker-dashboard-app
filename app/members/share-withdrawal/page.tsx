@@ -805,7 +805,7 @@ export default function ShareWithdrawalPage() {
                           <TableHead className="text-xs">{"Father's Name"}</TableHead>
                           <TableHead className="text-xs">Phone</TableHead>
                           <TableHead className="text-xs">Type</TableHead>
-                          <TableHead className="text-xs w-20">Action</TableHead>
+                          {/* <TableHead className="text-xs w-20">Action</TableHead> */}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -822,7 +822,7 @@ export default function ShareWithdrawalPage() {
                             <TableCell>
                               <Badge className="text-[10px] bg-orange-100 text-orange-700">{result.member_type}</Badge>
                             </TableCell>
-                            <TableCell>
+                            {/* <TableCell>
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -831,7 +831,7 @@ export default function ShareWithdrawalPage() {
                               >
                                 Select
                               </Button>
-                            </TableCell>
+                            </TableCell> */}
                           </TableRow>
                         ))}
                       </TableBody>

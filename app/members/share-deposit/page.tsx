@@ -788,7 +788,7 @@ function ShareDepositContent() {
                           <TableHead className="text-xs">{"Father's Name"}</TableHead>
                           <TableHead className="text-xs">Phone</TableHead>
                           <TableHead className="text-xs">Type</TableHead>
-                          <TableHead className="text-xs w-20">Action</TableHead>
+                          {/* <TableHead className="text-xs w-20">Action</TableHead> */}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -805,7 +805,7 @@ function ShareDepositContent() {
                             <TableCell>
                               <Badge className="text-[10px] bg-teal-100 text-teal-700">{result.member_type}</Badge>
                             </TableCell>
-                            <TableCell>
+                            {/* <TableCell>
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -814,7 +814,7 @@ function ShareDepositContent() {
                               >
                                 Select
                               </Button>
-                            </TableCell>
+                            </TableCell> */}
                           </TableRow>
                         ))}
                       </TableBody>
