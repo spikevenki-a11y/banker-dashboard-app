@@ -1348,7 +1348,7 @@ const getLogindate = async () => {
                           <TableHead className="text-xs">Father Name</TableHead>
                           <TableHead className="text-xs">Aadhaar</TableHead>
                           <TableHead className="text-xs">Mobile</TableHead>
-                          <TableHead className="text-xs w-20">Action</TableHead>
+                          {/* <TableHead className="text-xs w-20">Action</TableHead> */}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1359,11 +1359,11 @@ const getLogindate = async () => {
                             <TableCell className="text-xs text-muted-foreground">{member.father_name || "---"}</TableCell>
                             <TableCell className="font-mono text-xs text-muted-foreground">{member.aadhaar_no || "---"}</TableCell>
                             <TableCell className="text-xs text-muted-foreground">{member.mobile_no || "---"}</TableCell>
-                            <TableCell>
+                            {/* <TableCell>
                               <Button size="sm" variant="ghost" className="h-7 text-xs text-teal-600 hover:text-teal-700 hover:bg-teal-50" onClick={(e) => { e.stopPropagation(); handleSelectMember(member) }}>
                                 Select
                               </Button>
-                            </TableCell>
+                            </TableCell> */}
                           </TableRow>
                         ))}
                       </TableBody>

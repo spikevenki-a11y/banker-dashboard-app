@@ -37,7 +37,7 @@ const routes = [
     href: "/members",
   },
   {
-    label: "SB / CA / TD",
+    label: "Savings",
     icon: Wallet,
     href: "/savings",
   },
