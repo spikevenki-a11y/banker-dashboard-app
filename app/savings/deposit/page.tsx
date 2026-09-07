@@ -555,43 +555,43 @@ export default function DepositPage() {
                       {searchError && <p className="text-sm text-red-500">{searchError}</p>}
                     </div>
 
-                    {accountInfo && (
-                      <div className={`rounded-lg border p-4 ${isActive ? "border-teal-200 bg-teal-50/50" : "border-amber-200 bg-amber-50/50"}`}>
-                        <div className="mb-3 flex items-center gap-2">
-                          <CheckCircle2 className={`h-5 w-5 ${isActive ? "text-teal-600" : "text-amber-600"}`} />
-                          <span className={`font-medium ${isActive ? "text-teal-700" : "text-amber-700"}`}>Account Found</span>
-                          <Badge variant="outline" className={`ml-auto ${isActive ? "border-teal-300 text-teal-700" : "border-amber-300 text-amber-700"}`}>
-                            {accountInfo.account_status}
-                          </Badge>
-                        </div>
-                        <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                          <div>
-                            <p className="text-xs text-muted-foreground">Account Holder</p>
-                            <p className="text-sm font-medium">{accountInfo.full_name}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Membership No</p>
-                            <p className="text-sm font-mono font-medium">{accountInfo.membership_no}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Scheme</p>
-                            <p className="text-sm font-medium">{accountInfo.scheme_name}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Available Balance</p>
-                            <p className="text-sm font-semibold text-teal-600">{formatCurrency(accountInfo.available_balance)}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Mobile</p>
-                            <p className="text-sm font-medium">{accountInfo.mobile_no || "---"}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Member Type</p>
-                            <p className="text-sm font-medium">{accountInfo.member_type || "---"}</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                    {/*{accountInfo && (
+                      // <div className={`rounded-lg border p-4 ${isActive ? "border-teal-200 bg-teal-50/50" : "border-amber-200 bg-amber-50/50"}`}>
+                      //   <div className="mb-3 flex items-center gap-2">
+                      //     <CheckCircle2 className={`h-5 w-5 ${isActive ? "text-teal-600" : "text-amber-600"}`} />
+                      //     <span className={`font-medium ${isActive ? "text-teal-700" : "text-amber-700"}`}>Account Found</span>
+                      //     <Badge variant="outline" className={`ml-auto ${isActive ? "border-teal-300 text-teal-700" : "border-amber-300 text-amber-700"}`}>
+                      //       {accountInfo.account_status}
+                      //     </Badge>
+                      //   </div>
+                      //   <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                      //     <div>
+                      //       <p className="text-xs text-muted-foreground">Account Holder</p>
+                      //       <p className="text-sm font-medium">{accountInfo.full_name}</p>
+                      //     </div>
+                      //     <div>
+                      //       <p className="text-xs text-muted-foreground">Membership No</p>
+                      //       <p className="text-sm font-mono font-medium">{accountInfo.membership_no}</p>
+                      //     </div>
+                      //     <div>
+                      //       <p className="text-xs text-muted-foreground">Scheme</p>
+                      //       <p className="text-sm font-medium">{accountInfo.scheme_name}</p>
+                      //     </div>
+                      //     <div>
+                      //       <p className="text-xs text-muted-foreground">Available Balance</p>
+                      //       <p className="text-sm font-semibold text-teal-600">{formatCurrency(accountInfo.available_balance)}</p>
+                      //     </div>
+                      //     <div>
+                      //       <p className="text-xs text-muted-foreground">Mobile</p>
+                      //       <p className="text-sm font-medium">{accountInfo.mobile_no || "---"}</p>
+                      //     </div>
+                      //     <div>
+                      //       <p className="text-xs text-muted-foreground">Member Type</p>
+                      //       <p className="text-sm font-medium">{accountInfo.member_type || "---"}</p>
+                      //     </div>
+                      //   </div>
+                      // </div>
+                    )}*/}
                   </CardContent>
                 </Card>
 

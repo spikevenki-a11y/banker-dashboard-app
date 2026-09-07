@@ -553,7 +553,7 @@ export default function WithdrawPage() {
                       {searchError && <p className="text-sm text-red-500">{searchError}</p>}
                     </div>
 
-                    {accountInfo && (
+                    {/* {accountInfo && (
                       <div className={`rounded-lg border p-4 ${isActive ? "border-teal-200 bg-teal-50/50" : "border-amber-200 bg-amber-50/50"}`}>
                         <div className="mb-3 flex items-center gap-2">
                           <CheckCircle2 className={`h-5 w-5 ${isActive ? "text-teal-600" : "text-amber-600"}`} />
@@ -589,7 +589,7 @@ export default function WithdrawPage() {
                           </div>
                         </div>
                       </div>
-                    )}
+                    )} */}
                   </CardContent>
                 </Card>
 

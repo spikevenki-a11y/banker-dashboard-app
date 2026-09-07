@@ -898,7 +898,7 @@ const getLogindate = async () => {
                 </Card>
 
                 {/* Deposit Summary */}
-                <Card>
+                {/* <Card>
                   <CardHeader className="pb-3">
                     <div className="flex items-center gap-2">
                       <Banknote className="h-4 w-4 text-muted-foreground" />
@@ -949,7 +949,7 @@ const getLogindate = async () => {
                       </div>
                     </div>
                   </CardContent>
-                </Card>
+                </Card> */}
               </div>
             </div>
 

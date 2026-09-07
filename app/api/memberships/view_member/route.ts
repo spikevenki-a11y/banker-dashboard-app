@@ -12,6 +12,7 @@ export async function POST(req: Request) {
     const ledger_folio_number = body.ledger_folio_number
     const member_name = body.member_name
     const membership_no = body.membership_no
+    const spouse_name = body.spouse_name
 
   try {
   
@@ -165,6 +166,10 @@ export async function POST(req: Request) {
     if (father_name) {
       params.push(father_name)
       query += ` AND c.father_name ilike '%' || $${params.length} || '%'`
+    }
+    if (spouse_name) {
+      params.push(spouse_name)
+      query += ` AND c.spouse_name ilike '%' || $${params.length} || '%'`
     }
     if (ledger_folio_number) {
       params.push(ledger_folio_number)
