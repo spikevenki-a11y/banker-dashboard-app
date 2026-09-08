@@ -795,7 +795,7 @@ export default function ViewModifyAccountPage() {
                     {/* Transactions Tab */}
                     <TabsContent value="transactions" className="space-y-4 pt-4">
                       {/* Transaction Form */}
-                      <Card>
+                      {/* <Card>
                         <CardHeader>
                           <CardTitle className="text-lg">New Transaction</CardTitle>
                           <CardDescription>Process a deposit or withdrawal on this account</CardDescription>
@@ -880,7 +880,7 @@ export default function ViewModifyAccountPage() {
                             </div>
                           )}
                         </CardContent>
-                      </Card>
+                      </Card> */}
 
                       {/* Transaction History */}
                       <Card>
@@ -1359,6 +1359,9 @@ export default function ViewModifyAccountPage() {
                           <TableRow className="bg-muted/50">
                             <TableHead className="font-semibold">Account No</TableHead>
                             <TableHead className="font-semibold">Member Name</TableHead>
+                            <TableHead className="font-semibold">Father's Name</TableHead>
+                            <TableHead className="font-semibold">Spouse's Name</TableHead>
+                            <TableHead className="font-semibold">Phone Number</TableHead>
                             <TableHead className="font-semibold">Member No</TableHead>
                             <TableHead className="font-semibold">Scheme</TableHead>
                             <TableHead className="text-right font-semibold">Balance</TableHead>
@@ -1374,16 +1377,11 @@ export default function ViewModifyAccountPage() {
                             >
                               <TableCell className="font-mono text-sm font-medium">{result.account_number}</TableCell>
                               <TableCell>
-                                <div>
-                                  <div className="font-medium">{result.full_name}</div>
-                                  {result.father_name && (
-                                    <div className="text-xs text-muted-foreground">S/o D/o {result.father_name}</div>
-                                  )}
-                                  {result.spouse_name && (
-                                    <div className="text-xs text-muted-foreground">Spouse: {result.spouse_name}</div>
-                                  )}
-                                </div>
+                                <div className="font-medium">{result.full_name}</div>
                               </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">{result.father_name || "---"}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">{result.spouse_name || "---"}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">{result.mobile_no || "---"}</TableCell>
                               <TableCell className="font-mono text-sm">{result.membership_no}</TableCell>
                               <TableCell className="text-sm text-muted-foreground">{result.scheme_name}</TableCell>
                               <TableCell className="text-right font-mono text-sm font-semibold">
