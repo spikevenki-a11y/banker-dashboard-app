@@ -99,6 +99,7 @@ type SearchFields = {
   membership_no: string
   member_name: string
   father_name: string
+  spouse_name: string
   phone_number: string
   aadhaar_number: string
   ledger_folio_number: string
@@ -113,6 +114,7 @@ export default function ViewMemberPage() {
     membership_no: membershipNoFromParams || "",
     member_name: "",
     father_name: "",
+    spouse_name: "",
     phone_number: "",
     aadhaar_number: "",
     ledger_folio_number: "",
@@ -305,6 +307,7 @@ export default function ViewMemberPage() {
             membership_no: no,
             member_name: "",
             father_name: "",
+            spouse_name: "",
             phone_number: "",
             aadhaar_number: "",
             ledger_folio_number: "",
@@ -405,7 +408,7 @@ export default function ViewMemberPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-5 lg:grid-cols-7">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-4 lg:grid-cols-8">
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-muted-foreground">Membership No.</Label>
                 <Input
@@ -430,6 +433,15 @@ export default function ViewMemberPage() {
                   placeholder="Enter father name"
                   value={searchFields.father_name}
                   onChange={(e) => setSearchFields({ ...searchFields, father_name: e.target.value })}
+                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-muted-foreground">Spouse Name</Label>
+                <Input
+                  placeholder="Enter spouse name"
+                  value={searchFields.spouse_name}
+                  onChange={(e) => setSearchFields({ ...searchFields, spouse_name: e.target.value })}
                   onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                 />
               </div>

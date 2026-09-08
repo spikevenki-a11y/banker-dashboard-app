@@ -52,6 +52,8 @@ import {
   History,
   Users,
   X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 
@@ -152,17 +154,23 @@ export default function DepositPage() {
     membership_no: number
     full_name: string
     father_name: string
+    spouse_name: string
     mobile_no: string
     aadhaar_no: string
   }
   const [searchDialogOpen, setSearchDialogOpen] = useState(false)
+  const [searchAccountNumber, setSearchAccountNumber] = useState("")
   const [searchMemberNo, setSearchMemberNo] = useState("")
   const [searchMemberName, setSearchMemberName] = useState("")
   const [searchFatherName, setSearchFatherName] = useState("")
+  const [searchSpouseName, setSearchSpouseName] = useState("")
+  const [searchLedgerFolio, setSearchLedgerFolio] = useState("")
   const [searchAadhaar, setSearchAadhaar] = useState("")
   const [searchContact, setSearchContact] = useState("")
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [isPopupSearching, setIsPopupSearching] = useState(false)
+  const [searchResultsPage, setSearchResultsPage] = useState(1)
+  const searchResultsPageSize = 10
 
   const fetchTransactions = async (accNo: string) => {
     setIsLoadingTxns(true)
@@ -276,10 +284,11 @@ export default function DepositPage() {
 
   // Popup advanced search
   const handlePopupSearch = async () => {
-    if (!searchMemberNo.trim() && !searchMemberName.trim() && !searchFatherName.trim() && !searchAadhaar.trim() && !searchContact.trim()) return
+    if (!searchAccountNumber.trim() && !searchMemberNo.trim() && !searchMemberName.trim() && !searchFatherName.trim() && !searchSpouseName.trim() && !searchLedgerFolio.trim() && !searchAadhaar.trim() && !searchContact.trim()) return
 
     setIsPopupSearching(true)
     setSearchResults([])
+    setSearchResultsPage(1)
 
     try {
       const res = await fetch("/api/savings/account-search", {
@@ -287,9 +296,12 @@ export default function DepositPage() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          accountNumber: searchAccountNumber.trim(),
           memberNumber: searchMemberNo.trim(),
           memberName: searchMemberName.trim(),
           fatherName: searchFatherName.trim(),
+          spouseName: searchSpouseName.trim(),
+          ledgerFolioNumber: searchLedgerFolio.trim(),
           aadhaarNumber: searchAadhaar.trim(),
           contactNo: searchContact.trim(),
         }),
@@ -306,18 +318,28 @@ export default function DepositPage() {
     }
   }
 
+  const totalSearchResultPages = Math.max(1, Math.ceil(searchResults.length / searchResultsPageSize))
+  const paginatedSearchResults = searchResults.slice(
+    (searchResultsPage - 1) * searchResultsPageSize,
+    searchResultsPage * searchResultsPageSize
+  )
+
   const handleSelectAccount = (result: SearchResult) => {
     setAccountNumber(result.account_number)
     setMemberAccounts([])
     setSelectedMemberAccount("")
     setMemberSearchError("")
     setSearchDialogOpen(false)
+    setSearchAccountNumber("")
     setSearchMemberNo("")
     setSearchMemberName("")
     setSearchFatherName("")
+    setSearchSpouseName("")
+    setSearchLedgerFolio("")
     setSearchAadhaar("")
     setSearchContact("")
     setSearchResults([])
+    setSearchResultsPage(1)
     loadAccount(result.account_number)
   }
 
@@ -469,12 +491,11 @@ export default function DepositPage() {
                         />
                         <Button
                           variant="outline"
-                          onClick={handleMemberLookup}
-                          disabled={isMemberSearching || !membershipNo.trim()}
+                          onClick={() => setSearchDialogOpen(true)}
                           className="gap-2 bg-transparent"
                         >
-                          {isMemberSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
-                          Lookup
+                          <Search className="h-4 w-4" />
+                          Search
                         </Button>
                       </div>
                       {isMemberSearching && (
@@ -508,13 +529,13 @@ export default function DepositPage() {
                       )}
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    {/* <div className="flex items-center gap-3">
                       <div className="flex-1 border-t" />
                       <span className="text-xs text-muted-foreground">or</span>
                       <div className="flex-1 border-t" />
-                    </div>
+                    </div> */}
 
-                    <div className="space-y-2">
+                    {/* <div className="space-y-2">
                       <Label htmlFor="account-no">Account Number</Label>
                       <div className="flex gap-2">
                         <Input
@@ -553,45 +574,45 @@ export default function DepositPage() {
                         </div>
                       )}
                       {searchError && <p className="text-sm text-red-500">{searchError}</p>}
-                    </div>
+                    </div> */}
 
-                    {accountInfo && (
-                      <div className={`rounded-lg border p-4 ${isActive ? "border-teal-200 bg-teal-50/50" : "border-amber-200 bg-amber-50/50"}`}>
-                        <div className="mb-3 flex items-center gap-2">
-                          <CheckCircle2 className={`h-5 w-5 ${isActive ? "text-teal-600" : "text-amber-600"}`} />
-                          <span className={`font-medium ${isActive ? "text-teal-700" : "text-amber-700"}`}>Account Found</span>
-                          <Badge variant="outline" className={`ml-auto ${isActive ? "border-teal-300 text-teal-700" : "border-amber-300 text-amber-700"}`}>
-                            {accountInfo.account_status}
-                          </Badge>
-                        </div>
-                        <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                          <div>
-                            <p className="text-xs text-muted-foreground">Account Holder</p>
-                            <p className="text-sm font-medium">{accountInfo.full_name}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Membership No</p>
-                            <p className="text-sm font-mono font-medium">{accountInfo.membership_no}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Scheme</p>
-                            <p className="text-sm font-medium">{accountInfo.scheme_name}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Available Balance</p>
-                            <p className="text-sm font-semibold text-teal-600">{formatCurrency(accountInfo.available_balance)}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Mobile</p>
-                            <p className="text-sm font-medium">{accountInfo.mobile_no || "---"}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Member Type</p>
-                            <p className="text-sm font-medium">{accountInfo.member_type || "---"}</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                    {/*{accountInfo && (
+                      // <div className={`rounded-lg border p-4 ${isActive ? "border-teal-200 bg-teal-50/50" : "border-amber-200 bg-amber-50/50"}`}>
+                      //   <div className="mb-3 flex items-center gap-2">
+                      //     <CheckCircle2 className={`h-5 w-5 ${isActive ? "text-teal-600" : "text-amber-600"}`} />
+                      //     <span className={`font-medium ${isActive ? "text-teal-700" : "text-amber-700"}`}>Account Found</span>
+                      //     <Badge variant="outline" className={`ml-auto ${isActive ? "border-teal-300 text-teal-700" : "border-amber-300 text-amber-700"}`}>
+                      //       {accountInfo.account_status}
+                      //     </Badge>
+                      //   </div>
+                      //   <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                      //     <div>
+                      //       <p className="text-xs text-muted-foreground">Account Holder</p>
+                      //       <p className="text-sm font-medium">{accountInfo.full_name}</p>
+                      //     </div>
+                      //     <div>
+                      //       <p className="text-xs text-muted-foreground">Membership No</p>
+                      //       <p className="text-sm font-mono font-medium">{accountInfo.membership_no}</p>
+                      //     </div>
+                      //     <div>
+                      //       <p className="text-xs text-muted-foreground">Scheme</p>
+                      //       <p className="text-sm font-medium">{accountInfo.scheme_name}</p>
+                      //     </div>
+                      //     <div>
+                      //       <p className="text-xs text-muted-foreground">Available Balance</p>
+                      //       <p className="text-sm font-semibold text-teal-600">{formatCurrency(accountInfo.available_balance)}</p>
+                      //     </div>
+                      //     <div>
+                      //       <p className="text-xs text-muted-foreground">Mobile</p>
+                      //       <p className="text-sm font-medium">{accountInfo.mobile_no || "---"}</p>
+                      //     </div>
+                      //     <div>
+                      //       <p className="text-xs text-muted-foreground">Member Type</p>
+                      //       <p className="text-sm font-medium">{accountInfo.member_type || "---"}</p>
+                      //     </div>
+                      //   </div>
+                      // </div>
+                    )}*/}
                   </CardContent>
                 </Card>
 
@@ -947,6 +968,10 @@ export default function DepositPage() {
 
                 <div className="grid grid-cols-2 gap-4 py-2">
                   <div className="space-y-1.5">
+                    <Label htmlFor="dp-search-account-no" className="text-xs">Account Number</Label>
+                    <Input id="dp-search-account-no" placeholder="Enter account number" value={searchAccountNumber} onChange={(e) => setSearchAccountNumber(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handlePopupSearch()} />
+                  </div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="dp-search-member-no" className="text-xs">Member Number</Label>
                     <Input id="dp-search-member-no" placeholder="Enter member number" value={searchMemberNo} onChange={(e) => setSearchMemberNo(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handlePopupSearch()} />
                   </div>
@@ -959,6 +984,14 @@ export default function DepositPage() {
                     <Input id="dp-search-father-name" placeholder="Enter father's name" value={searchFatherName} onChange={(e) => setSearchFatherName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handlePopupSearch()} />
                   </div>
                   <div className="space-y-1.5">
+                    <Label htmlFor="dp-search-spouse-name" className="text-xs">Spouse{"'"}s Name</Label>
+                    <Input id="dp-search-spouse-name" placeholder="Enter spouse's name" value={searchSpouseName} onChange={(e) => setSearchSpouseName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handlePopupSearch()} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="dp-search-ledger-folio" className="text-xs">Ledger Folio Number</Label>
+                    <Input id="dp-search-ledger-folio" placeholder="Enter ledger folio number" value={searchLedgerFolio} onChange={(e) => setSearchLedgerFolio(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handlePopupSearch()} />
+                  </div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="dp-search-aadhaar" className="text-xs">Aadhaar Number</Label>
                     <Input id="dp-search-aadhaar" placeholder="Enter Aadhaar number" value={searchAadhaar} onChange={(e) => setSearchAadhaar(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handlePopupSearch()} />
                   </div>
@@ -969,11 +1002,11 @@ export default function DepositPage() {
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <Button variant="outline" size="sm" onClick={() => { setSearchMemberNo(""); setSearchMemberName(""); setSearchFatherName(""); setSearchAadhaar(""); setSearchContact(""); setSearchResults([]) }} className="gap-1.5 bg-transparent text-xs">
+                  <Button variant="outline" size="sm" onClick={() => { setSearchAccountNumber(""); setSearchMemberNo(""); setSearchMemberName(""); setSearchFatherName(""); setSearchSpouseName(""); setSearchLedgerFolio(""); setSearchAadhaar(""); setSearchContact(""); setSearchResults([]); setSearchResultsPage(1) }} className="gap-1.5 bg-transparent text-xs">
                     <X className="h-3 w-3" />
                     Clear
                   </Button>
-                  <Button size="sm" onClick={handlePopupSearch} disabled={isPopupSearching || (!searchMemberNo.trim() && !searchMemberName.trim() && !searchFatherName.trim() && !searchAadhaar.trim() && !searchContact.trim())} className="gap-2 bg-teal-600 hover:bg-teal-700 text-white">
+                  <Button size="sm" onClick={handlePopupSearch} disabled={isPopupSearching || (!searchAccountNumber.trim() && !searchMemberNo.trim() && !searchMemberName.trim() && !searchFatherName.trim() && !searchSpouseName.trim() && !searchLedgerFolio.trim() && !searchAadhaar.trim() && !searchContact.trim())} className="gap-2 bg-teal-600 hover:bg-teal-700 text-white">
                     {isPopupSearching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
                     Search
                   </Button>
@@ -995,11 +1028,11 @@ export default function DepositPage() {
                           <TableHead className="text-xs">Scheme</TableHead>
                           <TableHead className="text-xs">Balance</TableHead>
                           <TableHead className="text-xs">Status</TableHead>
-                          <TableHead className="text-xs w-20">Action</TableHead>
+                          {/* <TableHead className="text-xs w-20">Action</TableHead> */}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {searchResults.map((result) => (
+                        {paginatedSearchResults.map((result) => (
                           <TableRow key={result.account_number} className="cursor-pointer hover:bg-teal-50/50 dark:hover:bg-teal-950/20" onClick={() => handleSelectAccount(result)}>
                             <TableCell className="font-mono text-xs font-medium">{result.account_number}</TableCell>
                             <TableCell className="text-xs font-medium">{result.full_name}</TableCell>
@@ -1011,11 +1044,11 @@ export default function DepositPage() {
                                 {result.account_status}
                               </Badge>
                             </TableCell>
-                            <TableCell>
+                            {/* <TableCell>
                               <Button size="sm" variant="ghost" className="h-7 text-xs text-teal-600 hover:text-teal-700 hover:bg-teal-50" onClick={(e) => { e.stopPropagation(); handleSelectAccount(result) }}>
                                 Select
                               </Button>
-                            </TableCell>
+                            </TableCell> */}
                           </TableRow>
                         ))}
                       </TableBody>
@@ -1024,7 +1057,7 @@ export default function DepositPage() {
                     <div className="flex flex-col items-center justify-center py-12 text-center">
                       <CreditCard className="h-8 w-8 text-muted-foreground/30" />
                       <p className="mt-2 text-sm text-muted-foreground">
-                        {searchMemberNo || searchMemberName || searchFatherName || searchAadhaar || searchContact
+                        {searchAccountNumber || searchMemberNo || searchMemberName || searchFatherName || searchSpouseName || searchLedgerFolio || searchAadhaar || searchContact
                           ? "No accounts found. Try different search criteria."
                           : "Enter search criteria and click Search to find accounts."}
                       </p>
@@ -1033,9 +1066,46 @@ export default function DepositPage() {
                 </div>
 
                 {searchResults.length > 0 && (
-                  <p className="text-xs text-muted-foreground text-right">
-                    {searchResults.length} result{searchResults.length !== 1 ? "s" : ""} found
-                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">
+                      Showing {(searchResultsPage - 1) * searchResultsPageSize + 1}
+                      {"–"}
+                      {Math.min(searchResultsPage * searchResultsPageSize, searchResults.length)} of {searchResults.length}
+                    </p>
+                    {totalSearchResultPages > 1 && (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7 bg-transparent"
+                          onClick={() => setSearchResultsPage((p) => Math.max(1, p - 1))}
+                          disabled={searchResultsPage === 1}
+                        >
+                          <ChevronLeft className="h-3.5 w-3.5" />
+                        </Button>
+                        {Array.from({ length: totalSearchResultPages }, (_, i) => i + 1).map((pn) => (
+                          <Button
+                            key={pn}
+                            variant={pn === searchResultsPage ? "default" : "outline"}
+                            size="icon"
+                            className={`h-7 w-7 text-xs ${pn === searchResultsPage ? "bg-teal-600 hover:bg-teal-700 text-white" : "bg-transparent"}`}
+                            onClick={() => setSearchResultsPage(pn)}
+                          >
+                            {pn}
+                          </Button>
+                        ))}
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7 bg-transparent"
+                          onClick={() => setSearchResultsPage((p) => Math.min(totalSearchResultPages, p + 1))}
+                          disabled={searchResultsPage === totalSearchResultPages}
+                        >
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 )}
               </DialogContent>
             </Dialog>
