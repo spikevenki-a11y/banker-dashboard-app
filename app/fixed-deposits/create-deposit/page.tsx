@@ -320,6 +320,12 @@ const getLogindate = async () => {
       maturityDate: matDate.toISOString().split("T")[0],
     }
   }
+  const formatDate = (date) => {
+    const d = new Date(date);
+    return `${String(d.getDate()).padStart(2, "0")}-${String(
+      d.getMonth() + 1
+    ).padStart(2, "0")}-${d.getFullYear()}`;
+  };
 
   const maturityCalc = depositType === "TERM" ? calculateMaturity() : null
 
@@ -438,8 +444,8 @@ const getLogindate = async () => {
 
   return (
     <DashboardWrapper>
-      <div className="flex h-screen overflow-hidden">
-        <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="">
+        <div className="">
           <main className="flex-1 overflow-y-auto bg-background p-6">
             {/* Header */}
             <div className="mb-6 flex items-center gap-4">
@@ -624,13 +630,14 @@ const getLogindate = async () => {
                       <h4 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wide">Basic Details</h4>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="opening-date">Opening Date</Label>
+                          <Label htmlFor="opening-date">Effective Date</Label>
                           <Input
                             id="opening-date"
                             type="date"
                             value={openingDate}
                             onChange={(e) => setOpeningDate(e.target.value)}
-                            disabled={!selectedScheme}
+                            disabled
+                            // disabled={!selectedScheme}
                           />
                         </div>
                         <div className="space-y-2">
@@ -718,7 +725,7 @@ const getLogindate = async () => {
                             <div className="mt-2 flex items-center gap-2 rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-sm dark:border-teal-800 dark:bg-teal-950">
                               <Info className="h-4 w-4 text-teal-600" />
                               <span className="text-teal-700 dark:text-teal-300">
-                                Maturity Date: <span className="font-semibold">{maturityCalc.maturityDate}</span>
+                                Maturity Date: <span className="font-semibold">{formatDate(maturityCalc.maturityDate)}</span>
                               </span>
                             </div>
                           )}
@@ -767,58 +774,73 @@ const getLogindate = async () => {
                             <RefreshCw className="h-3.5 w-3.5" />
                             Auto Renewal Options
                           </h4>
-                          <div className="rounded-lg border border-border p-4 space-y-4">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <Label htmlFor="auto-renewal" className="cursor-pointer">Auto Renewal on Maturity</Label>
-                                <p className="text-xs text-muted-foreground">
-                                  {selectedScheme?.auto_renewal_allowed ? "Allowed by scheme" : "Not allowed by scheme"}
-                                </p>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="rounded-lg border border-border p-4 space-y-4">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <Label htmlFor="auto-renewal" className="cursor-pointer">Auto Renewal on Maturity</Label>
+                                  <p className="text-xs text-muted-foreground">
+                                    {selectedScheme?.auto_renewal_allowed ? "Allowed by scheme" : "Not allowed by scheme"}
+                                  </p>
+                                </div>
+                                <Switch
+                                  id="auto-renewal"
+                                  checked={autoRenewal}
+                                  onCheckedChange={setAutoRenewal}
+                                  disabled={!selectedScheme?.auto_renewal_allowed}
+                                />
                               </div>
-                              <Switch
-                                id="auto-renewal"
-                                checked={autoRenewal}
-                                onCheckedChange={setAutoRenewal}
-                                disabled={!selectedScheme?.auto_renewal_allowed}
-                              />
+                              {autoRenewal && (
+                                <>
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                      <Label htmlFor="renewal-months">Renewal Period (Months)</Label>
+                                      <Input
+                                        id="renewal-months"
+                                        type="number"
+                                        placeholder="Same as original"
+                                        value={renewalPeriodMonths}
+                                        onChange={(e) => setRenewalPeriodMonths(e.target.value)}
+                                      />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label htmlFor="renewal-days">Renewal Period (Days)</Label>
+                                      <Input
+                                        id="renewal-days"
+                                        type="number"
+                                        placeholder="Same as original"
+                                        value={renewalPeriodDays}
+                                        onChange={(e) => setRenewalPeriodDays(e.target.value)}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <Label htmlFor="renewal-interest" className="cursor-pointer">Renew with Interest</Label>
+                                      <p className="text-xs text-muted-foreground">Include accrued interest in renewal amount</p>
+                                    </div>
+                                    <Switch
+                                      id="renewal-interest"
+                                      checked={renewalWithInterest}
+                                      onCheckedChange={setRenewalWithInterest}
+                                    />
+                                  </div>
+                                </>
+                              )}
                             </div>
-                            {autoRenewal && (
-                              <>
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div className="space-y-2">
-                                    <Label htmlFor="renewal-months">Renewal Period (Months)</Label>
-                                    <Input
-                                      id="renewal-months"
-                                      type="number"
-                                      placeholder="Same as original"
-                                      value={renewalPeriodMonths}
-                                      onChange={(e) => setRenewalPeriodMonths(e.target.value)}
-                                    />
-                                  </div>
-                                  <div className="space-y-2">
-                                    <Label htmlFor="renewal-days">Renewal Period (Days)</Label>
-                                    <Input
-                                      id="renewal-days"
-                                      type="number"
-                                      placeholder="Same as original"
-                                      value={renewalPeriodDays}
-                                      onChange={(e) => setRenewalPeriodDays(e.target.value)}
-                                    />
-                                  </div>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <Label htmlFor="renewal-interest" className="cursor-pointer">Renew with Interest</Label>
-                                    <p className="text-xs text-muted-foreground">Include accrued interest in renewal amount</p>
-                                  </div>
-                                  <Switch
-                                    id="renewal-interest"
-                                    checked={renewalWithInterest}
-                                    onCheckedChange={setRenewalWithInterest}
-                                  />
-                                </div>
-                              </>
-                            )}
+                            
+                            <div className="rounded-lg border border-border p-4 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <Label>TDS Applicable</Label>
+                                <Switch
+                                  checked={tdsApplicable}
+                                  onCheckedChange={setTdsApplicable}
+                                />
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                {tdsApplicable ? "TDS will be deducted as per applicable rates" : "No TDS deduction"}
+                              </p>
+                            </div>
                           </div>
                         </div>
 
@@ -850,18 +872,6 @@ const getLogindate = async () => {
                                   />
                                 </div>
                               )}
-                            </div>
-                            <div className="rounded-lg border border-border p-4 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <Label>TDS Applicable</Label>
-                                <Switch
-                                  checked={tdsApplicable}
-                                  onCheckedChange={setTdsApplicable}
-                                />
-                              </div>
-                              <p className="text-xs text-muted-foreground">
-                                {tdsApplicable ? "TDS will be deducted as per applicable rates" : "No TDS deduction"}
-                              </p>
                             </div>
                           </div>
                         </div>
