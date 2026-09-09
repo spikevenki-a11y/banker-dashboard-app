@@ -35,8 +35,8 @@ export default function SundryDebtorsPage() {
 
   return (
     <DashboardWrapper>
-      <div className="flex h-screen overflow-hidden">
-        <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="">
+        <div className="">
           <main className="flex-1 overflow-y-auto bg-background p-6">
             {/* Header */}
             <div className="mb-6 flex items-center gap-4">

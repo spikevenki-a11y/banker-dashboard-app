@@ -24,6 +24,11 @@ export function DashboardWrapper({ children }: { children: React.ReactNode }) {
         <main className="min-h-0 flex-1 overflow-y-auto bg-background p-6">
           {children}
         </main>
+        <div className="border-t border-sidebar-border p-4">
+          <p className="text-sm text-muted-foreground text-right">
+            &copy; {new Date().getFullYear()} LDB Banking System. All rights reserved.
+          </p>
+        </div>
       </div>
 
       <Analytics />
