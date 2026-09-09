@@ -15,13 +15,20 @@ export function DashboardWrapper({ children }: { children: React.ReactNode }) {
   // }
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-dvh w-full overflow-hidden">
       <DashboardSidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
+
+      <div className="flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden">
         <DashboardHeader />
-        <main className="flex-1 overflow-y-auto bg-background p-6">{children}</main>
+
+        <main className="min-h-0 flex-1 overflow-y-auto bg-background p-6">
+          {children}
+        </main>
       </div>
+
       <Analytics />
     </div>
+
+
   )
 }

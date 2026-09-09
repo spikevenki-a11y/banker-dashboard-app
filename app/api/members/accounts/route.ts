@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
       4: "PREMATURE CLOSED",
     }
 
-    // Build Assets
+    // Build liabilities
     const liabilities: any[] = []
 
     // Savings
@@ -158,7 +158,7 @@ export async function GET(req: NextRequest) {
       })
     })
 
-    // Liabilities - Currently loans are not fully implemented, but structure is ready
+    // assets - Currently loans are not fully implemented, but structure is ready
     const assets: any[] = []
 
     // Summary totals
