@@ -13,7 +13,7 @@ export async function GET() {
       `SELECT scheme_id, scheme_name, scheme_description, deposit_type,
               minimum_deposit, maximum_deposit,
               minimum_period_months, maximum_period_months,
-              minimum_period_days, maximum_period_days,
+              minimum_period_days, maximum_period_days, period_unit,
               installment_frequency, minimum_installment_amount, maximum_installment_amount,
               interest_rate, interest_frequency, interest_calculation_method,
               premature_closure_allowed, premature_penal_rate,

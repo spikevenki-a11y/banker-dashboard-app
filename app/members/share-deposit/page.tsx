@@ -289,7 +289,7 @@ function ShareDepositContent() {
 
   return (
     <DashboardWrapper>
-      <div className="flex h-screen overflow-hidden">
+      <div className="flex h-screen overflow-hidden ">
         <div className="flex flex-1 flex-col overflow-hidden">
           <main className="flex-1 overflow-y-auto bg-background p-6">
             {/* Header */}

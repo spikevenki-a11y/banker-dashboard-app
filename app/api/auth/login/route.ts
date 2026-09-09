@@ -3,6 +3,7 @@ import pool from "@/lib/connection/db"
 import { createSession, createPendingTwoFactorSession } from "@/lib/auth/session"
 import { NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
+import { getSession } from "@/lib/auth/session"
 
 export async function POST(request: Request) {
   console.log("Login request received")
@@ -22,11 +23,11 @@ export async function POST(request: Request) {
 
     // Branch business day check
     const { rows: [day] } = await pool.query(
-      `SELECT business_date, is_open FROM branch_business_day WHERE branch_id = $1 AND is_open = true`,
+      `SELECT business_date::text, is_open FROM branch_business_day WHERE branch_id = $1 AND is_open = true`,
       [user.branch]
     )
-
-    console.log("---------------------------------------------"+day?.business_date)
+    const businessDate = day?.business_date ? new Date(day.business_date).toISOString().split("T")[0] : null
+    console.log("---------------------------------------------"+businessDate)
     if (!day?.is_open)
       return NextResponse.json({ error: "Branch day not opened" }, { status: 403 })
 
@@ -77,18 +78,19 @@ export async function POST(request: Request) {
         role: user.role,
         branch: user.branch,
         branch_name: user.branch,
-        businessDate: day!.business_date,
+        businessDate: businessDate,
       })
       return NextResponse.json({ requiresTwoFactor: true })
     }
 
+
     const created = await createSession({
       userId: user.id,
-      fullName: user.full_name,
+      fullName: user.full_name+"---Aemer",
       role: user.role,
       branch: user.branch,
       branch_name: user.branch,
-      businessDate: day!.business_date,
+      businessDate: businessDate,
     })
 
     if (!created) {

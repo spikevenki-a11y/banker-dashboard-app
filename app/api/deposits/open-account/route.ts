@@ -93,15 +93,18 @@ export async function POST(req: Request) {
     const interest = Number(rate_of_interest) || Number(scheme.interest_rate) || 0
 
     if (deposit_type === "TERM" && amt > 0) {
-      // Simple interest maturity calculation
-      const totalDays = months * 30 + days
-      const interestEarned = (amt * interest * totalDays) / (365 * 100)
-      maturityAmount = Math.round((amt + interestEarned) * 100) / 100
-
+      // Simple interest maturity calculation using real calendar month lengths
+      // (28/29/30/31 days), rather than assuming every month is 30 days
       const openDate = new Date(account_open_date)
-      openDate.setMonth(openDate.getMonth() + months)
-      openDate.setDate(openDate.getDate() + days)
-      maturityDate = openDate.toISOString().split("T")[0]
+      const maturityDateObj = new Date(account_open_date)
+      maturityDateObj.setMonth(maturityDateObj.getMonth() + months)
+      maturityDateObj.setDate(maturityDateObj.getDate() + days)
+      const totalDays = Math.round((maturityDateObj.getTime() - openDate.getTime()) / (1000 * 60 * 60 * 24))
+
+      const interestEarned = (amt * interest * totalDays) / (365 * 100)
+      // Nearest rounding: round to the nearest whole number (0.50 and above rounds up)
+      maturityAmount = Math.round(amt + interestEarned)
+      maturityDate = maturityDateObj.toISOString().split("T")[0]
     }
     console.log("the data is : ",branchId,
         scheme_id,

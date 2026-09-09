@@ -5,6 +5,8 @@ export async function GET() {
   const session = await getSession()
   if (!session) return NextResponse.json(null)
 
+  console.log("Session data:", session) // Log the session data for debugging
+  console.log("Full Name:-----------------------------", session.businessDate) // Log the full name for debugging
   return NextResponse.json({
     name: session.fullName,
     role: session.role,

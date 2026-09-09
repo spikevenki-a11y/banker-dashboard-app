@@ -48,6 +48,7 @@ type Scheme = {
   maximum_period_months: number
   minimum_period_days: number
   maximum_period_days: number
+  period_unit: string
   interest_rate: number
   interest_frequency: string
   interest_calculation_method: string
@@ -277,11 +278,26 @@ const getLogindate = async () => {
       setRenewalPeriodMonths("")
       setRenewalPeriodDays("")
       setRenewalWithInterest(false)
+      // Deposit Period is driven by the scheme's period_unit — clear the field that no longer applies
+      setPeriodMonths("")
+      setPeriodDays("")
       if (scheme.deposit_type === "R" && scheme.installment_frequency) {
         setInstallmentFrequency(scheme.installment_frequency)
         setRdPenalRate(String(scheme.penal_rate || 0))
       }
     }
+  }
+
+  // Resolve the deposit period against the opening date using real calendar month lengths
+  // (28/29/30/31 days), rather than assuming every month is 30 days.
+  const getPeriodEndInfo = (months: number, days: number) => {
+    const base = openingDate ? new Date(openingDate) : new Date()
+    const start = new Date(base)
+    const end = new Date(base)
+    end.setMonth(end.getMonth() + months)
+    end.setDate(end.getDate() + days)
+    const totalDays = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+    return { endDate: end, totalDays }
   }
 
   // Calculate maturity
@@ -293,25 +309,55 @@ const getLogindate = async () => {
 
     if (amt <= 0 || rate <= 0 || (months <= 0 && days <= 0)) return null
 
-    const totalDays = months * 30 + days
-    const interest = (amt * rate * totalDays) / (365 * 100)
+    const { endDate: matDate, totalDays } = getPeriodEndInfo(months, days)
+    const interest = Math.round((amt * rate * totalDays) / (365 * 100))
     const maturity = amt + interest
-
-    const matDate = new Date(openingDate)
-    matDate.setMonth(matDate.getMonth() + months)
-    matDate.setDate(matDate.getDate() + days)
 
     return {
       interest: Math.round(interest * 100) / 100,
-      maturityAmount: Math.round(maturity * 100) / 100,
+      // Nearest rounding: round to the nearest whole number (0.50 and above rounds up)
+      maturityAmount: Math.round(maturity),
       maturityDate: matDate.toISOString().split("T")[0],
     }
   }
 
   const maturityCalc = depositType === "TERM" ? calculateMaturity() : null
 
-  // Compute total days for display
-  const totalDays = (Number(periodMonths) || 0) * 30 + (Number(periodDays) || 0)
+  // Compute total days for display using actual calendar days in the selected period
+  const totalDays = getPeriodEndInfo(Number(periodMonths) || 0, Number(periodDays) || 0).totalDays
+
+  // Deposit Period unit as configured on the selected scheme (defaults to MONTHS when no scheme is selected)
+  const periodUnit = selectedScheme?.period_unit || "MONTHS"
+
+  // Payout Frequency options depend on period_unit and, for MONTHS, on the selected term
+  const getPayoutFrequencyOptions = (): { value: string; label: string }[] => {
+    if (periodUnit === "DAYS") {
+      return [{ value: "ON_MATURITY", label: "On Maturity" }]
+    }
+    const months = Number(periodMonths) || 0
+    if (months > 0 && months % 3 === 0) {
+      return [
+        { value: "HALF_YEARLY", label: "Half Yearly" },
+        { value: "QUARTERLY", label: "Quarterly" },
+        { value: "MONTHLY", label: "Monthly" },
+        { value: "ON_MATURITY", label: "On Maturity" },
+      ]
+    }
+    return [
+      { value: "MONTHLY", label: "Monthly" },
+      { value: "ON_MATURITY", label: "On Maturity" },
+    ]
+  }
+  const payoutFrequencyOptions = getPayoutFrequencyOptions()
+
+  // Reset the selected Payout Frequency if it is no longer valid for the current period_unit/term
+  useEffect(() => {
+    const validValues = payoutFrequencyOptions.map((o) => o.value)
+    if (!validValues.includes(interestPayoutFrequency)) {
+      setInterestPayoutFrequency("ON_MATURITY")
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periodUnit, periodMonths])
 
   // Compute maturity date for RD too
   const rdMaturityDate = (() => {
@@ -627,27 +673,30 @@ const getLogindate = async () => {
                         {/* Period */}
                         <div>
                           <h4 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wide">Deposit Period</h4>
-                          <div className="grid grid-cols-3 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="period-months">Period (Months)</Label>
-                              <Input
-                                id="period-months"
-                                type="number"
-                                placeholder="0"
-                                value={periodMonths}
-                                onChange={(e) => setPeriodMonths(e.target.value)}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="period-days">Period (Days)</Label>
-                              <Input
-                                id="period-days"
-                                type="number"
-                                placeholder="0"
-                                value={periodDays}
-                                onChange={(e) => setPeriodDays(e.target.value)}
-                              />
-                            </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            {periodUnit === "DAYS" ? (
+                              <div className="space-y-2">
+                                <Label htmlFor="period-days">Period (Days)</Label>
+                                <Input
+                                  id="period-days"
+                                  type="number"
+                                  placeholder="0"
+                                  value={periodDays}
+                                  onChange={(e) => setPeriodDays(e.target.value)}
+                                />
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                <Label htmlFor="period-months">Period (Months)</Label>
+                                <Input
+                                  id="period-months"
+                                  type="number"
+                                  placeholder="0"
+                                  value={periodMonths}
+                                  onChange={(e) => setPeriodMonths(e.target.value)}
+                                />
+                              </div>
+                            )}
                             <div className="space-y-2">
                               <Label>Total Days</Label>
                               <Input
@@ -660,7 +709,9 @@ const getLogindate = async () => {
                           </div>
                           {selectedScheme && totalDays > 0 && (
                             <p className="mt-1 text-xs text-muted-foreground">
-                              Scheme period: {selectedScheme.minimum_period_months}m {selectedScheme.minimum_period_days}d to {selectedScheme.maximum_period_months}m {selectedScheme.maximum_period_days}d
+                              Scheme period: {periodUnit === "DAYS"
+                                ? `${selectedScheme.minimum_period_days}d to ${selectedScheme.maximum_period_days}d`
+                                : `${selectedScheme.minimum_period_months}m to ${selectedScheme.maximum_period_months}m`}
                             </p>
                           )}
                           {maturityCalc && (
@@ -679,14 +730,18 @@ const getLogindate = async () => {
                           <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                               <Label>Interest Payout Frequency</Label>
-                              <Select value={interestPayoutFrequency} onValueChange={setInterestPayoutFrequency}>
+                              <Select
+                                value={interestPayoutFrequency}
+                                onValueChange={setInterestPayoutFrequency}
+                                disabled={payoutFrequencyOptions.length <= 1}
+                              >
                                 <SelectTrigger>
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="MONTHLY">Monthly</SelectItem>
-                                  <SelectItem value="QUARTERLY">Quarterly</SelectItem>
-                                  <SelectItem value="ON_MATURITY">On Maturity</SelectItem>
+                                  {payoutFrequencyOptions.map((opt) => (
+                                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                  ))}
                                 </SelectContent>
                               </Select>
                             </div>
@@ -896,28 +951,31 @@ const getLogindate = async () => {
                                 onChange={(e) => setNumberOfInstallments(e.target.value)}
                               />
                             </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="period-months-rd">Period (Months)</Label>
-                              <Input
-                                id="period-months-rd"
-                                type="number"
-                                placeholder="0"
-                                value={periodMonths}
-                                onChange={(e) => setPeriodMonths(e.target.value)}
-                              />
-                            </div>
+                            {periodUnit === "DAYS" ? (
+                              <div className="space-y-2">
+                                <Label htmlFor="period-days-rd">Period (Days)</Label>
+                                <Input
+                                  id="period-days-rd"
+                                  type="number"
+                                  placeholder="0"
+                                  value={periodDays}
+                                  onChange={(e) => setPeriodDays(e.target.value)}
+                                />
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                <Label htmlFor="period-months-rd">Period (Months)</Label>
+                                <Input
+                                  id="period-months-rd"
+                                  type="number"
+                                  placeholder="0"
+                                  value={periodMonths}
+                                  onChange={(e) => setPeriodMonths(e.target.value)}
+                                />
+                              </div>
+                            )}
                           </div>
                           <div className="mt-4 grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="period-days-rd">Period (Days)</Label>
-                              <Input
-                                id="period-days-rd"
-                                type="number"
-                                placeholder="0"
-                                value={periodDays}
-                                onChange={(e) => setPeriodDays(e.target.value)}
-                              />
-                            </div>
                             <div className="space-y-2">
                               <Label>Total Days</Label>
                               <Input
@@ -944,14 +1002,18 @@ const getLogindate = async () => {
                           <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                               <Label>Interest Payout</Label>
-                              <Select value={interestPayoutFrequency} onValueChange={setInterestPayoutFrequency}>
+                              <Select
+                                value={interestPayoutFrequency}
+                                onValueChange={setInterestPayoutFrequency}
+                                disabled={payoutFrequencyOptions.length <= 1}
+                              >
                                 <SelectTrigger>
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="MONTHLY">Monthly</SelectItem>
-                                  <SelectItem value="QUARTERLY">Quarterly</SelectItem>
-                                  <SelectItem value="ON_MATURITY">On Maturity</SelectItem>
+                                  {payoutFrequencyOptions.map((opt) => (
+                                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                  ))}
                                 </SelectContent>
                               </Select>
                             </div>
