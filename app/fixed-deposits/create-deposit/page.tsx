@@ -19,9 +19,11 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Switch } from "@/components/ui/switch"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, Search, Loader2, CheckCircle2, User, Banknote, Calendar, Wallet, TrendingUp, TrendingDown, Shield, ShieldCheck, RefreshCw, Info, Users, X, Eye, MapPin, Camera, PenTool } from "lucide-react"
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts"
+import { ArrowLeft, Search, Loader2, CheckCircle2, User, Banknote, Calendar, Wallet, TrendingUp, TrendingDown, Shield, ShieldCheck, RefreshCw, Info, Users, X, Eye, MapPin, Camera, PenTool, BarChart3 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 
 type MemberInfo = {
@@ -186,6 +188,7 @@ export default function CreateDepositPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [successInfo, setSuccessInfo] = useState<{ account_number: string; maturity_date?: string; maturity_amount?: number } | null>(null)
+  const [interestChartOpen, setInterestChartOpen] = useState(false)
 
   // Member search popup state
   const [searchDialogOpen, setSearchDialogOpen] = useState(false)
@@ -440,7 +443,58 @@ const getLogindate = async () => {
     ).padStart(2, "0")}-${d.getFullYear()}`;
   };
 
+  // Breaks the deposit term into payout intervals (per the selected Payout Frequency)
+  // and computes the simple-interest amount payable at each interval, using real
+  // calendar days per interval rather than a flat 30-day assumption.
+  const getInterestPayableSeries = () => {
+    const amt = Number(depositAmount) || 0
+    const months = Number(periodMonths) || 0
+    const days = Number(periodDays) || 0
+    const rate = Number(rateOfInterest) || 0
+
+    if (amt <= 0 || rate <= 0 || (months <= 0 && days <= 0)) return []
+
+    const base = openingDate ? new Date(openingDate) : new Date()
+    const start = new Date(base)
+    const { endDate: end } = getPeriodEndInfo(months, days)
+
+    const stepMonths: Record<string, number> = { MONTHLY: 1, QUARTERLY: 3, HALF_YEARLY: 6 }
+    const step = stepMonths[interestPayoutFrequency]
+
+    // ON_MATURITY (or an unrecognized value) pays out once, at the end of the term
+    const boundaries: Date[] = [new Date(start)]
+    if (!step) {
+      boundaries.push(new Date(end))
+    } else {
+      let cursor = new Date(start)
+      while (true) {
+        const next = new Date(cursor)
+        next.setMonth(next.getMonth() + step)
+        if (next >= end) {
+          boundaries.push(new Date(end))
+          break
+        }
+        boundaries.push(next)
+        cursor = next
+      }
+    }
+
+    return boundaries.slice(1).map((periodEnd, idx) => {
+      const periodStart = boundaries[idx]
+      const periodDaysCount = Math.round((periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24))
+      const interestPayable = Math.round((amt * rate * periodDaysCount) / (365 * 100))
+      return {
+        period: `Period ${idx + 1}`,
+        date: periodEnd.toISOString().split("T")[0],
+        dateLabel: formatDate(periodEnd),
+        days: periodDaysCount,
+        interestPayable,
+      }
+    })
+  }
+
   const maturityCalc = depositType === "TERM" ? calculateMaturity() : null
+  const interestPayableSeries = depositType === "TERM" && maturityCalc ? getInterestPayableSeries() : []
 
   // Compute total days for display using actual calendar days in the selected period
   const totalDays = getPeriodEndInfo(Number(periodMonths) || 0, Number(periodDays) || 0).totalDays
@@ -559,7 +613,7 @@ const getLogindate = async () => {
     <DashboardWrapper>
       <div className="">
         <div className="">
-          <main className="flex-1 overflow-y-auto bg-background p-6">
+          <main className="flex-1 overflow-y-auto bg-background p-2">
             {/* Header */}
             <div className="mb-6 flex items-center gap-4">
               <Button variant="ghost" size="icon" onClick={() => router.push("/fixed-deposits")}>
@@ -691,7 +745,7 @@ const getLogindate = async () => {
                       </Select>
                     </div>
 
-                    {selectedScheme && (
+                    {/* {selectedScheme && (
                       <div className="rounded-lg border border-border bg-muted/50 p-4 text-sm">
                         <div className="mb-2 flex items-center justify-between">
                           <span className="font-semibold">{selectedScheme.scheme_name}</span>
@@ -725,7 +779,7 @@ const getLogindate = async () => {
                           </div>
                         </div>
                       </div>
-                    )}
+                    )} */}
                   </CardContent>
                 </Card>
 
@@ -741,7 +795,7 @@ const getLogindate = async () => {
                   <CardContent className="space-y-6">
                     {/* Common fields for all deposit types */}
                     <div>
-                      <h4 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wide">Basic Details</h4>
+                      {/* <h4 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wide">Basic Details</h4> */}
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="opening-date">Effective Date</Label>
@@ -754,7 +808,7 @@ const getLogindate = async () => {
                             // disabled={!selectedScheme}
                           />
                         </div>
-                        <div className="space-y-2">
+                        {/* <div className="space-y-2">
                           <Label htmlFor="interest-rate">Interest Rate (%)</Label>
                           <Input
                             id="interest-rate"
@@ -765,7 +819,7 @@ const getLogindate = async () => {
                             disabled
                             // disabled={!selectedScheme}
                           />
-                        </div>
+                        </div> */}
                       </div>
                     </div>
 
@@ -774,8 +828,9 @@ const getLogindate = async () => {
                       <>
                         {/* Amount */}
                         <div>
-                          <h4 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wide">Deposit Amount</h4>
-                          <div className="space-y-2">
+                          {/* <h4 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wide">Deposit Amount</h4> */}
+                          <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2 ">
                             <Label htmlFor="deposit-amount">Amount</Label>
                             <Input
                               id="deposit-amount"
@@ -790,11 +845,12 @@ const getLogindate = async () => {
                               </p>
                             )}
                           </div>
+                          </div>
                         </div>
 
                         {/* Period */}
                         <div>
-                          <h4 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wide">Deposit Period</h4>
+                          {/* <h4 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wide">Deposit Period</h4> */}
                           <div className="grid grid-cols-2 gap-4">
                             {periodUnit === "DAYS" ? (
                               <div className="space-y-2">
@@ -848,7 +904,7 @@ const getLogindate = async () => {
 
                         {/* Interest Configuration */}
                         <div>
-                          <h4 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wide">Interest Configuration</h4>
+                          {/* <h4 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wide">Interest Configuration</h4> */}
                           <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                               <Label>Interest Payout Frequency</Label>
@@ -858,7 +914,7 @@ const getLogindate = async () => {
                                 disabled={payoutFrequencyOptions.length <= 1}
                               >
                                 <SelectTrigger>
-                                  <SelectValue />
+                                  <SelectValue placeholder="Select frequency" />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {payoutFrequencyOptions.map((opt) => (
@@ -867,7 +923,7 @@ const getLogindate = async () => {
                                 </SelectContent>
                               </Select>
                             </div>
-                            <div className="space-y-2">
+                            {/* <div className="space-y-2">
                               <Label>Calculation Method</Label>
                               <Select value={interestCalcMethod} onValueChange={setInterestCalcMethod}>
                                 <SelectTrigger>
@@ -879,7 +935,7 @@ const getLogindate = async () => {
                                   <SelectItem value="DAILY_PRODUCT">Daily Product</SelectItem>
                                 </SelectContent>
                               </Select>
-                            </div>
+                            </div> */}
                           </div>
                         </div>
 
@@ -960,7 +1016,7 @@ const getLogindate = async () => {
                         </div>
 
                         {/* Premature & TDS */}
-                        <div>
+                        {/* <div>
                           <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                             <Shield className="h-3.5 w-3.5" />
                             Closure & Tax
@@ -989,7 +1045,7 @@ const getLogindate = async () => {
                               )}
                             </div>
                           </div>
-                        </div>
+                        </div> */}
 
                         {/* Nominee */}
                         <div>
@@ -1267,7 +1323,7 @@ const getLogindate = async () => {
 
                 {/* Member Summary */}
                 <Card>
-                  <CardHeader className="pb-3">
+                  <CardHeader className="">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <User className="h-4 w-4 text-muted-foreground" />
@@ -1360,11 +1416,60 @@ const getLogindate = async () => {
                     </div>
                   </CardContent>
                 </Card> */}
+                {selectedScheme && (
+                  <Card>
+                    <CardHeader className="">
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <Wallet className="h-5 w-5" />
+                        {selectedScheme.scheme_name}
+                      </CardTitle>
+                      <CardDescription>
+                        ({depositTypeLabel(selectedScheme.deposit_type)})
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3 max-h-[400px] overflow-y-auto">
+                      <div className="rounded-lg border border-border bg-muted/50 p-4 text-sm">
+                        {/* <div className="mb-2 flex items-center justify-between">
+                          <span className="font-semibold">{selectedScheme.scheme_name}</span>
+                          <Badge variant="outline">{depositTypeLabel(selectedScheme.deposit_type)}</Badge>
+                        </div> */}
+                        {selectedScheme.scheme_description && (
+                          <p className="mb-2 text-muted-foreground">{selectedScheme.scheme_description}</p>
+                        )}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <span className="text-muted-foreground">Interest Rate:</span>
+                            <span className="ml-1 font-medium">{selectedScheme.interest_rate}%</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Min Deposit:</span>
+                            <span className="ml-1 font-medium">
+                              {Number(selectedScheme.minimum_deposit).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                            </span>
+                          </div>
+                          {selectedScheme.maximum_deposit > 0 && (
+                            <div>
+                              <span className="text-muted-foreground">Max Deposit:</span>
+                              <span className="ml-1 font-medium">
+                                {Number(selectedScheme.maximum_deposit).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                              </span>
+                            </div>
+                          )}
+                          <div>
+                            <span className="text-muted-foreground">Interest Freq:</span>
+                            <span className="ml-1 font-medium">{selectedScheme.interest_frequency}</span>
+                          </div>
+                        </div>
+                      </div>
+                      </CardContent>
+                    </Card>
+                    )
+                    }
                 
 
                 {memberInfo && (
                   <Card>
-                    <CardHeader className="pb-3">
+                    <CardHeader className="">
                       <CardTitle className="flex items-center gap-2 text-lg">
                         <Wallet className="h-5 w-5" />
                         Savings Accounts
@@ -1441,10 +1546,23 @@ const getLogindate = async () => {
                   
                   <Card>
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-lg">
-                        <TrendingUp className="h-5 w-5" />
-                        {depositType === "TERM" ? "Maturity Calculation" : "RD Summary"}
-                      </CardTitle>
+                      <div className="flex items-center justify-between gap-2">
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                          <TrendingUp className="h-5 w-5" />
+                          {depositType === "TERM" ? "Maturity Calculation" : "RD Summary"}
+                        </CardTitle>
+                        {depositType === "TERM" && maturityCalc && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setInterestChartOpen(true)}
+                            className="h-7 gap-1.5 text-xs bg-transparent"
+                          >
+                            <BarChart3 className="h-3.5 w-3.5" />
+                            Interest Payable Chart
+                          </Button>
+                        )}
+                      </div>
                     </CardHeader>
                     <CardContent className="space-y-3">
                       {depositType === "TERM" && (
@@ -1547,6 +1665,127 @@ const getLogindate = async () => {
                 )}
               </div>
             </div>
+
+            {/* Interest Payable Chart Dialog */}
+            <Dialog open={interestChartOpen} onOpenChange={setInterestChartOpen}>
+              <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2 text-teal-700 text-lg">
+                    <BarChart3 className="h-5 w-5" />
+                    Interest Payable Chart
+                  </DialogTitle>
+                  <DialogDescription>
+                    {interestPayableSeries.length > 1
+                      ? `Interest payable at each ${interestPayoutFrequency.replace("_", " ").toLowerCase()} payout across the deposit term.`
+                      : "Interest is paid out once, in full, at maturity."}
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="flex-1 overflow-y-auto space-y-4 py-2">
+                  {interestPayableSeries.length > 1 ? (
+                    <>
+                      {/* <ChartContainer
+                        config={{
+                          interestPayable: {
+                            label: "Interest Payable",
+                            color: "hsl(var(--chart-2))",
+                          },
+                        }}
+                        className="h-[280px] w-full"
+                      >
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={interestPayableSeries} margin={{ left: 8, right: 8 }}>
+                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
+                            <XAxis
+                              dataKey="dateLabel"
+                              className="text-xs text-muted-foreground"
+                              tickLine={false}
+                              axisLine={false}
+                            />
+                            <YAxis
+                              className="text-xs text-muted-foreground"
+                              tickLine={false}
+                              axisLine={false}
+                              width={64}
+                              tickFormatter={(v) => `₹${Number(v).toLocaleString("en-IN")}`}
+                            />
+                            <ChartTooltip
+                              content={
+                                <ChartTooltipContent
+                                  labelFormatter={(label) => `Payout on ${label}`}
+                                  formatter={(value) => [
+                                    Number(value).toLocaleString("en-IN", { style: "currency", currency: "INR" }),
+                                    "Interest Payable",
+                                  ]}
+                                />
+                              }
+                            />
+                            <Bar dataKey="interestPayable" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </ChartContainer> */}
+
+                      <div className="rounded-lg border overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/50">
+                              <TableHead className="text-xs">Payout Period</TableHead>
+                              <TableHead className="text-xs">Payout Date</TableHead>
+                              <TableHead className="text-xs text-right">Days</TableHead>
+                              <TableHead className="text-xs text-right">Interest Payable</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {interestPayableSeries.map((p) => (
+                              <TableRow key={p.period}>
+                                <TableCell className="text-xs">{p.period}</TableCell>
+                                <TableCell className="text-xs">{p.dateLabel}</TableCell>
+                                <TableCell className="text-xs text-right">{p.days}</TableCell>
+                                <TableCell className="text-xs text-right font-semibold text-teal-600">
+                                  {p.interestPayable.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                          <TableFooter>
+                            <TableRow>
+                              <TableCell colSpan={3} className="text-xs font-semibold">Total Interest Payable</TableCell>
+                              <TableCell className="text-xs text-right font-bold text-teal-600">
+                                {interestPayableSeries
+                                  .reduce((sum, p) => sum + p.interestPayable, 0)
+                                  .toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                              </TableCell>
+                            </TableRow>
+                          </TableFooter>
+                        </Table>
+                      </div>
+                    </>
+                  ) : interestPayableSeries.length === 1 ? (
+                    <div className="rounded-lg border border-teal-200 bg-teal-50 p-6 text-center dark:border-teal-800 dark:bg-teal-950">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Interest Payable at Maturity
+                      </p>
+                      <p className="mt-2 text-3xl font-bold text-teal-600">
+                        {interestPayableSeries[0].interestPayable.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                      </p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Payable on {interestPayableSeries[0].dateLabel}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="py-8 text-center text-sm text-muted-foreground">
+                      Enter deposit amount, interest rate, and period to see the interest payable chart.
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex justify-end border-t pt-3">
+                  <Button variant="outline" size="sm" onClick={() => setInterestChartOpen(false)} className="bg-transparent">
+                    Close
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
 
             {/* Member Profile Modal */}
             <Dialog open={viewMemberOpen} onOpenChange={setViewMemberOpen}>
