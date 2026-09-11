@@ -599,6 +599,10 @@ function DepositClosureContent() {
                         <span className="text-sm text-muted-foreground">Interest Earned</span>
                         <span className="text-sm font-semibold text-teal-600">{formatCurrency(account.interestdueforpayment)}</span>
                       </div>
+                      <div className="flex items-center justify-between border-b border-border pb-2">
+                        <span className="text-sm text-muted-foreground">Interest Already Paid</span>
+                        <span className="text-sm font-semibold">{formatCurrency(account.interestPaid || 0)}</span>
+                      </div>
 
                       {account.isPremature && (
                         <>
@@ -1292,6 +1296,10 @@ function DepositClosureContent() {
                         <div className="flex justify-between text-sm">
                           <span className="text-muted-foreground">Interest Earned:</span>
                           <span className="font-semibold">{formatCurrency(account?.interestdueforpayment)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Interest Already Paid:</span>
+                          <span className="font-semibold">{formatCurrency(account?.interestPaid || 0)}</span>
                         </div>
                         {effectivePenalty > 0 && (
                           <div className="flex justify-between text-sm">
