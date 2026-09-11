@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const branchId = session.branch
+    const businessDate = session.businessDate
 
     const { searchParams } = new URL(request.url)
     const accountNumber = searchParams.get("account")
@@ -57,9 +58,9 @@ export async function GET(request: NextRequest) {
     const interestEarned = maturityAmount > 0 ? maturityAmount - depositAmount : 0
     const interestPaid = Number(account.interestpaidamount) || 0
 
-    // Determine if premature
+    // Determine if premature, relative to the bank's current business date (not the server clock)
     const maturityDate = account.td_maturity_date || account.rd_maturity_date || null
-    const isPremature = maturityDate ? new Date(maturityDate) > new Date() : false
+    const isPremature = maturityDate ? new Date(maturityDate) > new Date(businessDate) : false
     const prematurePenalRate = Number(account.premature_penal_rate) || 0
 
     // For premature closure, calculate penalty on interest
