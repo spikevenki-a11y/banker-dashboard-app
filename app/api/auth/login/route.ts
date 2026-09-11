@@ -86,7 +86,7 @@ export async function POST(request: Request) {
 
     const created = await createSession({
       userId: user.id,
-      fullName: user.full_name+"---Aemer",
+      fullName: user.full_name,
       role: user.role,
       branch: user.branch,
       branch_name: user.branch,
