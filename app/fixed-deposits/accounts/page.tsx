@@ -86,6 +86,11 @@ const actionContext: Record<string, { title: string; description: string; preset
     description: "Only matured deposit accounts are eligible for renewal. Use Renew from the Actions menu.",
     presetStatus: "Maturity",
   },
+  "interest-payment": {
+    title: "Select an account for Interest Payment",
+    description: "Choose an active deposit account below, then use Interest Payment from its Actions menu.",
+    presetStatus: "active",
+  },
 }
 
 function FixedDepositsAccountsContent() {
@@ -420,6 +425,16 @@ function FixedDepositsAccountsContent() {
                                   >
                                     <Banknote className="mr-2 h-4 w-4" />
                                     Transactions
+                                  </DropdownMenuItem>
+                                )}
+                                {dep.status === "Active" && (
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      router.push(`/fixed-deposits/interest-payment?account=${dep.accountNumber}`)
+                                    }}
+                                  >
+                                    <TrendingUp className="mr-2 h-4 w-4" />
+                                    Interest Payment
                                   </DropdownMenuItem>
                                 )}
                                 {dep.status === "Maturity" && (
