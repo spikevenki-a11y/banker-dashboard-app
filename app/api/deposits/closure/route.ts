@@ -395,7 +395,7 @@ export async function POST(request: NextRequest) {
     // Record closure in module transaction table
     await client.query(
       `INSERT INTO deposit_transactions (
-         branch_id, account_number,
+         branch_id, accountnumber,
          transaction_date, value_date,
          transaction_type, voucher_type,
          debit_amount, credit_amount, running_balance,

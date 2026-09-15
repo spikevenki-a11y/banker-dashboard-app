@@ -59,9 +59,9 @@ export default function FixedDepositsDashboardPage() {
               </Card>
 
               <Card
-                className="relative flex flex-row transition-all"
+                className="cursor-pointer transition-all hover:shadow-lg hover:border-primary flex flex-row"
+                onClick={() => router.push("/fixed-deposits/interest-payment")}
               >
-                <Badge variant="secondary" className="absolute right-3 top-3 text-[10px]">Coming Soon</Badge>
                 <CardHeader className="pb-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
                     <TrendingUp className="h-6 w-6 text-primary" />

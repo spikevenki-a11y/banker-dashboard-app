@@ -98,8 +98,8 @@ CREATE TABLE pigmy_deposit_details (
 CREATE TABLE IF NOT EXISTS deposit_transactions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-  account_id UUID NOT NULL 
-      REFERENCES deposit_account(id),
+  accountnumber numeric(16,0) NOT NULL 
+      REFERENCES deposit_account(accountnumber),
 
   transaction_date DATE NOT NULL,
   value_date DATE NOT NULL,
@@ -129,6 +129,8 @@ CREATE TABLE IF NOT EXISTS deposit_transactions (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+
 
 
 CREATE TABLE deposit_schemes (

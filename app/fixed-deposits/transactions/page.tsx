@@ -374,29 +374,31 @@ function DepositTransactionsContent() {
       return
     }
 
-    // Validate debit entries
+    // Validate debit entries - only applicable when funding via Transfer from a savings account
     const selectedDebits = debitEntries.filter((e) => e.selected && e.debitAmount)
-    if (selectedDebits.length === 0) {
-      setFormError("Please select at least one savings account and enter debit amount.")
-      return
-    }
-
-    for (const entry of selectedDebits) {
-      const debitAmt = parseFloat(entry.debitAmount)
-      if (isNaN(debitAmt) || debitAmt <= 0) {
-        setFormError(`Invalid debit amount for account ${entry.accountNumber}.`)
+    if (voucherType === "TRANSFER") {
+      if (selectedDebits.length === 0) {
+        setFormError("Please select at least one savings account and enter debit amount.")
         return
       }
-      if (debitAmt > entry.availableBalance) {
-        setFormError(`Debit amount exceeds available balance for account ${entry.accountNumber}.`)
+
+      for (const entry of selectedDebits) {
+        const debitAmt = parseFloat(entry.debitAmount)
+        if (isNaN(debitAmt) || debitAmt <= 0) {
+          setFormError(`Invalid debit amount for account ${entry.accountNumber}.`)
+          return
+        }
+        if (debitAmt > entry.availableBalance) {
+          setFormError(`Debit amount exceeds available balance for account ${entry.accountNumber}.`)
+          return
+        }
+      }
+
+      const debitTotal = selectedDebits.reduce((s, e) => s + parseFloat(e.debitAmount), 0)
+      if (Math.abs(debitTotal - amt) >= 0.01) {
+        setFormError(`Total debit (${formatCurrency(debitTotal)}) must equal credit amount (${formatCurrency(amt)}).`)
         return
       }
-    }
-
-    const debitTotal = selectedDebits.reduce((s, e) => s + parseFloat(e.debitAmount), 0)
-    if (Math.abs(debitTotal - amt) >= 0.01) {
-      setFormError(`Total debit (${formatCurrency(debitTotal)}) must equal credit amount (${formatCurrency(amt)}).`)
-      return
     }
 
     setIsSubmitting(true)
@@ -413,10 +415,12 @@ function DepositTransactionsContent() {
           narration: narration || "Deposit Credit",
           voucherType,
           selectedBatch,
-          debitAccounts: selectedDebits.map((e) => ({
-            accountNumber: e.accountNumber,
-            amount: parseFloat(e.debitAmount),
-          })),
+          debitAccounts: voucherType === "TRANSFER"
+            ? selectedDebits.map((e) => ({
+                accountNumber: e.accountNumber,
+                amount: parseFloat(e.debitAmount),
+              }))
+            : [],
           selectedInstallments: selectedInstallmentsList.map((i) => ({
             id: i.id,
             installment_number: i.installment_number,
@@ -816,9 +820,12 @@ function DepositTransactionsContent() {
                             // }}
                             
                             onValueChange={(value) => {
-                              setVoucherType(value)
+                              setVoucherType(value as "CASH" | "TRANSFER")
                               if (value !== "TRANSFER") {
                                 setSelectedBatch(0)
+                                setDebitEntries((prev) =>
+                                  prev.map((e) => ({ ...e, selected: false, debitAmount: "" }))
+                                )
                               }
                             }}
 
@@ -918,7 +925,7 @@ function DepositTransactionsContent() {
                       <div className="flex gap-3 pt-2">
                         <Button
                           onClick={handleSubmit}
-                          disabled={isSubmitting || !voucherType || (isRd ? selectedInstallmentsList.length === 0 : !account.depositAmount) || !debitMatchesCredit || hasDebitValidationError}
+                          disabled={isSubmitting || !voucherType || (isRd ? selectedInstallmentsList.length === 0 : !account.depositAmount) || (voucherType === "TRANSFER" && (!debitMatchesCredit || hasDebitValidationError))}
                           className="gap-2"
                         >
                           {isSubmitting ? (
@@ -1059,8 +1066,8 @@ function DepositTransactionsContent() {
                   </CardContent>
                 </Card>
 
-                {/* Debit Account Card */}
-                {(isRd || account.depositAmount != account.balance) && (
+                {/* Debit Account Card - only relevant when funding via Transfer from a savings account */}
+                {voucherType === "TRANSFER" && (isRd || account.depositAmount != account.balance) && (
                   <Card className={!isActive ? "pointer-events-none opacity-50" : ""}>
                     <CardHeader className="pb-3">
                       <div className="flex items-center gap-3">

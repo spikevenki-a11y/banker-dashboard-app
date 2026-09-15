@@ -19,12 +19,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Account number is required" }, { status: 400 })
     }
 
-    // Get deposit account info with member/scheme details vengatesh
+    // Get deposit account info with member/scheme details
     const { rows: accountRows } = await pool.query(
       `SELECT
         da.id, da.accountnumber, da.deposittype, da.membership_no,
         da.accountopendate, da.rateofinterest, da.clearbalance, da.unclearbalance,
         da.accountstatus, da.schemeid,
+        da.interestpaidamount, da.interestdueforpayment,
         ds.scheme_name, ds.deposit_gl_account, ds.interest_expense_gl_account,
         ds.interest_payable_gl_account,
         c.full_name AS member_name,
@@ -53,10 +54,11 @@ export async function GET(request: NextRequest) {
 
     const account = accountRows[0]
 
-    // Get transaction history from deposit_transactions
+    // Get interest payment history from deposit_transactions
     const { rows: transactions } = await pool.query(
       `SELECT
         dt.id,
+        dt.accountnumber,
         dt.transaction_date,
         dt.transaction_type,
         dt.voucher_type,
@@ -70,31 +72,17 @@ export async function GET(request: NextRequest) {
         gb.status AS batch_status
       FROM deposit_transactions dt
       LEFT JOIN gl_batches gb ON gb.branch_id = dt.branch_id AND gb.batch_id = dt.gl_batch_id
-      WHERE dt.accountnumber = $1 AND dt.branch_id = $2
+      WHERE dt.accountnumber = $1 AND dt.branch_id = $2 AND dt.transaction_type = 'INTEREST_PAYOUT'
       ORDER BY dt.transaction_date DESC, dt.created_at DESC
       LIMIT $3 OFFSET $4`,
-      [String(accountNumber), branchId, limit, offset]
+      [account.accountnumber, branchId, limit, offset]
     )
 
     const { rows: countResult } = await pool.query(
-      `SELECT COUNT(*) as total FROM deposit_transactions WHERE accountnumber = $1  AND branch_id = $2`,
-      [String(accountNumber), branchId]
+      `SELECT COUNT(*) as total FROM deposit_transactions
+       WHERE accountnumber = $1 AND branch_id = $2 AND transaction_type = 'INTEREST_PAYOUT'`,
+      [account.accountnumber, branchId]
     )
-
-    // Fetch RD installment details if it's a recurring deposit
-    let rdInstallments: any[] = []
-    if (account.deposittype === "RECURING" || account.deposittype === "R" || account.deposittype === "RECURRING") {
-      const { rows: installmentRows } = await pool.query(
-        `SELECT
-          id, installment_number, installment_amount, installment_due_date,
-          installment_paid_date, installment_voucher_no, penalty_collected
-        FROM rd_installment_details
-        WHERE accountnumber = $1 AND branch_id = $2
-        ORDER BY installment_number ASC`,
-        [accountNumber, branchId]
-      )
-      rdInstallments = installmentRows
-    }
 
     return NextResponse.json({
       account: {
@@ -109,9 +97,11 @@ export async function GET(request: NextRequest) {
         accountStatus: account.accountstatus,
         schemeId: account.schemeid,
         schemeName: account.scheme_name || "N/A",
-        depositGlAccount: account.depositGl,
+        interestPayableGlAccount: account.interest_payable_gl_account,
+        interestDue: Number(account.interestdueforpayment) || 0,
+        interestPaid: Number(account.interestpaidamount) || 0,
         // Type-specific
-        depositAmount: account.depositamount ,
+        depositAmount: account.depositamount,
         periodMonths: account.periodmonths,
         periodDays: account.perioddays,
         maturityDate: account.td_maturity_date || account.rd_maturity_date || null,
@@ -122,20 +112,15 @@ export async function GET(request: NextRequest) {
             : null,
         installmentAmount: account.installment_amount ? Number(account.installment_amount) : null,
         installmentFrequency: account.installment_frequency,
-        totalInstallments: account.numberofinstallments,
-        paidInstallments: account.numberofinstalmentspaid,
-        nextInstallmentDate: account.nextinstalmentdate,
-        penalRate: account.penalrate ? Number(account.penalrate) : 0,
         dailyAmount: account.minimum_daily_amount ? Number(account.minimum_daily_amount) : null,
         collectionFrequency: account.collection_frequency,
       },
       transactions,
       total: parseInt(countResult[0]?.total || "0"),
-      rdInstallments,
     })
   } catch (error: any) {
-    console.error("Failed to fetch deposit transactions:", error)
-    return NextResponse.json({ error: "Failed to fetch transactions: " + error.message }, { status: 500 })
+    console.error("Failed to fetch interest payment details:", error)
+    return NextResponse.json({ error: "Failed to fetch interest payment details: " + error.message }, { status: 500 })
   }
 }
 
@@ -150,7 +135,7 @@ export async function POST(request: NextRequest) {
     const businessDate = session.businessDate
 
     const body = await request.json()
-    const { accountNumber, amount, narration, voucherType, selectedBatch, debitAccounts, selectedInstallments } = body
+    const { accountNumber, amount, narration, voucherType, creditAccounts, selectedBatch } = body
 
     if (!accountNumber || !amount) {
       return NextResponse.json({ error: "Account number and amount are required" }, { status: 400 })
@@ -170,9 +155,9 @@ export async function POST(request: NextRequest) {
 
     await client.query("BEGIN")
 
-    // Get account info
+    // Get account info with lock
     const { rows: accounts } = await client.query(
-      `SELECT da.*, ds.deposit_gl_account, ds.scheme_name
+      `SELECT da.*, ds.interest_payable_gl_account, ds.scheme_name
        FROM deposit_account da
        JOIN deposit_schemes ds ON ds.scheme_id = da.schemeid AND ds.branch_id = da.branch_id
        WHERE da.accountnumber = $1 AND da.branch_id = $2
@@ -189,11 +174,20 @@ export async function POST(request: NextRequest) {
 
     if (account.accountstatus !== 1) {
       await client.query("ROLLBACK")
-      return NextResponse.json({ error: "Account is not active. Only active accounts can receive deposits." }, { status: 400 })
+      return NextResponse.json({ error: "Account is not active. Interest can only be paid on active accounts." }, { status: 400 })
     }
 
-    const depositGlAccount = account.deposit_gl_account
-    const newBalance = parseFloat(account.clearbalance) + amt
+    const interestDue = parseFloat(account.interestdueforpayment) || 0
+    if (amt - interestDue > 0.01) {
+      await client.query("ROLLBACK")
+      return NextResponse.json({ error: `Payment amount cannot exceed interest due (${interestDue}).` }, { status: 400 })
+    }
+    if (interestDue <= 0) {
+      await client.query("ROLLBACK")
+      return NextResponse.json({ error: "No interest is due for payment on this account." }, { status: 400 })
+    }
+
+    const interestPayableGlAccount = account.interest_payable_gl_account
 
     // Get or create batch ID
     let batchId = 0
@@ -238,60 +232,67 @@ export async function POST(request: NextRequest) {
       `, [businessDate, branchId, batchId, voucherNo, voucherType, session.userId])
     }
 
-    const txnNarration = narration || "Deposit Credit"
+    const txnNarration = narration || `Interest Payment - A/c ${accountNumber}`
 
-    // DR Savings Account(s) - Transfer from savings to deposit
-    if (debitAccounts && Array.isArray(debitAccounts) && debitAccounts.length > 0) {
-      for (const debit of debitAccounts) {
-        const debitAmt = parseFloat(debit.amount)
-        if (isNaN(debitAmt) || debitAmt <= 0) continue
+    // DR Interest Payable GL (liability decreases - interest due is now being paid)
+    await client.query(`
+      INSERT INTO gl_batch_lines (
+        branch_id, batch_id, business_date,
+        accountcode, ref_account_id,
+        debit_amount, credit_amount,
+        voucher_id, narration, created_by
+      ) VALUES ($1,$2,$3,$4,$5,$6,0,$7,$8,$9)
+    `, [
+      branchId, batchId, businessDate,
+      interestPayableGlAccount, String(accountNumber),
+      amt,
+      voucherNo,
+      txnNarration,
+      session.userId
+    ])
 
-        // Get savings account details
+    // CR Savings Account(s) or Cash (interest payout to member)
+    if (creditAccounts && Array.isArray(creditAccounts) && creditAccounts.length > 0) {
+      for (const credit of creditAccounts) {
+        const creditAmt = parseFloat(credit.amount)
+        if (isNaN(creditAmt) || creditAmt <= 0) continue
+
         const { rows: savingsRows } = await client.query(
           `SELECT sa.*, ss.savings_gl_account
            FROM savings_accounts sa
            JOIN savings_schemes ss ON ss.scheme_id = sa.scheme_id AND ss.branch_id = sa.branch_id
            WHERE sa.account_number = $1 AND sa.branch_id = $2
            FOR UPDATE`,
-          [debit.accountNumber, branchId]
+          [credit.accountNumber, branchId]
         )
 
         if (savingsRows.length === 0) {
           await client.query("ROLLBACK")
-          return NextResponse.json({ error: `Savings account ${debit.accountNumber} not found` }, { status: 404 })
+          return NextResponse.json({ error: `Savings account ${credit.accountNumber} not found` }, { status: 404 })
         }
 
         const savingsAccount = savingsRows[0]
-        const savingsBalance = parseFloat(savingsAccount.available_balance)
-
-        if (debitAmt > savingsBalance) {
-          await client.query("ROLLBACK")
-          return NextResponse.json({
-            error: `Insufficient balance in savings account ${debit.accountNumber}. Available: ${savingsBalance}, Required: ${debitAmt}`
-          }, { status: 400 })
-        }
-
         const savingsGl = savingsAccount.savings_gl_account
+        const newSavingsBalance = parseFloat(savingsAccount.available_balance) + creditAmt
 
-        // DR Savings GL (debit from savings - liability decreases)
+        // CR Savings GL (liability increases)
         await client.query(`
           INSERT INTO gl_batch_lines (
             branch_id, batch_id, business_date,
             accountcode, ref_account_id,
             debit_amount, credit_amount,
             voucher_id, narration, created_by
-          ) VALUES ($1,$2,$3,$4,$5,$6,0,$7,$8,$9)
+          ) VALUES ($1,$2,$3,$4,$5,0,$6,$7,$8,$9)
         `, [
           branchId, batchId, businessDate,
-          savingsGl, String(debit.accountNumber),
-          debitAmt,
+          savingsGl, String(credit.accountNumber),
+          creditAmt,
           voucherNo,
-          `Transfer to Deposit A/c ${accountNumber}`,
+          `Interest Payment credit from Deposit A/c ${accountNumber}`,
           session.userId
         ])
 
         // Record savings transaction
-        const newSavingsBalance = savingsBalance - debitAmt
         await client.query(`
           INSERT INTO savings_transactions (
             branch_id, account_number,
@@ -303,16 +304,16 @@ export async function POST(request: NextRequest) {
           ) VALUES (
             $1,$2,
             $3,$3,
-            'WITHDRAWAL','TRANSFER',
-            $4,0,$5,
+            'DEPOSIT','TRANSFER',
+            0,$4,$5,
             $6,$7,$8,
             'PENDING',$9
           )
         `, [
-          branchId, debit.accountNumber,
+          branchId, credit.accountNumber,
           businessDate,
-          debitAmt, newSavingsBalance,
-          `Transfer to Deposit A/c ${accountNumber}`,
+          creditAmt, newSavingsBalance,
+          `Interest Payment credit from Deposit A/c ${accountNumber}`,
           voucherNo, batchId,
           session.userId
         ])
@@ -322,18 +323,18 @@ export async function POST(request: NextRequest) {
           `UPDATE savings_accounts
            SET available_balance = $1, clear_balance = $1, updated_at = NOW()
            WHERE account_number = $2 AND branch_id = $3`,
-          [newSavingsBalance, debit.accountNumber, branchId]
+          [newSavingsBalance, credit.accountNumber, branchId]
         )
       }
     } else if (voucherType === "CASH") {
-      // DR Cash/Bank (if CASH and no debit accounts)
+      // CR Cash (interest paid out in cash)
       await client.query(`
         INSERT INTO gl_batch_lines (
           branch_id, batch_id, business_date,
           accountcode, ref_account_id,
           debit_amount, credit_amount,
           voucher_id, narration, created_by
-        ) VALUES ($1,$2,$3,$4,$5,$6,0,$7,$8,$9)
+        ) VALUES ($1,$2,$3,$4,$5,0,$6,$7,$8,$9)
       `, [
         branchId, batchId, businessDate,
         23100000, '0',
@@ -344,32 +345,18 @@ export async function POST(request: NextRequest) {
       ])
     }
 
-    // CR Deposit GL (Liability increases)
-    await client.query(`
-      INSERT INTO gl_batch_lines (
-        branch_id, batch_id, business_date,
-        accountcode, ref_account_id,
-        debit_amount, credit_amount,
-        voucher_id, narration, created_by
-      ) VALUES ($1,$2,$3,$4,$5,0,$6,$7,$8,$9)
-    `, [
-      branchId, batchId, businessDate,
-      depositGlAccount, String(accountNumber),
-      amt,
-      voucherNo,
-      txnNarration,
-      session.userId
-    ])
+    // Reduce interest due and accumulate interest paid on the deposit account
+    const newInterestDue = interestDue - amt
+    const newInterestPaid = (parseFloat(account.interestpaidamount) || 0) + amt
+    await client.query(
+      `UPDATE deposit_account
+       SET interestdueforpayment = $1,
+           interestpaidamount = $2
+       WHERE accountnumber = $3 AND branch_id = $4`,
+      [newInterestDue, newInterestPaid, accountNumber, branchId]
+    )
 
-    // Update deposit account balance
-    // await client.query(
-    //   `UPDATE deposit_account
-    //    SET clearbalance = $1
-    //    WHERE accountnumber = $2 AND branch_id = $3`,
-    //   [newBalance, accountNumber, branchId]
-    // )
-
-    // Record deposit transaction in module table
+    // Record interest payment in module transaction table
     await client.query(
       `INSERT INTO deposit_transactions (
          branch_id, accountnumber,
@@ -378,80 +365,32 @@ export async function POST(request: NextRequest) {
          debit_amount, credit_amount, running_balance,
          narration, voucher_no, gl_batch_id,
          status, created_by
-       ) VALUES ($1,$2,$3,$3,'DEPOSIT',$4,0,$5,$6,$7,$8,$9,'PENDING',$10)`,
+       ) VALUES ($1,$2,$3,$3,'INTEREST_PAYOUT',$4,$5,0,$6,$7,$8,$9,'PENDING',$10)`,
       [
-        branchId, String(accountNumber),
+        branchId, accountNumber,
         businessDate,
         voucherType,
-        amt, newBalance,
+        amt, parseFloat(account.clearbalance),
         txnNarration, voucherNo, batchId,
         session.userId,
       ]
     )
 
-    // If RD, update paid installments count and mark selected installments as paid
-    if (account.deposittype === "R" || account.deposittype === "RECURING" || account.deposittype === "RECURRING") {
-      const installmentCount = selectedInstallments && selectedInstallments.length > 0
-        ? selectedInstallments.length
-        : 1
-
-      await client.query(
-        `UPDATE recurring_deposit_details
-         SET numberofinstalmentspaid = COALESCE(numberofinstalmentspaid, 0) + $1,
-             nextinstalmentdate = nextinstalmentdate + ($2 || ' months')::INTERVAL
-         WHERE accountnumber = $3`,
-        [installmentCount, String(installmentCount), accountNumber]
-      )
-
-      if (selectedInstallments && selectedInstallments.length > 0) {
-        // Mark specific selected installments as paid with their penalties
-        for (const inst of selectedInstallments) {
-          await client.query(
-            `UPDATE rd_installment_details
-             SET installment_paid_date = $1,
-                 installment_voucher_no = $2,
-                 penalty_collected = $3,
-                 updated_at = NOW()
-             WHERE id = $4 AND branch_id = $5`,
-            [businessDate, voucherNo, Number(inst.penalty) || 0, inst.id, branchId]
-          )
-        }
-      } else {
-        // Fallback: mark the next unpaid installment as paid
-        const { rows: unpaidRows } = await client.query(
-          `SELECT id, installment_number FROM rd_installment_details
-           WHERE accountnumber = $1 AND branch_id = $2 AND installment_paid_date IS NULL
-           ORDER BY installment_number ASC
-           LIMIT 1`,
-          [accountNumber, branchId]
-        )
-
-        if (unpaidRows.length > 0) {
-          await client.query(
-            `UPDATE rd_installment_details
-             SET installment_paid_date = $1,
-                 installment_voucher_no = $2,
-                 updated_at = NOW()
-             WHERE id = $3`,
-            [businessDate, voucherNo, unpaidRows[0].id]
-          )
-        }
-      }
-    }
-
     await client.query("COMMIT")
+
+    const fmt = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" })
 
     return NextResponse.json({
       success: true,
       voucher_no: voucherNo,
       batch_id: batchId,
-      newBalance,
-      message: `Credit of ${new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(amt)} successful. Batch: ${batchId}, Voucher: ${voucherNo}. New balance: ${new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(newBalance)}`,
+      newInterestDue,
+      message: `Interest payment of ${fmt.format(amt)} processed successfully. Batch: ${batchId}, Voucher: ${voucherNo}. Remaining interest due: ${fmt.format(newInterestDue)}`,
     })
   } catch (err: any) {
     await client.query("ROLLBACK")
-    console.error("Failed to process deposit transaction:", err)
-    return NextResponse.json({ error: err.message || "Transaction failed" }, { status: 500 })
+    console.error("Failed to process interest payment:", err)
+    return NextResponse.json({ error: err.message || "Interest payment failed" }, { status: 500 })
   } finally {
     client.release()
   }
