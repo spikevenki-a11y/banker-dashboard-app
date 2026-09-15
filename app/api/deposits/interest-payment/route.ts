@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
     const { rows: transactions } = await pool.query(
       `SELECT
         dt.id,
+        dt.accountnumber,
         dt.transaction_date,
         dt.transaction_type,
         dt.voucher_type,
@@ -71,16 +72,16 @@ export async function GET(request: NextRequest) {
         gb.status AS batch_status
       FROM deposit_transactions dt
       LEFT JOIN gl_batches gb ON gb.branch_id = dt.branch_id AND gb.batch_id = dt.gl_batch_id
-      WHERE dt.account_id = $1 AND dt.branch_id = $2 AND dt.transaction_type = 'INTEREST_PAYOUT'
+      WHERE dt.accountnumber = $1 AND dt.branch_id = $2 AND dt.transaction_type = 'INTEREST_PAYOUT'
       ORDER BY dt.transaction_date DESC, dt.created_at DESC
       LIMIT $3 OFFSET $4`,
-      [account.id, branchId, limit, offset]
+      [account.accountnumber, branchId, limit, offset]
     )
 
     const { rows: countResult } = await pool.query(
       `SELECT COUNT(*) as total FROM deposit_transactions
-       WHERE account_id = $1 AND branch_id = $2 AND transaction_type = 'INTEREST_PAYOUT'`,
-      [account.id, branchId]
+       WHERE accountnumber = $1 AND branch_id = $2 AND transaction_type = 'INTEREST_PAYOUT'`,
+      [account.accountnumber, branchId]
     )
 
     return NextResponse.json({
@@ -358,7 +359,7 @@ export async function POST(request: NextRequest) {
     // Record interest payment in module transaction table
     await client.query(
       `INSERT INTO deposit_transactions (
-         branch_id, account_id,
+         branch_id, accountnumber,
          transaction_date, value_date,
          transaction_type, voucher_type,
          debit_amount, credit_amount, running_balance,
@@ -366,7 +367,7 @@ export async function POST(request: NextRequest) {
          status, created_by
        ) VALUES ($1,$2,$3,$3,'INTEREST_PAYOUT',$4,$5,0,$6,$7,$8,$9,'PENDING',$10)`,
       [
-        branchId, account.id,
+        branchId, accountNumber,
         businessDate,
         voucherType,
         amt, parseFloat(account.clearbalance),
