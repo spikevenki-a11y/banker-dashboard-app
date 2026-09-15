@@ -120,6 +120,40 @@ export async function POST(req: Request) {
       // ── 5. Bank-level modules with reference_no (other-liabilities, provisions, etc.) ──
       // Same reasoning — master balances are already current. COA handled above.
 
+      // ── 6. Deposit transactions: PENDING → COMPLETED + update deposit account ──
+      await client.query(
+        `UPDATE deposit_transactions
+         SET status = 'COMPLETED', updated_at = NOW()
+         WHERE gl_batch_id = $1 AND branch_id = $2 AND status = 'PENDING'`,
+        [batchId, u.branch]
+      )
+
+      const { rows: depTxns } = await client.query(
+        `SELECT accountnumber, transaction_type, transaction_date, running_balance
+         FROM deposit_transactions
+         WHERE gl_batch_id = $1 AND branch_id = $2 AND status = 'COMPLETED'`,
+        [batchId, u.branch]
+      )
+      for (const txn of depTxns) {
+        if (txn.transaction_type === "CLOSURE") {
+          // Closure: zero out balances, mark account Closed, stamp close date
+          await client.query(
+            `UPDATE deposit_account
+             SET clearbalance = 0, unclearbalance = 0, accountstatus = 3, accountclosedate = $1
+             WHERE accountnumber = $2 AND branch_id = $3`,
+            [txn.transaction_date, txn.accountnumber, u.branch]
+          )
+        } else {
+          // DEPOSIT / INTEREST_PAYOUT: set the balance recorded at posting time
+          await client.query(
+            `UPDATE deposit_account
+             SET clearbalance = $1
+             WHERE accountnumber = $2 AND branch_id = $3`,
+            [txn.running_balance, txn.accountnumber, u.branch]
+          )
+        }
+      }
+
     // ═══════════════════════════════════════════════════════════════
     // REJECT
     // ═══════════════════════════════════════════════════════════════
@@ -275,6 +309,56 @@ export async function POST(req: Request) {
              AND m.branch_id      = t.branch_id`,
           [batchId, u.branch]
         )
+      }
+
+      // ── 7. Deposit transactions: PENDING → REJECTED, reverse eager side-effects ──
+      // deposit_account balance/status changes (DEPOSIT credit, CLOSURE) are deferred
+      // until APPROVE, so nothing to reverse there. RD installment marking and
+      // interest due/paid tracking, however, are applied at posting time — undo them.
+      const { rows: depTxnsToReject } = await client.query(
+        `SELECT accountnumber, transaction_type, voucher_no, debit_amount
+         FROM deposit_transactions
+         WHERE gl_batch_id = $1 AND branch_id = $2 AND status = 'PENDING'`,
+        [batchId, u.branch]
+      )
+
+      await client.query(
+        `UPDATE deposit_transactions
+         SET status = 'REJECTED', updated_at = NOW()
+         WHERE gl_batch_id = $1 AND branch_id = $2 AND status = 'PENDING'`,
+        [batchId, u.branch]
+      )
+
+      for (const txn of depTxnsToReject) {
+        if (txn.transaction_type === "DEPOSIT") {
+          // Undo any RD installments this voucher marked as paid
+          const { rows: reversedInstallments } = await client.query(
+            `UPDATE rd_installment_details
+             SET installment_paid_date = NULL, installment_voucher_no = NULL, penalty_collected = 0, updated_at = NOW()
+             WHERE accountnumber = $1 AND branch_id = $2 AND installment_voucher_no = $3
+             RETURNING id`,
+            [txn.accountnumber, u.branch, txn.voucher_no]
+          )
+          if (reversedInstallments.length > 0) {
+            await client.query(
+              `UPDATE recurring_deposit_details
+               SET numberofinstalmentspaid = GREATEST(COALESCE(numberofinstalmentspaid, 0) - $1, 0),
+                   nextinstalmentdate = nextinstalmentdate - ($2 || ' months')::INTERVAL
+               WHERE accountnumber = $3`,
+              [reversedInstallments.length, String(reversedInstallments.length), txn.accountnumber]
+            )
+          }
+        } else if (txn.transaction_type === "INTEREST_PAYOUT") {
+          // Restore the interest due/paid amounts this voucher moved
+          await client.query(
+            `UPDATE deposit_account
+             SET interestdueforpayment = COALESCE(interestdueforpayment, 0) + $1,
+                 interestpaidamount = GREATEST(COALESCE(interestpaidamount, 0) - $1, 0)
+             WHERE accountnumber = $2 AND branch_id = $3`,
+            [txn.debit_amount, txn.accountnumber, u.branch]
+          )
+        }
+        // CLOSURE: deposit_account was never touched at posting time — nothing to reverse.
       }
     }
 

@@ -44,7 +44,6 @@ export async function GET(req: NextRequest) {
        WHERE da.membership_no = $1
          AND da.branch_id    = $2
          AND da.accountstatus = 1
-          and da.clearbalance != 0
        ORDER BY da.accountopendate DESC`,
       [membershipNo, branchId]
     )

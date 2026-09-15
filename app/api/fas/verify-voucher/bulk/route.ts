@@ -98,6 +98,37 @@ async function processBatch(
       )
     }
 
+    // 4. Deposit transactions → COMPLETED + update deposit account
+    await client.query(
+      `UPDATE deposit_transactions
+       SET status = 'COMPLETED', updated_at = NOW()
+       WHERE gl_batch_id = $1 AND branch_id = $2 AND status = 'PENDING'`,
+      [batchId, branchId]
+    )
+    const { rows: depTxns } = await client.query(
+      `SELECT accountnumber, transaction_type, transaction_date, running_balance
+       FROM deposit_transactions
+       WHERE gl_batch_id = $1 AND branch_id = $2 AND status = 'COMPLETED'`,
+      [batchId, branchId]
+    )
+    for (const txn of depTxns) {
+      if (txn.transaction_type === "CLOSURE") {
+        await client.query(
+          `UPDATE deposit_account
+           SET clearbalance = 0, unclearbalance = 0, accountstatus = 3, accountclosedate = $1
+           WHERE accountnumber = $2 AND branch_id = $3`,
+          [txn.transaction_date, txn.accountnumber, branchId]
+        )
+      } else {
+        await client.query(
+          `UPDATE deposit_account
+           SET clearbalance = $1
+           WHERE accountnumber = $2 AND branch_id = $3`,
+          [txn.running_balance, txn.accountnumber, branchId]
+        )
+      }
+    }
+
   // ══════════════════════════════════════════════════════════════════
   // REJECT
   // ══════════════════════════════════════════════════════════════════
@@ -218,6 +249,49 @@ async function processBatch(
            AND m.branch_id      = t.branch_id`,
         [batchId, branchId]
       )
+    }
+
+    // 7. Deposit transactions → REJECTED, reverse eager side-effects (RD installments, interest)
+    const { rows: depTxnsToReject } = await client.query(
+      `SELECT accountnumber, transaction_type, voucher_no, debit_amount
+       FROM deposit_transactions
+       WHERE gl_batch_id = $1 AND branch_id = $2 AND status = 'PENDING'`,
+      [batchId, branchId]
+    )
+    await client.query(
+      `UPDATE deposit_transactions
+       SET status = 'REJECTED', updated_at = NOW()
+       WHERE gl_batch_id = $1 AND branch_id = $2 AND status = 'PENDING'`,
+      [batchId, branchId]
+    )
+    for (const txn of depTxnsToReject) {
+      if (txn.transaction_type === "DEPOSIT") {
+        const { rows: reversedInstallments } = await client.query(
+          `UPDATE rd_installment_details
+           SET installment_paid_date = NULL, installment_voucher_no = NULL, penalty_collected = 0, updated_at = NOW()
+           WHERE accountnumber = $1 AND branch_id = $2 AND installment_voucher_no = $3
+           RETURNING id`,
+          [txn.accountnumber, branchId, txn.voucher_no]
+        )
+        if (reversedInstallments.length > 0) {
+          await client.query(
+            `UPDATE recurring_deposit_details
+             SET numberofinstalmentspaid = GREATEST(COALESCE(numberofinstalmentspaid, 0) - $1, 0),
+                 nextinstalmentdate = nextinstalmentdate - ($2 || ' months')::INTERVAL
+             WHERE accountnumber = $3`,
+            [reversedInstallments.length, String(reversedInstallments.length), txn.accountnumber]
+          )
+        }
+      } else if (txn.transaction_type === "INTEREST_PAYOUT") {
+        await client.query(
+          `UPDATE deposit_account
+           SET interestdueforpayment = COALESCE(interestdueforpayment, 0) + $1,
+               interestpaidamount = GREATEST(COALESCE(interestpaidamount, 0) - $1, 0)
+           WHERE accountnumber = $2 AND branch_id = $3`,
+          [txn.debit_amount, txn.accountnumber, branchId]
+        )
+      }
+      // CLOSURE: deposit_account was never touched at posting time — nothing to reverse.
     }
   }
 
