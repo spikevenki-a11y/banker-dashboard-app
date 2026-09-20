@@ -22,7 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   ArrowLeft, Loader2, CheckCircle2, AlertTriangle, IndianRupee,
   Calendar, TrendingUp, Landmark, PiggyBank, AlertCircle, XCircle, ShieldAlert,
-  User, Eye, MapPin, ShieldCheck, TrendingDown, Camera, PenTool,
+  User, Eye, MapPin, ShieldCheck, TrendingDown, Camera, PenTool, Search,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 
@@ -65,6 +65,16 @@ type SavingsAccount = {
   availableBalance: number
   clearBalance: number
   schemeName: string
+}
+
+type MemberDepositAccount = {
+  accountNumber: string
+  depositType: string
+  depositTypeLabel: string
+  schemeName: string
+  balance: number
+  interestRate: number
+  accountStatus: number
 }
 
 type CreditEntry = {
@@ -189,6 +199,13 @@ function DepositClosureContent() {
   const [creditEntries, setCreditEntries] = useState<CreditEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
+  // Member number account lookup (Select Account step)
+  const [membershipNoInput, setMembershipNoInput] = useState("")
+  const [isMemberSearching, setIsMemberSearching] = useState(false)
+  const [memberSearchError, setMemberSearchError] = useState("")
+  const [memberAccounts, setMemberAccounts] = useState<MemberDepositAccount[]>([])
+  const [selectedMemberAccount, setSelectedMemberAccount] = useState("")
+
   // Member summary
   const [memberInfo, setMemberInfo] = useState<MemberInfo | null>(null)
 
@@ -263,6 +280,58 @@ function DepositClosureContent() {
     } catch {
       // silent
     }
+  }
+
+  const handleMemberLookup = async () => {
+    if (!membershipNoInput.trim()) return
+    setIsMemberSearching(true)
+    setMemberSearchError("")
+    setMemberAccounts([])
+    setSelectedMemberAccount("")
+    try {
+      const res = await fetch(
+        `/api/deposits/by-member?membership_no=${encodeURIComponent(membershipNoInput.trim())}&statuses=1,2`,
+        { credentials: "include" }
+      )
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        setMemberSearchError(data.error || "Lookup failed.")
+        return
+      }
+      const accounts: MemberDepositAccount[] = data.deposits || []
+      if (accounts.length === 0) {
+        setMemberSearchError("No active or matured deposit accounts found for this member number.")
+      } else if (accounts.length === 1) {
+        setSelectedMemberAccount(accounts[0].accountNumber)
+        fetchClosureData(accounts[0].accountNumber)
+      } else {
+        setMemberAccounts(accounts)
+      }
+    } catch {
+      setMemberSearchError("Failed to lookup member number. Please try again.")
+    } finally {
+      setIsMemberSearching(false)
+    }
+  }
+
+  const handleMemberAccountSelect = (accNo: string) => {
+    setSelectedMemberAccount(accNo)
+    fetchClosureData(accNo)
+  }
+
+  const handleChangeAccount = () => {
+    setAccount(null)
+    setSavingsAccounts([])
+    setCreditEntries([])
+    setMemberInfo(null)
+    setMembershipNoInput("")
+    setMemberSearchError("")
+    setMemberAccounts([])
+    setSelectedMemberAccount("")
+    setVoucherType("")
+    setNarration("")
+    setPenaltyOverride("")
+    setFormError("")
   }
 
   const fmt = (n: number) =>
@@ -427,17 +496,107 @@ function DepositClosureContent() {
   if (!account) {
     return (
       <DashboardWrapper>
-        <div className="flex h-screen overflow-hidden">
-          <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="">
+          <div className="">
             <main className="flex-1 overflow-y-auto bg-background p-6">
               <div className="mb-6 flex items-center gap-4">
                 <Button variant="outline" size="icon" onClick={() => router.push("/fixed-deposits")} className="h-10 w-10 bg-transparent">
                   <ArrowLeft className="h-5 w-5" />
                 </Button>
                 <div>
-                  <h1 className="text-3xl font-bold tracking-tight text-foreground">Account Closure</h1>
-                  <p className="text-muted-foreground">Account not found or no account specified.</p>
+                  <h1 className="text-3xl font-bold tracking-tight text-foreground">Deposit Closure</h1>
+                  <p className="text-muted-foreground">Find a deposit account by member number to begin closure</p>
                 </div>
+              </div>
+
+              {accountParam && !membershipNoInput && memberAccounts.length === 0 && (
+                <div className="mx-auto max-w-xl">
+                  <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    Account not found. Search by member number below instead.
+                  </div>
+                </div>
+              )}
+
+              <div className="mx-auto max-w-xl">
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-100 text-sm font-bold text-teal-700">
+                        <Search className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">Select Account</CardTitle>
+                        <CardDescription>Enter the member number to find their deposit account</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="member-number">Member Number</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="member-number"
+                          placeholder="Enter member number"
+                          value={membershipNoInput}
+                          onChange={(e) => {
+                            setMembershipNoInput(e.target.value)
+                            setMemberAccounts([])
+                            setSelectedMemberAccount("")
+                            setMemberSearchError("")
+                          }}
+                          onKeyDown={(e) => e.key === "Enter" && handleMemberLookup()}
+                          className="flex-1"
+                          autoFocus
+                        />
+                        <Button
+                          onClick={handleMemberLookup}
+                          disabled={!membershipNoInput.trim() || isMemberSearching}
+                          className="gap-2"
+                        >
+                          {isMemberSearching ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Search className="h-4 w-4" />
+                          )}
+                          Search
+                        </Button>
+                      </div>
+                      {isMemberSearching && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Looking up deposit accounts...
+                        </div>
+                      )}
+                      {memberSearchError && <p className="text-sm text-red-500">{memberSearchError}</p>}
+                    </div>
+
+                    {memberAccounts.length > 1 && (
+                      <div className="space-y-1.5">
+                        <Label htmlFor="member-account-select" className="text-xs text-muted-foreground">
+                          {memberAccounts.length} deposit accounts found — select one to continue
+                        </Label>
+                        <Select value={selectedMemberAccount} onValueChange={handleMemberAccountSelect}>
+                          <SelectTrigger id="member-account-select">
+                            <SelectValue placeholder="Choose a deposit account..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {memberAccounts.map((acc) => (
+                              <SelectItem key={acc.accountNumber} value={acc.accountNumber}>
+                                <span className="font-mono">{acc.accountNumber}</span>
+                                <span className="ml-2 text-muted-foreground">
+                                  — {depositTypeLabels[acc.depositType] || acc.depositType} · {acc.schemeName}
+                                  {" "}({statusLabels[acc.accountStatus] || "Unknown"})
+                                </span>
+                                <span className="ml-2 text-teal-600">{formatCurrency(acc.balance)}</span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
             </main>
           </div>
@@ -457,24 +616,30 @@ function DepositClosureContent() {
         <div className="">
           <main className="flex-1 overflow-y-auto bg-background p-6">
             {/* Header */}
-            <div className="mb-6 flex items-center gap-4">
-              <Button variant="outline" size="icon" onClick={() => router.push("/fixed-deposits")} className="h-10 w-10 bg-transparent">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <div>
-                <div className="flex items-center gap-3">
-                  <h1 className="text-3xl font-bold tracking-tight text-foreground">Account Closure</h1>
-                  {account.isPremature && (
-                    <Badge className="bg-orange-100 text-orange-700">Premature</Badge>
-                  )}
-                  {isMatured && (
-                    <Badge className="bg-teal-100 text-teal-700">Matured</Badge>
-                  )}
+            <div className="mb-6 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <Button variant="outline" size="icon" onClick={() => router.push("/fixed-deposits")} className="h-10 w-10 bg-transparent">
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <div>
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-3xl font-bold tracking-tight text-foreground">Account Closure</h1>
+                    {account.isPremature && (
+                      <Badge className="bg-orange-100 text-orange-700">Premature</Badge>
+                    )}
+                    {isMatured && (
+                      <Badge className="bg-teal-100 text-teal-700">Matured</Badge>
+                    )}
+                  </div>
+                  <p className="text-muted-foreground">
+                    Close {typeLabel} - Account {account.accountNumber}
+                  </p>
                 </div>
-                <p className="text-muted-foreground">
-                  Close {typeLabel} - Account {account.accountNumber}
-                </p>
               </div>
+              <Button variant="outline" size="sm" onClick={handleChangeAccount} className="gap-2 bg-transparent">
+                <Search className="h-3.5 w-3.5" />
+                Change Account
+              </Button>
             </div>
 
             {!closureAllowed && (

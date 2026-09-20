@@ -1343,26 +1343,29 @@ function MembershipAccountFlow({
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor={`membership-no-${recurringOnly ? "rd" : "dep"}`}>Membership No. *</Label>
-            <div className="flex gap-2">
-              <Input
-                id={`membership-no-${recurringOnly ? "rd" : "dep"}`}
-                placeholder="Enter membership number"
-                value={membershipNo}
-                onChange={(e) => {
-                  setMembershipNo(e.target.value)
-                  setError("")
-                }}
-                onKeyDown={(e) => e.key === "Enter" && handleLookup()}
-                className="flex-1"
-              />
-              <Button onClick={handleLookup} disabled={isSearching || !membershipNo.trim()} className="gap-2">
-                {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                Lookup
-              </Button>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2 col-gap-2">
+              <Label htmlFor={`membership-no-${recurringOnly ? "rd" : "dep"}`}>Membership No. *</Label>
+              <div className="flex gap-2">
+                <Input
+                  id={`membership-no-${recurringOnly ? "rd" : "dep"}`}
+                  placeholder="Enter membership number"
+                  value={membershipNo}
+                  onChange={(e) => {
+                    setMembershipNo(e.target.value)
+                    setError("")
+                  }}
+                  onKeyDown={(e) => e.key === "Enter" && handleLookup()}
+                  className="flex-1"
+                />
+                <Button onClick={handleLookup} disabled={isSearching || !membershipNo.trim()} className="gap-2">
+                  {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  Lookup
+                </Button>
+              </div>
+              {error && <p className="text-sm text-red-500">{error}</p>}
             </div>
-            {error && <p className="text-sm text-red-500">{error}</p>}
+            
           </div>
 
           {accounts.length > 1 && (
