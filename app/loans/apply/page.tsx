@@ -1707,7 +1707,7 @@ export default function LoanApplicationPage() {
                     {/* ── Common fields shown for all security types ──────────── */}
                     {selectedSecurityId && (
                       <>
-                        <div className="grid grid-cols-3 gap-3">
+                        {/* <div className="grid grid-cols-3 gap-3">
                           <div className="space-y-1 col-span-2">
                             <Label className="text-xs">Assessed Value (₹)</Label>
                             <Input className="h-8 text-xs" type="number" placeholder="Current assessed value" value={securityForm.assessed_value} onChange={(e) => sf("assessed_value", e.target.value)} />
@@ -1716,7 +1716,7 @@ export default function LoanApplicationPage() {
                             <Label className="text-xs">Valuation Date</Label>
                             <Input className="h-8 text-xs" type="date" value={applicationDate} disabled onChange={(e) => sf("valuation_date", e.target.value)} />
                           </div>
-                        </div>
+                        </div> */}
 
                         {!isGeneral && (
                           <div className="space-y-1">
