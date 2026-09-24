@@ -45,7 +45,7 @@ export default function FixedDepositsDashboardPage() {
 
               <Card
                 className="cursor-pointer transition-all hover:shadow-lg hover:border-primary flex flex-row"
-                onClick={() => router.push("/fixed-deposits/accounts?action=transactions")}
+                onClick={() => router.push("/fixed-deposits/transactions")}
               >
                 <CardHeader className="pb-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
@@ -90,7 +90,7 @@ export default function FixedDepositsDashboardPage() {
 
               <Card
                 className="cursor-pointer transition-all hover:shadow-lg hover:border-primary flex flex-row"
-                onClick={() => router.push("/fixed-deposits/accounts?action=closure")}
+                onClick={() => router.push("/fixed-deposits/closure")}
               >
                 <CardHeader className="pb-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">

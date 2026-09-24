@@ -11,16 +11,23 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url)
     const membershipNo = searchParams.get("membership_no")
+    const statusesParam = searchParams.get("statuses")
 
     if (!membershipNo) {
       return NextResponse.json({ error: "Membership number is required" }, { status: 400 })
     }
+
+    const statuses = statusesParam
+      ? statusesParam.split(",").map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n))
+      : [1]
+
     console.log(`Fetching deposit accounts for member ${membershipNo} in branch ${branchId}`)
 
     const { rows } = await pool.query(
       `SELECT
         da.accountnumber,
         da.deposittype,
+        da.accountstatus,
         da.clearbalance,
         da.rateofinterest,
         da.accountopendate,
@@ -43,10 +50,9 @@ export async function GET(req: NextRequest) {
               ON rd.accountnumber = da.accountnumber
        WHERE da.membership_no = $1
          AND da.branch_id    = $2
-         AND da.accountstatus = 1
-          and da.clearbalance != 0
+         AND da.accountstatus = ANY($3::int[])
        ORDER BY da.accountopendate DESC`,
-      [membershipNo, branchId]
+      [membershipNo, branchId, statuses]
     )
 
     const typeLabel: Record<string, string> = { TERM: "FD", RECURRING: "RD", PIGMY: "Pigmy" }
@@ -57,6 +63,7 @@ export async function GET(req: NextRequest) {
       depositType: r.deposittype,
       depositTypeLabel: typeLabel[r.deposittype] ?? r.deposittype,
       depositTypeCode: typeCode[r.deposittype] ?? "OTHER",
+      accountStatus: r.accountstatus,
       schemeName: r.scheme_name ?? "---",
       balance: Number(r.clearbalance),
       depositAmount: r.depositamount ? Number(r.depositamount) : Number(r.clearbalance),
