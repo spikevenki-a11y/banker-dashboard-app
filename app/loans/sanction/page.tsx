@@ -273,7 +273,7 @@ export default function LoanSanctionPage() {
     const defaultTenure = app.minimum_period_months || 12
     setSanctionedAmount(app.applied_loan_amount.toString())
     setInterestRate(app.scheme_interest_rate?.toString() || "12")
-    setTenureMonths(defaultTenure.toString())
+    setTenureMonths(app.loan_tenure_months.toString())
     setMoratoriumPeriod("0")
     setRemarks("")
     setCalculatedEMI(null)
@@ -823,7 +823,7 @@ export default function LoanSanctionPage() {
                           </div>
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="interest-rate">Interest Rate (% p.a.) *</Label>
+                          <Label htmlFor="interest-rate">Interest Rate (% p.a.)</Label>
                           <div className="relative">
                             <Percent className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
@@ -832,8 +832,9 @@ export default function LoanSanctionPage() {
                               step="0.01"
                               placeholder="Enter rate"
                               value={interestRate}
-                              onChange={(e) => setInterestRate(e.target.value)}
+                              // onChange={(e) => setInterestRate(e.target.value)}
                               className="pl-9"
+                              disabled
                             />
                           </div>
                         </div>
@@ -848,7 +849,8 @@ export default function LoanSanctionPage() {
                             type="number"
                             placeholder="Enter tenure"
                             value={tenureMonths}
-                            onChange={(e) => setTenureMonths(e.target.value)}
+                            // onChange={(e) => setTenureMonths(e.target.value)}
+                            disabled
                           />
                           <p className="text-xs text-muted-foreground">
                             Min: {selectedApp.minimum_period_months || 1} | Max: {selectedApp.maximum_period_months || 60} months
