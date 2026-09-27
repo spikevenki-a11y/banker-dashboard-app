@@ -29,10 +29,10 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Plus, Search, Eye, CreditCard, AlertCircle, CheckCircle, Clock, Trash2, X, Loader2, Ban, Wallet, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react"
+import { Plus, Search, Eye, CreditCard, CheckCircle, Trash2, X, Loader2, Ban, Wallet, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Progress } from "@/components/ui/progress"
-import { DashboardWrapper } from "../_components/dashboard-wrapper"
+import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 
 type LoanScheme = {
   scheme_id: number
@@ -120,13 +120,11 @@ export default function LoansPage() {
   // Main list state
   const [searchQuery, setSearchQuery] = useState("")
   const [appliedSearch, setAppliedSearch] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
   const [loans, setLoans] = useState<LoanApplication[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
   const [total, setTotal] = useState(0)
-  const [loanStats, setLoanStats] = useState<any>(null)
   const [schemes, setSchemes] = useState<LoanScheme[]>([])
   
   // Dialog states
@@ -193,7 +191,8 @@ export default function LoansPage() {
     try {
       setIsLoading(true)
       const params = new URLSearchParams()
-      if (statusFilter !== "all") params.append("status", statusFilter)
+      // This page only lists pending applications
+      params.append("status", "PENDING")
       if (appliedSearch) params.append("search", appliedSearch)
       params.append("limit", String(pageSize))
       params.append("offset", String((page - 1) * pageSize))
@@ -204,13 +203,12 @@ export default function LoansPage() {
       if (data.error) throw new Error(data.error)
       setLoans(data.applications || [])
       setTotal(data.total || 0)
-      if (data.stats) setLoanStats(data.stats)
     } catch (error: any) {
       console.error("Failed to fetch loans:", error)
     } finally {
       setIsLoading(false)
     }
-  }, [statusFilter, appliedSearch, page, pageSize])
+  }, [appliedSearch, page, pageSize])
 
   // Fetch schemes
   const fetchSchemes = useCallback(async () => {
@@ -231,11 +229,6 @@ export default function LoansPage() {
   // Search/filter handlers
   const handleSearch = () => {
     setAppliedSearch(searchQuery)
-    setPage(1)
-  }
-
-  const handleStatusChange = (v: string) => {
-    setStatusFilter(v)
     setPage(1)
   }
 
@@ -567,80 +560,23 @@ export default function LoansPage() {
         <div className="">
           <main className="flex-1 overflow-y-auto bg-background p-6">
             <div className="mb-6 flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight text-foreground">Loan Management</h1>
+              <div className="flex items-center gap-3">
+                <Button variant="ghost" size="icon" onClick={() => router.push("/loans")}>
+                  <ChevronLeft className="h-5 w-5" />
+                </Button>
+                <div>
+                <h1 className="text-3xl font-bold tracking-tight text-foreground">View / Reject Application</h1>
                 <p className="text-muted-foreground">
                   {user?.role === "admin"
                     ? "All branches - Process applications, track EMIs, and manage repayments"
                     : `${user?.branch?.name || 'Branch'} - Process applications, track EMIs, and manage repayments`}
                 </p>
               </div>
+              </div>
 <Button onClick={() => router.push("/loans/apply")} className="gap-2">
   <Plus className="h-4 w-4" />
   New Application
   </Button>
-            </div>
-
-            {/* Stats Cards */}
-            <div className="mb-6 grid gap-4 md:grid-cols-4">
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="rounded-lg bg-blue-50 p-3">
-                      <CreditCard className="h-6 w-6 text-blue-600" />
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <h3 className="text-sm font-medium text-muted-foreground">Total Loans</h3>
-                    <p className="mt-1 text-2xl font-bold text-foreground">{formatCurrency(loanStats?.total_amount || 0)}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">{loanStats?.total_count || 0} Applications</p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="rounded-lg bg-orange-50 p-3">
-                      <Clock className="h-6 w-6 text-orange-600" />
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <h3 className="text-sm font-medium text-muted-foreground">Pending Applications</h3>
-                    <p className="mt-1 text-2xl font-bold text-foreground">{loanStats?.pending_count || 0}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">{formatCurrency(loanStats?.pending_amount || 0)}</p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="rounded-lg bg-blue-50 p-3">
-                      <CheckCircle className="h-6 w-6 text-blue-600" />
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <h3 className="text-sm font-medium text-muted-foreground">Sanctioned</h3>
-                    <p className="mt-1 text-2xl font-bold text-foreground">{loanStats?.sanctioned_count || 0}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">{formatCurrency(loanStats?.sanctioned_amount || 0)}</p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="rounded-lg bg-red-50 p-3">
-                      <AlertCircle className="h-6 w-6 text-red-600" />
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <h3 className="text-sm font-medium text-muted-foreground">Active / Overdue</h3>
-                    <p className="mt-1 text-2xl font-bold text-foreground">{loanStats?.active_count || 0} / {loanStats?.overdue_count || 0}</p>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
 
             {/* Loans Table */}
@@ -662,20 +598,6 @@ export default function LoansPage() {
                       <Search className="h-4 w-4" />
                       Search
                     </Button>
-                    <Select value={statusFilter} onValueChange={handleStatusChange}>
-                      <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Filter by status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Status</SelectItem>
-                        <SelectItem value="PENDING">Pending</SelectItem>
-                        <SelectItem value="SANCTIONED">Sanctioned</SelectItem>
-                        <SelectItem value="ACTIVE">Active</SelectItem>
-                        <SelectItem value="CLOSED">Closed</SelectItem>
-                        <SelectItem value="REJECTED">Rejected</SelectItem>
-                        <SelectItem value="OVERDUE">Overdue</SelectItem>
-                      </SelectContent>
-                    </Select>
                     <Button variant="outline" onClick={fetchLoans}>
                       Refresh
                     </Button>
@@ -690,7 +612,7 @@ export default function LoansPage() {
                 ) : loans.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
                     <CreditCard className="h-12 w-12 mb-2" />
-                    <p>No loan applications found</p>
+                    <p>No pending loan applications found</p>
                   </div>
                 ) : (
                   <>
