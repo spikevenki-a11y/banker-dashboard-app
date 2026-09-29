@@ -3,8 +3,20 @@
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Users, Construction } from "lucide-react"
+import { ArrowLeft, Users, Gem } from "lucide-react"
 import { DashboardWrapper } from "../../_components/dashboard-wrapper"
+
+const managementCards = [
+  {
+    id: "appraisers",
+    title: "Manage Appraiser Details",
+    description: "Add, edit, and activate or deactivate jewel loan appraisers for this branch",
+    icon: Gem,
+    color: "text-amber-600",
+    bgColor: "bg-amber-50",
+    href: "/settings/management/appraisers",
+  },
+]
 
 export default function ManagementPage() {
   const router = useRouter()
@@ -32,17 +44,30 @@ export default function ManagementPage() {
           </div>
         </div>
 
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 mb-4">
-              <Construction className="h-8 w-8 text-emerald-600" />
-            </div>
-            <CardTitle className="text-xl mb-2">Coming Soon</CardTitle>
-            <CardDescription className="text-center max-w-md">
-              The Management module is under development. You will be able to manage users, roles, branches, and organizational settings here.
-            </CardDescription>
-          </CardContent>
-        </Card>
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {managementCards.map((card) => (
+            <Card
+              key={card.id}
+              className="cursor-pointer transition-all hover:shadow-lg hover:border-primary/50 group"
+              onClick={() => router.push(card.href)}
+            >
+              <CardHeader className="pb-3">
+                <div
+                  className={`flex h-12 w-12 items-center justify-center rounded-lg ${card.bgColor} transition-transform group-hover:scale-110`}
+                >
+                  <card.icon className={`h-6 w-6 ${card.color}`} />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <CardTitle className="text-lg">{card.title}</CardTitle>
+                <CardDescription className="text-sm leading-relaxed">{card.description}</CardDescription>
+                <Button variant="outline" className="w-full bg-transparent mt-2">
+                  Open
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     </DashboardWrapper>
   )

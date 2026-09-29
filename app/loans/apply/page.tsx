@@ -26,6 +26,7 @@ import {
   Upload, ImageIcon, X, Camera, RefreshCw,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
+import { MemberSummaryCard } from "@/components/member-summary-card"
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -41,6 +42,7 @@ type MemberInfo = {
   aadhaar_no: string
   customer_code: string
   gender: string
+  ledger_folio_number: string
 }
 
 type LoanScheme = {
@@ -80,6 +82,14 @@ type MemberDepositAccount = {
   maturityAmount: number | null
   interestRate: number
   periodMonths: number | null
+}
+
+type Appraiser = {
+  appraiser_id: number
+  appraiser_code: string
+  appraiser_name: string
+  license_no: string | null
+  license_valid_till: string | null
 }
 
 type GoldItem = {
@@ -233,6 +243,10 @@ export default function LoanApplicationPage() {
   const [selectedSchemeId, setSelectedSchemeId] = useState("")
   const [loadingSchemes, setLoadingSchemes] = useState(true)
 
+  // Appraisers (Settings → Management → Manage Appraiser Details)
+  const [appraisers, setAppraisers] = useState<Appraiser[]>([])
+  const [loadingAppraisers, setLoadingAppraisers] = useState(true)
+
   // Form fields
   const [applicationDate, setApplicationDate] = useState("")
   const [loanAmount, setLoanAmount] = useState("")
@@ -296,8 +310,22 @@ export default function LoanApplicationPage() {
   const sfDraft = (key: keyof GoldItem, value: string) =>
     setGoldItemDraft((prev) => ({ ...prev, [key]: value }))
 
+  // Pieces / Gross Weight / Disallowed Weight accept only 0 or positive values
+  const blockNonNumericKeys = (integer: boolean) => (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (["-", "+", "e", "E"].includes(e.key) || (integer && e.key === ".")) e.preventDefault()
+  }
+  const toNonNegative = (value: string, integer = false) => {
+    if (integer) return value.replace(/\D/g, "")
+    const [whole, ...fraction] = value.replace(/[^\d.]/g, "").split(".")
+    return fraction.length ? `${whole}.${fraction.join("")}` : whole
+  }
+  const isNegative = (value: string) => parseFloat(value) < 0
+  const hasNegativeGoldValue = (item: GoldItem) =>
+    isNegative(item.number_of_pieces) || isNegative(item.gross_weight_grams) || isNegative(item.stone_weight_grams)
+
   const handleAddGoldItem = () => {
     if (!goldItemDraft.ornament_name.trim() || !goldItemDraft.gross_weight_grams) return
+    if (hasNegativeGoldValue(goldItemDraft)) return
     const gross = parseFloat(goldItemDraft.gross_weight_grams) || 0
     const stone = parseFloat(goldItemDraft.stone_weight_grams) || 0
     const net = Math.max(0, gross - stone)
@@ -405,6 +433,7 @@ export default function LoanApplicationPage() {
 
   useEffect(() => {
     fetchSchemes()
+    fetchAppraisers()
     getLoginDate()
   }, [])
 
@@ -466,6 +495,25 @@ export default function LoanApplicationPage() {
       setLoadingSchemes(false)
     }
   }
+
+  async function fetchAppraisers() {
+    try {
+      const res = await fetch("/api/settings/appraisers?status=ACTIVE", { credentials: "include" })
+      const data = await res.json()
+      if (res.ok) setAppraisers(data.appraisers || [])
+    } catch (e) {
+      console.error("Failed to fetch appraisers:", e)
+    } finally {
+      setLoadingAppraisers(false)
+    }
+  }
+
+  const isAppraiserLicenseExpired = (a: Appraiser) =>
+    !!a.license_valid_till && !!applicationDate && a.license_valid_till < applicationDate
+
+  const selectedAppraiser = appraisers.find(
+    (a) => a.appraiser_name === securityForm.appraiser_name && (a.license_no ?? "") === securityForm.appraiser_license_no
+  )
 
   async function getLoginDate() {
     try {
@@ -590,6 +638,7 @@ export default function LoanApplicationPage() {
 
   const handleSubmit = async () => {
     if (!memberInfo || !selectedSchemeId || !applicationDate || !loanAmount || !tenureMonths) return
+    if (Number(selectedSecurityId) === 6 && goldItems.some(hasNegativeGoldValue)) return
     setIsSubmitting(true)
 
     // Build security payload
@@ -825,31 +874,6 @@ export default function LoanApplicationPage() {
                       {isSearching && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />Loading member details...</div>}
                       {memberError && <p className="text-sm text-red-500">{memberError}</p>}
                     </div>
-
-                    {memberInfo && (
-                      <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-4">
-                        <div className="mb-3 flex items-center gap-2">
-                          <CheckCircle2 className="h-5 w-5 text-blue-600" />
-                          <span className="font-medium text-blue-700">Member Found</span>
-                          <Badge variant="outline" className="ml-auto border-blue-300 text-blue-700">{memberInfo.member_type}</Badge>
-                        </div>
-                        <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                          {[
-                            ["Full Name", memberInfo.full_name],
-                            ["Father Name", memberInfo.father_name || "---"],
-                            ["Mobile", memberInfo.mobile_no || "---"],
-                            ["Date of Birth", memberInfo.date_of_birth || "---"],
-                            ["Gender", memberInfo.gender || "---"],
-                            ["Customer Code", memberInfo.customer_code?.trim()],
-                          ].map(([label, value]) => (
-                            <div key={label}>
-                              <p className="text-xs text-muted-foreground">{label}</p>
-                              <p className="text-sm font-medium">{value}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
 
@@ -999,24 +1023,27 @@ export default function LoanApplicationPage() {
                           <div className="grid grid-cols-4 gap-2">
                             <div className="space-y-1">
                               <Label className="text-xs">Pieces</Label>
-                              <Input className="h-8 text-xs" type="number" min="1" placeholder="1"
+                              <Input className="h-8 text-xs" type="number" min="0" step="1" placeholder="1"
                                 value={goldItemDraft.number_of_pieces}
-                                onChange={(e) => sfDraft("number_of_pieces", e.target.value)} />
+                                onKeyDown={blockNonNumericKeys(true)}
+                                onChange={(e) => sfDraft("number_of_pieces", toNonNegative(e.target.value, true))} />
                             </div>
                             <div className="space-y-1">
-                              <Label className="text-xs">Gross Wt (g) *</Label>
-                              <Input className="h-8 text-xs" type="number" step="0.001" placeholder="0.000"
+                              <Label className="text-xs">Gross Weight (g) *</Label>
+                              <Input className="h-8 text-xs" type="number" min="0" step="0.001" placeholder="0.000"
                                 value={goldItemDraft.gross_weight_grams}
-                                onChange={(e) => sfDraft("gross_weight_grams", e.target.value)} />
+                                onKeyDown={blockNonNumericKeys(false)}
+                                onChange={(e) => sfDraft("gross_weight_grams", toNonNegative(e.target.value))} />
                             </div>
                             <div className="space-y-1">
-                              <Label className="text-xs">Stone Wt (g)</Label>
-                              <Input className="h-8 text-xs" type="number" step="0.001" placeholder="0.000"
+                              <Label className="text-xs">Disallowed Weight (g)</Label>
+                              <Input className="h-8 text-xs" type="number" min="0" step="0.001" placeholder="0.000"
                                 value={goldItemDraft.stone_weight_grams}
-                                onChange={(e) => sfDraft("stone_weight_grams", e.target.value)} />
+                                onKeyDown={blockNonNumericKeys(false)}
+                                onChange={(e) => sfDraft("stone_weight_grams", toNonNegative(e.target.value))} />
                             </div>
                             <div className="space-y-1">
-                              <Label className="text-xs">Net Wt (g)</Label>
+                              <Label className="text-xs">Net Weight (g)</Label>
                               <Input className="h-8 text-xs bg-muted" readOnly placeholder="Auto"
                                 value={(() => {
                                   const g = parseFloat(goldItemDraft.gross_weight_grams) || 0
@@ -1027,7 +1054,7 @@ export default function LoanApplicationPage() {
                           </div>
                           <div className="flex justify-end">
                             <Button size="sm"
-                              disabled={!goldItemDraft.ornament_name.trim() || !goldItemDraft.gross_weight_grams}
+                              disabled={!goldItemDraft.ornament_name.trim() || !goldItemDraft.gross_weight_grams || hasNegativeGoldValue(goldItemDraft)}
                               onClick={handleAddGoldItem}
                               className="h-7 text-xs bg-yellow-600 hover:bg-yellow-700 text-white">
                               + Add Item
@@ -1045,10 +1072,11 @@ export default function LoanApplicationPage() {
                                   <TableRow className="bg-yellow-50 h-7">
                                     <TableHead className="text-xs py-1 w-8">#</TableHead>
                                     <TableHead className="text-xs py-1">Ornament</TableHead>
-                                    <TableHead className="text-xs py-1">Form</TableHead>
+                                    {/* <TableHead className="text-xs py-1">Form</TableHead> */}
                                     <TableHead className="text-xs py-1">Karat</TableHead>
-                                    <TableHead className="text-xs py-1 text-right">Pcs</TableHead>
+                                    <TableHead className="text-xs py-1 text-right">Quantity</TableHead>
                                     <TableHead className="text-xs py-1 text-right">Gross (g)</TableHead>
+                                    <TableHead className="text-xs py-1 text-right">Disallowed (g)</TableHead>
                                     <TableHead className="text-xs py-1 text-right">Net (g)</TableHead>
                                     <TableHead className="w-6"></TableHead>
                                   </TableRow>
@@ -1058,10 +1086,11 @@ export default function LoanApplicationPage() {
                                     <TableRow key={idx} className="h-7">
                                       <TableCell className="text-xs py-1">{idx + 1}</TableCell>
                                       <TableCell className="text-xs py-1 font-medium">{item.ornament_name}</TableCell>
-                                      <TableCell className="text-xs py-1">{item.gold_form}</TableCell>
+                                      {/* <TableCell className="text-xs py-1">{item.gold_form}</TableCell> */}
                                       <TableCell className="text-xs py-1">{item.purity_karat}K</TableCell>
                                       <TableCell className="text-xs py-1 text-right">{item.number_of_pieces}</TableCell>
                                       <TableCell className="text-xs py-1 text-right">{parseFloat(item.gross_weight_grams).toFixed(3)}</TableCell>
+                                      <TableCell className="text-xs py-1 text-right">{parseFloat(item.stone_weight_grams).toFixed(3)}</TableCell>
                                       <TableCell className="text-xs py-1 text-right">{item.net_weight_grams}</TableCell>
                                       <TableCell className="py-1 text-center">
                                         <button onClick={() => handleRemoveGoldItem(idx)}
@@ -1070,12 +1099,15 @@ export default function LoanApplicationPage() {
                                     </TableRow>
                                   ))}
                                   <TableRow className="bg-yellow-50/80 font-semibold h-7">
-                                    <TableCell className="text-xs py-1" colSpan={4}>Totals</TableCell>
+                                    <TableCell className="text-xs py-1" colSpan={3}>Totals</TableCell>
                                     <TableCell className="text-xs py-1 text-right">
                                       {goldItems.reduce((s, i) => s + (parseInt(i.number_of_pieces) || 1), 0)}
                                     </TableCell>
                                     <TableCell className="text-xs py-1 text-right">
                                       {goldItems.reduce((s, i) => s + (parseFloat(i.gross_weight_grams) || 0), 0).toFixed(3)}
+                                    </TableCell>
+                                    <TableCell className="text-xs py-1 text-right">
+                                      {goldItems.reduce((s, i) => s + (parseFloat(i.stone_weight_grams) || 0), 0).toFixed(3)}
                                     </TableCell>
                                     <TableCell className="text-xs py-1 text-right">
                                       {goldItems.reduce((s, i) => s + (parseFloat(i.net_weight_grams) || 0), 0).toFixed(3)}
@@ -1111,19 +1143,41 @@ export default function LoanApplicationPage() {
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs">Appraiser Name</Label>
-                            <Input className="h-8 text-xs" placeholder="Appraiser name" value={securityForm.appraiser_name} onChange={(e) => sf("appraiser_name", e.target.value)} />
+                            <Select
+                              value={selectedAppraiser ? String(selectedAppraiser.appraiser_id) : ""}
+                              onValueChange={(v) => {
+                                const a = appraisers.find((x) => String(x.appraiser_id) === v)
+                                setSecurityForm((prev) => ({
+                                  ...prev,
+                                  appraiser_name: a?.appraiser_name ?? "",
+                                  appraiser_license_no: a?.license_no ?? "",
+                                }))
+                              }}
+                              disabled={loadingAppraisers || !appraisers.length}
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder={loadingAppraisers ? "Loading..." : appraisers.length ? "Select appraiser" : "No active appraisers"} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {appraisers.map((a) => (
+                                  <SelectItem key={a.appraiser_id} value={String(a.appraiser_id)} disabled={isAppraiserLicenseExpired(a)}>
+                                    {a.appraiser_name} ({a.appraiser_code}){isAppraiserLicenseExpired(a) && " — License expired"}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs">Appraiser License No</Label>
-                            <Input className="h-8 text-xs" placeholder="License no" value={securityForm.appraiser_license_no} onChange={(e) => sf("appraiser_license_no", e.target.value)} />
+                            <Input className="h-8 text-xs bg-muted" readOnly placeholder="Auto-filled" value={securityForm.appraiser_license_no} />
                           </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1">
+                          {/* <div className="space-y-1">
                             <Label className="text-xs">Appraisal Date</Label>
                             <Input className="h-8 text-xs" type="date" value={applicationDate} disabled onChange={(e) => sf("appraisal_date", e.target.value)} />
-                          </div>
+                          </div> */}
                           <div className="space-y-1">
                             <Label className="text-xs">Storage Location</Label>
                             <Input className="h-8 text-xs" placeholder="Vault / locker reference" value={securityForm.storage_location} onChange={(e) => sf("storage_location", e.target.value)} />
@@ -1764,6 +1818,9 @@ export default function LoanApplicationPage() {
 
               {/* ── Right Column ─────────────────────────────────────────────── */}
               <div className="space-y-6">
+                {/* Member Summary */}
+                <MemberSummaryCard memberInfo={memberInfo} />
+
                 {/* EMI Calculator */}
                 <Card>
                   <CardHeader className="pb-3">
