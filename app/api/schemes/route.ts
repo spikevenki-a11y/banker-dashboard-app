@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
                 auto_renewal_allowed, tds_applicable,
                 deposit_gl_account, interest_payable_gl_account, interest_expense_gl_account,
                 penal_interest_gl_account, penal_rate, agent_commission_percent,
-                interest_code, minimum_age, maximum_age, is_staff_only,
+                 minimum_age, maximum_age, is_staff_only,
                 collection_frequency,
                 created_at, updated_at
          FROM deposit_schemes

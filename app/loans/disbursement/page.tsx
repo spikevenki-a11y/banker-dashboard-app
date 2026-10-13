@@ -62,6 +62,7 @@ import {
   AlertCircle,
   Receipt,
   FileText,
+  Home,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 
@@ -307,7 +308,7 @@ export default function LoanDisbursementPage() {
         `Loan disbursed successfully!\n\n` +
         `Loan Account: ${data.loan_account_no}\n` +
         `Amount: ${formatCurrency(parseFloat(disbursementAmount))}\n` +
-        `EMI Amount: ${formatCurrency(data.emi_amount)}\n` +
+        `Monthly EMI: ${formatCurrency(data.emi_amount)}\n` +
         `Total EMIs: ${data.total_installments}\n` +
         `Voucher No: ${data.voucher_no}`
       )
@@ -845,8 +846,8 @@ export default function LoanDisbursementPage() {
         </Dialog>
 
         {/* Confirm Disbursement Dialog */}
-        <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-          <DialogContent>
+        <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog} className="">
+          <DialogContent className="w-[calc(100%-2rem)] !max-w-[600px]">
             <DialogHeader>
               <DialogTitle>Confirm Loan Disbursement</DialogTitle>
               <DialogDescription>
@@ -898,7 +899,18 @@ export default function LoanDisbursementPage() {
         {/* Success Dialog */}
         <AlertDialog open={successOpen} onOpenChange={setSuccessOpen}>
           <AlertDialogContent>
-            <AlertDialogHeader>
+            <button
+              type="button"
+              onClick={() => {
+                setSuccessOpen(false)
+                router.push("/dashboard")
+              }}
+              className="ring-offset-background focus:ring-ring absolute top-4 right-4 inline-flex items-center gap-1.5 rounded-md border border-input bg-transparent px-2.5 py-1.5 text-xs font-medium text-foreground opacity-80 transition-opacity hover:bg-accent hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden"
+            >
+              <Home className="h-3.5 w-3.5" />
+              Home
+            </button>
+            <AlertDialogHeader className="pr-24">
               <AlertDialogTitle className="flex items-center gap-2 text-teal-600">
                 <CheckCircle2 className="h-5 w-5" />
                 Disbursement Successful

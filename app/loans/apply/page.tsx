@@ -906,7 +906,7 @@ export default function LoanApplicationPage() {
                       </div>
                     </div>
 
-                    {selectedScheme && (
+                    {/* {selectedScheme && (
                       <div className="rounded-lg border border-muted bg-muted/30 p-3">
                         <div className="grid grid-cols-4 gap-4 text-sm">
                           {[
@@ -919,7 +919,7 @@ export default function LoanApplicationPage() {
                           ))}
                         </div>
                       </div>
-                    )}
+                    )} */}
 
                     <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-2">
