@@ -1,7 +1,7 @@
 CREATE TABLE memberships (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-    customer_code BIGINT REFERENCES membermaster(customercode),
+    customer_code BIGINT REFERENCES customers(customer_code),
 
     branch_id BIGINT REFERENCES branchparameters(branch_id),
 

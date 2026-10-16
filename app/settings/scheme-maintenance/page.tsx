@@ -50,6 +50,7 @@ interface FieldDef {
   type: "text" | "number" | "boolean" | "select"
   options?: string[]
   group?: string
+  readOnly?: boolean
 }
 
 const SAVINGS_FIELDS: FieldDef[] = [
@@ -106,6 +107,52 @@ const DEPOSIT_FIELDS: FieldDef[] = [
   { key: "interest_expense_gl_account", label: "Interest Expense GL", type: "text", group: "GL Accounts" },
   { key: "penal_interest_gl_account", label: "Penal Interest GL", type: "text", group: "GL Accounts" },
 ]
+
+const LOAN_FIELDS: FieldDef[] = [
+  { key: "scheme_name", label: "Scheme Name", type: "text", group: "General", readOnly: true },
+  { key: "scheme_description", label: "Description", type: "text", group: "General", readOnly: true },
+  { key: "scheme_status", label: "Status", type: "select", options: ["ACTIVE", "INACTIVE", "CLOSED"], group: "General" },
+  { key: "loan_type", label: "Loan Type", type: "text", group: "General", readOnly: true },
+  { key: "minimum_loan_amount", label: "Min Loan Amount", type: "number", group: "Limits" },
+  { key: "maximum_loan_amount", label: "Max Loan Amount", type: "number", group: "Limits" },
+  { key: "minimum_period_months", label: "Min Period (Months)", type: "number", group: "Limits", readOnly: true },
+  { key: "maximum_period_months", label: "Max Period (Months)", type: "number", group: "Limits", readOnly: true },
+  { key: "repayment_frequency", label: "Repayment Frequency", type: "select", options: ["MONTHLY", "QUARTERLY", "HALF_YEARLY", "YEARLY", "ON_MATURITY"], group: "Repayment" },
+  { key: "installment_calculation_method", label: "Installment Method", type: "select", options: ["EMI", "FLAT", "BULLET"], group: "Repayment" },
+  { key: "prepayment_allowed", label: "Prepayment Allowed", type: "boolean", group: "Repayment" },
+  { key: "prepayment_penalty_percent", label: "Prepayment Penalty (%)", type: "number", group: "Repayment" },
+  { key: "interest_policy_id", label: "Interest Policy ID", type: "text", group: "Interest", readOnly: true },
+  { key: "interest_rate", label: "Interest Rate (%)", type: "number", group: "Interest", readOnly: true },
+  { key: "interest_calculation_method", label: "Calculation Method", type: "select", options: ["SIMPLE", "COMPOUND", "REDUCING_BALANCE", "FLAT"], group: "Interest", readOnly: true },
+  { key: "interest_frequency", label: "Interest Frequency", type: "select", options: ["MONTHLY", "QUARTERLY", "HALF_YEARLY", "YEARLY", "ON_MATURITY"], group: "Interest", readOnly: true },
+  { key: "compounding_frequency", label: "Compounding Frequency", type: "select", options: ["MONTHLY", "QUARTERLY", "HALF_YEARLY", "YEARLY"], group: "Interest", readOnly: true },
+  { key: "interest_rounding", label: "Rounding", type: "select", options: ["NEAREST", "ROUND", "FLOOR", "CEIL"], group: "Interest", readOnly: true },
+  { key: "minimum_interest_payable", label: "Min Interest Payable", type: "number", group: "Interest", readOnly: true },
+  { key: "penal_interest_rate", label: "Penal Interest Rate (%)", type: "number", group: "Charges" },
+  { key: "penalty_grace_days", label: "Penalty Grace Days", type: "number", group: "Charges" },
+  { key: "processing_fee_percent", label: "Processing Fee (%)", type: "number", group: "Charges" },
+  { key: "processing_fee_min", label: "Processing Fee Min", type: "number", group: "Charges" },
+  { key: "processing_fee_max", label: "Processing Fee Max", type: "number", group: "Charges" },
+  { key: "appraiser_charge_allowed", label: "Appraiser Charge", type: "boolean", group: "Charges" },
+  { key: "appraiser_charge_code", label: "Appraiser Charge Code", type: "text", group: "Charges" },
+  { key: "appraiser_name", label: "Appraiser Name", type: "text", group: "Charges" },
+  { key: "appraiser_amount_receive_account_number", label: "Appraiser Receive A/c", type: "text", group: "Charges" },
+  { key: "collateral_required", label: "Collateral Required", type: "boolean", group: "Eligibility" },
+  { key: "minimum_age", label: "Min Age", type: "number", group: "Eligibility" },
+  { key: "maximum_age", label: "Max Age", type: "number", group: "Eligibility" },
+  { key: "is_staff_only", label: "Staff Only", type: "boolean", group: "Eligibility" },
+  { key: "loan_gl_account", label: "Loan GL Account", type: "text", group: "GL Accounts", readOnly: true },
+  { key: "interest_income_gl_account", label: "Interest Income GL", type: "text", group: "GL Accounts", readOnly: true },
+  { key: "interest_receivable_gl_account", label: "Interest Receivable GL", type: "text", group: "GL Accounts", readOnly: true },
+  { key: "penal_interest_gl_account", label: "Penal Interest GL", type: "text", group: "GL Accounts", readOnly: true },
+  { key: "processing_fee_gl_account", label: "Processing Fee GL", type: "text", group: "GL Accounts", readOnly: true },
+]
+
+const MODULE_FIELDS: Record<string, FieldDef[]> = {
+  savings: SAVINGS_FIELDS,
+  deposits: DEPOSIT_FIELDS,
+  loans: LOAN_FIELDS,
+}
 
 const MODULE_OPTIONS = [
   { value: "savings", label: "Savings Schemes", icon: PiggyBank, color: "text-emerald-600" },
@@ -166,8 +213,9 @@ export default function SchemeMaintenancePage() {
 
     // Build only changed fields
     const updates: Record<string, any> = {}
-    const fields = selectedModule === "savings" ? SAVINGS_FIELDS : DEPOSIT_FIELDS
+    const fields = MODULE_FIELDS[selectedModule] || []
     for (const f of fields) {
+      if (f.readOnly) continue
       const newVal = editValues[f.key]
       const oldVal = editScheme[f.key]
       if (newVal !== oldVal) {
@@ -209,7 +257,7 @@ export default function SchemeMaintenancePage() {
     }
   }
 
-  const fields = selectedModule === "savings" ? SAVINGS_FIELDS : selectedModule === "deposits" ? DEPOSIT_FIELDS : []
+  const fields = MODULE_FIELDS[selectedModule] || []
 
   // Summary columns for the table
   const summaryColumns =
@@ -217,7 +265,9 @@ export default function SchemeMaintenancePage() {
       ? ["scheme_id", "scheme_name", "interest_rate", "min_balance", "scheme_status"]
       : selectedModule === "deposits"
         ? ["scheme_id", "scheme_name", "deposit_type", "interest_rate", "scheme_status"]
-        : []
+        : selectedModule === "loans"
+          ? ["scheme_id", "scheme_name", "loan_type", "interest_rate", "minimum_loan_amount", "maximum_loan_amount", "scheme_status"]
+          : []
 
   const summaryLabels: Record<string, string> = {
     scheme_id: "ID",
@@ -225,8 +275,13 @@ export default function SchemeMaintenancePage() {
     interest_rate: "Rate (%)",
     min_balance: "Min Balance",
     deposit_type: "Type",
+    loan_type: "Type",
+    minimum_loan_amount: "Min Amount",
+    maximum_loan_amount: "Max Amount",
     scheme_status: "Status",
   }
+
+  const amountColumns = ["min_balance", "minimum_deposit", "minimum_loan_amount", "maximum_loan_amount"]
 
   return (
     <DashboardWrapper>
@@ -325,7 +380,9 @@ export default function SchemeMaintenancePage() {
                               </Badge>
                             ) : col === "interest_rate" ? (
                               `${scheme[col] ?? "-"}`
-                            ) : col === "min_balance" || col === "minimum_deposit" ? (
+                            ) : col === "loan_type" ? (
+                              scheme[col] ? String(scheme[col]).replace(/_/g, " ") : "-"
+                            ) : amountColumns.includes(col) ? (
                               scheme[col] != null ? Number(scheme[col]).toLocaleString("en-IN") : "-"
                             ) : (
                               scheme[col] ?? "-"
@@ -356,9 +413,7 @@ export default function SchemeMaintenancePage() {
               </div>
               <CardTitle className="text-xl mb-2">No Schemes Found</CardTitle>
               <CardDescription className="text-center max-w-md">
-                {selectedModule === "loans"
-                  ? "Loan schemes module is under development."
-                  : `No ${selectedModule} schemes are configured for your branch yet.`}
+                {`No ${selectedModule === "loans" ? "loan" : selectedModule} schemes are configured for your branch yet.`}
               </CardDescription>
             </CardContent>
           </Card>
@@ -411,11 +466,12 @@ export default function SchemeMaintenancePage() {
                           {f.type === "boolean" ? (
                             <Switch
                               id={f.key}
+                              disabled={f.readOnly}
                               checked={!!editValues[f.key]}
                               onCheckedChange={(v) => handleFieldChange(f.key, v)}
                             />
                           ) : f.type === "select" ? (
-                            <Select value={editValues[f.key] || ""} onValueChange={(v) => handleFieldChange(f.key, v)}>
+                            <Select value={editValues[f.key] || ""} onValueChange={(v) => handleFieldChange(f.key, v)} disabled={f.readOnly}>
                               <SelectTrigger id={f.key}>
                                 <SelectValue placeholder="Select..." />
                               </SelectTrigger>
@@ -429,6 +485,8 @@ export default function SchemeMaintenancePage() {
                             <Input
                               id={f.key}
                               type={f.type === "number" ? "number" : "text"}
+                              readOnly={f.readOnly}
+                              disabled={f.readOnly}
                               value={editValues[f.key] ?? ""}
                               onChange={(e) => handleFieldChange(f.key, f.type === "number" ? e.target.value : e.target.value)}
                             />

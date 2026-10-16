@@ -155,11 +155,6 @@ create table loan_schemes (
   maximum_age integer null default 70,
 
   is_staff_only boolean not null default false,
-  appraiser_charge_allowed boolean not null default false,
-  appraiser_charge_code varchar(20) null,
-
-  appraiser_name VARCHAR(50) NULL,
-  appraiser_amount_receive_account_number VARCHAR(20) NULL,
 
   scheme_status varchar(20) not null default 'ACTIVE',
 
