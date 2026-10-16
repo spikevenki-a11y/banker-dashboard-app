@@ -33,6 +33,7 @@ import { Plus, Search, Eye, CreditCard, AlertCircle, CheckCircle, Clock, Trash2,
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Progress } from "@/components/ui/progress"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
+import { SanctionPanel, type SanctionApplication } from "../_components/sanction-panel"
 
 type LoanScheme = {
   scheme_id: number
@@ -131,6 +132,8 @@ export default function LoansPage() {
   const [isNewLoanOpen, setIsNewLoanOpen] = useState(false)
   const [selectedLoan, setSelectedLoan] = useState<LoanApplication | null>(null)
   const [isSanctionOpen, setIsSanctionOpen] = useState(false)
+  // Sanction popup (same form as Loans → Sanction Loans)
+  const [sanctionPopupApp, setSanctionPopupApp] = useState<LoanApplication | null>(null)
   const [isDisbursementOpen, setIsDisbursementOpen] = useState(false)
   const [isCollectionOpen, setIsCollectionOpen] = useState(false)
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
@@ -678,7 +681,7 @@ export default function LoansPage() {
                                 </DropdownMenuItem>
                                 {loan.application_status === "PENDING" && (
                                   <>
-                                    <DropdownMenuItem onClick={() => router.push(`/loans/sanction?applicationId=${loan.loan_application_id}`)}>
+                                    <DropdownMenuItem onClick={() => setSanctionPopupApp(loan)}>
                                       <CheckCircle className="mr-2 h-4 w-4" />
                                       Sanction
                                     </DropdownMenuItem>
@@ -1189,6 +1192,35 @@ export default function LoansPage() {
               </AlertDialogContent>
             </AlertDialog>
 
+            {/* Sanction Popup */}
+            <Dialog open={!!sanctionPopupApp} onOpenChange={(open) => { if (!open) setSanctionPopupApp(null) }}>
+              <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Loan Sanction</DialogTitle>
+                  <DialogDescription>Review and approve or reject the loan application</DialogDescription>
+                </DialogHeader>
+                {sanctionPopupApp && (
+                  <SanctionPanel
+                    key={sanctionPopupApp.loan_application_id}
+                    app={sanctionPopupApp as unknown as SanctionApplication}
+                    onCancel={() => setSanctionPopupApp(null)}
+                    onApproved={({ message }) => {
+                      setSanctionPopupApp(null)
+                      setSuccessMessage(message)
+                      setSuccessOpen(true)
+                      fetchLoans()
+                    }}
+                    onRejected={({ message }) => {
+                      setSanctionPopupApp(null)
+                      setSuccessMessage(message)
+                      setSuccessOpen(true)
+                      fetchLoans()
+                    }}
+                  />
+                )}
+              </DialogContent>
+            </Dialog>
+
             {/* Success Dialog */}
             <AlertDialog open={successOpen} onOpenChange={setSuccessOpen}>
               <AlertDialogContent>
@@ -1197,7 +1229,7 @@ export default function LoansPage() {
                     <CheckCircle className="h-5 w-5 text-teal-600" />
                     Success
                   </AlertDialogTitle>
-                  <AlertDialogDescription>{successMessage}</AlertDialogDescription>
+                  <AlertDialogDescription className="whitespace-pre-line">{successMessage}</AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogAction onClick={() => setSuccessOpen(false)}>OK</AlertDialogAction>
