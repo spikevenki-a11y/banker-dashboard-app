@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea"
 import {
   AlertDialog,
   AlertDialogAction,
+  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -22,11 +23,12 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   ArrowLeft, Search, Loader2, CheckCircle2, Calculator,
-  FileText, Users, IndianRupee, Clock, ChevronRight,
+  FileText, Users, IndianRupee, Clock, ChevronRight, AlertCircle,
   Upload, ImageIcon, X, Camera, RefreshCw,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { MemberSummaryCard } from "@/components/member-summary-card"
+import { MemberSearchDialog } from "@/components/member-search-dialog"
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -193,6 +195,13 @@ type SecurityForm = {
   policy_maturity_date: string
   assignment_done: boolean
   assignee_name: string
+  // Personal Surety
+  surety_membership_no: string
+  surety_customer_code: string
+  surety_name: string
+  surety_mobile_no: string
+  surety_annual_income: string
+  surety_eligible_security_amount: string
 }
 
 const emptySecurityForm: SecurityForm = {
@@ -216,6 +225,8 @@ const emptySecurityForm: SecurityForm = {
   policy_no: "", policy_type: "LIFE", insurer_name: "", insured_name: "", sum_assured: "",
   surrender_value: "", surrender_value_date: "", premium_amount: "", premium_frequency: "ANNUAL",
   policy_start_date: "", policy_maturity_date: "", assignment_done: false, assignee_name: "",
+  surety_membership_no: "", surety_customer_code: "", surety_name: "", surety_mobile_no: "",
+  surety_annual_income: "", surety_eligible_security_amount: "",
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -229,14 +240,8 @@ export default function LoanApplicationPage() {
   const [memberInfo, setMemberInfo] = useState<MemberInfo | null>(null)
   const [memberError, setMemberError] = useState("")
 
-  // Member search popup
+  // Member search popup (shared with Savings → Open Account)
   const [searchDialogOpen, setSearchDialogOpen] = useState(false)
-  const [searchMemberNo, setSearchMemberNo] = useState("")
-  const [searchMemberName, setSearchMemberName] = useState("")
-  const [searchFatherName, setSearchFatherName] = useState("")
-  const [searchAadhaar, setSearchAadhaar] = useState("")
-  const [searchResults, setSearchResults] = useState<MemberInfo[]>([])
-  const [isPopupSearching, setIsPopupSearching] = useState(false)
 
   // Schemes
   const [schemes, setSchemes] = useState<LoanScheme[]>([])
@@ -246,14 +251,14 @@ export default function LoanApplicationPage() {
   // Appraisers (Settings → Management → Manage Appraiser Details)
   const [appraisers, setAppraisers] = useState<Appraiser[]>([])
   const [loadingAppraisers, setLoadingAppraisers] = useState(true)
+  // "select" = gold security submitted without an appraiser, "create" = no usable appraiser exists
+  const [appraiserPopup, setAppraiserPopup] = useState<"select" | "create" | null>(null)
 
   // Form fields
   const [applicationDate, setApplicationDate] = useState("")
   const [loanAmount, setLoanAmount] = useState("")
   const [tenureMonths, setTenureMonths] = useState("")
   const [interestRate, setInterestRate] = useState("")
-  const [guarantorName, setGuarantorName] = useState("")
-  const [guarantorMembership, setGuarantorMembership] = useState("")
   const [remarks, setRemarks] = useState("")
 
 
@@ -279,6 +284,11 @@ export default function LoanApplicationPage() {
   const [securityForm, setSecurityForm] = useState<SecurityForm>(emptySecurityForm)
   const [memberDepositAccounts, setMemberDepositAccounts] = useState<MemberDepositAccount[]>([])
   const [loadingDepositAccounts, setLoadingDepositAccounts] = useState(false)
+
+  // Personal Surety (13) — surety member lookup
+  const [isSuretySearching, setIsSuretySearching] = useState(false)
+  const [suretyError, setSuretyError] = useState("")
+  const [suretySearchOpen, setSuretySearchOpen] = useState(false)
 
   // Gold item-by-item tracking
   const [goldItems, setGoldItems] = useState<GoldItem[]>([])
@@ -511,9 +521,20 @@ export default function LoanApplicationPage() {
   const isAppraiserLicenseExpired = (a: Appraiser) =>
     !!a.license_valid_till && !!applicationDate && a.license_valid_till < applicationDate
 
-  const selectedAppraiser = appraisers.find(
+  // Active (filtered by the API) and licence not expired as of the business date
+  const availableAppraisers = appraisers.filter((a) => !isAppraiserLicenseExpired(a))
+
+  const selectedAppraiser = availableAppraisers.find(
     (a) => a.appraiser_name === securityForm.appraiser_name && (a.license_no ?? "") === securityForm.appraiser_license_no
   )
+
+  // Gold selected: check once appraisers and the business date are loaded
+  const isGoldSecurity = Number(selectedSecurityId) === 6
+  useEffect(() => {
+    if (isGoldSecurity && !loadingAppraisers && applicationDate && availableAppraisers.length === 0) {
+      setAppraiserPopup("create")
+    }
+  }, [isGoldSecurity, loadingAppraisers, applicationDate, availableAppraisers.length])
 
   async function getLoginDate() {
     try {
@@ -605,33 +626,68 @@ export default function LoanApplicationPage() {
     finally { setIsSearching(false) }
   }
 
+  // Surety must be an active member of this branch and cannot be the applicant
+  const handleSuretySearch = async () => {
+    const suretyNo = securityForm.surety_membership_no.trim()
+    if (!suretyNo) return
+    if (memberInfo && suretyNo === memberInfo.membership_no) {
+      setSuretyError("Applicant cannot stand as their own surety.")
+      return
+    }
+    setIsSuretySearching(true); setSuretyError("")
+    try {
+      const res = await fetch("/api/savings/member-lookup", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ membership_no: suretyNo }),
+      })
+      const data = await res.json()
+      if (res.ok && data.found) {
+        setSecurityForm((prev) => ({
+          ...prev,
+          surety_customer_code: String(data.member.customer_code),
+          surety_name: data.member.full_name || "",
+          surety_mobile_no: data.member.mobile_no || "",
+        }))
+      } else {
+        setSuretyError("No active member found with this membership number.")
+      }
+    } catch { setSuretyError("Failed to search surety. Please try again.") }
+    finally { setIsSuretySearching(false) }
+  }
+
+  const handleSelectSurety = (member: MemberInfo) => {
+    if (memberInfo && member.membership_no === memberInfo.membership_no) {
+      handleSuretyNoChange(member.membership_no)
+      setSuretyError("Applicant cannot stand as their own surety.")
+      return
+    }
+    setSecurityForm((prev) => ({
+      ...prev,
+      surety_membership_no: member.membership_no,
+      surety_customer_code: String(member.customer_code),
+      surety_name: member.full_name || "",
+      surety_mobile_no: member.mobile_no || "",
+    }))
+    setSuretyError("")
+  }
+
+  const handleSuretyNoChange = (value: string) =>
+    setSecurityForm((prev) => ({
+      ...prev,
+      surety_membership_no: value,
+      surety_customer_code: "",
+      surety_name: "",
+      surety_mobile_no: "",
+    }))
+
   const handleMemberBlur = () => {
     if (membershipNo.trim() && !memberInfo && !isSearching) handleMemberSearch()
   }
 
-  const handlePopupSearch = async () => {
-    if (!searchMemberNo && !searchMemberName && !searchFatherName && !searchAadhaar) return
-    setIsPopupSearching(true); setSearchResults([])
-    try {
-      const res = await fetch("/api/savings/member-search", {
-        method: "POST", credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          memberNumber: searchMemberNo, memberName: searchMemberName,
-          fatherName: searchFatherName, aadhaarNumber: searchAadhaar,
-        }),
-      })
-      const data = await res.json()
-      if (data.success) setSearchResults(data.results || [])
-    } catch { /* silent */ }
-    finally { setIsPopupSearching(false) }
-  }
-
   const handleSelectMember = (member: MemberInfo) => {
     setMemberInfo(member); setMembershipNo(member.membership_no)
-    setMemberError(""); setSearchDialogOpen(false)
-    setSearchMemberNo(""); setSearchMemberName(""); setSearchFatherName(""); setSearchAadhaar("")
-    setSearchResults([])
+    setMemberError("")
   }
 
   // ── Submit ─────────────────────────────────────────────────────────────────
@@ -639,6 +695,24 @@ export default function LoanApplicationPage() {
   const handleSubmit = async () => {
     if (!memberInfo || !selectedSchemeId || !applicationDate || !loanAmount || !tenureMonths) return
     if (Number(selectedSecurityId) === 6 && goldItems.some(hasNegativeGoldValue)) return
+    if (isGoldSecurity && !selectedAppraiser) {
+      setAppraiserPopup(availableAppraisers.length === 0 ? "create" : "select")
+      return
+    }
+    if (Number(selectedSecurityId) === 13) {
+      const income = Number(securityForm.surety_annual_income)
+      const eligible = Number(securityForm.surety_eligible_security_amount)
+      let suretyMsg = ""
+      if (!securityForm.surety_customer_code) suretyMsg = "Please search and select a valid surety member."
+      else if (securityForm.surety_membership_no.trim() === memberInfo.membership_no) suretyMsg = "Applicant cannot stand as their own surety."
+      else if (!securityForm.surety_annual_income || !(income > 0)) suretyMsg = "Please enter the surety's annual income."
+      else if (!securityForm.surety_eligible_security_amount || !(eligible > 0)) suretyMsg = "Please enter the surety's eligible security amount."
+      if (suretyMsg) {
+        setSuretyError(suretyMsg)
+        alert(suretyMsg)
+        return
+      }
+    }
     setIsSubmitting(true)
 
     // Build security payload
@@ -753,6 +827,13 @@ export default function LoanApplicationPage() {
           assignment_done: securityForm.assignment_done,
           assignee_name: securityForm.assignment_done ? securityForm.assignee_name : null,
         })
+      } else if (typeId === 13) {
+        Object.assign(securityPayload, {
+          assessed_value: Number(securityForm.surety_eligible_security_amount),
+          surety_membership_no: securityForm.surety_membership_no.trim(),
+          surety_annual_income: Number(securityForm.surety_annual_income),
+          surety_eligible_security_amount: Number(securityForm.surety_eligible_security_amount),
+        })
       }
     }
 
@@ -768,8 +849,6 @@ export default function LoanApplicationPage() {
           tenure_months: Number(tenureMonths),
           interest_rate: Number(interestRate),
           loan_purpose: selectedPurposeId,
-          guarantor_name: guarantorName,
-          guarantor_membership_no: guarantorMembership,
           remarks,
           security: securityPayload,
         }),
@@ -803,8 +882,8 @@ export default function LoanApplicationPage() {
     setMembershipNo(""); setMemberInfo(null); setMemberError("")
     setSelectedSchemeId(""); setLoanAmount(""); setTenureMonths(""); setInterestRate("")
     setSelectedPurposeId(""); setSelectedSecurityId(""); setSecurityForm(emptySecurityForm)
-    setGoldItems([]); setGoldItemDraft(emptyGoldItem)
-    setGuarantorName(""); setGuarantorMembership(""); setRemarks("")
+    setGoldItems([]); setGoldItemDraft(emptyGoldItem); setSuretyError("")
+    setRemarks("")
     setEmiAmount(null); setTotalInterest(null); setTotalPayment(null); setEmiSchedule([])
   }
 
@@ -819,7 +898,8 @@ export default function LoanApplicationPage() {
   const isVehicle = secTypeId === 7
   const isDeposit = [8, 12].includes(secTypeId)
   const isInsurance = secTypeId === 10
-  const isGeneral = secTypeId > 0 && !isGold && !isProperty && !isVehicle && !isDeposit && !isInsurance
+  const isSurety = secTypeId === 13
+  const isGeneral = secTypeId > 0 && !isGold && !isProperty && !isVehicle && !isDeposit && !isInsurance && !isSurety
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -954,8 +1034,8 @@ export default function LoanApplicationPage() {
                     <div className="flex items-center gap-3">
                       <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">3</div>
                       <div>
-                        <CardTitle className="text-lg">Security & Guarantor</CardTitle>
-                        <CardDescription>Add collateral security details and guarantor information</CardDescription>
+                        <CardTitle className="text-lg">Security Details</CardTitle>
+                        <CardDescription>Add collateral security details</CardDescription>
                       </div>
                     </div>
                   </CardHeader>
@@ -965,7 +1045,7 @@ export default function LoanApplicationPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Security Type</Label>
-                        <Select value={selectedSecurityId} onValueChange={(v) => { setSelectedSecurityId(v); setSecurityForm(emptySecurityForm); setGoldItems([]); setGoldItemDraft(emptyGoldItem) }} disabled={!securities.length}>
+                        <Select value={selectedSecurityId} onValueChange={(v) => { setSelectedSecurityId(v); setSecurityForm(emptySecurityForm); setGoldItems([]); setGoldItemDraft(emptyGoldItem); setSuretyError("") }} disabled={!securities.length}>
                           <SelectTrigger><SelectValue placeholder={securities.length ? "Select security type" : "No securities for this scheme"} /></SelectTrigger>
                           <SelectContent>
                             {securities.map((s: any) => <SelectItem key={s.security_id} value={String(s.security_id)}>{s.security_name}</SelectItem>)}
@@ -1146,22 +1226,22 @@ export default function LoanApplicationPage() {
                             <Select
                               value={selectedAppraiser ? String(selectedAppraiser.appraiser_id) : ""}
                               onValueChange={(v) => {
-                                const a = appraisers.find((x) => String(x.appraiser_id) === v)
+                                const a = availableAppraisers.find((x) => String(x.appraiser_id) === v)
                                 setSecurityForm((prev) => ({
                                   ...prev,
                                   appraiser_name: a?.appraiser_name ?? "",
                                   appraiser_license_no: a?.license_no ?? "",
                                 }))
                               }}
-                              disabled={loadingAppraisers || !appraisers.length}
+                              disabled={loadingAppraisers || !availableAppraisers.length}
                             >
                               <SelectTrigger className="h-8 text-xs">
-                                <SelectValue placeholder={loadingAppraisers ? "Loading..." : appraisers.length ? "Select appraiser" : "No active appraisers"} />
+                                <SelectValue placeholder={loadingAppraisers ? "Loading..." : availableAppraisers.length ? "Select appraiser" : "No active appraisers"} />
                               </SelectTrigger>
                               <SelectContent>
-                                {appraisers.map((a) => (
-                                  <SelectItem key={a.appraiser_id} value={String(a.appraiser_id)} disabled={isAppraiserLicenseExpired(a)}>
-                                    {a.appraiser_name} ({a.appraiser_code}){isAppraiserLicenseExpired(a) && " — License expired"}
+                                {availableAppraisers.map((a) => (
+                                  <SelectItem key={a.appraiser_id} value={String(a.appraiser_id)}>
+                                    {a.appraiser_name} ({a.appraiser_code})
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -1747,6 +1827,64 @@ export default function LoanApplicationPage() {
                       </div>
                     )}
 
+                    {/* ── Personal Surety ────────────────────────────────────── */}
+                    {isSurety && (
+                      <div className="rounded-lg border border-teal-200 bg-teal-50/30 p-4 space-y-4">
+                        <p className="text-sm font-semibold text-teal-800">Personal Surety Details</p>
+
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Surety Membership No *</Label>
+                            <div className="flex gap-2">
+                              <Input className="h-8 text-xs" placeholder="Enter membership no"
+                                value={securityForm.surety_membership_no}
+                                onChange={(e) => {
+                                  handleSuretyNoChange(e.target.value)
+                                  setSuretyError(memberInfo && e.target.value.trim() === memberInfo.membership_no
+                                    ? "Applicant cannot stand as their own surety." : "")
+                                }}
+                                onBlur={() => { if (securityForm.surety_membership_no.trim() && !securityForm.surety_customer_code && !isSuretySearching) handleSuretySearch() }}
+                                onKeyDown={(e) => { if (e.key === "Enter") handleSuretySearch() }} />
+                              <Button type="button" variant="outline" size="sm" className="h-8 gap-1 bg-transparent text-xs"
+                                onClick={() => setSuretySearchOpen(true)} title="Search member">
+                                <Search className="h-3 w-3" /> Search
+                              </Button>
+                            </div>
+                            {isSuretySearching && (
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Loader2 className="h-3 w-3 animate-spin" />Loading member details...
+                              </div>
+                            )}
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Surety Name</Label>
+                            <Input className="h-8 text-xs bg-muted" readOnly placeholder="Auto-filled" value={securityForm.surety_name} />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Mobile No</Label>
+                            <Input className="h-8 text-xs bg-muted" readOnly placeholder="Auto-filled" value={securityForm.surety_mobile_no} />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Annual Income (₹) *</Label>
+                            <Input className="h-8 text-xs" type="number" min={0} placeholder="Surety's annual income"
+                              value={securityForm.surety_annual_income}
+                              onChange={(e) => sf("surety_annual_income", e.target.value)} />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Eligible Security Amount (₹) *</Label>
+                            <Input className="h-8 text-xs" type="number" min={0} placeholder="Amount the surety can guarantee"
+                              value={securityForm.surety_eligible_security_amount}
+                              onChange={(e) => { sf("surety_eligible_security_amount", e.target.value); sf("assessed_value", e.target.value) }} />
+                          </div>
+                        </div>
+
+                        {suretyError && <p className="text-xs text-destructive">{suretyError}</p>}
+                      </div>
+                    )}
+
                     {/* ── General Security (Machinery / Inventory / Shares etc.) ── */}
                     {isGeneral && (
                       <div className="rounded-lg border border-gray-200 bg-gray-50/30 p-4 space-y-3">
@@ -1781,19 +1919,7 @@ export default function LoanApplicationPage() {
                       </>
                     )}
 
-                    {/* ── Guarantor ──────────────────────────────────────────── */}
                     <div className="border-t pt-4 space-y-3">
-                      <p className="text-sm font-semibold text-muted-foreground">Guarantor (Optional)</p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <Label className="text-xs">Guarantor Name</Label>
-                          <Input className="h-8 text-xs" placeholder="Enter guarantor name" value={guarantorName} onChange={(e) => setGuarantorName(e.target.value)} />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs">Guarantor Membership No</Label>
-                          <Input className="h-8 text-xs" placeholder="Enter membership no" value={guarantorMembership} onChange={(e) => setGuarantorMembership(e.target.value)} />
-                        </div>
-                      </div>
                       <div className="space-y-1">
                         <Label className="text-xs">Remarks</Label>
                         <Textarea className="text-xs" rows={2} placeholder="Any additional remarks" value={remarks} onChange={(e) => setRemarks(e.target.value)} />
@@ -1927,61 +2053,19 @@ export default function LoanApplicationPage() {
       </div>
 
       {/* Member Search Dialog */}
-      <Dialog open={searchDialogOpen} onOpenChange={setSearchDialogOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Users className="h-5 w-5" />Search Member</DialogTitle>
-            <DialogDescription>Search by membership number, name, father name, or Aadhaar</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                ["Membership No", searchMemberNo, setSearchMemberNo, "Enter membership no"],
-                ["Member Name", searchMemberName, setSearchMemberName, "Enter name"],
-                ["Father Name", searchFatherName, setSearchFatherName, "Enter father name"],
-                ["Aadhaar Number", searchAadhaar, setSearchAadhaar, "Enter Aadhaar"],
-              ].map(([label, value, setter, ph]: any) => (
-                <div key={label} className="space-y-2">
-                  <Label>{label}</Label>
-                  <Input placeholder={ph} value={value} onChange={(e) => setter(e.target.value)} />
-                </div>
-              ))}
-            </div>
-            <Button onClick={handlePopupSearch} disabled={isPopupSearching} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-              {isPopupSearching ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Searching...</> : <><Search className="mr-2 h-4 w-4" />Search</>}
-            </Button>
+      <MemberSearchDialog<MemberInfo>
+        open={searchDialogOpen}
+        onOpenChange={setSearchDialogOpen}
+        onSelect={handleSelectMember}
+      />
 
-            {searchResults.length > 0 && (
-              <div className="max-h-64 overflow-y-auto rounded-lg border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Membership No</TableHead><TableHead>Name</TableHead>
-                      <TableHead>Father Name</TableHead><TableHead>Mobile</TableHead><TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {searchResults.map((m) => (
-                      <TableRow key={m.membership_no}>
-                        <TableCell className="font-mono">{m.membership_no}</TableCell>
-                        <TableCell>{m.full_name}</TableCell>
-                        <TableCell>{m.father_name || "---"}</TableCell>
-                        <TableCell>{m.mobile_no || "---"}</TableCell>
-                        <TableCell>
-                          <Button size="sm" variant="outline" onClick={() => handleSelectMember(m)} className="bg-transparent">Select</Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-            {searchResults.length === 0 && !isPopupSearching && (searchMemberNo || searchMemberName || searchFatherName || searchAadhaar) && (
-              <p className="text-center text-sm text-muted-foreground">No members found. Try different search criteria.</p>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Surety Member Search Dialog (Personal Surety) */}
+      <MemberSearchDialog<MemberInfo>
+        open={suretySearchOpen}
+        onOpenChange={setSuretySearchOpen}
+        onSelect={handleSelectSurety}
+        excludeMembershipNo={memberInfo?.membership_no}
+      />
 
       {/* Success Dialog */}
       <AlertDialog open={successOpen} onOpenChange={setSuccessOpen}>
@@ -2008,6 +2092,36 @@ export default function LoanApplicationPage() {
             <AlertDialogAction onClick={() => { setSuccessOpen(false); router.push(`/loans/sanction?appId=${createdApplicationNo}`) }} className="bg-blue-600 hover:bg-blue-700 text-white">
               Proceed to Sanction <ChevronRight className="ml-1 h-4 w-4" />
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Appraiser validation popup (gold security) */}
+      <AlertDialog open={!!appraiserPopup} onOpenChange={(open) => !open && setAppraiserPopup(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-amber-700">
+              <AlertCircle className="h-5 w-5" />
+              {appraiserPopup === "create" ? "No Appraiser Available" : "Appraiser Required"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {appraiserPopup === "create" ? "Please create appraiser." : "Please select appraiser"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            {appraiserPopup === "create" ? (
+              <>
+                <AlertDialogCancel>Close</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => router.push("/settings/management/appraisers")}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Go to Manage Appraisers <ChevronRight className="ml-1 h-4 w-4" />
+                </AlertDialogAction>
+              </>
+            ) : (
+              <AlertDialogAction>OK</AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

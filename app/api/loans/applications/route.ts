@@ -49,10 +49,6 @@ export async function GET(request: NextRequest) {
         lscheme.minimum_period_months,
         lscheme.maximum_period_months,
         lscheme.loan_gl_account,
-        lscheme.appraiser_charge_allowed,
-        lscheme.appraiser_charge_code,
-        lscheme.appraiser_name as scheme_appraiser_name,
-        lscheme.appraiser_amount_receive_account_number,
         m.customer_code,
         c.full_name as member_name,
         c.mobile_no
@@ -240,6 +236,35 @@ export async function POST(request: NextRequest) {
       ]
     )
 
+    // Personal Surety — surety must be another active member of this branch, with income and eligible amount
+    let suretyCustomerCode: number | null = null
+    if (Number(security?.security_type_id) === 13) {
+      const suretyNo = String(security.surety_membership_no || "").trim()
+      const annualIncome = Number(security.surety_annual_income)
+      const eligibleAmount = Number(security.surety_eligible_security_amount)
+
+      let suretyError = ""
+      if (!suretyNo) suretyError = "Surety membership number is required"
+      else if (suretyNo === String(membership_no)) suretyError = "Applicant cannot stand as their own surety"
+      else if (!(annualIncome > 0)) suretyError = "Surety annual income must be greater than zero"
+      else if (!(eligibleAmount > 0)) suretyError = "Surety eligible security amount must be greater than zero"
+
+      if (!suretyError) {
+        const { rows: suretyRows } = await client.query(
+          `SELECT customer_code FROM memberships
+           WHERE membership_no = $1 AND branch_id = $2 AND status = 'ACTIVE'`,
+          [suretyNo, branchId]
+        )
+        if (suretyRows.length === 0) suretyError = "Surety must be an active member of this branch"
+        else suretyCustomerCode = suretyRows[0].customer_code
+      }
+
+      if (suretyError) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: suretyError }, { status: 400 })
+      }
+    }
+
     // Persist security details if provided
     if (security?.security_type_id) {
       const secRefNo = `SEC-${branchId}-${loanApplicationId}-1`
@@ -423,6 +448,21 @@ export async function POST(request: NextRequest) {
             security.assignment_done ? (security.assignee_name || null) : null,
           ]
         )
+      } else if (typeId === 13) {
+        // Personal Surety (validated above)
+        await client.query(
+          `INSERT INTO personal_surety_details (
+            loan_application_id, membership_no, surety_customer_code,
+            surety_annual_income, surety_eligible_security_amount, created_at
+          ) VALUES ($1,$2,$3,$4,$5,NOW())`,
+          [
+            loanApplicationId,
+            String(security.surety_membership_no).trim(),
+            suretyCustomerCode,
+            Number(security.surety_annual_income),
+            Number(security.surety_eligible_security_amount),
+          ]
+        )
       }
       // For types 3,4,5,9,11 — base loan_securities record is sufficient
     }
@@ -479,6 +519,11 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Delete related records first
+    await client.query(
+      `DELETE FROM personal_surety_details WHERE loan_application_id = $1`,
+      [applicationId]
+    )
+
     await client.query(
       `DELETE FROM loan_security_details WHERE loan_application_id = $1`,
       [applicationId]

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Users, Gem } from "lucide-react"
+import { ArrowLeft, Users, Gem, ClipboardList } from "lucide-react"
 import { DashboardWrapper } from "../../_components/dashboard-wrapper"
 
 const managementCards = [
@@ -15,6 +15,15 @@ const managementCards = [
     color: "text-amber-600",
     bgColor: "bg-amber-50",
     href: "/settings/management/appraisers",
+  },
+  {
+    id: "appraisal-master",
+    title: "Appraisal Master Maintenance",
+    description: "View jewel loan appraisal charge masters, effective periods, and slab counts",
+    icon: ClipboardList,
+    color: "text-blue-600",
+    bgColor: "bg-blue-50",
+    href: "/settings/management/appraisal-master",
   },
 ]
 

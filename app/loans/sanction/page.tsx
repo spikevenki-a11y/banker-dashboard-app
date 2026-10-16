@@ -56,7 +56,13 @@ import {
   Banknote,
   Receipt,
   CheckCircle2,
+  Download,
 } from "lucide-react"
+import { useBranchInfo } from "@/app/reports/_components/use-branch-info"
+import { downloadPdf } from "@/app/reports/_components/download-pdf"
+
+const escapeHtml = (value: unknown) =>
+  String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!)
 
 interface LoanApplication {
   loan_application_id: number
@@ -135,6 +141,8 @@ export default function LoanSanctionPage() {
   const [totalPayment, setTotalPayment] = useState<number | null>(null)
   const [emiSchedule, setEmiSchedule] = useState<EMIScheduleItem[]>([])
   const [showScheduleDialog, setShowScheduleDialog] = useState(false)
+  const [downloadingSchedule, setDownloadingSchedule] = useState(false)
+  const branchInfo = useBranchInfo()
 
   // Dialog states
   const [showRejectDialog, setShowRejectDialog] = useState(false)
@@ -155,6 +163,87 @@ export default function LoanSanctionPage() {
       currency: "INR",
       maximumFractionDigits: 0,
     }).format(amount)
+  }
+
+  // Builds the PDF from the same emiSchedule rows shown in the Repayment Schedule dialog
+  async function handleDownloadSchedule() {
+    if (emiSchedule.length === 0) return
+    setDownloadingSchedule(true)
+    try {
+      const sum = (key: "principal" | "interest" | "total") => emiSchedule.reduce((acc, item) => acc + item[key], 0)
+      const details = [
+        ["Reference No", selectedApp?.reference_no],
+        ["Member", selectedApp ? `${selectedApp.member_name} (${selectedApp.membership_no})` : ""],
+        ["Scheme", selectedApp?.scheme_name],
+        ["Sanctioned Amount", formatCurrency(Number(sanctionedAmount) || 0)],
+        ["Interest Rate", `${interestRate}% p.a.`],
+        ["Tenure", `${tenureMonths} months`],
+        ["Repayment Type", repaymentType.replace(/_/g, " ")],
+        ["Moratorium", `${parseInt(moratoriumPeriod) || 0} months`],
+        ["EMI", formatCurrency(calculatedEMI || 0)],
+        ["Total Installments", String(emiSchedule.length)],
+        ["Total Interest", formatCurrency(totalInterest || 0)],
+        ["Total Payment", formatCurrency(totalPayment || 0)],
+      ]
+      const detailRows = []
+      for (let i = 0; i < details.length; i += 2) {
+        detailRows.push(
+          `<tr>${details
+            .slice(i, i + 2)
+            .map(([label, value]) => `<th style="width:18%">${escapeHtml(label)}</th><td>${escapeHtml(value)}</td>`)
+            .join("")}</tr>`
+        )
+      }
+
+      const contentHtml = `
+        <table>${detailRows.join("")}</table>
+        <table>
+          <thead>
+            <tr>
+              <th class="tc">No.</th><th>Due Date</th>
+              <th class="tr">Principal</th><th class="tr">Interest</th>
+              <th class="tr">Total EMI</th><th class="tr">Balance</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${emiSchedule
+              .map(
+                (item) => `<tr>
+                  <td class="tc">${item.installment_no}</td>
+                  <td>${new Date(item.due_date).toLocaleDateString("en-IN")}</td>
+                  <td class="tr">${formatCurrency(item.principal)}</td>
+                  <td class="tr">${formatCurrency(item.interest)}</td>
+                  <td class="tr">${formatCurrency(item.total)}</td>
+                  <td class="tr">${formatCurrency(item.balance)}</td>
+                </tr>`
+              )
+              .join("")}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="2">Total</td>
+              <td class="tr">${formatCurrency(sum("principal"))}</td>
+              <td class="tr">${formatCurrency(sum("interest"))}</td>
+              <td class="tr">${formatCurrency(sum("total"))}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>`
+
+      const generatedOn = identity?.businessDate
+        ? new Date(identity.businessDate).toLocaleDateString("en-IN")
+        : new Date().toLocaleDateString("en-IN")
+      await downloadPdf(
+        `Repayment Schedule ${selectedApp?.reference_no ?? ""}`.trim(),
+        `Generated on ${generatedOn}`,
+        branchInfo,
+        contentHtml
+      )
+    } catch (error) {
+      console.error("Failed to download repayment schedule:", error)
+    } finally {
+      setDownloadingSchedule(false)
+    }
   }
 
   // Repayment type options
@@ -1037,6 +1126,18 @@ export default function LoanSanctionPage() {
               </Table>
             </div>
             <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={handleDownloadSchedule}
+                disabled={downloadingSchedule || emiSchedule.length === 0}
+              >
+                {downloadingSchedule ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-2 h-4 w-4" />
+                )}
+                Download PDF
+              </Button>
               <Button onClick={() => setShowScheduleDialog(false)}>Close</Button>
             </DialogFooter>
           </DialogContent>

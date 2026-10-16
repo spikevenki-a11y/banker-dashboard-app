@@ -1,15 +1,17 @@
 
-CREATE TABLE appraisal_master (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    appraisal_master_id BIGINT,
-    appraisal_name VARCHAR(100),
-    description VARCHAR(500),
-    effective_from DATE,
-    effective_to DATE,
-    status VARCHAR(20), -- ACTIVE, INACTIVE
-    created_by VARCHAR(100),
-    created_date TIMESTAMP
-);
+create table public.appraisal_master (
+  id uuid not null default gen_random_uuid (),
+  appraisal_master_id bigint null,
+  appraisal_name character varying(100) null,
+  description character varying(500) null,
+  effective_from date null,
+  effective_to date null,
+  status character varying(20) null,
+  created_by character varying(100) null,
+  created_date timestamp without time zone null,
+  appraiser_amount_receive_account_number character varying(20) null,
+  constraint appraisal_master_pkey primary key (id)
+) TABLESPACE pg_default;
 
 CREATE TABLE appraisal_slab (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
