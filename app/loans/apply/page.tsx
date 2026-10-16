@@ -29,6 +29,7 @@ import {
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { MemberSummaryCard } from "@/components/member-summary-card"
 import { MemberSearchDialog } from "@/components/member-search-dialog"
+import { LoanSchemeDetailsCard, type LoanSchemeDetails } from "@/components/loan-scheme-details-card"
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -245,6 +246,7 @@ export default function LoanApplicationPage() {
 
   // Schemes
   const [schemes, setSchemes] = useState<LoanScheme[]>([])
+  const [selectedLoanType, setSelectedLoanType] = useState("")
   const [selectedSchemeId, setSelectedSchemeId] = useState("")
   const [loadingSchemes, setLoadingSchemes] = useState(true)
 
@@ -281,6 +283,7 @@ export default function LoanApplicationPage() {
   // Loan securities
   const [securities, setSecurities] = useState<any[]>([])
   const [selectedSecurityId, setSelectedSecurityId] = useState("")
+  const [securityTypeError, setSecurityTypeError] = useState("")
   const [securityForm, setSecurityForm] = useState<SecurityForm>(emptySecurityForm)
   const [memberDepositAccounts, setMemberDepositAccounts] = useState<MemberDepositAccount[]>([])
   const [loadingDepositAccounts, setLoadingDepositAccounts] = useState(false)
@@ -332,10 +335,15 @@ export default function LoanApplicationPage() {
   const isNegative = (value: string) => parseFloat(value) < 0
   const hasNegativeGoldValue = (item: GoldItem) =>
     isNegative(item.number_of_pieces) || isNegative(item.gross_weight_grams) || isNegative(item.stone_weight_grams)
+  // Disallowed weight must be strictly less than gross weight
+  const DISALLOWED_WEIGHT_MSG = "Disallowed weight must be less than gross weight."
+  const isDisallowedWeightInvalid = (item: GoldItem) =>
+    item.gross_weight_grams !== "" &&
+    (parseFloat(item.stone_weight_grams) || 0) >= (parseFloat(item.gross_weight_grams) || 0)
 
   const handleAddGoldItem = () => {
     if (!goldItemDraft.ornament_name.trim() || !goldItemDraft.gross_weight_grams) return
-    if (hasNegativeGoldValue(goldItemDraft)) return
+    if (hasNegativeGoldValue(goldItemDraft) || isDisallowedWeightInvalid(goldItemDraft)) return
     const gross = parseFloat(goldItemDraft.gross_weight_grams) || 0
     const stone = parseFloat(goldItemDraft.stone_weight_grams) || 0
     const net = Math.max(0, gross - stone)
@@ -448,6 +456,19 @@ export default function LoanApplicationPage() {
   }, [])
 
   const selectedScheme = schemes.find((s) => String(s.scheme_id) === selectedSchemeId)
+
+  // Loan types come from the loan_type of the schemes loaded from loan_schemes
+  const loanTypes = Array.from(new Set(schemes.map((s) => s.loan_type).filter(Boolean))).sort()
+  const filteredSchemes = schemes.filter((s) => s.loan_type === selectedLoanType)
+
+  // Changing the loan type clears the scheme and everything loaded for it
+  const handleLoanTypeChange = (type: string) => {
+    setSelectedLoanType(type)
+    setSelectedSchemeId(""); setInterestRate("")
+    setPurposes([]); setSelectedPurposeId("")
+    setSecurities([]); setSelectedSecurityId(""); setSecurityTypeError(""); setSecurityForm(emptySecurityForm)
+    setGoldItems([]); setGoldItemDraft(emptyGoldItem); setSuretyError("")
+  }
 
   useEffect(() => {
     if (selectedScheme) setInterestRate(String(selectedScheme.interest_rate))
@@ -604,8 +625,16 @@ export default function LoanApplicationPage() {
     try {
       const res = await fetch(`/api/loans/aplication_settings/security?schemeId=${schemeId}`)
       const data = await res.json()
-      setSecurities(data.security || [])
+      const list = data.security || []
+      setSecurities(list)
+      // Only one security type for this scheme → select it automatically
+      if (list.length === 1) handleSecurityTypeChange(String(list[0].security_id))
     } catch { /* silent */ }
+  }
+
+  const handleSecurityTypeChange = (v: string) => {
+    setSelectedSecurityId(v); setSecurityForm(emptySecurityForm); setGoldItems([]); setGoldItemDraft(emptyGoldItem); setSuretyError("")
+    setSecurityTypeError("")
   }
 
   // ── Member handlers ────────────────────────────────────────────────────────
@@ -694,7 +723,17 @@ export default function LoanApplicationPage() {
 
   const handleSubmit = async () => {
     if (!memberInfo || !selectedSchemeId || !applicationDate || !loanAmount || !tenureMonths) return
+    // Several security types offered for the scheme → user must pick one (a single type is auto-selected)
+    if (securities.length > 0 && !selectedSecurityId) {
+      setSecurityTypeError("Please select a security type.")
+      alert("Please select a security type.")
+      return
+    }
     if (Number(selectedSecurityId) === 6 && goldItems.some(hasNegativeGoldValue)) return
+    if (Number(selectedSecurityId) === 6 && goldItems.some(isDisallowedWeightInvalid)) {
+      alert(DISALLOWED_WEIGHT_MSG)
+      return
+    }
     if (isGoldSecurity && !selectedAppraiser) {
       setAppraiserPopup(availableAppraisers.length === 0 ? "create" : "select")
       return
@@ -880,8 +919,8 @@ export default function LoanApplicationPage() {
 
   const handleReset = () => {
     setMembershipNo(""); setMemberInfo(null); setMemberError("")
-    setSelectedSchemeId(""); setLoanAmount(""); setTenureMonths(""); setInterestRate("")
-    setSelectedPurposeId(""); setSelectedSecurityId(""); setSecurityForm(emptySecurityForm)
+    setSelectedLoanType(""); setSelectedSchemeId(""); setLoanAmount(""); setTenureMonths(""); setInterestRate("")
+    setSelectedPurposeId(""); setSelectedSecurityId(""); setSecurityTypeError(""); setSecurityForm(emptySecurityForm)
     setGoldItems([]); setGoldItemDraft(emptyGoldItem); setSuretyError("")
     setRemarks("")
     setEmiAmount(null); setTotalInterest(null); setTotalPayment(null); setEmiSchedule([])
@@ -969,14 +1008,23 @@ export default function LoanApplicationPage() {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label>Loan Type *</Label>
+                        <Select value={selectedLoanType} disabled={loadingSchemes || !loanTypes.length} onValueChange={handleLoanTypeChange}>
+                          <SelectTrigger><SelectValue placeholder={loadingSchemes ? "Loading..." : loanTypes.length ? "Select loan type" : "No loan types available"} /></SelectTrigger>
+                          <SelectContent>
+                            {loanTypes.map((t) => <SelectItem key={t} value={t}>{t.replace(/_/g, " ")}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <div className="space-y-2">
                         <Label>Loan Scheme *</Label>
-                        <Select value={selectedSchemeId} disabled={loadingSchemes}
-                          onValueChange={(v) => { setSelectedSchemeId(v); loadpurpose(v); loadSecurity(v); setSelectedSecurityId(""); setSecurityForm(emptySecurityForm) }}>
-                          <SelectTrigger><SelectValue placeholder={loadingSchemes ? "Loading..." : "Select a loan scheme"} /></SelectTrigger>
+                        <Select value={selectedSchemeId} disabled={loadingSchemes || !selectedLoanType}
+                          onValueChange={(v) => { setSelectedSchemeId(v); loadpurpose(v); loadSecurity(v); setSelectedSecurityId(""); setSecurityTypeError(""); setSecurityForm(emptySecurityForm) }}>
+                          <SelectTrigger><SelectValue placeholder={loadingSchemes ? "Loading..." : !selectedLoanType ? "Select loan type first" : "Select a loan scheme"} /></SelectTrigger>
                           <SelectContent>
-                            {schemes.map((s) => <SelectItem key={s.scheme_id} value={String(s.scheme_id)}>{s.scheme_name} ({s.interest_rate}%)</SelectItem>)}
+                            {filteredSchemes.map((s) => <SelectItem key={s.scheme_id} value={String(s.scheme_id)}>{s.scheme_name} ({s.interest_rate}%)</SelectItem>)}
                           </SelectContent>
                         </Select>
                       </div>
@@ -1012,7 +1060,7 @@ export default function LoanApplicationPage() {
                       </div>
                       <div className="space-y-2">
                         <Label>Interest Rate (% p.a.)</Label>
-                        <Input type="number" step="0.01" placeholder="Rate" value={interestRate} onChange={(e) => setInterestRate(e.target.value)} />
+                        <Input type="number" step="0.01" placeholder="Rate" readOnly value={interestRate} onChange={(e) => setInterestRate(e.target.value)} />
                       </div>
                     </div>
 
@@ -1044,13 +1092,14 @@ export default function LoanApplicationPage() {
                     {/* Security type + primary flag */}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label>Security Type</Label>
-                        <Select value={selectedSecurityId} onValueChange={(v) => { setSelectedSecurityId(v); setSecurityForm(emptySecurityForm); setGoldItems([]); setGoldItemDraft(emptyGoldItem); setSuretyError("") }} disabled={!securities.length}>
-                          <SelectTrigger><SelectValue placeholder={securities.length ? "Select security type" : "No securities for this scheme"} /></SelectTrigger>
+                        <Label>Security Type{securities.length > 0 && " *"}</Label>
+                        <Select value={selectedSecurityId} onValueChange={handleSecurityTypeChange} disabled={!securities.length}>
+                          <SelectTrigger className={securityTypeError ? "border-red-500" : ""}><SelectValue placeholder={securities.length ? "Select security type" : "No securities for this scheme"} /></SelectTrigger>
                           <SelectContent>
                             {securities.map((s: any) => <SelectItem key={s.security_id} value={String(s.security_id)}>{s.security_name}</SelectItem>)}
                           </SelectContent>
                         </Select>
+                        {securityTypeError && <p className="text-xs text-red-500">{securityTypeError}</p>}
                       </div>
                       {selectedSecurityId && (
                         <div className="space-y-2">
@@ -1081,7 +1130,7 @@ export default function LoanApplicationPage() {
                                 onChange={(e) => sfDraft("ornament_name", e.target.value)}
                                 onKeyDown={(e) => e.key === "Enter" && handleAddGoldItem()} />
                             </div>
-                            <div className="space-y-1">
+                            <div className="hidden  space-y-1">
                               <Label className="text-xs">Gold Form</Label>
                               <Select value={goldItemDraft.gold_form} onValueChange={(v) => sfDraft("gold_form", v)}>
                                 <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
@@ -1102,7 +1151,7 @@ export default function LoanApplicationPage() {
                           </div>
                           <div className="grid grid-cols-4 gap-2">
                             <div className="space-y-1">
-                              <Label className="text-xs">Pieces</Label>
+                              <Label className="text-xs">Quantity</Label>
                               <Input className="h-8 text-xs" type="number" min="0" step="1" placeholder="1"
                                 value={goldItemDraft.number_of_pieces}
                                 onKeyDown={blockNonNumericKeys(true)}
@@ -1117,7 +1166,8 @@ export default function LoanApplicationPage() {
                             </div>
                             <div className="space-y-1">
                               <Label className="text-xs">Disallowed Weight (g)</Label>
-                              <Input className="h-8 text-xs" type="number" min="0" step="0.001" placeholder="0.000"
+                              <Input className={`h-8 text-xs ${isDisallowedWeightInvalid(goldItemDraft) ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                                type="number" min="0" step="0.001" placeholder="0.000"
                                 value={goldItemDraft.stone_weight_grams}
                                 onKeyDown={blockNonNumericKeys(false)}
                                 onChange={(e) => sfDraft("stone_weight_grams", toNonNegative(e.target.value))} />
@@ -1132,9 +1182,12 @@ export default function LoanApplicationPage() {
                                 })()} />
                             </div>
                           </div>
+                          {isDisallowedWeightInvalid(goldItemDraft) && (
+                            <p className="text-xs text-red-500">{DISALLOWED_WEIGHT_MSG}</p>
+                          )}
                           <div className="flex justify-end">
                             <Button size="sm"
-                              disabled={!goldItemDraft.ornament_name.trim() || !goldItemDraft.gross_weight_grams || hasNegativeGoldValue(goldItemDraft)}
+                              disabled={!goldItemDraft.ornament_name.trim() || !goldItemDraft.gross_weight_grams || hasNegativeGoldValue(goldItemDraft) || isDisallowedWeightInvalid(goldItemDraft)}
                               onClick={handleAddGoldItem}
                               className="h-7 text-xs bg-yellow-600 hover:bg-yellow-700 text-white">
                               + Add Item
@@ -1947,8 +2000,11 @@ export default function LoanApplicationPage() {
                 {/* Member Summary */}
                 <MemberSummaryCard memberInfo={memberInfo} />
 
+                {/* Scheme Details */}
+                <LoanSchemeDetailsCard scheme={selectedScheme as LoanSchemeDetails | undefined} />
+
                 {/* EMI Calculator */}
-                <Card>
+                {/* <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="flex items-center gap-2 text-lg">
                       <Calculator className="h-5 w-5 text-blue-600" />EMI Calculator
@@ -1985,10 +2041,10 @@ export default function LoanApplicationPage() {
                       </div>
                     )}
                   </CardContent>
-                </Card>
+                </Card> */}
 
-                {/* Application Summary */}
-                <Card>
+                {/* Application Summary for future use*/}
+                {/* <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="flex items-center gap-2 text-lg">
                       <FileText className="h-5 w-5 text-blue-600" />Application Summary
@@ -2009,7 +2065,7 @@ export default function LoanApplicationPage() {
                       </div>
                     ))}
                   </CardContent>
-                </Card>
+                </Card> */}
 
                 {/* EMI Schedule Preview */}
                 {emiSchedule.length > 0 && (
