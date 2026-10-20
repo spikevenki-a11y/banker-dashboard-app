@@ -1269,7 +1269,8 @@ export default function FixedAssetsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Cancel Purchase?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the pending purchase record and all its line items. This action cannot be undone.
+              This will permanently delete the pending purchase record and all its line items.
+               {/* This action cannot be undone. */}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

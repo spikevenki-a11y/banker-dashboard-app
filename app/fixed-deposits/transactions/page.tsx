@@ -19,12 +19,13 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   ArrowLeft, Loader2, CheckCircle2, Banknote, History, IndianRupee, Calendar,
   CreditCard, Landmark, PiggyBank, AlertCircle, Search, RefreshCw,
+  Users, X, ChevronLeft, ChevronRight,
 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
@@ -111,6 +112,22 @@ type MemberDepositAccount = {
   maturityAmount: number | null
   depositAmount: number | null
   periodMonths: number | null
+}
+
+type SearchResult = {
+  account_number: string
+  deposit_type: string
+  deposit_type_label: string
+  balance: number
+  account_status: string
+  opening_date: string
+  scheme_name: string
+  membership_no: string
+  full_name: string
+  father_name: string
+  spouse_name: string
+  mobile_no: string
+  aadhaar_no: string
 }
 
 function formatCurrency(val: number | string | null | undefined) {
@@ -1257,6 +1274,259 @@ function DepositAccountPanel({ accountNumber }: { accountNumber: string | null }
 }
 
 /**
+ * Advanced deposit account search popup (same criteria and API as the Deposit Interest Payment screen).
+ * Results are scoped to RD or non-RD accounts to match the active tab.
+ */
+function DepositAccountSearchDialog({
+  open,
+  onOpenChange,
+  recurringOnly,
+  onSelect,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  recurringOnly: boolean
+  onSelect: (result: SearchResult) => void
+}) {
+  const idPrefix = `tx-search-${recurringOnly ? "rd" : "dep"}`
+  const [searchAccountNumber, setSearchAccountNumber] = useState("")
+  const [searchMemberNo, setSearchMemberNo] = useState("")
+  const [searchMemberName, setSearchMemberName] = useState("")
+  const [searchFatherName, setSearchFatherName] = useState("")
+  const [searchSpouseName, setSearchSpouseName] = useState("")
+  const [searchLedgerFolio, setSearchLedgerFolio] = useState("")
+  const [searchAadhaar, setSearchAadhaar] = useState("")
+  const [searchContact, setSearchContact] = useState("")
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [isPopupSearching, setIsPopupSearching] = useState(false)
+  const [searchResultsPage, setSearchResultsPage] = useState(1)
+  const searchResultsPageSize = 10
+
+  const hasCriteria = !!(
+    searchAccountNumber.trim() || searchMemberNo.trim() || searchMemberName.trim() || searchFatherName.trim() ||
+    searchSpouseName.trim() || searchLedgerFolio.trim() || searchAadhaar.trim() || searchContact.trim()
+  )
+
+  const resetSearch = () => {
+    setSearchAccountNumber("")
+    setSearchMemberNo("")
+    setSearchMemberName("")
+    setSearchFatherName("")
+    setSearchSpouseName("")
+    setSearchLedgerFolio("")
+    setSearchAadhaar("")
+    setSearchContact("")
+    setSearchResults([])
+    setSearchResultsPage(1)
+  }
+
+  const handlePopupSearch = async () => {
+    if (!hasCriteria) return
+
+    setIsPopupSearching(true)
+    setSearchResults([])
+    setSearchResultsPage(1)
+
+    try {
+      const res = await fetch("/api/deposits/account-search", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accountNumber: searchAccountNumber.trim(),
+          memberNumber: searchMemberNo.trim(),
+          memberName: searchMemberName.trim(),
+          fatherName: searchFatherName.trim(),
+          spouseName: searchSpouseName.trim(),
+          ledgerFolioNumber: searchLedgerFolio.trim(),
+          aadhaarNumber: searchAadhaar.trim(),
+          contactNo: searchContact.trim(),
+        }),
+      })
+
+      const data = await res.json()
+      if (data.success) {
+        setSearchResults(
+          (data.results || []).filter((r: SearchResult) =>
+            recurringOnly ? isRecurringType(r.deposit_type) : !isRecurringType(r.deposit_type)
+          )
+        )
+      }
+    } catch {
+      // silent
+    } finally {
+      setIsPopupSearching(false)
+    }
+  }
+
+  const totalSearchResultPages = Math.max(1, Math.ceil(searchResults.length / searchResultsPageSize))
+  const paginatedSearchResults = searchResults.slice(
+    (searchResultsPage - 1) * searchResultsPageSize,
+    searchResultsPage * searchResultsPageSize
+  )
+
+  const handleSelectSearchResult = (result: SearchResult) => {
+    onOpenChange(false)
+    resetSearch()
+    onSelect(result)
+  }
+
+  const fields: { key: string; label: string; placeholder: string; value: string; set: (v: string) => void }[] = [
+    { key: "account-no", label: "Account Number", placeholder: "Enter account number", value: searchAccountNumber, set: setSearchAccountNumber },
+    { key: "member-no", label: "Member Number", placeholder: "Enter member number", value: searchMemberNo, set: setSearchMemberNo },
+    { key: "member-name", label: "Member Name", placeholder: "Enter member name", value: searchMemberName, set: setSearchMemberName },
+    { key: "father-name", label: "Father's Name", placeholder: "Enter father's name", value: searchFatherName, set: setSearchFatherName },
+    { key: "spouse-name", label: "Spouse's Name", placeholder: "Enter spouse's name", value: searchSpouseName, set: setSearchSpouseName },
+    { key: "ledger-folio", label: "Ledger Folio Number", placeholder: "Enter ledger folio number", value: searchLedgerFolio, set: setSearchLedgerFolio },
+    { key: "aadhaar", label: "Aadhaar Number", placeholder: "Enter Aadhaar number", value: searchAadhaar, set: setSearchAadhaar },
+    { key: "contact", label: "Contact No", placeholder: "Enter contact number", value: searchContact, set: setSearchContact },
+  ]
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5 text-teal-600" />
+            {recurringOnly ? "Search Recurring Deposit Account" : "Search Deposit Account"}
+          </DialogTitle>
+          <DialogDescription>
+            Search for a deposit account using one or more criteria below
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid grid-cols-2 gap-4 py-2">
+          {fields.map((f, i) => (
+            <div key={f.key} className={`space-y-1.5 ${i === fields.length - 1 ? "col-span-2 sm:col-span-1" : ""}`}>
+              <Label htmlFor={`${idPrefix}-${f.key}`} className="text-xs">{f.label}</Label>
+              <Input
+                id={`${idPrefix}-${f.key}`}
+                placeholder={f.placeholder}
+                value={f.value}
+                onChange={(e) => f.set(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handlePopupSearch()}
+              />
+            </div>
+          ))}
+        </div>
+
+        <div className="flex items-center justify-between">
+          <Button variant="outline" size="sm" onClick={resetSearch} className="gap-1.5 bg-transparent text-xs">
+            <X className="h-3 w-3" />
+            Clear
+          </Button>
+          <Button
+            size="sm"
+            onClick={handlePopupSearch}
+            disabled={isPopupSearching || !hasCriteria}
+            className="gap-2 bg-teal-600 hover:bg-teal-700 text-white"
+          >
+            {isPopupSearching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+            Search
+          </Button>
+        </div>
+
+        <div className="flex-1 overflow-auto border rounded-lg min-h-0">
+          {isPopupSearching ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-sm text-muted-foreground">Searching deposit accounts...</span>
+            </div>
+          ) : searchResults.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">Account No</TableHead>
+                  <TableHead className="text-xs">Member Name</TableHead>
+                  <TableHead className="text-xs">Member No</TableHead>
+                  <TableHead className="text-xs">Type</TableHead>
+                  <TableHead className="text-xs">Scheme</TableHead>
+                  <TableHead className="text-xs">Balance</TableHead>
+                  <TableHead className="text-xs">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedSearchResults.map((result) => (
+                  <TableRow
+                    key={result.account_number}
+                    className="cursor-pointer hover:bg-teal-50/50 dark:hover:bg-teal-950/20"
+                    onClick={() => handleSelectSearchResult(result)}
+                  >
+                    <TableCell className="font-mono text-xs font-medium">{result.account_number}</TableCell>
+                    <TableCell className="text-xs font-medium">{result.full_name}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{result.membership_no}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{result.deposit_type_label}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{result.scheme_name}</TableCell>
+                    <TableCell className="text-xs font-medium">{formatCurrency(result.balance)}</TableCell>
+                    <TableCell>
+                      <Badge className={`text-[10px] ${result.account_status === "Active" ? "bg-teal-100 text-teal-700" : "bg-amber-100 text-amber-700"}`}>
+                        {result.account_status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <CreditCard className="h-8 w-8 text-muted-foreground/30" />
+              <p className="mt-2 text-sm text-muted-foreground">
+                {hasCriteria
+                  ? "No accounts found. Try different search criteria."
+                  : "Enter search criteria and click Search to find accounts."}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {searchResults.length > 0 && (
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">
+              Showing {(searchResultsPage - 1) * searchResultsPageSize + 1}
+              {"–"}
+              {Math.min(searchResultsPage * searchResultsPageSize, searchResults.length)} of {searchResults.length}
+            </p>
+            {totalSearchResultPages > 1 && (
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-7 w-7 bg-transparent"
+                  onClick={() => setSearchResultsPage((p) => Math.max(1, p - 1))}
+                  disabled={searchResultsPage === 1}
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </Button>
+                {Array.from({ length: totalSearchResultPages }, (_, i) => i + 1).map((pn) => (
+                  <Button
+                    key={pn}
+                    variant={pn === searchResultsPage ? "default" : "outline"}
+                    size="icon"
+                    className={`h-7 w-7 text-xs ${pn === searchResultsPage ? "bg-teal-600 hover:bg-teal-700 text-white" : "bg-transparent"}`}
+                    onClick={() => setSearchResultsPage(pn)}
+                  >
+                    {pn}
+                  </Button>
+                ))}
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-7 w-7 bg-transparent"
+                  onClick={() => setSearchResultsPage((p) => Math.min(totalSearchResultPages, p + 1))}
+                  disabled={searchResultsPage === totalSearchResultPages}
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/**
  * Membership No. lookup -> account resolution/selection -> transaction panel.
  * `recurringOnly` scopes the account list to RD accounts (RD Installments tab)
  * or non-RD deposit accounts (Deposit Transactions tab).
@@ -1275,6 +1545,7 @@ function MembershipAccountFlow({
   const [accounts, setAccounts] = useState<MemberDepositAccount[]>([])
   const [selectedAccount, setSelectedAccount] = useState(initialAccountNumber || "")
   const [error, setError] = useState("")
+  const [searchDialogOpen, setSearchDialogOpen] = useState(false)
 
   useEffect(() => {
     if (initialAccountNumber) {
@@ -1285,8 +1556,8 @@ function MembershipAccountFlow({
     }
   }, [initialAccountNumber, initialMembershipNo])
 
-  const handleLookup = async () => {
-    const no = membershipNo.trim()
+  const handleLookup = async (membershipOverride?: string, preselectAccount?: string) => {
+    const no = (membershipOverride ?? membershipNo).trim()
     if (!no) {
       setError("Please enter a membership number.")
       return
@@ -1314,6 +1585,8 @@ function MembershipAccountFlow({
             ? "No active Recurring Deposit accounts found for this membership number."
             : "No active deposit accounts found for this membership number."
         )
+      } else if (preselectAccount && filtered.some((d) => d.accountNumber === preselectAccount)) {
+        setSelectedAccount(preselectAccount)
       } else if (filtered.length === 1) {
         setSelectedAccount(filtered[0].accountNumber)
       }
@@ -1358,9 +1631,13 @@ function MembershipAccountFlow({
                   onKeyDown={(e) => e.key === "Enter" && handleLookup()}
                   className="flex-1"
                 />
-                <Button onClick={handleLookup} disabled={isSearching || !membershipNo.trim()} className="gap-2">
+                <Button onClick={() => handleLookup()} disabled={isSearching || !membershipNo.trim()} className="gap-2">
                   {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                   Lookup
+                </Button>
+                <Button variant="outline" onClick={() => setSearchDialogOpen(true)} className="gap-2 bg-transparent">
+                  <Users className="h-4 w-4" />
+                  Search
                 </Button>
               </div>
               {error && <p className="text-sm text-red-500">{error}</p>}
@@ -1400,6 +1677,16 @@ function MembershipAccountFlow({
       </Card>
 
       <DepositAccountPanel accountNumber={selectedAccount || null} />
+
+      <DepositAccountSearchDialog
+        open={searchDialogOpen}
+        onOpenChange={setSearchDialogOpen}
+        recurringOnly={recurringOnly}
+        onSelect={(result) => {
+          setMembershipNo(result.membership_no)
+          handleLookup(result.membership_no, result.account_number)
+        }}
+      />
     </div>
   )
 }
