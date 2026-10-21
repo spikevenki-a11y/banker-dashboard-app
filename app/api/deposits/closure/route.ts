@@ -151,6 +151,8 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const { accountNumber, payoutAmount, penaltyAmount, narration, voucherType, creditAccounts } = body
+    // An existing GL batch can only be reused for TRANSFER vouchers
+    const selectedBatch = voucherType === "TRANSFER" ? Number(body.selectedBatch) || 0 : 0
 
     if (!accountNumber || payoutAmount == null) {
       return NextResponse.json({ error: "Account number and payout amount are required" }, { status: 400 })
@@ -201,32 +203,52 @@ export async function POST(request: NextRequest) {
     const interest_expense_gl_account = account.interest_expense_gl_account
     const penalty = parseFloat(penaltyAmount) || 0
 
-    // Get batch ID
-    const { rows: [batch] } = await client.query(`
-      UPDATE gl_batch_sequences
-      SET last_batch_id = last_batch_id + 1
-      WHERE branch_id = $1
-      RETURNING last_batch_id
-    `, [branchId])
-    const batchId = batch.last_batch_id
+    // Get or create batch ID
+    let batchId = 0
+    if (selectedBatch !== 0) {
+      batchId = selectedBatch
+    } else {
+      const { rows: [batch] } = await client.query(`
+        UPDATE gl_batch_sequences
+        SET last_batch_id = last_batch_id + 1
+        WHERE branch_id = $1
+        RETURNING last_batch_id
+      `, [branchId])
+      batchId = batch.last_batch_id
+    }
 
     // Get voucher number
-    const { rows: [voucher] } = await client.query(`
-      INSERT INTO voucher_sequences (branch_id, business_date, last_voucher_no)
-      VALUES ($1, $2, 1)
-      ON CONFLICT (branch_id, business_date)
-      DO UPDATE SET last_voucher_no = voucher_sequences.last_voucher_no + 1
-      RETURNING last_voucher_no
-    `, [branchId, businessDate])
-    const voucherNo = voucher.last_voucher_no
+    let voucherNo = 0
+    if (selectedBatch === 0) {
+      const { rows: [voucher] } = await client.query(`
+        INSERT INTO voucher_sequences (branch_id, business_date, last_voucher_no)
+        VALUES ($1, $2, 1)
+        ON CONFLICT (branch_id, business_date)
+        DO UPDATE SET last_voucher_no = voucher_sequences.last_voucher_no + 1
+        RETURNING last_voucher_no
+      `, [branchId, businessDate])
+      voucherNo = voucher.last_voucher_no
+    } else {
+      const { rows: [lvo] } = await client.query(`
+        SELECT voucher_id FROM gl_batches
+        WHERE branch_id = $1 AND batch_id = $2
+      `, [branchId, batchId])
+      if (!lvo) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: `GL batch ${batchId} not found` }, { status: 400 })
+      }
+      voucherNo = lvo.voucher_id || 0
+    }
 
     // Create GL batch header
-    await client.query(`
-      INSERT INTO gl_batches (
-        business_date, branch_id, batch_id, voucher_id,
-        voucher_type, maker_id, status
-      ) VALUES ($1,$2,$3,$4,$5,$6,'PENDING')
-    `, [businessDate, branchId, batchId, voucherNo, voucherType, session.userId])
+    if (selectedBatch === 0) {
+      await client.query(`
+        INSERT INTO gl_batches (
+          business_date, branch_id, batch_id, voucher_id,
+          voucher_type, maker_id, status
+        ) VALUES ($1,$2,$3,$4,$5,$6,'PENDING')
+      `, [businessDate, branchId, batchId, voucherNo, voucherType, session.userId])
+    }
 
     const closureNarration = narration || `Deposit Closure - A/c ${accountNumber}`
 
