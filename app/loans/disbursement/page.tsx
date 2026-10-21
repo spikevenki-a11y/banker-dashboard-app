@@ -243,6 +243,20 @@ export default function LoanDisbursementPage() {
     }
   }
 
+  // Inline validation for the Disbursement Amount field
+  const getAmountError = (): string => {
+    if (!selectedLoan || disbursementAmount.trim() === "") return ""
+    const amount = parseFloat(disbursementAmount)
+    if (isNaN(amount)) return "Please enter a valid disbursement amount"
+    if (amount < 0) return "Disbursement amount cannot be negative"
+    if (amount === 0) return "Disbursement amount must be greater than zero"
+    if (amount > selectedLoan.sanctioned_amount) {
+      return `Disbursement amount cannot exceed sanctioned amount (${formatCurrency(selectedLoan.sanctioned_amount)})`
+    }
+    return ""
+  }
+  const amountError = getAmountError()
+
   // Validate form
   const validateForm = (): boolean => {
     setFormError("")
@@ -308,8 +322,8 @@ export default function LoanDisbursementPage() {
         `Loan disbursed successfully!\n\n` +
         `Loan Account: ${data.loan_account_no}\n` +
         `Amount: ${formatCurrency(parseFloat(disbursementAmount))}\n` +
-        `Monthly EMI: ${formatCurrency(data.emi_amount)}\n` +
-        `Total EMIs: ${data.total_installments}\n` +
+        // `Monthly EMI: ${formatCurrency(data.emi_amount)}\n` +
+        // `Total EMIs: ${data.total_installments}\n` +
         `Voucher No: ${data.voucher_no}`
       )
       setSuccessOpen(true)
@@ -582,14 +596,21 @@ export default function LoanDisbursementPage() {
                               id="disbursement-amount"
                               type="number"
                               placeholder="Enter amount"
+                              min="0"
+                              max={selectedLoan.sanctioned_amount}
                               value={disbursementAmount}
                               onChange={(e) => setDisbursementAmount(e.target.value)}
-                              className="pl-9"
+                              aria-invalid={!!amountError}
+                              className={`pl-9 ${amountError ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                             />
                           </div>
-                          <p className="text-xs text-muted-foreground">
-                            Max: {formatCurrency(selectedLoan.sanctioned_amount)}
-                          </p>
+                          {amountError ? (
+                            <p className="text-xs text-red-500">{amountError}</p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              Max: {formatCurrency(selectedLoan.sanctioned_amount)}
+                            </p>
+                          )}
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="payment-mode">Payment Mode *</Label>
@@ -772,7 +793,7 @@ export default function LoanDisbursementPage() {
                         setShowConfirmDialog(true)
                       }
                     }}
-                    disabled={!disbursementAmount || parseFloat(disbursementAmount) <= 0}
+                    disabled={!disbursementAmount || parseFloat(disbursementAmount) <= 0 || !!amountError}
                   >
                     <Wallet className="mr-2 h-4 w-4" />
                     Disburse Loan
@@ -887,7 +908,7 @@ export default function LoanDisbursementPage() {
               <Button 
                 className="bg-teal-600 hover:bg-teal-700"
                 onClick={processDisbursement}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !!amountError}
               >
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Confirm Disbursement

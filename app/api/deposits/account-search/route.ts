@@ -11,7 +11,7 @@ export async function POST(req: Request) {
   try {
     const branchId = session.branch
     const body = await req.json()
-    const { accountNumber, memberNumber, memberName, fatherName, spouseName, ledgerFolioNumber, aadhaarNumber, contactNo } = body
+    const { accountNumber, memberNumber, memberName, fatherName, spouseName, ledgerFolioNumber, aadhaarNumber, contactNo, zeroBalanceOnly } = body
 
     // Build dynamic query conditions
     const conditions: string[] = ["da.branch_id = $1"]
@@ -91,6 +91,7 @@ export async function POST(req: Request) {
       JOIN customers c ON m.customer_code = c.customer_code
       LEFT JOIN customer_kycdetails ck ON ck.customer_code = m.customer_code
       WHERE ${conditions.join(" AND ")}
+        ${zeroBalanceOnly === true ? "AND da.clearbalance = 0" : ""}
       ORDER BY da.accountnumber ASC
       LIMIT 50
     `

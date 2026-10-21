@@ -149,6 +149,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
   const [emiSchedule, setEmiSchedule] = useState<EMIScheduleItem[]>([])
   const [showScheduleDialog, setShowScheduleDialog] = useState(false)
   const [downloadingSchedule, setDownloadingSchedule] = useState(false)
+  const [scheduleDownloadError, setScheduleDownloadError] = useState("")
   const branchInfo = useBranchInfo()
 
   // Dialog states
@@ -193,6 +194,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
   async function handleDownloadSchedule() {
     if (emiSchedule.length === 0) return
     setDownloadingSchedule(true)
+    setScheduleDownloadError("")
     try {
       const sum = (key: "principal" | "interest" | "total") => emiSchedule.reduce((acc, item) => acc + item[key], 0)
       const details = [
@@ -265,6 +267,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
       )
     } catch (error) {
       console.error("Failed to download repayment schedule:", error)
+      setScheduleDownloadError("Failed to generate the PDF. Please try again.")
     } finally {
       setDownloadingSchedule(false)
     }
@@ -417,6 +420,20 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
     }
   }, [sanctionedAmount, interestRate, tenureMonths, moratoriumPeriod, repaymentType, calculateEMI])
 
+  // Inline validation for the Sanctioned Amount field
+  const getAmountError = (): string => {
+    if (!selectedApp || sanctionedAmount.trim() === "") return ""
+    const amount = parseFloat(sanctionedAmount)
+    if (isNaN(amount)) return "Please enter a valid sanctioned amount"
+    if (amount < 0) return "Sanctioned amount cannot be negative"
+    if (amount === 0) return "Sanctioned amount must be greater than zero"
+    if (amount > Number(selectedApp.applied_loan_amount)) {
+      return `Sanctioned amount cannot exceed applied amount (${formatCurrency(selectedApp.applied_loan_amount)})`
+    }
+    return ""
+  }
+  const amountError = getAmountError()
+
   // Validate form
   const validateForm = (): boolean => {
     setFormError("")
@@ -427,6 +444,11 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
 
     if (isNaN(amount) || amount <= 0) {
       setFormError("Please enter a valid sanctioned amount")
+      return false
+    }
+
+    if (amountError) {
+      setFormError(amountError)
       return false
     }
 
@@ -695,11 +717,21 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                     id="sanctioned-amount"
                     type="number"
                     placeholder="Enter amount"
+                    min="0"
+                    max={selectedApp.applied_loan_amount}
                     value={sanctionedAmount}
                     onChange={(e) => setSanctionedAmount(e.target.value)}
-                    className="pl-9"
+                    aria-invalid={!!amountError}
+                    className={`pl-9 ${amountError ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                   />
                 </div>
+                {amountError ? (
+                  <p className="text-xs text-red-500">{amountError}</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Max: {formatCurrency(selectedApp.applied_loan_amount)}
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="interest-rate">Interest Rate (% p.a.)</Label>
@@ -865,7 +897,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                   setShowConfirmDialog(true)
                 }
               }}
-              disabled={!calculatedEMI}
+              disabled={!calculatedEMI || !!amountError}
             >
               <CheckCircle className="mr-2 h-4 w-4" />
               Approve & Sanction
@@ -909,6 +941,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
               </TableBody>
             </Table>
           </div>
+          {scheduleDownloadError && <p className="text-sm text-red-500">{scheduleDownloadError}</p>}
           <DialogFooter>
             <Button
               variant="outline"
@@ -986,7 +1019,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
             <Button
               className="bg-teal-600 hover:bg-teal-700"
               onClick={processApproval}
-              disabled={isSubmitting}
+              disabled={isSubmitting || !!amountError}
             >
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Confirm Sanction

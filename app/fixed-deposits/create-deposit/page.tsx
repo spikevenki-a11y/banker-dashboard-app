@@ -631,11 +631,17 @@ const getLogindate = async () => {
                 {/* Step 1: Member Search */}
                 <Card>
                   <CardHeader>
+                     <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-100 text-sm font-bold text-teal-700">
+                        1
+                      </div>
+                      <div>
                     <CardTitle className="flex items-center gap-2 text-lg">
-                      <User className="h-5 w-5" />
                       Select Member
                     </CardTitle>
                     <CardDescription>Search by membership number</CardDescription>
+                    </div>
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex gap-2">
@@ -721,11 +727,18 @@ const getLogindate = async () => {
                 {/* Step 2: Select Scheme */}
                 <Card>
                   <CardHeader>
+                     <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-100 text-sm font-bold text-teal-700">
+                        2
+                      </div>
+                      <div>
                     <CardTitle className="flex items-center gap-2 text-lg">
                       <Banknote className="h-5 w-5" />
                       Select Deposit Scheme
                     </CardTitle>
                     <CardDescription>Choose the deposit scheme for this account</CardDescription>
+                    </div>
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
@@ -786,11 +799,18 @@ const getLogindate = async () => {
                 {/* Step 3: Deposit Details */}
                 <Card>
                   <CardHeader>
+                     <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-100 text-sm font-bold text-teal-700">
+                        3
+                      </div>
+                      <div>
                     <CardTitle className="flex items-center gap-2 text-lg">
                       <Calendar className="h-5 w-5" />
                       Deposit Details
                     </CardTitle>
                     <CardDescription>Enter the deposit amount, period, and configuration</CardDescription>
+                      </div>
+                      </div>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     {/* Common fields for all deposit types */}

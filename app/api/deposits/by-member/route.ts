@@ -12,6 +12,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const membershipNo = searchParams.get("membership_no")
     const statusesParam = searchParams.get("statuses")
+    const zeroBalanceOnly = searchParams.get("zero_balance") === "1"
 
     if (!membershipNo) {
       return NextResponse.json({ error: "Membership number is required" }, { status: 400 })
@@ -51,6 +52,7 @@ export async function GET(req: NextRequest) {
        WHERE da.membership_no = $1
          AND da.branch_id    = $2
          AND da.accountstatus = ANY($3::int[])
+         ${zeroBalanceOnly ? "AND da.clearbalance = 0" : ""}
        ORDER BY da.accountopendate DESC`,
       [membershipNo, branchId, statuses]
     )

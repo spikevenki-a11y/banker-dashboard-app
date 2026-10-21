@@ -22,9 +22,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   ArrowLeft, Loader2, CheckCircle2, AlertTriangle, IndianRupee,
   Calendar, TrendingUp, Landmark, PiggyBank, AlertCircle, XCircle, ShieldAlert,
-  User, Eye, MapPin, ShieldCheck, TrendingDown, Camera, PenTool, Search,
+  User, Eye, MapPin, ShieldCheck, TrendingDown, Camera, PenTool, Search, Users,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
+import { DepositAccountSearchDialog } from "../_components/deposit-account-search-dialog"
 
 type ClosureAccount = {
   accountNumber: string
@@ -205,6 +206,7 @@ function DepositClosureContent() {
   const [memberSearchError, setMemberSearchError] = useState("")
   const [memberAccounts, setMemberAccounts] = useState<MemberDepositAccount[]>([])
   const [selectedMemberAccount, setSelectedMemberAccount] = useState("")
+  const [searchDialogOpen, setSearchDialogOpen] = useState(false)
 
   // Member summary
   const [memberInfo, setMemberInfo] = useState<MemberInfo | null>(null)
@@ -221,6 +223,9 @@ function DepositClosureContent() {
 
   // Form state
   const [voucherType, setVoucherType] = useState<string>("")
+  const [selectedBatch, setSelectedBatch] = useState<number>(0)
+  const [isBatchPopupOpen, setIsBatchPopupOpen] = useState(false)
+  const [incompleteBatches, setIncompleteBatches] = useState<any[]>([])
   const [narration, setNarration] = useState("")
   const [penaltyOverride, setPenaltyOverride] = useState<string>("")
 
@@ -262,6 +267,18 @@ function DepositClosureContent() {
       // silent
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const fetchIncompleteBatches = async () => {
+    try {
+      const res = await fetch("/api/fas/incomplete-batches", { credentials: "include" })
+      const data = await res.json()
+      if (res.ok && data.data) {
+        setIncompleteBatches(data.data)
+      }
+    } catch {
+      // silent
     }
   }
 
@@ -329,6 +346,7 @@ function DepositClosureContent() {
     setMemberAccounts([])
     setSelectedMemberAccount("")
     setVoucherType("")
+    setSelectedBatch(0)
     setNarration("")
     setPenaltyOverride("")
     setFormError("")
@@ -467,6 +485,7 @@ function DepositClosureContent() {
           cccc : account.interestdueforpayment,
           narration: narration || `Deposit Closure - A/c ${account.accountNumber}`,
           voucherType,
+          selectedBatch: voucherType === "TRANSFER" ? selectedBatch : 0,
           creditAccounts: voucherType === "TRANSFER" ? selectedCredits : [],
         }),
       })
@@ -561,6 +580,10 @@ function DepositClosureContent() {
                           )}
                           Search
                         </Button>
+                        <Button variant="outline" onClick={() => setSearchDialogOpen(true)} className="gap-2 bg-transparent">
+                          <Users className="h-4 w-4" />
+                          Advanced Search
+                        </Button>
                       </div>
                       {isMemberSearching && (
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -598,6 +621,21 @@ function DepositClosureContent() {
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Same Active/Matured scope as the member number lookup (statuses=1,2) */}
+              <DepositAccountSearchDialog
+                open={searchDialogOpen}
+                onOpenChange={setSearchDialogOpen}
+                idPrefix="closure-search"
+                filterResult={(r) => r.account_status === "Active" || r.account_status === "Matured"}
+                onSelect={(result) => {
+                  setMembershipNoInput(result.membership_no)
+                  setMemberAccounts([])
+                  setMemberSearchError("")
+                  setSelectedMemberAccount(result.account_number)
+                  fetchClosureData(result.account_number)
+                }}
+              />
             </main>
           </div>
         </div>
@@ -828,7 +866,13 @@ function DepositClosureContent() {
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="voucher-type">Voucher Type *</Label>
-                          <Select value={voucherType} onValueChange={setVoucherType}>
+                          <Select
+                            value={voucherType}
+                            onValueChange={(value) => {
+                              setVoucherType(value)
+                              if (value !== "TRANSFER") setSelectedBatch(0)
+                            }}
+                          >
                             <SelectTrigger id="voucher-type" className="w-full">
                               <SelectValue placeholder="Select type" />
                             </SelectTrigger>
@@ -847,6 +891,33 @@ function DepositClosureContent() {
                           />
                         </div>
                       </div>
+
+                      {/* GL Batch Selection - only for TRANSFER */}
+                      {voucherType === "TRANSFER" && (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium">GL Batch ID</Label>
+                            <div className="flex gap-2">
+                              <Input
+                                value={selectedBatch && selectedBatch !== 0 ? selectedBatch : "New Batch"}
+                                readOnly
+                                placeholder="Select or create batch"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="bg-transparent"
+                                onClick={() => {
+                                  fetchIncompleteBatches()
+                                  setIsBatchPopupOpen(true)
+                                }}
+                              >
+                                Select
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       <div className="space-y-2">
                         <Label htmlFor="closure-narration">Narration</Label>
@@ -1430,6 +1501,70 @@ function DepositClosureContent() {
                     </Button>
                   </div>
                 )}
+              </DialogContent>
+            </Dialog>
+
+            {/* GL Batch Selection Dialog */}
+            <Dialog open={isBatchPopupOpen} onOpenChange={setIsBatchPopupOpen}>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Select Incomplete GL Batch</DialogTitle>
+                </DialogHeader>
+                <div className="max-h-[400px] overflow-y-auto">
+                  {incompleteBatches.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-muted-foreground">No incomplete batches found. A new batch will be created.</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Batch ID</TableHead>
+                          <TableHead>Total Debit</TableHead>
+                          <TableHead>Total Credit</TableHead>
+                          <TableHead>Difference</TableHead>
+                          <TableHead className="text-right">Action</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {incompleteBatches.map((b) => (
+                          <TableRow key={b.batch_id}>
+                            <TableCell>{b.batch_id}</TableCell>
+                            <TableCell>{formatCurrency(b.total_debit)}</TableCell>
+                            <TableCell>{formatCurrency(b.total_credit)}</TableCell>
+                            <TableCell className="text-red-600">{formatCurrency(b.difference)}</TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="bg-transparent"
+                                onClick={() => {
+                                  setSelectedBatch(b.batch_id)
+                                  setIsBatchPopupOpen(false)
+                                }}
+                              >
+                                Select
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </div>
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button
+                    variant="outline"
+                    className="bg-transparent"
+                    onClick={() => {
+                      setSelectedBatch(0)
+                      setIsBatchPopupOpen(false)
+                    }}
+                  >
+                    New Batch
+                  </Button>
+                  <Button variant="outline" className="bg-transparent" onClick={() => setIsBatchPopupOpen(false)}>
+                    Cancel
+                  </Button>
+                </div>
               </DialogContent>
             </Dialog>
 
