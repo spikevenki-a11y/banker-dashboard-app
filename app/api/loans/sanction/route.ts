@@ -66,6 +66,16 @@ export async function POST(request: NextRequest) {
         )
       }
 
+      const requestedAmount = parseFloat(sanctioned_amount)
+      if (isNaN(requestedAmount) || requestedAmount <= 0) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: "Sanctioned amount must be greater than zero" }, { status: 400 })
+      }
+      if (requestedAmount > parseFloat(app.applied_loan_amount)) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: "Sanctioned amount cannot exceed the applied amount" }, { status: 400 })
+      }
+
       // Calculate EMI
       const P = parseFloat(sanctioned_amount)
       const R = parseFloat(interest_rate) / 12 / 100

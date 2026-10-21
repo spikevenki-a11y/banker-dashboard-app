@@ -163,6 +163,7 @@ function DepositAccountPanel({ accountNumber }: { accountNumber: string | null }
   const [narration, setNarration] = useState("")
   const [voucherType, setVoucherType] = useState<"CASH" | "TRANSFER">()
   const [selectedBatch, setSelectedBatch] = useState<number>(0)
+  const [isBatchChosen, setIsBatchChosen] = useState(false)
   const [isBatchPopupOpen, setIsBatchPopupOpen] = useState(false)
   const [incompleteBatches, setIncompleteBatches] = useState<any[]>([])
 
@@ -396,6 +397,11 @@ function DepositAccountPanel({ accountNumber }: { accountNumber: string | null }
 
     const selectedDebits = debitEntries.filter((e) => e.selected && e.debitAmount)
     if (voucherType === "TRANSFER") {
+      if (!isBatchChosen) {
+        setFormError("Please select a GL batch (new or existing).")
+        return
+      }
+
       if (selectedDebits.length === 0) {
         setFormError("Please select at least one savings account and enter debit amount.")
         return
@@ -457,6 +463,7 @@ function DepositAccountPanel({ accountNumber }: { accountNumber: string | null }
 
       setNarration("")
       setSelectedBatch(0)
+      setIsBatchChosen(false)
       setDebitEntries((prev) =>
         prev.map((e) => ({ ...e, selected: false, debitAmount: "" }))
       )
@@ -807,6 +814,7 @@ function DepositAccountPanel({ accountNumber }: { accountNumber: string | null }
                       setVoucherType(value as "CASH" | "TRANSFER")
                       if (value !== "TRANSFER") {
                         setSelectedBatch(0)
+                        setIsBatchChosen(false)
                         setDebitEntries((prev) =>
                           prev.map((e) => ({ ...e, selected: false, debitAmount: "" }))
                         )
@@ -858,12 +866,12 @@ function DepositAccountPanel({ accountNumber }: { accountNumber: string | null }
               {voucherType === "TRANSFER" && (
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>GL Batch ID</Label>
+                    <Label>GL Batch ID *</Label>
                     <div className="flex gap-2">
                       <Input
-                        value={selectedBatch && selectedBatch !== 0 ? selectedBatch : "New Batch"}
+                        value={!isBatchChosen ? "" : selectedBatch && selectedBatch !== 0 ? selectedBatch : "New Batch"}
+                        placeholder="Select new or existing batch"
                         readOnly
-                        disabled
                       />
                       <Button
                         type="button"
@@ -873,12 +881,13 @@ function DepositAccountPanel({ accountNumber }: { accountNumber: string | null }
                           fetchIncompleteBatches()
                           setIsBatchPopupOpen(true)
                         }}
-                        disabled
-                        hidden
                       >
                         Select
                       </Button>
                     </div>
+                    {!isBatchChosen && (
+                      <p className="text-xs text-muted-foreground">Choose a batch to enable submission</p>
+                    )}
                   </div>
                 </div>
               )}
@@ -905,7 +914,7 @@ function DepositAccountPanel({ accountNumber }: { accountNumber: string | null }
               <div className="flex gap-3 pt-2">
                 <Button
                   onClick={handleSubmit}
-                  disabled={isSubmitting || !voucherType || (isRd ? selectedInstallmentsList.length === 0 : !account.depositAmount) || (voucherType === "TRANSFER" && (!debitMatchesCredit || hasDebitValidationError))}
+                  disabled={isSubmitting || !voucherType || (isRd ? selectedInstallmentsList.length === 0 : !account.depositAmount) || (voucherType === "TRANSFER" && (!isBatchChosen || !debitMatchesCredit || hasDebitValidationError))}
                   className="gap-2"
                 >
                   {isSubmitting ? (
@@ -920,6 +929,7 @@ function DepositAccountPanel({ accountNumber }: { accountNumber: string | null }
                   onClick={() => {
                     setNarration("")
                     setSelectedBatch(0)
+                    setIsBatchChosen(false)
                     setFormError("")
                     setDebitEntries((prev) =>
                       prev.map((e) => ({ ...e, selected: false, debitAmount: "" }))
@@ -1209,6 +1219,7 @@ function DepositAccountPanel({ accountNumber }: { accountNumber: string | null }
                           className="bg-transparent"
                           onClick={() => {
                             setSelectedBatch(b.batch_id)
+                            setIsBatchChosen(true)
                             setIsBatchPopupOpen(false)
                           }}
                         >
@@ -1226,6 +1237,7 @@ function DepositAccountPanel({ accountNumber }: { accountNumber: string | null }
               variant="outline"
               onClick={() => {
                 setSelectedBatch(0)
+                setIsBatchChosen(true)
                 setIsBatchPopupOpen(false)
               }}
               className="bg-transparent"

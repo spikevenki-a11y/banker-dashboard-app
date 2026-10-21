@@ -7,6 +7,18 @@ const MARGIN_MM           = 8
 const PRINTABLE_WIDTH_MM  = A4_WIDTH_MM - 2 * MARGIN_MM  // 194 mm
 
 /**
+ * html2canvas 1.x cannot parse modern CSS colour functions (oklch/lab) used by the
+ * app's Tailwind v4 theme and aborts with "unsupported color function". The PDF
+ * markup is fully self-styled, so drop the app stylesheets from html2canvas's
+ * cloned document (the live page is untouched).
+ */
+function stripAppStyles(clonedDoc: Document) {
+  clonedDoc.querySelectorAll('link[rel="stylesheet"], style').forEach((el) => {
+    if (!el.closest("#pdf-hdr, #pdf-body")) el.remove()
+  })
+}
+
+/**
  * Generates and downloads a PDF that mirrors the print-window layout.
  * The bank/branch header is rendered on every page; body content is sliced
  * across pages.  Both header and body are captured as high-DPI canvases so
@@ -84,9 +96,10 @@ export async function downloadPdf(
     const bodyEl = wrapper.querySelector<HTMLElement>("#pdf-body")!
 
     const SCALE = 2
+    const canvasOpts = { scale: SCALE, backgroundColor: "#ffffff", logging: false, useCORS: true, onclone: stripAppStyles }
     const [hdrCanvas, bodyCanvas] = await Promise.all([
-      html2canvas(hdrEl,  { scale: SCALE, backgroundColor: "#ffffff", logging: false, useCORS: true }),
-      html2canvas(bodyEl, { scale: SCALE, backgroundColor: "#ffffff", logging: false, useCORS: true }),
+      html2canvas(hdrEl,  canvasOpts),
+      html2canvas(bodyEl, canvasOpts),
     ])
 
     // mm per 1 CSS pixel: container is CONTAINER_WIDTH_PX wide → PRINTABLE_WIDTH_MM mm

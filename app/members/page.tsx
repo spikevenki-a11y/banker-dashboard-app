@@ -44,6 +44,7 @@ import {
   PiggyBank,
   XCircle,
   Plus,
+  Fingerprint,
 } from "lucide-react"
 import { DashboardWrapper } from "../_components/dashboard-wrapper"
 import {
@@ -795,6 +796,21 @@ export default function MembersPage() {
                 <CardContent>
                   <CardTitle className="text-lg">Member Closure</CardTitle>
                   <CardDescription className="mt-1">Close member account</CardDescription>
+                </CardContent>
+              </Card>
+
+              <Card
+                className="cursor-pointer transition-all hover:shadow-lg hover:border-indigo-500"
+                onClick={() => router.push("/members/ekyc")}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-indigo-50">
+                    <Fingerprint className="h-6 w-6 text-indigo-600" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <CardTitle className="text-lg">eKYC</CardTitle>
+                  <CardDescription className="mt-1">Verify member identity electronically</CardDescription>
                 </CardContent>
               </Card>
             </div>
