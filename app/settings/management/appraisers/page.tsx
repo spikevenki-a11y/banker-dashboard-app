@@ -8,11 +8,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ArrowLeft, Gem, Plus, Pencil, Search, Loader2, History } from "lucide-react"
 import { DashboardWrapper } from "../../../_components/dashboard-wrapper"
+import { APPRAISER_ACCOUNT_TYPES } from "@/lib/appraiser-history"
 
 interface Appraiser {
   appraiser_id: number
@@ -23,6 +25,8 @@ interface Appraiser {
   mobile_no: string | null
   email: string | null
   address: string | null
+  account_number: string | null
+  account_type: string | null
   status: "ACTIVE" | "INACTIVE"
 }
 
@@ -37,6 +41,8 @@ interface AppraiserHistoryEntry {
   mobile_no: string | null
   email: string | null
   address: string | null
+  account_number: string | null
+  account_type: string | null
   status: "ACTIVE" | "INACTIVE"
   changed_by_name: string | null
   changed_at: string
@@ -50,6 +56,8 @@ const FIELD_LABELS: Record<string, string> = {
   mobile_no: "Mobile No",
   email: "Email",
   address: "Address",
+  account_number: "Account No",
+  account_type: "Account Type",
   status: "Status",
 }
 
@@ -60,10 +68,14 @@ const ACTION_STYLES: Record<AppraiserHistoryEntry["action"], { label: string; cl
   DEACTIVATED: { label: "Deactivated", className: "bg-slate-200 text-slate-800 hover:bg-slate-200" },
 }
 
+const accountTypeLabel = (value: string | null) =>
+  APPRAISER_ACCOUNT_TYPES.find((t) => t.value === value)?.label ?? value ?? "-"
+
 const formatHistoryValue = (field: string, value: string | null) => {
   if (value === null || value === "") return "—"
   if (field === "license_valid_till") return new Date(value).toLocaleDateString("en-IN")
   if (field === "status") return value === "ACTIVE" ? "Active" : "Inactive"
+  if (field === "account_type") return accountTypeLabel(value)
   return value
 }
 
@@ -75,6 +87,8 @@ const emptyForm = {
   mobile_no: "",
   email: "",
   address: "",
+  account_number: "",
+  account_type: "",
   status: "ACTIVE" as "ACTIVE" | "INACTIVE",
 }
 
@@ -119,7 +133,7 @@ export default function AppraisersPage() {
     const q = search.trim().toLowerCase()
     if (!q) return appraisers
     return appraisers.filter((a) =>
-      [a.appraiser_code, a.appraiser_name, a.license_no, a.mobile_no].some((v) => v?.toLowerCase().includes(q))
+      [a.appraiser_code, a.appraiser_name, a.license_no, a.mobile_no, a.account_number].some((v) => v?.toLowerCase().includes(q))
     )
   }, [appraisers, search])
 
@@ -140,6 +154,8 @@ export default function AppraisersPage() {
       mobile_no: a.mobile_no ?? "",
       email: a.email ?? "",
       address: a.address ?? "",
+      account_number: a.account_number ?? "",
+      account_type: a.account_type ?? "",
       status: a.status,
     })
     setFormError("")
@@ -155,6 +171,10 @@ export default function AppraisersPage() {
     }
     if (formData.mobile_no && !/^\d{10}$/.test(formData.mobile_no.trim())) {
       setFormError("Mobile number must be 10 digits")
+      return
+    }
+    if (formData.account_number && !formData.account_type) {
+      setFormError("Select the account type for the account number")
       return
     }
 
@@ -234,7 +254,7 @@ export default function AppraisersPage() {
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     className="pl-8 w-64"
-                    placeholder="Search code, name, license, mobile"
+                    placeholder="Search code, name, license, mobile, account"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                   />
@@ -267,6 +287,7 @@ export default function AppraisersPage() {
                     <TableHead>Valid Till</TableHead>
                     <TableHead>Mobile</TableHead>
                     <TableHead>Email</TableHead>
+                    <TableHead>Account</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -289,6 +310,16 @@ export default function AppraisersPage() {
                       </TableCell>
                       <TableCell>{a.mobile_no || "-"}</TableCell>
                       <TableCell className="text-sm">{a.email || "-"}</TableCell>
+                      <TableCell>
+                        {a.account_number ? (
+                          <div>
+                            <div className="font-mono text-sm">{a.account_number}</div>
+                            <div className="text-xs text-muted-foreground">{accountTypeLabel(a.account_type)}</div>
+                          </div>
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={a.status === "ACTIVE" ? "default" : "secondary"}>
                           {a.status === "ACTIVE" ? "Active" : "Inactive"}
@@ -374,6 +405,31 @@ export default function AppraisersPage() {
                   value={formData.email}
                   onChange={(e) => f("email", e.target.value)}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="account_number">Account No</Label>
+                <Input
+                  id="account_number"
+                  placeholder="Charges credit account"
+                  inputMode="numeric"
+                  value={formData.account_number}
+                  onChange={(e) => f("account_number", e.target.value.replace(/\D/g, ""))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="account_type">Account Type</Label>
+                <Select value={formData.account_type} onValueChange={(v) => f("account_type", v)}>
+                  <SelectTrigger id="account_type">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {APPRAISER_ACCOUNT_TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>
+                        {t.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="col-span-2 space-y-2">
                 <Label htmlFor="address">Address</Label>

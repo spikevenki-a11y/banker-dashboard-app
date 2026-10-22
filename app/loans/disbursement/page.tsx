@@ -65,6 +65,27 @@ import {
   Home,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
+import { APPRAISER_ACCOUNT_TYPES } from "@/lib/appraiser-history"
+
+type LoanAppraiser = {
+  appraiser_id: number
+  appraiser_code: string
+  appraiser_name: string
+  account_number: string | null
+  account_type: string | null
+}
+
+// Returns the reason the appraiser cannot receive the charge, or "" when the account is usable
+function getAppraiserAccountError(appraiser: LoanAppraiser | undefined) {
+  if (!appraiser) return "Select the appraiser to receive the appraiser charge"
+  if (!appraiser.account_number || !appraiser.account_type) {
+    return `No account is configured for appraiser ${appraiser.appraiser_name}. Update it in Settings > Management > Manage Appraiser Details.`
+  }
+  if (!APPRAISER_ACCOUNT_TYPES.some((t) => t.value === appraiser.account_type)) {
+    return `Account type ${appraiser.account_type} is not supported for appraiser ${appraiser.appraiser_name}. Update it in Settings > Management > Manage Appraiser Details.`
+  }
+  return ""
+}
 
 type SanctionedLoan = {
   id: string
@@ -87,6 +108,21 @@ type SanctionedLoan = {
   appraiser_charge_code: string | null
   scheme_appraiser_name: string | null
   appraiser_amount_receive_account_number: string | null
+}
+
+type PaymentMode = "CASH" | "TRANSFER" | "DEFAULT_TRANSFER"
+
+type MemberSavingsAccount = {
+  account_number: string
+  available_balance: number
+  account_status: string
+  scheme_name: string
+}
+
+const PAYMENT_MODE_LABELS: Record<PaymentMode, string> = {
+  CASH: "CASH",
+  TRANSFER: "TRANSFER",
+  DEFAULT_TRANSFER: "DEFAULT TRANSFER",
 }
 
 function formatCurrency(val: number | string) {
@@ -113,7 +149,7 @@ export default function LoanDisbursementPage() {
 
   // Disbursement form
   const [disbursementAmount, setDisbursementAmount] = useState("")
-  const [disbursementMode, setDisbursementMode] = useState<"CASH" | "TRANSFER">("CASH")
+  const [disbursementMode, setDisbursementMode] = useState<PaymentMode>("CASH")
   const [narration, setNarration] = useState("")
 
   // Batch selection for Transfer mode
@@ -121,10 +157,17 @@ export default function LoanDisbursementPage() {
   const [isBatchPopupOpen, setIsBatchPopupOpen] = useState(false)
   const [incompleteBatches, setIncompleteBatches] = useState<any[]>([])
 
+  // Member savings accounts for Default Transfer mode
+  const [savingsAccounts, setSavingsAccounts] = useState<MemberSavingsAccount[]>([])
+  const [selectedSavingsAccount, setSelectedSavingsAccount] = useState("")
+  const [isLoadingSavings, setIsLoadingSavings] = useState(false)
+  const [savingsError, setSavingsError] = useState("")
+
   // Appraiser charge
   const [appraiserCharge, setAppraiserCharge] = useState({
-    appraiser_name: "", charge_amount: "", charge_date: "", invoice_no: "", charge_remarks: "", payment_mode: "CASH",
+    appraiser_id: "", appraiser_name: "", charge_amount: "", charge_date: "", invoice_no: "", charge_remarks: "", payment_mode: "CASH",
   })
+  const [appraisers, setAppraisers] = useState<LoanAppraiser[]>([])
   const ac = (key: string, value: string) => setAppraiserCharge((prev) => ({ ...prev, [key]: value }))
 
   // Submit state
@@ -140,6 +183,18 @@ export default function LoanDisbursementPage() {
       .then((r) => r.json())
       .then(setIdentity)
   }, [])
+
+  // Fetch active appraisers (Settings → Management → Manage Appraiser Details)
+  useEffect(() => {
+    fetch("/api/settings/appraisers?status=ACTIVE", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data) => setAppraisers(data.appraisers || []))
+      .catch(() => {/* silent */})
+  }, [])
+
+  const selectedAppraiser = appraisers.find((a) => String(a.appraiser_id) === appraiserCharge.appraiser_id)
+  const hasAppraiserCharge = !!selectedLoan?.appraiser_charge_allowed && Number(appraiserCharge.charge_amount) > 0
+  const appraiserAccountError = hasAppraiserCharge ? getAppraiserAccountError(selectedAppraiser) : ""
 
   // Fetch sanctioned loans
   const fetchSanctionedLoans = useCallback(async () => {
@@ -212,6 +267,46 @@ export default function LoanDisbursementPage() {
       .catch(() => {/* silent */})
   }, [disbursementAmount, selectedLoan])
 
+  // Load member's active savings accounts when Default Transfer is selected
+  useEffect(() => {
+    setSavingsAccounts([])
+    setSelectedSavingsAccount("")
+    setSavingsError("")
+    if (disbursementMode !== "DEFAULT_TRANSFER" || !selectedLoan?.membership_no) return
+
+    let cancelled = false
+    setIsLoadingSavings(true)
+    fetch(`/api/savings/by-member?membership_no=${encodeURIComponent(selectedLoan.membership_no)}`, {
+      credentials: "include",
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return
+        if (data.error) throw new Error(data.error)
+        const active: MemberSavingsAccount[] = (data.accounts || [])
+          .filter((a: any) => String(a.account_status).toUpperCase() === "ACTIVE")
+          .map((a: any) => ({
+            account_number: String(a.account_number),
+            available_balance: Number(a.available_balance) || 0,
+            account_status: a.account_status,
+            scheme_name: a.scheme_name,
+          }))
+        setSavingsAccounts(active)
+        if (active.length === 1) setSelectedSavingsAccount(active[0].account_number)
+        if (active.length === 0) setSavingsError("No active savings account found for this member")
+      })
+      .catch((err: any) => {
+        if (!cancelled) setSavingsError(err.message || "Failed to load savings accounts")
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingSavings(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [disbursementMode, selectedLoan])
+
   // Select loan for disbursement
   const selectLoanForDisbursement = (loan: SanctionedLoan) => {
     setSelectedLoan(loan)
@@ -221,9 +316,19 @@ export default function LoanDisbursementPage() {
     setSelectedBatch(0)
     setFormError("")
     setAppraiserCharge({
-      appraiser_name: loan.scheme_appraiser_name || "",
+      appraiser_id: "", appraiser_name: loan.scheme_appraiser_name || "",
       charge_amount: "", charge_date: "", invoice_no: "", charge_remarks: "", payment_mode: "CASH",
     })
+
+    // Preselect the appraiser recorded on the loan's gold security
+    if (loan.appraiser_charge_allowed) {
+      fetch(`/api/loans/disbursement?loan_application_id=${loan.loan_application_id}`, { credentials: "include" })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.appraiser_id) setAppraiserCharge((prev) => ({ ...prev, appraiser_id: String(data.appraiser_id) }))
+        })
+        .catch(() => {/* silent */})
+    }
   }
 
   // Load incomplete batches for transfer mode
@@ -282,6 +387,16 @@ export default function LoanDisbursementPage() {
       return false
     }
 
+    if (disbursementMode === "DEFAULT_TRANSFER" && !selectedSavingsAccount) {
+      setFormError(savingsError || "Please select a savings account for Default Transfer")
+      return false
+    }
+
+    if (appraiserAccountError) {
+      setFormError(appraiserAccountError)
+      return false
+    }
+
     return true
   }
 
@@ -302,14 +417,15 @@ export default function LoanDisbursementPage() {
           disbursement_mode: disbursementMode,
           narration: narration || "Loan Disbursement",
           selectedBatch: selectedBatch,
-          appraiser_charge: selectedLoan!.appraiser_charge_allowed && appraiserCharge.charge_amount ? {
-            appraiser_name: appraiserCharge.appraiser_name || null,
+          savings_account_no: disbursementMode === "DEFAULT_TRANSFER" ? selectedSavingsAccount : null,
+          appraiser_charge: hasAppraiserCharge ? {
+            appraiser_id: Number(appraiserCharge.appraiser_id),
+            appraiser_name: selectedAppraiser?.appraiser_name || null,
             charge_amount: Number(appraiserCharge.charge_amount),
             charge_date: appraiserCharge.charge_date || null,
             invoice_no: appraiserCharge.invoice_no || null,
             charge_remarks: appraiserCharge.charge_remarks || null,
             payment_mode: appraiserCharge.payment_mode,
-            receive_account_number: selectedLoan!.appraiser_amount_receive_account_number || null,
           } : null,
         })
       })
@@ -322,6 +438,12 @@ export default function LoanDisbursementPage() {
         `Loan disbursed successfully!\n\n` +
         `Loan Account: ${data.loan_account_no}\n` +
         `Amount: ${formatCurrency(parseFloat(disbursementAmount))}\n` +
+        (data.savings_account_no
+          ? `Credited to Savings A/c: ${data.savings_account_no}\nBatch ID: ${data.batch_id}\n`
+          : "") +
+        (data.appraiser_account_no
+          ? `Appraiser charge credited to A/c: ${data.appraiser_account_no}\n`
+          : "") +
         // `Monthly EMI: ${formatCurrency(data.emi_amount)}\n` +
         // `Total EMIs: ${data.total_installments}\n` +
         `Voucher No: ${data.voucher_no}`
@@ -360,7 +482,7 @@ export default function LoanDisbursementPage() {
     setNarration("")
     setSelectedBatch(0)
     setFormError("")
-    setAppraiserCharge({ appraiser_name: "", charge_amount: "", charge_date: "", invoice_no: "", charge_remarks: "", payment_mode: "CASH" })
+    setAppraiserCharge({ appraiser_id: "", appraiser_name: "", charge_amount: "", charge_date: "", invoice_no: "", charge_remarks: "", payment_mode: "CASH" })
   }
 
   return (
@@ -616,7 +738,7 @@ export default function LoanDisbursementPage() {
                           <Label htmlFor="payment-mode">Payment Mode *</Label>
                           <Select 
                             value={disbursementMode} 
-                            onValueChange={(v) => setDisbursementMode(v as "CASH" | "TRANSFER")}
+                            onValueChange={(v) => setDisbursementMode(v as PaymentMode)}
                           >
                             <SelectTrigger id="payment-mode">
                               <SelectValue placeholder="Select mode" />
@@ -632,6 +754,12 @@ export default function LoanDisbursementPage() {
                                 <div className="flex items-center gap-2">
                                   <Building2 className="h-4 w-4" />
                                   Bank Transfer
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="DEFAULT_TRANSFER">
+                                <div className="flex items-center gap-2">
+                                  <Wallet className="h-4 w-4" />
+                                  Default Transfer
                                 </div>
                               </SelectItem>
                             </SelectContent>
@@ -654,6 +782,43 @@ export default function LoanDisbursementPage() {
                               Select Batch
                             </Button>
                           </div>
+                        </div>
+                      )}
+
+                      {/* Conditional: Destination savings account for Default Transfer */}
+                      {disbursementMode === "DEFAULT_TRANSFER" && (
+                        <div className="space-y-2">
+                          <Label htmlFor="savings-account">Credit to Savings Account *</Label>
+                          {isLoadingSavings ? (
+                            <div className="flex items-center gap-2 rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Loading savings accounts...
+                            </div>
+                          ) : savingsAccounts.length > 1 ? (
+                            <Select value={selectedSavingsAccount} onValueChange={setSelectedSavingsAccount}>
+                              <SelectTrigger id="savings-account">
+                                <SelectValue placeholder="Select savings account" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {savingsAccounts.map((a) => (
+                                  <SelectItem key={a.account_number} value={a.account_number}>
+                                    {a.account_number} - {a.scheme_name} ({formatCurrency(a.available_balance)})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : savingsAccounts.length === 1 ? (
+                            <div className="rounded-md border border-input bg-muted/50 px-3 py-2 text-sm">
+                              {savingsAccounts[0].account_number} - {savingsAccounts[0].scheme_name} ({formatCurrency(savingsAccounts[0].available_balance)})
+                            </div>
+                          ) : null}
+                          {savingsError ? (
+                            <p className="text-xs text-red-500">{savingsError}</p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              Amount will be credited to the member&apos;s savings account under a new GL batch.
+                            </p>
+                          )}
                         </div>
                       )}
 
@@ -683,7 +848,7 @@ export default function LoanDisbursementPage() {
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">Payment Mode</p>
-                            <p className="text-lg font-semibold">{disbursementMode}</p>
+                            <p className="text-lg font-semibold">{PAYMENT_MODE_LABELS[disbursementMode]}</p>
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">Monthly EMI</p>
@@ -705,13 +870,20 @@ export default function LoanDisbursementPage() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      {selectedLoan.appraiser_amount_receive_account_number && (
+                      {selectedAppraiser?.account_number && !getAppraiserAccountError(selectedAppraiser) && (
                         <div className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-                          Charge credited to account:{" "}
+                          Charge credited to appraiser account:{" "}
                           <span className="font-semibold text-foreground">
-                            {selectedLoan.appraiser_amount_receive_account_number}
-                          </span>
+                            {selectedAppraiser.account_number}
+                          </span>{" "}
+                          ({APPRAISER_ACCOUNT_TYPES.find((t) => t.value === selectedAppraiser.account_type)?.label})
                         </div>
+                      )}
+                      {appraiserAccountError && (
+                        <Alert variant="destructive">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>{appraiserAccountError}</AlertDescription>
+                        </Alert>
                       )}
 
                       {/* Payment Mode */}
@@ -739,12 +911,19 @@ export default function LoanDisbursementPage() {
 
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
-                          <Label>Appraiser Name</Label>
-                          <Input
-                            placeholder="Enter appraiser name"
-                            value={appraiserCharge.appraiser_name}
-                            onChange={(e) => ac("appraiser_name", e.target.value)}
-                          />
+                          <Label>Appraiser</Label>
+                          <Select value={appraiserCharge.appraiser_id} onValueChange={(v) => ac("appraiser_id", v)}>
+                            <SelectTrigger>
+                              <SelectValue placeholder={appraisers.length ? "Select appraiser" : "No active appraisers"} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {appraisers.map((a) => (
+                                <SelectItem key={a.appraiser_id} value={String(a.appraiser_id)}>
+                                  {a.appraiser_code} - {a.appraiser_name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                         <div className="space-y-2">
                           <Label className="flex items-center gap-1">
@@ -793,7 +972,13 @@ export default function LoanDisbursementPage() {
                         setShowConfirmDialog(true)
                       }
                     }}
-                    disabled={!disbursementAmount || parseFloat(disbursementAmount) <= 0 || !!amountError}
+                    disabled={
+                      !disbursementAmount ||
+                      parseFloat(disbursementAmount) <= 0 ||
+                      !!amountError ||
+                      (disbursementMode === "DEFAULT_TRANSFER" && (isLoadingSavings || !selectedSavingsAccount)) ||
+                      !!appraiserAccountError
+                    }
                   >
                     <Wallet className="mr-2 h-4 w-4" />
                     Disburse Loan
@@ -894,8 +1079,14 @@ export default function LoanDisbursementPage() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Payment Mode:</span>
-                <span>{disbursementMode}</span>
+                <span>{PAYMENT_MODE_LABELS[disbursementMode]}</span>
               </div>
+              {disbursementMode === "DEFAULT_TRANSFER" && selectedSavingsAccount && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Credit to Savings A/c:</span>
+                  <span className="font-mono">{selectedSavingsAccount}</span>
+                </div>
+              )}
               <div className="flex justify-between text-sm border-t pt-2">
                 <span className="font-semibold">Monthly EMI:</span>
                 <span className="font-bold text-primary">{formatCurrency(selectedLoan?.emi_amount || 0)}</span>

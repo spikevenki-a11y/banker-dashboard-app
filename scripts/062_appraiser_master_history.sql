@@ -4,31 +4,31 @@
 -- details after the change, plus the old -> new values that changed.
 -- =========================================================
 
-CREATE TABLE IF NOT EXISTS appraiser_master_history (
-    history_id          SERIAL          PRIMARY KEY,
-    appraiser_id        INTEGER         NOT NULL REFERENCES appraiser_master(appraiser_id),
-    branch_id           INTEGER         NOT NULL,
+create table public.appraiser_master_history (
+  history_id serial not null,
+  appraiser_id integer not null,
+  branch_id integer not null,
+  action character varying(20) not null,
+  changes jsonb null,
+  appraiser_code character varying(20) not null,
+  appraiser_name character varying(150) not null,
+  license_no character varying(50) null,
+  license_valid_till date null,
+  mobile_no character varying(15) null,
+  email character varying(150) null,
+  address text null,
+  status character varying(20) not null,
+  changed_by character varying(100) null,
+  changed_at timestamp without time zone null default now(),
+  account_type character varying(50) null,
+  account_number numeric null,
+  constraint appraiser_master_history_pkey primary key (history_id),
+  constraint appraiser_master_history_appraiser_id_fkey foreign KEY (appraiser_id) references appraiser_master (appraiser_id)
+) TABLESPACE pg_default;
 
-    action              VARCHAR(20)     NOT NULL,   -- CREATED | UPDATED | ACTIVATED | DEACTIVATED
-    changes             JSONB,                      -- { field: { "old": .., "new": .. } }, NULL for CREATED
+create index IF not exists idx_appraiser_hist_appraiser on public.appraiser_master_history using btree (appraiser_id, changed_at) TABLESPACE pg_default;
 
-    -- Snapshot after the change
-    appraiser_code      VARCHAR(20)     NOT NULL,
-    appraiser_name      VARCHAR(150)    NOT NULL,
-    license_no          VARCHAR(50),
-    license_valid_till  DATE,
-    mobile_no           VARCHAR(15),
-    email               VARCHAR(150),
-    address             TEXT,
-    status              VARCHAR(20)     NOT NULL,
-
-    -- Audit
-    changed_by          VARCHAR(100),
-    changed_at          TIMESTAMP WITHOUT TIME ZONE DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS idx_appraiser_hist_appraiser ON appraiser_master_history(appraiser_id, changed_at);
-CREATE INDEX IF NOT EXISTS idx_appraiser_hist_branch    ON appraiser_master_history(branch_id);
+create index IF not exists idx_appraiser_hist_branch on public.appraiser_master_history using btree (branch_id) TABLESPACE pg_default;
 
 -- Backfill: seed a CREATED entry for appraisers added before history existed
 INSERT INTO appraiser_master_history

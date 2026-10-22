@@ -22,7 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   ArrowLeft, Loader2, CheckCircle2, AlertTriangle, IndianRupee,
   Calendar, TrendingUp, Landmark, PiggyBank, AlertCircle, XCircle, ShieldAlert,
-  User, Eye, MapPin, ShieldCheck, TrendingDown, Camera, PenTool, Search, Users,
+  User, Eye, MapPin, ShieldCheck, TrendingDown, Camera, PenTool, Search, Users, History,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { DepositAccountSearchDialog } from "../_components/deposit-account-search-dialog"
@@ -59,6 +59,19 @@ type ClosureAccount = {
   payoutAmount: number
   prematureClosureAllowed: boolean
   interestdueforpayment : number
+  interestPaidFromTransactions?: number
+  interestPayoutCount?: number
+}
+
+type InterestTransaction = {
+  id: string
+  transaction_date: string
+  voucher_type: string
+  debit_amount: number
+  narration: string
+  voucher_no: number
+  gl_batch_id: number
+  batch_status: string | null
 }
 
 type SavingsAccount = {
@@ -208,6 +221,13 @@ function DepositClosureContent() {
   const [selectedMemberAccount, setSelectedMemberAccount] = useState("")
   const [searchDialogOpen, setSearchDialogOpen] = useState(false)
 
+  // View interest transactions dialog
+  const [interestTxnsOpen, setInterestTxnsOpen] = useState(false)
+  const [interestTxns, setInterestTxns] = useState<InterestTransaction[]>([])
+  const [interestTxnsTotal, setInterestTxnsTotal] = useState(0)
+  const [isLoadingInterestTxns, setIsLoadingInterestTxns] = useState(false)
+  const [interestTxnsError, setInterestTxnsError] = useState("")
+
   // Member summary
   const [memberInfo, setMemberInfo] = useState<MemberInfo | null>(null)
 
@@ -267,6 +287,33 @@ function DepositClosureContent() {
       // silent
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  // Interest payout history (deposit_transactions, type INTEREST_PAYOUT) for the selected account
+  const openInterestTransactions = async () => {
+    if (!account) return
+    setInterestTxnsOpen(true)
+    setIsLoadingInterestTxns(true)
+    setInterestTxnsError("")
+    setInterestTxns([])
+    setInterestTxnsTotal(0)
+    try {
+      const res = await fetch(
+        `/api/deposits/interest-payment?account=${encodeURIComponent(account.accountNumber)}&limit=100`,
+        { credentials: "include" }
+      )
+      const data = await res.json()
+      if (!res.ok) {
+        setInterestTxnsError(data.error || "Failed to load interest transactions.")
+        return
+      }
+      setInterestTxns(data.transactions || [])
+      setInterestTxnsTotal(data.total || 0)
+    } catch {
+      setInterestTxnsError("Failed to load interest transactions. Please try again.")
+    } finally {
+      setIsLoadingInterestTxns(false)
     }
   }
 
@@ -432,6 +479,14 @@ function DepositClosureContent() {
   }, 0)
 
   const creditMatchesPayout = Math.abs(totalCredit - effectivePayout) < 0.01
+
+  // Confirmation summary: interest paid comes from the payout transactions when any exist,
+  // otherwise from the account's recorded interest paid amount
+  const confirmInterestDue = Number(account?.interestdueforpayment) || 0
+  const confirmInterestPaid = account?.interestPayoutCount
+    ? Number(account.interestPaidFromTransactions) || 0
+    : Number(account?.interestPaid) || 0
+  const confirmTotalInterestEarned = confirmInterestPaid + confirmInterestDue
 
   const canSubmit = account &&
     voucherType &&
@@ -805,6 +860,18 @@ function DepositClosureContent() {
                       <div className="flex items-center justify-between border-b border-border pb-2">
                         <span className="text-sm text-muted-foreground">Interest Already Paid</span>
                         <span className="text-sm font-semibold">{formatCurrency(account.interestPaid || 0)}</span>
+                      </div>
+                      <div className="flex justify-end">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={openInterestTransactions}
+                          className="gap-2 bg-transparent"
+                        >
+                          <History className="h-3.5 w-3.5" />
+                          View Transactions
+                        </Button>
                       </div>
 
                       {account.isPremature && (
@@ -1504,6 +1571,122 @@ function DepositClosureContent() {
               </DialogContent>
             </Dialog>
 
+            {/* Interest Transactions Dialog */}
+            <Dialog open={interestTxnsOpen} onOpenChange={setInterestTxnsOpen}>
+              <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <History className="h-5 w-5 text-teal-600" />
+                    Interest Transactions
+                  </DialogTitle>
+                  <DialogDescription>
+                    Interest payouts recorded for account {account.accountNumber}
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="rounded-lg border border-border p-3">
+                    <p className="text-xs text-muted-foreground">Interest Already Paid</p>
+                    <p className="mt-1 text-lg font-bold">{formatCurrency(account.interestPaid || 0)}</p>
+                  </div>
+                  <div className="rounded-lg border border-teal-200 bg-teal-50 p-3 dark:border-teal-800 dark:bg-teal-950/30">
+                    <p className="text-xs text-teal-700 dark:text-teal-400">Interest Due for Payment</p>
+                    <p className="mt-1 text-lg font-bold text-teal-700 dark:text-teal-400">{formatCurrency(account.interestdueforpayment || 0)}</p>
+                  </div>
+                  <div className="rounded-lg border border-border p-3">
+                    <p className="text-xs text-muted-foreground">Payout Status</p>
+                    <div className="mt-1">
+                      {Number(account.interestPaid) > 0 && Number(account.interestdueforpayment) > 0 ? (
+                        <Badge className="bg-amber-100 text-amber-700">Partially Paid</Badge>
+                      ) : Number(account.interestPaid) > 0 ? (
+                        <Badge className="bg-teal-100 text-teal-700">Fully Paid</Badge>
+                      ) : (
+                        <Badge variant="outline">Not Paid</Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-auto rounded-lg border min-h-0">
+                  {isLoadingInterestTxns ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      <span className="ml-2 text-sm text-muted-foreground">Loading interest transactions...</span>
+                    </div>
+                  ) : interestTxnsError ? (
+                    <p className="py-12 text-center text-sm text-red-500">{interestTxnsError}</p>
+                  ) : interestTxns.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <History className="h-8 w-8 text-muted-foreground/30" />
+                      <p className="mt-2 text-sm text-muted-foreground">No interest payments have been made on this account.</p>
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Voucher</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead className="text-right">Amount Paid</TableHead>
+                          <TableHead>Narration</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {interestTxns.map((txn) => (
+                          <TableRow key={txn.id}>
+                            <TableCell className="text-sm">{formatDate(txn.transaction_date)}</TableCell>
+                            <TableCell className="font-mono text-xs">B{txn.gl_batch_id}/V{txn.voucher_no}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-xs">{txn.voucher_type || "CASH"}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right text-sm font-medium text-teal-600">{formatCurrency(txn.debit_amount)}</TableCell>
+                            <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground">{txn.narration}</TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="outline"
+                                className={
+                                  txn.batch_status === "APPROVED"
+                                    ? "border-teal-300 text-teal-700"
+                                    : txn.batch_status === "PENDING"
+                                      ? "border-amber-300 text-amber-700"
+                                      : "border-gray-300 text-gray-700"
+                                }
+                              >
+                                {txn.batch_status || "PENDING"}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </div>
+
+                {interestTxns.length > 0 && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {interestTxnsTotal > interestTxns.length
+                        ? `Showing latest ${interestTxns.length} of ${interestTxnsTotal} payments`
+                        : `${interestTxns.length} payment(s)`}
+                    </span>
+                    <span>
+                      <span className="text-muted-foreground">Total shown: </span>
+                      <span className="font-semibold text-teal-600">
+                        {formatCurrency(interestTxns.reduce((sum, t) => sum + Number(t.debit_amount || 0), 0))}
+                      </span>
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex justify-end">
+                  <Button variant="outline" className="bg-transparent" onClick={() => setInterestTxnsOpen(false)}>
+                    Close
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
             {/* GL Batch Selection Dialog */}
             <Dialog open={isBatchPopupOpen} onOpenChange={setIsBatchPopupOpen}>
               <DialogContent className="max-w-2xl">
@@ -1590,27 +1773,40 @@ function DepositClosureContent() {
                           <span className="font-medium">{account?.memberName}</span>
                         </div>
                         <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Current Balance:</span>
-                          <span className="font-semibold">{formatCurrency(account?.balance)}</span>
+                          <span className="text-muted-foreground">Deposit Amount:</span>
+                          <span className="font-semibold">{formatCurrency(account?.depositAmount)}</span>
                         </div>
                         <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Interest Earned:</span>
-                          <span className="font-semibold">{formatCurrency(account?.interestdueforpayment)}</span>
+                          <span className="text-muted-foreground">Maturity Amount:</span>
+                          <span className="font-semibold">
+                            {account?.maturityAmount ? formatCurrency(account.maturityAmount) : "--"}
+                          </span>
                         </div>
                         <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Interest Already Paid:</span>
-                          <span className="font-semibold">{formatCurrency(account?.interestPaid || 0)}</span>
+                          <span className="text-muted-foreground">Total Interest Earned:</span>
+                          <span className="font-semibold">{formatCurrency(confirmTotalInterestEarned)}</span>
                         </div>
-                        {effectivePenalty > 0 && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Penalty:</span>
-                            <span className="font-semibold text-red-600">- {formatCurrency(effectivePenalty)}</span>
-                          </div>
-                        )}
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">
+                            Total Interest Paid
+                            {account?.interestPayoutCount ? ` (${account.interestPayoutCount} payout${account.interestPayoutCount > 1 ? "s" : ""})` : ""}:
+                          </span>
+                          <span className="font-semibold">{formatCurrency(confirmInterestPaid)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Penalty Amount:</span>
+                          <span className={`font-semibold ${effectivePenalty > 0 ? "text-red-600" : ""}`}>
+                            {effectivePenalty > 0 ? `- ${formatCurrency(effectivePenalty)}` : formatCurrency(0)}
+                          </span>
+                        </div>
                         <div className="flex justify-between text-sm border-t border-border pt-2">
-                          <span className="font-medium">Net Payout:</span>
+                          <span className="font-medium">Net Payout Amount:</span>
                           <span className="font-bold text-teal-700">{formatCurrency(effectivePayout)}</span>
                         </div>
+                        <p className="text-xs text-muted-foreground text-right">
+                          Balance {formatCurrency(account?.balance)} + Unpaid Interest {formatCurrency(confirmInterestDue)}
+                          {effectivePenalty > 0 ? ` − Penalty ${formatCurrency(effectivePenalty)}` : ""}
+                        </p>
                       </div>
                     </div>
                   </AlertDialogDescription>

@@ -8,8 +8,26 @@ export const APPRAISER_TRACKED_FIELDS = [
   "mobile_no",
   "email",
   "address",
+  "account_number",
+  "account_type",
   "status",
 ] as const
+
+export const APPRAISER_ACCOUNT_TYPES = [
+  { value: "SAVINGS", label: "Savings" },
+  { value: "SUNDRY_CREDITOR", label: "Sundry Creditor" },
+  // { value: "CURRENT", label: "Current" },
+  // { value: "CASH", label: "Cash" },
+  // { value: "OTHER", label: "Other" },
+] as const
+
+// Returns an error message when the account details are invalid, otherwise null.
+export function validateAccount(accountNumber: unknown, accountType: unknown) {
+  const number = String(accountNumber ?? "").trim()
+  if (number && !/^\d+$/.test(number)) return "Account number must contain digits only"
+  if (accountType && !APPRAISER_ACCOUNT_TYPES.some((t) => t.value === accountType)) return "Invalid account type"
+  return null
+}
 
 export type AppraiserSnapshot = Record<(typeof APPRAISER_TRACKED_FIELDS)[number], string | null>
 
@@ -44,9 +62,9 @@ export async function recordAppraiserHistory(
   await client.query(
     `INSERT INTO appraiser_master_history
        (appraiser_id, branch_id, action, changes, appraiser_code, appraiser_name, license_no,
-        license_valid_till, mobile_no, email, address, status, changed_by)
+        license_valid_till, mobile_no, email, address, account_number, account_type, status, changed_by)
      SELECT appraiser_id, branch_id, $2, $3, appraiser_code, appraiser_name, license_no,
-            license_valid_till, mobile_no, email, address, status, $4
+            license_valid_till, mobile_no, email, address, account_number, account_type, status, $4
      FROM appraiser_master WHERE appraiser_id = $1`,
     [appraiserId, action, changes ? JSON.stringify(changes) : null, changedBy]
   )

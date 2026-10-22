@@ -250,6 +250,8 @@ export async function POST(req: Request) {
       account_id: acctNum,
       maturity_date: maturityDate,
       maturity_amount: maturityAmount,
+      deposit_amount: amt,
+      installment_amount: deposit_type === "RECURRING" ? Number(installment_amount) || 0 : null,
     })
   } catch (error: any) {
     await client.query("ROLLBACK")

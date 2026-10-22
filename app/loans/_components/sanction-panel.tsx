@@ -514,7 +514,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
           `Loan sanctioned successfully!\n\n` +
           `Sanction ID: ${data.sanction_id}\n` +
           `Amount: ${formatCurrency(parseFloat(sanctionedAmount))}\n` +
-          `EMI: ${formatCurrency(data.emi_amount)}\n` +
+          // `EMI: ${formatCurrency(data.emi_amount)}\n` +
           `Tenure: ${tenureMonths} months`,
       })
     } catch (error: any) {

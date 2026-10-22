@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { getSession } from "@/lib/auth/session"
-import { diffAppraiser, historyAction, recordAppraiserHistory } from "@/lib/appraiser-history"
+import { diffAppraiser, historyAction, recordAppraiserHistory, validateAccount } from "@/lib/appraiser-history"
 
 const SNAPSHOT_COLUMNS = `appraiser_code, appraiser_name, license_no,
        TO_CHAR(license_valid_till, 'YYYY-MM-DD') AS license_valid_till,
-       mobile_no, email, address, status`
+       mobile_no, email, address,
+       account_number::text AS account_number, account_type, status`
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession()
@@ -17,12 +18,16 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
   const client = await pool.connect()
   try {
-    const { appraiser_code, appraiser_name, license_no, license_valid_till, mobile_no, email, address, status } =
-      await req.json()
+    const {
+      appraiser_code, appraiser_name, license_no, license_valid_till, mobile_no, email, address,
+      account_number, account_type, status,
+    } = await req.json()
 
     if (!appraiser_code?.trim() || !appraiser_name?.trim()) {
       return NextResponse.json({ error: "Appraiser code and name are required" }, { status: 400 })
     }
+    const accountError = validateAccount(account_number, account_type)
+    if (accountError) return NextResponse.json({ error: accountError }, { status: 400 })
 
     await client.query("BEGIN")
 
@@ -41,9 +46,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const { rows: afterRows } = await client.query(
       `UPDATE appraiser_master
        SET appraiser_code = $1, appraiser_name = $2, license_no = $3, license_valid_till = $4,
-           mobile_no = $5, email = $6, address = $7, status = $8,
-           updated_by = $9, updated_at = now()
-       WHERE appraiser_id = $10 AND branch_id = $11
+           mobile_no = $5, email = $6, address = $7, account_number = $8, account_type = $9, status = $10,
+           updated_by = $11, updated_at = now()
+       WHERE appraiser_id = $12 AND branch_id = $13
        RETURNING ${SNAPSHOT_COLUMNS}`,
       [
         appraiser_code.trim().toUpperCase(),
@@ -53,6 +58,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         mobile_no?.trim() || null,
         email?.trim() || null,
         address?.trim() || null,
+        String(account_number ?? "").trim() || null,
+        account_type || null,
         status === "INACTIVE" ? "INACTIVE" : "ACTIVE",
         session.userId,
         appraiserId,

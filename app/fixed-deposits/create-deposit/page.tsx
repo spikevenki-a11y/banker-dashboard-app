@@ -187,7 +187,13 @@ export default function CreateDepositPage() {
   const [rdPenalRate, setRdPenalRate] = useState("")
 
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [successInfo, setSuccessInfo] = useState<{ account_number: string; maturity_date?: string; maturity_amount?: number } | null>(null)
+  const [successInfo, setSuccessInfo] = useState<{
+    account_number: string
+    maturity_date?: string
+    maturity_amount?: number
+    deposit_amount?: number
+    installment_amount?: number | null
+  } | null>(null)
   const [interestChartOpen, setInterestChartOpen] = useState(false)
 
   // Member search popup state
@@ -589,6 +595,8 @@ const getLogindate = async () => {
           account_number: data.account_number,
           maturity_date: data.maturity_date,
           maturity_amount: data.maturity_amount,
+          deposit_amount: data.deposit_amount,
+          installment_amount: data.installment_amount,
         })
       } else {
         alert(data.error || "Failed to create deposit account")
@@ -2241,6 +2249,21 @@ const getLogindate = async () => {
                           <span className="text-muted-foreground">Member:</span>
                           <span className="font-medium text-foreground">{memberInfo?.full_name}</span>
                         </div>
+                        {successInfo?.installment_amount != null ? (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Installment Amount:</span>
+                            <span className="font-semibold text-foreground">
+                              {Number(successInfo.installment_amount).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                            </span>
+                          </div>
+                        ) : successInfo?.deposit_amount != null && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Deposit Amount:</span>
+                            <span className="font-semibold text-foreground">
+                              {Number(successInfo.deposit_amount).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                            </span>
+                          </div>
+                        )}
                         {successInfo?.maturity_date && (
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Maturity Date:</span>
