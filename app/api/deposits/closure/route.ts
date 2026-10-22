@@ -74,6 +74,16 @@ export async function GET(request: NextRequest) {
       ? currentBalance - penaltyAmount
       : currentBalance
 
+    // Interest actually paid out, from the interest payout transactions
+    const { rows: [payoutTotals] } = await pool.query(
+      `SELECT COALESCE(SUM(debit_amount), 0) AS total_paid, COUNT(*) AS payout_count
+       FROM deposit_transactions
+       WHERE accountnumber = $1 AND branch_id = $2
+         AND transaction_type = 'INTEREST_PAYOUT'
+         AND COALESCE(status, '') <> 'REVERSED'`,
+      [account.accountnumber, branchId]
+    )
+
     // Fetch savings accounts for credit
     const { rows: savingsRows } = await pool.query(
       `SELECT sa.account_number, sa.available_balance, sa.clear_balance, sa.account_status, sa.scheme_id,
@@ -124,7 +134,9 @@ export async function GET(request: NextRequest) {
         penaltyAmount,
         payoutAmount,
         prematureClosureAllowed: account.premature_closure_allowed,
-        interestdueforpayment : account.interestdueforpayment
+        interestdueforpayment : account.interestdueforpayment,
+        interestPaidFromTransactions: Number(payoutTotals?.total_paid) || 0,
+        interestPayoutCount: parseInt(payoutTotals?.payout_count || "0"),
       },
       savingsAccounts: savingsRows.map((s: any) => ({
         accountNumber: s.account_number,

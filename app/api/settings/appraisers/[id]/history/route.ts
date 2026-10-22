@@ -15,7 +15,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       `SELECT h.history_id, h.action, h.changes,
               h.appraiser_code, h.appraiser_name, h.license_no,
               TO_CHAR(h.license_valid_till, 'YYYY-MM-DD') AS license_valid_till,
-              h.mobile_no, h.email, h.address, h.status,
+              h.mobile_no, h.email, h.address,
+              h.account_number::text AS account_number, h.account_type, h.status,
               h.changed_by, COALESCE(u.full_name, h.changed_by) AS changed_by_name,
               h.changed_at
        FROM appraiser_master_history h

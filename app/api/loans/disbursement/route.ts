@@ -2,6 +2,35 @@ import { getSession } from "@/lib/auth/session"
 import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
+import { creditAppraiserAccount, lockAppraiserAccount, type AppraiserAccount } from "@/lib/appraiser-account"
+
+// GET: Appraiser recorded on the loan's gold security (?loan_application_id=)
+export async function GET(request: NextRequest) {
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const loanApplicationId = Number(request.nextUrl.searchParams.get("loan_application_id"))
+  if (!loanApplicationId) return NextResponse.json({ error: "loan_application_id is required" }, { status: 400 })
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT am.appraiser_id
+       FROM loan_securities ls
+       JOIN security_gold_details g ON g.security_id = ls.id
+       JOIN appraiser_master am ON am.branch_id = ls.branch_id
+                               AND am.appraiser_name = g.appraiser_name
+                               AND COALESCE(am.license_no, '') = COALESCE(g.appraiser_license_no, '')
+       WHERE ls.loan_application_id = $1 AND ls.branch_id = $2
+       ORDER BY ls.is_primary_security DESC, ls.id
+       LIMIT 1`,
+      [loanApplicationId, session.branch]
+    )
+
+    return NextResponse.json({ success: true, appraiser_id: rows[0]?.appraiser_id ?? null })
+  } catch (error: any) {
+    return NextResponse.json({ error: "Failed to fetch loan appraiser: " + error.message }, { status: 500 })
+  }
+}
 
 // POST: Disburse a sanctioned loan
 export async function POST(request: NextRequest) {
@@ -18,14 +47,23 @@ export async function POST(request: NextRequest) {
     const {
       loan_application_id,
       disbursement_amount,
-      disbursement_mode, // 'CASH' or 'TRANSFER'
+      disbursement_mode, // 'CASH', 'TRANSFER' or 'DEFAULT_TRANSFER'
       narration,
       appraiser_charge,
+      savings_account_no, // required for DEFAULT_TRANSFER
     } = body
 
     if (!loan_application_id || !disbursement_amount || !disbursement_mode) {
       return NextResponse.json(
         { error: "Application ID, amount, and disbursement mode are required" },
+        { status: 400 }
+      )
+    }
+
+    const isDefaultTransfer = disbursement_mode === 'DEFAULT_TRANSFER'
+    if (isDefaultTransfer && !savings_account_no) {
+      return NextResponse.json(
+        { error: "Savings account is required for Default Transfer" },
         { status: 400 }
       )
     }
@@ -66,6 +104,65 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Disbursement amount cannot exceed sanctioned amount" }, { status: 400 })
     }
 
+    // Default Transfer: lock and validate the member's destination savings account
+    let savingsAccount: any = null
+    if (isDefaultTransfer) {
+      const { rows: savingsRows } = await client.query(
+        `SELECT sa.*, ss.savings_gl_account
+         FROM savings_accounts sa
+         JOIN savings_schemes ss ON ss.scheme_id = sa.scheme_id AND ss.branch_id = sa.branch_id
+         WHERE sa.account_number = $1 AND sa.branch_id = $2
+           AND CAST(sa.membership_no AS VARCHAR) = $3
+         FOR UPDATE`,
+        [savings_account_no, branchId, String(app.membership_no)]
+      )
+
+      if (savingsRows.length === 0) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: `Savings account ${savings_account_no} not found for this member` }, { status: 404 })
+      }
+
+      savingsAccount = savingsRows[0]
+
+      if (String(savingsAccount.account_status).toUpperCase() !== 'ACTIVE') {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: `Savings account ${savings_account_no} is not active` }, { status: 400 })
+      }
+
+      if (!savingsAccount.savings_gl_account) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: "Savings GL account is not configured for the savings scheme" }, { status: 400 })
+      }
+    }
+
+    // Appraiser charge adjusted with loan reduces the amount credited to savings
+    const adjustedChargeAmt =
+      appraiser_charge && appraiser_charge.charge_amount > 0 && appraiser_charge.payment_mode !== 'CASH'
+        ? parseFloat(appraiser_charge.charge_amount)
+        : 0
+    const savingsCreditAmt = parseFloat(disbursement_amount) - adjustedChargeAmt
+
+    if (isDefaultTransfer && savingsCreditAmt <= 0) {
+      await client.query("ROLLBACK")
+      return NextResponse.json({ error: "Appraiser charge cannot be equal to or exceed the disbursement amount" }, { status: 400 })
+    }
+
+    // Appraiser charge: resolve and lock the appraiser's designated account before posting anything
+    const hasAppraiserCharge = !!appraiser_charge && parseFloat(appraiser_charge.charge_amount) > 0
+    let appraiserAccount: AppraiserAccount | null = null
+    if (hasAppraiserCharge) {
+      if (!appraiser_charge.appraiser_id) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: "Select the appraiser to receive the appraiser charge" }, { status: 400 })
+      }
+      const resolved = await lockAppraiserAccount(client, branchId, Number(appraiser_charge.appraiser_id))
+      if (resolved.error) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: resolved.error }, { status: 400 })
+      }
+      appraiserAccount = resolved.account!
+    }
+
     // Generate loan account number
     // const loanAccountNo = `LN${branchId}${String(app.loan_application_id).padStart(8, '0')}`
     const loanAccountNo = app.loan_application_id
@@ -95,7 +192,7 @@ export async function POST(request: NextRequest) {
         business_date, branch_id, batch_id, voucher_id,
         voucher_type, maker_id, status
       ) VALUES ($1, $2, $3, $4, $5, $6, 'PENDING')
-    `, [businessDate, branchId, batchId, voucherNo, disbursement_mode, session.userId])
+    `, [businessDate, branchId, batchId, voucherNo, isDefaultTransfer ? 'TRANSFER' : disbursement_mode, session.userId])
 
     // GL entries: DR Loan Account, CR Cash/Bank
     // Debit Loan GL (Asset increases)
@@ -115,31 +212,86 @@ export async function POST(request: NextRequest) {
       session.userId
     ])
 
-    // Credit Cash/Bank (Asset decreases)
-    const cashGlAccount = disbursement_mode === 'CASH' ? '23100000' : '11100000'
-    await client.query(`
-      INSERT INTO gl_batch_lines (
-        branch_id, batch_id, business_date,
-        accountcode, ref_account_id,
-        debit_amount, credit_amount,
-        voucher_id, narration, created_by
-      ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9)
-    `, [
-      branchId, batchId, businessDate,
-      cashGlAccount, '0',
-      disbursement_amount,
-      voucherNo,
-      narration || "Loan Disbursement",
-      session.userId
-    ])
+    if (isDefaultTransfer) {
+      // CR Savings GL (liability increases) - credit member's savings account
+      const savingsNarration = `Loan disbursement - Ref ${app.reference_no}`
+      const newSavingsBalance = parseFloat(savingsAccount.available_balance) + savingsCreditAmt
 
-    // Appraiser charge GL entries
-    if (appraiser_charge && appraiser_charge.charge_amount > 0) {
+      await client.query(`
+        INSERT INTO gl_batch_lines (
+          branch_id, batch_id, business_date,
+          accountcode, ref_account_id,
+          debit_amount, credit_amount,
+          voucher_id, narration, created_by
+        ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9)
+      `, [
+        branchId, batchId, businessDate,
+        savingsAccount.savings_gl_account, String(savings_account_no),
+        savingsCreditAmt,
+        voucherNo,
+        savingsNarration,
+        session.userId
+      ])
+
+      // Record savings transaction
+      await client.query(`
+        INSERT INTO savings_transactions (
+          branch_id, account_number,
+          transaction_date, value_date,
+          transaction_type, voucher_type,
+          debit_amount, credit_amount, running_balance,
+          narration, voucher_no, gl_batch_id,
+          status, created_by
+        ) VALUES (
+          $1,$2,
+          $3,$3,
+          'DEPOSIT','TRANSFER',
+          0,$4,$5,
+          $6,$7,$8,
+          'PENDING',$9
+        )
+      `, [
+        branchId, savings_account_no,
+        businessDate,
+        savingsCreditAmt, newSavingsBalance,
+        savingsNarration,
+        voucherNo, batchId,
+        session.userId
+      ])
+
+      // Update savings balance
+      await client.query(
+        `UPDATE savings_accounts
+         SET available_balance = $1, clear_balance = $1, updated_at = NOW()
+         WHERE account_number = $2 AND branch_id = $3`,
+        [newSavingsBalance, savings_account_no, branchId]
+      )
+    } else {
+      // Credit Cash/Bank (Asset decreases)
+      const cashGlAccount = disbursement_mode === 'CASH' ? '23100000' : '11100000'
+      await client.query(`
+        INSERT INTO gl_batch_lines (
+          branch_id, batch_id, business_date,
+          accountcode, ref_account_id,
+          debit_amount, credit_amount,
+          voucher_id, narration, created_by
+        ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9)
+      `, [
+        branchId, batchId, businessDate,
+        cashGlAccount, '0',
+        disbursement_amount,
+        voucherNo,
+        narration || "Loan Disbursement",
+        session.userId
+      ])
+    }
+
+    // Appraiser charge: transfer to the appraiser's designated account
+    if (hasAppraiserCharge && appraiserAccount) {
       const chargeAmt = parseFloat(appraiser_charge.charge_amount)
-      const receiveAccount = appraiser_charge.receive_account_number || '23100000'
 
       if (appraiser_charge.payment_mode === 'CASH') {
-        // Separate cash voucher: DR Cash, CR Appraiser Receive Account
+        // Separate cash voucher: DR Cash, CR Appraiser Account
         const { rows: [chargeBatch] } = await client.query(`
           UPDATE gl_batch_sequences SET last_batch_id = last_batch_id + 1
           WHERE branch_id = $1 RETURNING last_batch_id
@@ -166,24 +318,29 @@ export async function POST(request: NextRequest) {
           VALUES ($1, $2, $3, '23100000', '0', $4, 0, $5, $6, $7)
         `, [branchId, chargeBatchId, businessDate, chargeAmt, chargeVoucherNo, `Appraiser charge - ${app.reference_no}`, session.userId])
 
-        // CR Appraiser Receive Account
-        await client.query(`
-          INSERT INTO gl_batch_lines (branch_id, batch_id, business_date, accountcode, ref_account_id, debit_amount, credit_amount, voucher_id, narration, created_by)
-          VALUES ($1, $2, $3, $4, '0', 0, $5, $6, $7, $8)
-        `, [branchId, chargeBatchId, businessDate, receiveAccount, chargeAmt, chargeVoucherNo, `Appraiser charge - ${app.reference_no}`, session.userId])
+        // CR Appraiser Account
+        await creditAppraiserAccount(client, {
+          account: appraiserAccount, branchId, batchId: chargeBatchId, voucherNo: chargeVoucherNo, businessDate,
+          voucherType: 'CASH', amount: chargeAmt,
+          narration: `Appraiser charge - ${app.reference_no}`, userId: session.userId,
+        })
 
       } else {
         // ADJUST_WITH_LOAN: add CR Appraiser Account to existing batch (reduces cash paid to member)
-        await client.query(`
-          INSERT INTO gl_batch_lines (branch_id, batch_id, business_date, accountcode, ref_account_id, debit_amount, credit_amount, voucher_id, narration, created_by)
-          VALUES ($1, $2, $3, $4, '0', 0, $5, $6, $7, $8)
-        `, [branchId, batchId, businessDate, receiveAccount, chargeAmt, voucherNo, `Appraiser charge adjusted - ${app.reference_no}`, session.userId])
+        await creditAppraiserAccount(client, {
+          account: appraiserAccount, branchId, batchId, voucherNo, businessDate,
+          voucherType: 'TRANSFER', amount: chargeAmt,
+          narration: `Appraiser charge adjusted - ${app.reference_no}`, userId: session.userId,
+        })
 
         // Offset the cash line: additional CR on cash account to net down member payout
-        await client.query(`
-          INSERT INTO gl_batch_lines (branch_id, batch_id, business_date, accountcode, ref_account_id, debit_amount, credit_amount, voucher_id, narration, created_by)
-          VALUES ($1, $2, $3, '23100000', '0', $4, 0, $5, $6, $7)
-        `, [branchId, batchId, businessDate, chargeAmt, voucherNo, `Appraiser charge offset - ${app.reference_no}`, session.userId])
+        // (Default Transfer already credits the net amount to savings, so no offset is needed)
+        if (!isDefaultTransfer) {
+          await client.query(`
+            INSERT INTO gl_batch_lines (branch_id, batch_id, business_date, accountcode, ref_account_id, debit_amount, credit_amount, voucher_id, narration, created_by)
+            VALUES ($1, $2, $3, '23100000', '0', $4, 0, $5, $6, $7)
+          `, [branchId, batchId, businessDate, chargeAmt, voucherNo, `Appraiser charge offset - ${app.reference_no}`, session.userId])
+        }
       }
     }
 
@@ -259,6 +416,8 @@ export async function POST(request: NextRequest) {
       loan_account_no: loanAccountNo,
       voucher_no: voucherNo,
       batch_id: batchId,
+      savings_account_no: isDefaultTransfer ? savings_account_no : null,
+      appraiser_account_no: appraiserAccount?.account_number ?? null,
       emi_amount: emi,
       total_installments: N
     })
