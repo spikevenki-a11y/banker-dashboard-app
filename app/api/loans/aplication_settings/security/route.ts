@@ -13,16 +13,16 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const schemeId = searchParams.get("schemeId")
 
-    let query = `select lssm.security_id , lssmr.security_name from loan_scheme_security_mapping lssm
-      left join loan_scheme_security_master lssmr on lssmr.security_id = lssm.security_id
-      WHERE lssm.branch_id = $1
+    let query = `select distinct lssm.security_id , lssmr.security_name from loan_scheme_security_mapping lssm
+      join loan_scheme_security_master lssmr on lssmr.security_id = lssm.security_id
+      WHERE lssm.branch_id = $1 AND lssmr.is_active = TRUE
     `
     const params: any[] = [branchId]
     if (schemeId) {
       params.push(schemeId)
-      query += ` AND scheme_id = $${params.length}`
+      query += ` AND lssm.scheme_id = $${params.length}`
     }
-
+    query += ` ORDER BY lssm.security_id`
 
 
     const { rows: security } = await pool.query(query, params)
