@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Users, Gem, ClipboardList } from "lucide-react"
+import { ArrowLeft, Users, Gem, ClipboardList, ShieldCheck } from "lucide-react"
 import { DashboardWrapper } from "../../_components/dashboard-wrapper"
 
 const managementCards = [
@@ -24,6 +24,15 @@ const managementCards = [
     color: "text-blue-600",
     bgColor: "bg-blue-50",
     href: "/settings/management/appraisal-master",
+  },
+  {
+    id: "loan-scheme-security",
+    title: "Loan Scheme Security Configuration",
+    description: "Configure which security types are accepted for each loan scheme",
+    icon: ShieldCheck,
+    color: "text-violet-600",
+    bgColor: "bg-violet-50",
+    href: "/settings/management/loan-scheme-security",
   },
 ]
 
