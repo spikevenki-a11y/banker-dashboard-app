@@ -131,8 +131,9 @@ export default function DashboardPage() {
   const statsCards = [
     {
       title: "Liquid Deposit-1",
-      value: stats?.totalMembers?.toString() || "0",
-      subtitle: `${ 0} active`,
+      value:  "0" ,
+      // value: stats?.totalMembers?.toString() || "0",
+      subtitle: "0 active",
       // subtitle: `${stats?.activeMembers || 0} active`,
       icon: PiggyBank,
       gradient: "from-blue-500 to-blue-600",

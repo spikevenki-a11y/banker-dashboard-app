@@ -67,8 +67,11 @@ create table loan_scheme_security_mapping (
     foreign key (security_id) references security_master(security_id)
 );
 
-insert into loan_scheme_security_mapping (branch_id, scheme_id, security_id) values
-(23108001, 501, 8);
+ALTER TABLE public.loan_scheme_security_mapping
+ADD COLUMN is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+ADD COLUMN created_by VARCHAR(100) NULL;
+
+
 
 CREATE TABLE security_details (
     branch_id INT,

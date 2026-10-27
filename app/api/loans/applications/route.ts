@@ -339,7 +339,9 @@ export async function POST(request: NextRequest) {
           )
         }
       } else if ([1, 2].includes(typeId)) {
-        // Land / Building
+        // Land / Building. Land (type 1) no longer stores property type, owner,
+        // address, sqft areas or document type.
+        const isLand = typeId === 1
         await client.query(
           `INSERT INTO security_property_details (
             security_id, property_type, ownership_type, survey_no, owner_name,
@@ -347,31 +349,36 @@ export async function POST(request: NextRequest) {
             land_area_sqft, built_up_area_sqft, land_area_acres,
             registration_no, registration_date, document_type,
             guideline_value, market_value, encumbrance_cert_date,
-            title_clear, legal_opinion_by, legal_opinion_date, created_at
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,NOW())`,
+            title_clear, legal_opinion_by, legal_opinion_date,
+            ec_date_from, ec_date_to, vao_details, revenue_village, created_at
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,NOW())`,
           [
             securityId,
-            security.property_type || (typeId === 1 ? 'AGRICULTURAL' : 'RESIDENTIAL'),
+            isLand ? null : (security.property_type || 'RESIDENTIAL'),
             security.ownership_type || 'OWNED',
             security.survey_no || null,
-            security.owner_name || null,
-            security.address_line1 || null,
-            security.city || null,
-            security.district || null,
-            security.state_name || null,
-            security.pincode || null,
-            security.land_area_sqft || null,
-            security.built_up_area_sqft || null,
+            isLand ? null : (security.owner_name || null),
+            isLand ? null : (security.address_line1 || null),
+            isLand ? null : (security.city || null),
+            isLand ? null : (security.district || null),
+            isLand ? null : (security.state_name || null),
+            isLand ? null : (security.pincode || null),
+            isLand ? null : (security.land_area_sqft || null),
+            isLand ? null : (security.built_up_area_sqft || null),
             security.land_area_acres || null,
             security.registration_no || null,
             security.registration_date || null,
-            security.document_type || null,
+            isLand ? null : (security.document_type || null),
             security.guideline_value || null,
             security.market_value || null,
             security.encumbrance_cert_date || null,
             security.title_clear || null,
             security.legal_opinion_by || null,
             security.legal_opinion_date || null,
+            isLand ? (security.ec_date_from || null) : null,
+            isLand ? (security.ec_date_to || null) : null,
+            isLand ? (security.vao_details || null) : null,
+            isLand ? (security.revenue_village || null) : null,
           ]
         )
       } else if (typeId === 7) {

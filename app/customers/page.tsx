@@ -260,7 +260,7 @@ function AddressSection({
         <Field id={`${prefix}street`} label="Street / Area">
           <Input id={`${prefix}street`} placeholder="e.g. Gandhi Nagar" {...f("street")} />
         </Field>
-        <Field id={`${prefix}village`} label="Village / Town">
+        <Field id={`${prefix}village`} label="Revenue Village">
           <Input id={`${prefix}village`} placeholder="e.g. Coimbatore" {...f("village")} />
         </Field>
         <Field id={`${prefix}taluk`} label="Taluk">
@@ -707,10 +707,11 @@ export default function CustomerPage() {
                           <SelectItem value="Farmer">Farmer</SelectItem>
                           <SelectItem value="Cooperative">Cooperative</SelectItem>
                           <SelectItem value="Goverment/Public Sector">Goverment/Public Sector</SelectItem>
-                          <SelectItem value="Private Sector Job">Private Sector Job</SelectItem>
+                          <SelectItem value="Salaried">Salaried</SelectItem>
                           <SelectItem value="Professional">Professional</SelectItem>
                           <SelectItem value="Self Employed / Business">Self Employed / Business</SelectItem>
                           <SelectItem value="Student">Student</SelectItem>
+                          <SelectItem value="Retired">Retired</SelectItem>
                           <SelectItem value="Others">Others</SelectItem>
                           <SelectItem value="N/A">N/A</SelectItem>
                         </SelectContent>
