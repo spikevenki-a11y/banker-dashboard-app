@@ -167,6 +167,7 @@ export default function SchemeMaintenancePage() {
   const [selectedModule, setSelectedModule] = useState<string>("")
   const [schemes, setSchemes] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [loadError, setLoadError] = useState("")
   const [editScheme, setEditScheme] = useState<any | null>(null)
   const [editValues, setEditValues] = useState<Record<string, any>>({})
   const [isSaving, setIsSaving] = useState(false)
@@ -183,14 +184,15 @@ export default function SchemeMaintenancePage() {
   async function fetchSchemes(mod: string) {
     setIsLoading(true)
     setSchemes([])
+    setLoadError("")
     try {
       const res = await fetch(`/api/schemes?module=${mod}`, { credentials: "include" })
       const data = await res.json()
-      if (data.success) {
-        setSchemes(data.schemes)
-      }
-    } catch (err) {
+      if (!res.ok || !data.success) throw new Error(data.error || "Failed to fetch schemes")
+      setSchemes(data.schemes)
+    } catch (err: any) {
       console.error("Failed to fetch schemes:", err)
+      setLoadError(err.message || "Failed to fetch schemes")
     } finally {
       setIsLoading(false)
     }
@@ -404,8 +406,20 @@ export default function SchemeMaintenancePage() {
           </Card>
         )}
 
+        {/* Load error */}
+        {!isLoading && selectedModule && loadError && (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center gap-4 py-12">
+              <p className="text-sm text-destructive">{loadError}</p>
+              <Button variant="outline" onClick={() => fetchSchemes(selectedModule)} className="bg-transparent">
+                Retry
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Empty state */}
-        {!isLoading && selectedModule && schemes.length === 0 && (
+        {!isLoading && selectedModule && !loadError && schemes.length === 0 && (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-16">
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">

@@ -125,6 +125,10 @@ type PropertyDetail = {
   legal_opinion_by: string
   legal_opinion_date: string
   encumbrance_cert_date: string
+  ec_date_from?: string | null
+  ec_date_to?: string | null
+  vao_details?: string | null
+  revenue_village?: string | null
 }
 
 type VehicleDetail = {
@@ -382,9 +386,19 @@ function GoldSecurityPanel({ detail, items, documents }: {
   )
 }
 
-function PropertySecurityPanel({ detail }: { detail: PropertyDetail }) {
+function PropertySecurityPanel({ detail, isLand = false }: { detail: PropertyDetail; isLand?: boolean }) {
   return (
     <div className="space-y-5">
+      {isLand && (
+        <Section title="Land Records">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <InfoRow label="EC Date From" value={formatDate(detail.ec_date_from)} />
+            <InfoRow label="EC Date To" value={formatDate(detail.ec_date_to)} />
+            <InfoRow label="VAO Details" value={detail.vao_details} />
+            <InfoRow label="Revenue Village" value={detail.revenue_village} />
+          </div>
+        </Section>
+      )}
       <Section title="Property Info">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <InfoRow label="Property Type" value={detail.property_type} />
@@ -962,7 +976,10 @@ export default function LoanDetailsPage() {
                           />
                         )}
                         {(loanSecurity.security_code === "LAND" || loanSecurity.security_code === "BUILDING") && (
-                          <PropertySecurityPanel detail={loanSecurity.detail as PropertyDetail} />
+                          <PropertySecurityPanel
+                            detail={loanSecurity.detail as PropertyDetail}
+                            isLand={loanSecurity.security_code === "LAND"}
+                          />
                         )}
                         {loanSecurity.security_code === "VEHICLE" && (
                           <VehicleSecurityPanel detail={loanSecurity.detail as VehicleDetail} />

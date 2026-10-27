@@ -157,6 +157,11 @@ type SecurityForm = {
   title_clear: boolean
   legal_opinion_by: string
   legal_opinion_date: string
+  // Land only
+  ec_date_from: string
+  ec_date_to: string
+  vao_details: string
+  revenue_village: string
   // Vehicle
   vehicle_type: string
   vehicle_registration_no: string
@@ -216,6 +221,7 @@ const emptySecurityForm: SecurityForm = {
   built_up_area_sqft: "", registration_no: "", registration_date: "", document_type: "",
   guideline_value: "", encumbrance_cert_date: "", title_clear: false,
   legal_opinion_by: "", legal_opinion_date: "",
+  ec_date_from: "", ec_date_to: "", vao_details: "", revenue_village: "",
   vehicle_type: "FOUR_WHEELER", vehicle_registration_no: "", chassis_no: "", engine_no: "",
   manufacturer: "", model: "", year_of_manufacture: "", vehicle_registration_date: "",
   rc_book_held: false, insurance_policy_no: "", insurance_expiry: "", purchase_price: "",
@@ -752,6 +758,11 @@ export default function LoanApplicationPage() {
         return
       }
     }
+    if (Number(selectedSecurityId) === 1 && securityForm.ec_date_from && securityForm.ec_date_to
+        && securityForm.ec_date_from > securityForm.ec_date_to) {
+      alert("EC Date From cannot be after EC Date To.")
+      return
+    }
     setIsSubmitting(true)
 
     // Build security payload
@@ -798,28 +809,34 @@ export default function LoanApplicationPage() {
           })),
         })
       } else if ([1, 2].includes(typeId)) {
+        // Land (type 1) does not capture property type, owner, address, sqft areas or document type
+        const land = typeId === 1
         Object.assign(securityPayload, {
-          property_type: securityForm.property_type || null,
+          property_type: land ? null : securityForm.property_type || null,
           ownership_type: securityForm.ownership_type || null,
           survey_no: securityForm.survey_no || null,
-          owner_name: securityForm.owner_name || null,
-          address_line1: securityForm.address_line1 || null,
-          city: securityForm.city || null,
-          district: securityForm.district || null,
-          state_name: securityForm.state_name || null,
-          pincode: securityForm.pincode || null,
-          land_area_sqft: securityForm.land_area_sqft ? Number(securityForm.land_area_sqft) : null,
+          owner_name: land ? null : securityForm.owner_name || null,
+          address_line1: land ? null : securityForm.address_line1 || null,
+          city: land ? null : securityForm.city || null,
+          district: land ? null : securityForm.district || null,
+          state_name: land ? null : securityForm.state_name || null,
+          pincode: land ? null : securityForm.pincode || null,
+          land_area_sqft: !land && securityForm.land_area_sqft ? Number(securityForm.land_area_sqft) : null,
           land_area_acres: securityForm.land_area_acres ? Number(securityForm.land_area_acres) : null,
-          built_up_area_sqft: securityForm.built_up_area_sqft ? Number(securityForm.built_up_area_sqft) : null,
+          built_up_area_sqft: !land && securityForm.built_up_area_sqft ? Number(securityForm.built_up_area_sqft) : null,
           registration_no: securityForm.registration_no || null,
           registration_date: securityForm.registration_date || null,
-          document_type: securityForm.document_type || null,
+          document_type: land ? null : securityForm.document_type || null,
           guideline_value: securityForm.guideline_value ? Number(securityForm.guideline_value) : null,
           market_value: securityForm.market_value ? Number(securityForm.market_value) : null,
           encumbrance_cert_date: securityForm.encumbrance_cert_date || null,
           title_clear: securityForm.title_clear,
           legal_opinion_by: securityForm.legal_opinion_by || null,
           legal_opinion_date: securityForm.legal_opinion_date || null,
+          ec_date_from: land ? securityForm.ec_date_from || null : null,
+          ec_date_to: land ? securityForm.ec_date_to || null : null,
+          vao_details: land ? securityForm.vao_details.trim() || null : null,
+          revenue_village: land ? securityForm.revenue_village.trim() || null : null,
         })
       } else if (typeId === 7) {
         Object.assign(securityPayload, {
@@ -934,6 +951,7 @@ export default function LoanApplicationPage() {
   const secTypeId = Number(selectedSecurityId)
   const isGold = secTypeId === 6
   const isProperty = [1, 2].includes(secTypeId)
+  const isLand = secTypeId === 1
   const isVehicle = secTypeId === 7
   const isDeposit = [8, 12].includes(secTypeId)
   const isInsurance = secTypeId === 10
@@ -1460,16 +1478,18 @@ export default function LoanApplicationPage() {
                       <div className="rounded-lg border border-green-200 bg-green-50/30 p-4 space-y-4">
                         <p className="text-sm font-semibold text-green-800">Property Details</p>
 
-                        <div className="grid grid-cols-3 gap-3">
-                          <div className="space-y-1">
-                            <Label className="text-xs">Property Type *</Label>
-                            <Select value={securityForm.property_type} onValueChange={(v) => sf("property_type", v)}>
-                              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select type" /></SelectTrigger>
-                              <SelectContent>
-                                {["RESIDENTIAL", "COMMERCIAL", "AGRICULTURAL", "INDUSTRIAL", "PLOT"].map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                          </div>
+                        <div className={`grid gap-3 ${isLand ? "grid-cols-2" : "grid-cols-3"}`}>
+                          {!isLand && (
+                            <div className="space-y-1">
+                              <Label className="text-xs">Property Type *</Label>
+                              <Select value={securityForm.property_type} onValueChange={(v) => sf("property_type", v)}>
+                                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select type" /></SelectTrigger>
+                                <SelectContent>
+                                  {["RESIDENTIAL", "COMMERCIAL", "AGRICULTURAL", "INDUSTRIAL", "PLOT"].map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
                           <div className="space-y-1">
                             <Label className="text-xs">Ownership Type</Label>
                             <Select value={securityForm.ownership_type} onValueChange={(v) => sf("ownership_type", v)}>
@@ -1485,6 +1505,7 @@ export default function LoanApplicationPage() {
                           </div>
                         </div>
 
+                        {!isLand && (<>
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1">
                             <Label className="text-xs">Owner Name</Label>
@@ -1514,23 +1535,28 @@ export default function LoanApplicationPage() {
                             <Input className="h-8 text-xs" maxLength={6} value={securityForm.pincode} onChange={(e) => sf("pincode", e.target.value)} />
                           </div>
                         </div>
+                        </>)}
 
-                        <div className="grid grid-cols-3 gap-3">
-                          <div className="space-y-1">
-                            <Label className="text-xs">Land Area (Sqft)</Label>
-                            <Input className="h-8 text-xs" type="number" value={securityForm.land_area_sqft} onChange={(e) => sf("land_area_sqft", e.target.value)} />
-                          </div>
+                        <div className={`grid gap-3 ${isLand ? "grid-cols-1" : "grid-cols-3"}`}>
+                          {!isLand && (
+                            <div className="space-y-1">
+                              <Label className="text-xs">Land Area (Sqft)</Label>
+                              <Input className="h-8 text-xs" type="number" value={securityForm.land_area_sqft} onChange={(e) => sf("land_area_sqft", e.target.value)} />
+                            </div>
+                          )}
                           <div className="space-y-1">
                             <Label className="text-xs">Land Area (Acres)</Label>
                             <Input className="h-8 text-xs" type="number" step="0.0001" value={securityForm.land_area_acres} onChange={(e) => sf("land_area_acres", e.target.value)} />
                           </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs">Built-up Area (Sqft)</Label>
-                            <Input className="h-8 text-xs" type="number" value={securityForm.built_up_area_sqft} onChange={(e) => sf("built_up_area_sqft", e.target.value)} />
-                          </div>
+                          {!isLand && (
+                            <div className="space-y-1">
+                              <Label className="text-xs">Built-up Area (Sqft)</Label>
+                              <Input className="h-8 text-xs" type="number" value={securityForm.built_up_area_sqft} onChange={(e) => sf("built_up_area_sqft", e.target.value)} />
+                            </div>
+                          )}
                         </div>
 
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className={`grid gap-3 ${isLand ? "grid-cols-2" : "grid-cols-3"}`}>
                           <div className="space-y-1">
                             <Label className="text-xs">Registration No</Label>
                             <Input className="h-8 text-xs" placeholder="Deed / doc number" value={securityForm.registration_no} onChange={(e) => sf("registration_no", e.target.value)} />
@@ -1539,15 +1565,17 @@ export default function LoanApplicationPage() {
                             <Label className="text-xs">Registration Date</Label>
                             <Input className="h-8 text-xs" type="date" value={securityForm.registration_date} onChange={(e) => sf("registration_date", e.target.value)} />
                           </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs">Document Type</Label>
-                            <Select value={securityForm.document_type} onValueChange={(v) => sf("document_type", v)}>
-                              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select" /></SelectTrigger>
-                              <SelectContent>
-                                {["SALE_DEED", "GIFT_DEED", "PARTITION_DEED", "LEASE_DEED"].map((t) => <SelectItem key={t} value={t}>{t.replace(/_/g, " ")}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                          </div>
+                          {!isLand && (
+                            <div className="space-y-1">
+                              <Label className="text-xs">Document Type</Label>
+                              <Select value={securityForm.document_type} onValueChange={(v) => sf("document_type", v)}>
+                                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select" /></SelectTrigger>
+                                <SelectContent>
+                                  {["SALE_DEED", "GIFT_DEED", "PARTITION_DEED", "LEASE_DEED"].map((t) => <SelectItem key={t} value={t}>{t.replace(/_/g, " ")}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
                         </div>
 
                         <div className="grid grid-cols-3 gap-3">
@@ -1564,6 +1592,27 @@ export default function LoanApplicationPage() {
                             <Input className="h-8 text-xs" placeholder="Advocate name" value={securityForm.legal_opinion_by} onChange={(e) => sf("legal_opinion_by", e.target.value)} />
                           </div>
                         </div>
+
+                        {isLand && (
+                          <div className="grid grid-cols-4 gap-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs">EC Date From</Label>
+                              <Input className="h-8 text-xs" type="date" max={securityForm.ec_date_to || undefined} value={securityForm.ec_date_from} onChange={(e) => sf("ec_date_from", e.target.value)} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">EC Date To</Label>
+                              <Input className="h-8 text-xs" type="date" min={securityForm.ec_date_from || undefined} value={securityForm.ec_date_to} onChange={(e) => sf("ec_date_to", e.target.value)} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">VAO Details</Label>
+                              <Input className="h-8 text-xs" maxLength={255} placeholder="VAO name / office" value={securityForm.vao_details} onChange={(e) => sf("vao_details", e.target.value)} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Revenue Village</Label>
+                              <Input className="h-8 text-xs" maxLength={150} placeholder="Revenue village" value={securityForm.revenue_village} onChange={(e) => sf("revenue_village", e.target.value)} />
+                            </div>
+                          </div>
+                        )}
 
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input type="checkbox" className="h-4 w-4 rounded border-gray-300"
