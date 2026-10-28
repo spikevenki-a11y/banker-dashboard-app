@@ -436,7 +436,7 @@ export default function LoanDisbursementPage() {
 
       setSuccessMessage(
         `Loan disbursed successfully!\n\n` +
-        `Loan Account: ${data.loan_account_no}\n` +
+        `Account No : ${data.loan_account_no}\n` +
         `Amount: ${formatCurrency(parseFloat(disbursementAmount))}\n` +
         (data.savings_account_no
           ? `Credited to Savings A/c: ${data.savings_account_no}\nBatch ID: ${data.batch_id}\n`
@@ -1087,10 +1087,10 @@ export default function LoanDisbursementPage() {
                   <span className="font-mono">{selectedSavingsAccount}</span>
                 </div>
               )}
-              <div className="flex justify-between text-sm border-t pt-2">
+              {/* <div className="flex justify-between text-sm border-t pt-2">
                 <span className="font-semibold">Monthly EMI:</span>
                 <span className="font-bold text-primary">{formatCurrency(selectedLoan?.emi_amount || 0)}</span>
-              </div>
+              </div> */}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowConfirmDialog(false)}>
@@ -1131,7 +1131,7 @@ export default function LoanDisbursementPage() {
                 <div>
                   <span className="whitespace-pre-line block">{successMessage}</span>
                   <span className="block mt-3 text-muted-foreground">
-                    The loan has been successfully disbursed. The member can now begin repayments as per the EMI schedule.
+                    The loan has been successfully disbursed.
                   </span>
                 </div>
               </AlertDialogDescription>

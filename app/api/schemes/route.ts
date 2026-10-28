@@ -67,8 +67,6 @@ export async function GET(req: NextRequest) {
                 loan_gl_account, interest_income_gl_account, interest_receivable_gl_account,
                 penal_interest_gl_account, processing_fee_gl_account,
                 minimum_age, maximum_age, is_staff_only,
-                appraiser_charge_allowed, appraiser_charge_code,
-                appraiser_name, appraiser_amount_receive_account_number,
                 created_at, updated_at
          FROM loan_schemes
          WHERE branch_id = $1
@@ -138,9 +136,7 @@ export async function PUT(req: NextRequest) {
         "penal_interest_rate", "penalty_grace_days",
         "processing_fee_percent", "processing_fee_min", "processing_fee_max",
         "prepayment_allowed", "prepayment_penalty_percent", "collateral_required",
-        "minimum_age", "maximum_age", "is_staff_only",
-        "appraiser_charge_allowed", "appraiser_charge_code",
-        "appraiser_name", "appraiser_amount_receive_account_number"
+        "minimum_age", "maximum_age", "is_staff_only"
       ]
     }
 
