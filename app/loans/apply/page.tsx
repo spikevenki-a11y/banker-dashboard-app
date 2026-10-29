@@ -30,6 +30,8 @@ import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { MemberSummaryCard } from "@/components/member-summary-card"
 import { MemberSearchDialog } from "@/components/member-search-dialog"
 import { LoanSchemeDetailsCard, type LoanSchemeDetails } from "@/components/loan-scheme-details-card"
+import { getEcDateError, getEcYearsError, EC_YEARS_MAX } from "@/lib/land-security"
+import { calculateAge, getSchemeAgeError } from "@/lib/member-age"
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -61,6 +63,8 @@ type LoanScheme = {
   processing_fee_percent: number
   collateral_required: boolean
   scheme_status: string
+  minimum_age?: number | string | null
+  maximum_age?: number | string | null
 }
 
 type EMISchedule = {
@@ -162,6 +166,7 @@ type SecurityForm = {
   ec_date_to: string
   vao_details: string
   revenue_village: string
+  ec_years_obtained: string
   // Vehicle
   vehicle_type: string
   vehicle_registration_no: string
@@ -221,7 +226,7 @@ const emptySecurityForm: SecurityForm = {
   built_up_area_sqft: "", registration_no: "", registration_date: "", document_type: "",
   guideline_value: "", encumbrance_cert_date: "", title_clear: false,
   legal_opinion_by: "", legal_opinion_date: "",
-  ec_date_from: "", ec_date_to: "", vao_details: "", revenue_village: "",
+  ec_date_from: "", ec_date_to: "", vao_details: "", revenue_village: "", ec_years_obtained: "",
   vehicle_type: "FOUR_WHEELER", vehicle_registration_no: "", chassis_no: "", engine_no: "",
   manufacturer: "", model: "", year_of_manufacture: "", vehicle_registration_date: "",
   rc_book_held: false, insurance_policy_no: "", insurance_expiry: "", purchase_price: "",
@@ -297,6 +302,8 @@ export default function LoanApplicationPage() {
   // Personal Surety (13) — surety member lookup
   const [isSuretySearching, setIsSuretySearching] = useState(false)
   const [suretyError, setSuretyError] = useState("")
+  // Show Land EC errors once the user has tried to submit
+  const [showLandErrors, setShowLandErrors] = useState(false)
   const [suretySearchOpen, setSuretySearchOpen] = useState(false)
 
   // Gold item-by-item tracking
@@ -462,6 +469,13 @@ export default function LoanApplicationPage() {
   }, [])
 
   const selectedScheme = schemes.find((s) => String(s.scheme_id) === selectedSchemeId)
+
+  // Member's age as of the application date, checked against the selected scheme's age limits.
+  // Recomputed whenever the member or the scheme changes.
+  const memberAge = memberInfo && applicationDate ? calculateAge(memberInfo.date_of_birth, applicationDate) : null
+  const schemeAgeError = memberInfo && selectedScheme && applicationDate
+    ? getSchemeAgeError(memberAge, selectedScheme.minimum_age, selectedScheme.maximum_age, selectedScheme.scheme_name)
+    : ""
 
   // Loan types come from the loan_type of the schemes loaded from loan_schemes
   const loanTypes = Array.from(new Set(schemes.map((s) => s.loan_type).filter(Boolean))).sort()
@@ -729,6 +743,10 @@ export default function LoanApplicationPage() {
 
   const handleSubmit = async () => {
     if (!memberInfo || !selectedSchemeId || !applicationDate || !loanAmount || !tenureMonths) return
+    if (schemeAgeError) {
+      alert(schemeAgeError)
+      return
+    }
     // Several security types offered for the scheme → user must pick one (a single type is auto-selected)
     if (securities.length > 0 && !selectedSecurityId) {
       setSecurityTypeError("Please select a security type.")
@@ -758,10 +776,14 @@ export default function LoanApplicationPage() {
         return
       }
     }
-    if (Number(selectedSecurityId) === 1 && securityForm.ec_date_from && securityForm.ec_date_to
-        && securityForm.ec_date_from > securityForm.ec_date_to) {
-      alert("EC Date From cannot be after EC Date To.")
-      return
+    if (Number(selectedSecurityId) === 1) {
+      const landMsg = getEcDateError(securityForm.ec_date_from, securityForm.ec_date_to)
+        || getEcYearsError(securityForm.ec_years_obtained)
+      if (landMsg) {
+        setShowLandErrors(true)
+        alert(landMsg)
+        return
+      }
     }
     setIsSubmitting(true)
 
@@ -829,7 +851,7 @@ export default function LoanApplicationPage() {
           document_type: land ? null : securityForm.document_type || null,
           guideline_value: securityForm.guideline_value ? Number(securityForm.guideline_value) : null,
           market_value: securityForm.market_value ? Number(securityForm.market_value) : null,
-          encumbrance_cert_date: securityForm.encumbrance_cert_date || null,
+          encumbrance_cert_date: land ? null : securityForm.encumbrance_cert_date || null,
           title_clear: securityForm.title_clear,
           legal_opinion_by: securityForm.legal_opinion_by || null,
           legal_opinion_date: securityForm.legal_opinion_date || null,
@@ -837,6 +859,7 @@ export default function LoanApplicationPage() {
           ec_date_to: land ? securityForm.ec_date_to || null : null,
           vao_details: land ? securityForm.vao_details.trim() || null : null,
           revenue_village: land ? securityForm.revenue_village.trim() || null : null,
+          ec_years_obtained: land && securityForm.ec_years_obtained ? Number(securityForm.ec_years_obtained) : null,
         })
       } else if (typeId === 7) {
         Object.assign(securityPayload, {
@@ -952,6 +975,10 @@ export default function LoanApplicationPage() {
   const isGold = secTypeId === 6
   const isProperty = [1, 2].includes(secTypeId)
   const isLand = secTypeId === 1
+  // Show the order error as soon as both dates are filled; the "enter both" error only after a submit attempt
+  const ecDateRaw = isLand ? getEcDateError(securityForm.ec_date_from, securityForm.ec_date_to) : ""
+  const ecDateError = ecDateRaw && (showLandErrors || (securityForm.ec_date_from && securityForm.ec_date_to)) ? ecDateRaw : ""
+  const ecYearsError = isLand ? getEcYearsError(securityForm.ec_years_obtained) : ""
   const isVehicle = secTypeId === 7
   const isDeposit = [8, 12].includes(secTypeId)
   const isInsurance = secTypeId === 10
@@ -1051,6 +1078,13 @@ export default function LoanApplicationPage() {
                         <Input type="date" value={applicationDate} disabled />
                       </div>
                     </div>
+
+                    {schemeAgeError && (
+                      <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>{schemeAgeError}</span>
+                      </div>
+                    )}
 
                     {/* {selectedScheme && (
                       <div className="rounded-lg border border-muted bg-muted/30 p-3">
@@ -1478,7 +1512,7 @@ export default function LoanApplicationPage() {
                       <div className="rounded-lg border border-green-200 bg-green-50/30 p-4 space-y-4">
                         <p className="text-sm font-semibold text-green-800">Property Details</p>
 
-                        <div className={`grid gap-3 ${isLand ? "grid-cols-2" : "grid-cols-3"}`}>
+                        <div className={`grid gap-3 ${isLand ? "grid-cols-3" : "grid-cols-3"}`}>
                           {!isLand && (
                             <div className="space-y-1">
                               <Label className="text-xs">Property Type *</Label>
@@ -1502,6 +1536,10 @@ export default function LoanApplicationPage() {
                           <div className="space-y-1">
                             <Label className="text-xs">Survey No</Label>
                             <Input className="h-8 text-xs" placeholder="Survey / plot number" value={securityForm.survey_no} onChange={(e) => sf("survey_no", e.target.value)} />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Land Area (Acres)</Label>
+                            <Input className="h-8 text-xs" type="number" step="0.0001" value={securityForm.land_area_acres} onChange={(e) => sf("land_area_acres", e.target.value)} />
                           </div>
                         </div>
 
@@ -1544,10 +1582,6 @@ export default function LoanApplicationPage() {
                               <Input className="h-8 text-xs" type="number" value={securityForm.land_area_sqft} onChange={(e) => sf("land_area_sqft", e.target.value)} />
                             </div>
                           )}
-                          <div className="space-y-1">
-                            <Label className="text-xs">Land Area (Acres)</Label>
-                            <Input className="h-8 text-xs" type="number" step="0.0001" value={securityForm.land_area_acres} onChange={(e) => sf("land_area_acres", e.target.value)} />
-                          </div>
                           {!isLand && (
                             <div className="space-y-1">
                               <Label className="text-xs">Built-up Area (Sqft)</Label>
@@ -1578,15 +1612,17 @@ export default function LoanApplicationPage() {
                           )}
                         </div>
 
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className={`grid gap-3 ${isLand ? "grid-cols-2" : "grid-cols-3"}`}>
                           <div className="space-y-1">
                             <Label className="text-xs">Guideline Value (₹)</Label>
                             <Input className="h-8 text-xs" type="number" value={securityForm.guideline_value} onChange={(e) => sf("guideline_value", e.target.value)} />
                           </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs">EC Date</Label>
-                            <Input className="h-8 text-xs" type="date" value={securityForm.encumbrance_cert_date} onChange={(e) => sf("encumbrance_cert_date", e.target.value)} />
-                          </div>
+                          {!isLand && (
+                            <div className="space-y-1">
+                              <Label className="text-xs">EC Date</Label>
+                              <Input className="h-8 text-xs" type="date" value={securityForm.encumbrance_cert_date} onChange={(e) => sf("encumbrance_cert_date", e.target.value)} />
+                            </div>
+                          )}
                           <div className="space-y-1">
                             <Label className="text-xs">Legal Opinion By</Label>
                             <Input className="h-8 text-xs" placeholder="Advocate name" value={securityForm.legal_opinion_by} onChange={(e) => sf("legal_opinion_by", e.target.value)} />
@@ -1594,14 +1630,19 @@ export default function LoanApplicationPage() {
                         </div>
 
                         {isLand && (
-                          <div className="grid grid-cols-4 gap-3">
+                          <div className="space-y-2">
+                          <div className="grid grid-cols-5 gap-3">
                             <div className="space-y-1">
                               <Label className="text-xs">EC Date From</Label>
-                              <Input className="h-8 text-xs" type="date" max={securityForm.ec_date_to || undefined} value={securityForm.ec_date_from} onChange={(e) => sf("ec_date_from", e.target.value)} />
+                              <Input className="h-8 text-xs" type="date" aria-invalid={!!ecDateError || undefined} value={securityForm.ec_date_from} onChange={(e) => sf("ec_date_from", e.target.value)} />
                             </div>
                             <div className="space-y-1">
                               <Label className="text-xs">EC Date To</Label>
-                              <Input className="h-8 text-xs" type="date" min={securityForm.ec_date_from || undefined} value={securityForm.ec_date_to} onChange={(e) => sf("ec_date_to", e.target.value)} />
+                              <Input className="h-8 text-xs" type="date" aria-invalid={!!ecDateError || undefined} value={securityForm.ec_date_to} onChange={(e) => sf("ec_date_to", e.target.value)} />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">No. of Years EC Obtained</Label>
+                              <Input className="h-8 text-xs" type="number" min={1} max={EC_YEARS_MAX} step={1} aria-invalid={!!ecYearsError || undefined} value={securityForm.ec_years_obtained} onChange={(e) => sf("ec_years_obtained", e.target.value)} />
                             </div>
                             <div className="space-y-1">
                               <Label className="text-xs">VAO Details</Label>
@@ -1611,6 +1652,9 @@ export default function LoanApplicationPage() {
                               <Label className="text-xs">Revenue Village</Label>
                               <Input className="h-8 text-xs" maxLength={150} placeholder="Revenue village" value={securityForm.revenue_village} onChange={(e) => sf("revenue_village", e.target.value)} />
                             </div>
+                          </div>
+                          {ecDateError && <p className="text-xs text-destructive">{ecDateError}</p>}
+                          {ecYearsError && <p className="text-xs text-destructive">{ecYearsError}</p>}
                           </div>
                         )}
 
@@ -2036,7 +2080,7 @@ export default function LoanApplicationPage() {
                   <Button variant="outline" onClick={() => router.push("/loans")} className="bg-transparent">Cancel</Button>
                   <Button
                     onClick={handleSubmit}
-                    disabled={!memberInfo || !selectedSchemeId || !applicationDate || !loanAmount || !tenureMonths || isSubmitting}
+                    disabled={!memberInfo || !selectedSchemeId || !applicationDate || !loanAmount || !tenureMonths || !!schemeAgeError || isSubmitting}
                     className="bg-blue-600 hover:bg-blue-700 text-white"
                   >
                     {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Submitting...</> : "Submit Application"}

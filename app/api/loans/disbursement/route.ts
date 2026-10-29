@@ -4,6 +4,14 @@ import pool from "@/lib/connection/db"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
 import { creditAppraiserAccount, lockAppraiserAccount, type AppraiserAccount } from "@/lib/appraiser-account"
 
+// CASH          — DR Loan, CR Cash; balanced voucher.
+// TRANSFER      — DR Loan only, posted into a selected open batch (or a new one). The batch
+//                 stays open until the contra entry is posted, same as other transfer vouchers.
+// DEFAULT_TRANSFER — DR Loan, CR member's savings account; balanced voucher. The savings
+//                 balance is updated when the voucher is verified, like other savings credits.
+const DISBURSEMENT_MODES = ['CASH', 'TRANSFER', 'DEFAULT_TRANSFER']
+const CASH_GL_ACCOUNT = '23100000'
+
 // GET: Appraiser recorded on the loan's gold security (?loan_application_id=)
 export async function GET(request: NextRequest) {
   const session = await getSession()
@@ -51,6 +59,7 @@ export async function POST(request: NextRequest) {
       narration,
       appraiser_charge,
       savings_account_no, // required for DEFAULT_TRANSFER
+      selectedBatch,      // TRANSFER only: open GL batch to post into (0/empty = new batch)
     } = body
 
     if (!loan_application_id || !disbursement_amount || !disbursement_mode) {
@@ -60,7 +69,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (!DISBURSEMENT_MODES.includes(disbursement_mode)) {
+      return NextResponse.json({ error: "Invalid disbursement mode" }, { status: 400 })
+    }
+
+    const disbursementAmt = Number(disbursement_amount)
+    if (!Number.isFinite(disbursementAmt) || disbursementAmt <= 0) {
+      return NextResponse.json({ error: "Disbursement amount must be greater than zero" }, { status: 400 })
+    }
+
     const isDefaultTransfer = disbursement_mode === 'DEFAULT_TRANSFER'
+    const isTransfer = disbursement_mode === 'TRANSFER'
+    const existingBatchId = isTransfer && Number(selectedBatch) > 0 ? Number(selectedBatch) : 0
+    if (isTransfer && selectedBatch && !(Number.isInteger(Number(selectedBatch)) && Number(selectedBatch) >= 0)) {
+      return NextResponse.json({ error: "Invalid GL batch" }, { status: 400 })
+    }
     if (isDefaultTransfer && !savings_account_no) {
       return NextResponse.json(
         { error: "Savings account is required for Default Transfer" },
@@ -99,7 +122,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Loan must be sanctioned before disbursement" }, { status: 400 })
     }
 
-    if (parseFloat(disbursement_amount) > parseFloat(app.sanctioned_amount)) {
+    if (disbursementAmt > parseFloat(app.sanctioned_amount)) {
       await client.query("ROLLBACK")
       return NextResponse.json({ error: "Disbursement amount cannot exceed sanctioned amount" }, { status: 400 })
     }
@@ -140,11 +163,34 @@ export async function POST(request: NextRequest) {
       appraiser_charge && appraiser_charge.charge_amount > 0 && appraiser_charge.payment_mode !== 'CASH'
         ? parseFloat(appraiser_charge.charge_amount)
         : 0
-    const savingsCreditAmt = parseFloat(disbursement_amount) - adjustedChargeAmt
+    const savingsCreditAmt = disbursementAmt - adjustedChargeAmt
 
-    if (isDefaultTransfer && savingsCreditAmt <= 0) {
+    if ((isDefaultTransfer || isTransfer) && savingsCreditAmt <= 0) {
       await client.query("ROLLBACK")
       return NextResponse.json({ error: "Appraiser charge cannot be equal to or exceed the disbursement amount" }, { status: 400 })
+    }
+
+    // Transfer into an existing batch: it must be an open transfer batch of this branch and business date
+    let existingVoucherNo: number | null = null
+    if (existingBatchId) {
+      const { rows: batchRows } = await client.query(
+        `SELECT voucher_id, voucher_type, status, business_date::text AS business_date
+         FROM gl_batches
+         WHERE branch_id = $1 AND batch_id = $2
+         FOR UPDATE`,
+        [branchId, existingBatchId]
+      )
+      const b = batchRows[0]
+      let batchError = ""
+      if (!b) batchError = `GL batch ${existingBatchId} not found`
+      else if (b.status !== 'PENDING') batchError = `GL batch ${existingBatchId} is already ${String(b.status).toLowerCase()}`
+      else if (b.voucher_type !== 'TRANSFER') batchError = `GL batch ${existingBatchId} is not a transfer batch`
+      else if (b.business_date !== String(businessDate).slice(0, 10)) batchError = `GL batch ${existingBatchId} belongs to another business date`
+      if (batchError) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: batchError }, { status: 400 })
+      }
+      existingVoucherNo = b.voucher_id
     }
 
     // Appraiser charge: resolve and lock the appraiser's designated account before posting anything
@@ -167,35 +213,42 @@ export async function POST(request: NextRequest) {
     // const loanAccountNo = `LN${branchId}${String(app.loan_application_id).padStart(8, '0')}`
     const loanAccountNo = app.loan_application_id
 
-    // Create batch for GL entries
-    const { rows: [batch] } = await client.query(`
-      UPDATE gl_batch_sequences
-      SET last_batch_id = last_batch_id + 1
-      WHERE branch_id = $1
-      RETURNING last_batch_id
-    `, [branchId])
-    const batchId = batch.last_batch_id
+    const voucherType = disbursement_mode === 'CASH' ? 'CASH' : 'TRANSFER'
+    const disbNarration = narration || "Loan Disbursement"
 
-    // Generate voucher number
-    const { rows: [voucher] } = await client.query(`
-      INSERT INTO voucher_sequences (branch_id, business_date, last_voucher_no)
-      VALUES ($1, $2, 1)
-      ON CONFLICT (branch_id, business_date)
-      DO UPDATE SET last_voucher_no = voucher_sequences.last_voucher_no + 1
-      RETURNING last_voucher_no
-    `, [branchId, businessDate])
-    const voucherNo = voucher.last_voucher_no
+    // GL batch + voucher: reuse the selected open batch (Transfer), otherwise open a new one
+    let batchId: number
+    let voucherNo: number
+    if (existingBatchId && existingVoucherNo !== null) {
+      batchId = existingBatchId
+      voucherNo = existingVoucherNo
+    } else {
+      const { rows: [batch] } = await client.query(`
+        UPDATE gl_batch_sequences
+        SET last_batch_id = last_batch_id + 1
+        WHERE branch_id = $1
+        RETURNING last_batch_id
+      `, [branchId])
+      batchId = batch.last_batch_id
 
-    // Create GL batch
-    await client.query(`
-      INSERT INTO gl_batches (
-        business_date, branch_id, batch_id, voucher_id,
-        voucher_type, maker_id, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, 'PENDING')
-    `, [businessDate, branchId, batchId, voucherNo, isDefaultTransfer ? 'TRANSFER' : disbursement_mode, session.userId])
+      const { rows: [voucher] } = await client.query(`
+        INSERT INTO voucher_sequences (branch_id, business_date, last_voucher_no)
+        VALUES ($1, $2, 1)
+        ON CONFLICT (branch_id, business_date)
+        DO UPDATE SET last_voucher_no = voucher_sequences.last_voucher_no + 1
+        RETURNING last_voucher_no
+      `, [branchId, businessDate])
+      voucherNo = voucher.last_voucher_no
 
-    // GL entries: DR Loan Account, CR Cash/Bank
-    // Debit Loan GL (Asset increases)
+      await client.query(`
+        INSERT INTO gl_batches (
+          business_date, branch_id, batch_id, voucher_id,
+          voucher_type, maker_id, status
+        ) VALUES ($1, $2, $3, $4, $5, $6, 'PENDING')
+      `, [businessDate, branchId, batchId, voucherNo, voucherType, session.userId])
+    }
+
+    // DR Loan GL (asset increases) — all modes
     await client.query(`
       INSERT INTO gl_batch_lines (
         branch_id, batch_id, business_date,
@@ -206,9 +259,9 @@ export async function POST(request: NextRequest) {
     `, [
       branchId, batchId, businessDate,
       app.loan_gl_account, loanAccountNo,
-      disbursement_amount,
+      disbursementAmt,
       voucherNo,
-      narration || "Loan Disbursement",
+      disbNarration,
       session.userId
     ])
 
@@ -233,7 +286,8 @@ export async function POST(request: NextRequest) {
         session.userId
       ])
 
-      // Record savings transaction
+      // Pending savings credit. The account balance is set from running_balance when the
+      // voucher is verified (FAS → Verify Voucher), so it is not updated here.
       await client.query(`
         INSERT INTO savings_transactions (
           branch_id, account_number,
@@ -258,17 +312,8 @@ export async function POST(request: NextRequest) {
         voucherNo, batchId,
         session.userId
       ])
-
-      // Update savings balance
-      await client.query(
-        `UPDATE savings_accounts
-         SET available_balance = $1, clear_balance = $1, updated_at = NOW()
-         WHERE account_number = $2 AND branch_id = $3`,
-        [newSavingsBalance, savings_account_no, branchId]
-      )
-    } else {
-      // Credit Cash/Bank (Asset decreases)
-      const cashGlAccount = disbursement_mode === 'CASH' ? '23100000' : '11100000'
+    } else if (!isTransfer) {
+      // CASH: CR Cash (asset decreases)
       await client.query(`
         INSERT INTO gl_batch_lines (
           branch_id, batch_id, business_date,
@@ -278,13 +323,14 @@ export async function POST(request: NextRequest) {
         ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9)
       `, [
         branchId, batchId, businessDate,
-        cashGlAccount, '0',
-        disbursement_amount,
+        CASH_GL_ACCOUNT, '0',
+        disbursementAmt,
         voucherNo,
-        narration || "Loan Disbursement",
+        disbNarration,
         session.userId
       ])
     }
+    // TRANSFER: no contra line here — the batch stays open for the credit side to be posted
 
     // Appraiser charge: transfer to the appraiser's designated account
     if (hasAppraiserCharge && appraiserAccount) {
@@ -333,13 +379,14 @@ export async function POST(request: NextRequest) {
           narration: `Appraiser charge adjusted - ${app.reference_no}`, userId: session.userId,
         })
 
-        // Offset the cash line: additional CR on cash account to net down member payout
-        // (Default Transfer already credits the net amount to savings, so no offset is needed)
-        if (!isDefaultTransfer) {
+        // CASH: DR Cash by the charge so the net cash paid to the member is amount − charge.
+        // Default Transfer already credits the net amount to savings; Transfer leaves the
+        // net amount (amount − charge) for the contra entry that completes the batch.
+        if (disbursement_mode === 'CASH') {
           await client.query(`
             INSERT INTO gl_batch_lines (branch_id, batch_id, business_date, accountcode, ref_account_id, debit_amount, credit_amount, voucher_id, narration, created_by)
-            VALUES ($1, $2, $3, '23100000', '0', $4, 0, $5, $6, $7)
-          `, [branchId, batchId, businessDate, chargeAmt, voucherNo, `Appraiser charge offset - ${app.reference_no}`, session.userId])
+            VALUES ($1, $2, $3, $4, '0', $5, 0, $6, $7, $8)
+          `, [branchId, batchId, businessDate, CASH_GL_ACCOUNT, chargeAmt, voucherNo, `Appraiser charge offset - ${app.reference_no}`, session.userId])
         }
       }
     }
@@ -353,7 +400,7 @@ export async function POST(request: NextRequest) {
       ) VALUES ($1, $2, $3, $4, 'DISBURSEMENT', $5, 0, 0, $5, $6, $7, NOW())
     `, [
       businessDate, branchId, voucherNo, loanAccountNo,
-      disbursement_amount, app.reference_no, narration || 'Loan Disbursement'
+      disbursementAmt, app.reference_no, narration || 'Loan Disbursement'
     ])
 
     // Generate repayment schedule
@@ -399,7 +446,7 @@ export async function POST(request: NextRequest) {
       UPDATE loan_applications 
       SET loan_outstanding = loan_outstanding + $1, updated_at = NOW() 
       WHERE loan_application_id = $2
-    `, [disbursement_amount, loan_application_id])
+    `, [disbursementAmt, loan_application_id])
 
     // Update application status to ACTIVE
     await client.query(
@@ -416,6 +463,8 @@ export async function POST(request: NextRequest) {
       loan_account_no: loanAccountNo,
       voucher_no: voucherNo,
       batch_id: batchId,
+      disbursement_mode,
+      batch_open: isTransfer, // Transfer batch still needs its contra entry
       savings_account_no: isDefaultTransfer ? savings_account_no : null,
       appraiser_account_no: appraiserAccount?.account_number ?? null,
       emi_amount: emi,

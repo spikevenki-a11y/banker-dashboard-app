@@ -2,6 +2,7 @@ import { getSession } from "@/lib/auth/session"
 import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
+import { openGlVoucher, lockOpenTransferBatch, insertGlLine, type GlVoucherType } from "@/lib/gl-voucher"
 
 export async function GET(request: NextRequest) {
   const session = await getSession()
@@ -139,6 +140,18 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// Voucher types follow the Loans → Loan Disbursement transfer logic (mirrored: the deposit is credited):
+// CASH             — DR Cash, CR Deposit; balanced voucher.
+// TRANSFER         — Bank Transfer. CR Deposit only, posted into a selected open transfer batch
+//                    (or a new one). The batch stays open until the contra (debit) entry is posted.
+// DEFAULT_TRANSFER — DR member's savings account(s), CR Deposit; balanced voucher. Savings
+//                    balances are updated when the voucher is verified, like other savings debits.
+const DEPOSIT_VOUCHER_TYPES = ["CASH", "TRANSFER", "DEFAULT_TRANSFER"]
+const CASH_GL_ACCOUNT = "23100000"
+const RD_TYPES = ["R", "RECURING", "RECURRING"]
+
+const round2 = (n: number) => Math.round(n * 100) / 100
+
 export async function POST(request: NextRequest) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -156,13 +169,59 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Account number and amount are required" }, { status: 400 })
     }
 
-    if (!voucherType || !["CASH", "TRANSFER"].includes(voucherType)) {
-      return NextResponse.json({ error: "Valid voucher type (CASH/TRANSFER) is required" }, { status: 400 })
+    if (!voucherType || !DEPOSIT_VOUCHER_TYPES.includes(voucherType)) {
+      return NextResponse.json(
+        { error: "Valid voucher type (Cash / Bank Transfer / Default Transfer) is required" },
+        { status: 400 }
+      )
     }
 
-    const amt = parseFloat(amount)
+    const amt = round2(parseFloat(amount))
     if (isNaN(amt) || amt <= 0) {
       return NextResponse.json({ error: "Amount must be positive" }, { status: 400 })
+    }
+
+    const isTransfer = voucherType === "TRANSFER"
+    const isDefaultTransfer = voucherType === "DEFAULT_TRANSFER"
+    const glVoucherType: GlVoucherType = voucherType === "CASH" ? "CASH" : "TRANSFER"
+
+    // An existing GL batch can only be reused for Bank Transfer (0/empty = new batch)
+    if (isTransfer && selectedBatch && !(Number.isInteger(Number(selectedBatch)) && Number(selectedBatch) >= 0)) {
+      return NextResponse.json({ error: "Invalid GL batch" }, { status: 400 })
+    }
+    const existingBatchId = isTransfer && Number(selectedBatch) > 0 ? Number(selectedBatch) : 0
+
+    // Default Transfer: one or more of the member's savings accounts, each debited once
+    const debits: { accountNumber: string; amount: number }[] = []
+    if (isDefaultTransfer) {
+      for (const d of Array.isArray(debitAccounts) ? debitAccounts : []) {
+        const debitAmt = round2(parseFloat(d?.amount))
+        if (!d?.accountNumber || isNaN(debitAmt) || debitAmt <= 0) continue
+        if (debits.some((x) => x.accountNumber === String(d.accountNumber))) {
+          return NextResponse.json({ error: `Savings account ${d.accountNumber} is listed more than once` }, { status: 400 })
+        }
+        debits.push({ accountNumber: String(d.accountNumber), amount: debitAmt })
+      }
+      if (debits.length === 0) {
+        return NextResponse.json({ error: "Savings account is required for Default Transfer" }, { status: 400 })
+      }
+      const totalDebit = round2(debits.reduce((s, d) => s + d.amount, 0))
+      if (Math.abs(totalDebit - amt) > 0.01) {
+        return NextResponse.json(
+          { error: `Total debit (${totalDebit.toFixed(2)}) must equal credit amount (${amt.toFixed(2)})` },
+          { status: 400 }
+        )
+      }
+    }
+
+    const installments: { id: any; penalty: number }[] = Array.isArray(selectedInstallments)
+      ? selectedInstallments.map((i: any) => ({ id: i?.id, penalty: Number(i?.penalty) || 0 }))
+      : []
+    if (installments.some((i) => i.id == null || i.penalty < 0)) {
+      return NextResponse.json({ error: "Invalid installment selection" }, { status: 400 })
+    }
+    if (new Set(installments.map((i) => String(i.id))).size !== installments.length) {
+      return NextResponse.json({ error: "An installment is selected more than once" }, { status: 400 })
     }
 
     const dayendErr = await checkDayEndRestriction(branchId, businessDate)
@@ -172,11 +231,12 @@ export async function POST(request: NextRequest) {
 
     // Get account info
     const { rows: accounts } = await client.query(
-      `SELECT da.*, ds.deposit_gl_account, ds.scheme_name
+      `SELECT da.*, ds.deposit_gl_account, ds.scheme_name, td.depositamount
        FROM deposit_account da
        JOIN deposit_schemes ds ON ds.scheme_id = da.schemeid AND ds.branch_id = da.branch_id
+       LEFT JOIN term_deposit_details td ON td.accountnumber = da.accountnumber
        WHERE da.accountnumber = $1 AND da.branch_id = $2
-       FOR UPDATE`,
+       FOR UPDATE OF da`,
       [accountNumber, branchId]
     )
 
@@ -193,183 +253,211 @@ export async function POST(request: NextRequest) {
     }
 
     const depositGlAccount = account.deposit_gl_account
-    const newBalance = parseFloat(account.clearbalance) + amt
-
-    // Get or create batch ID
-    let batchId = 0
-    if (selectedBatch && selectedBatch !== 0) {
-      batchId = selectedBatch
-    } else {
-      const { rows: [batch] } = await client.query(`
-        UPDATE gl_batch_sequences
-        SET last_batch_id = last_batch_id + 1
-        WHERE branch_id = $1
-        RETURNING last_batch_id
-      `, [branchId])
-      batchId = batch.last_batch_id
+    if (!depositGlAccount) {
+      await client.query("ROLLBACK")
+      return NextResponse.json({ error: "Deposit GL account is not configured for the deposit scheme" }, { status: 400 })
     }
 
-    // Get voucher number
-    let voucherNo = 0
-    if (!selectedBatch || selectedBatch === 0) {
-      const { rows: [voucher] } = await client.query(`
-        INSERT INTO voucher_sequences (branch_id, business_date, last_voucher_no)
-        VALUES ($1, $2, 1)
-        ON CONFLICT (branch_id, business_date)
-        DO UPDATE SET last_voucher_no = voucher_sequences.last_voucher_no + 1
-        RETURNING last_voucher_no
-      `, [branchId, businessDate])
-      voucherNo = voucher.last_voucher_no
-    } else {
-      const { rows: [lvo] } = await client.query(`
-        SELECT voucher_id FROM gl_batches
-        WHERE branch_id = $1 AND batch_id = $2
-      `, [branchId, batchId])
-      voucherNo = lvo?.voucher_id || 0
+    const isRd = RD_TYPES.includes(account.deposittype)
+    const isTerm = account.deposittype === "TERM"
+
+    // Term deposit is funded once, for exactly the deposit amount
+    if (isTerm) {
+      const termAmount = parseFloat(account.depositamount) || 0
+      if (termAmount > 0 && Math.abs(amt - termAmount) > 0.01) {
+        await client.query("ROLLBACK")
+        return NextResponse.json(
+          { error: `Credit amount must equal the deposit amount (${termAmount.toFixed(2)})` },
+          { status: 400 }
+        )
+      }
+      const { rows: [funded] } = await client.query(
+        `SELECT COUNT(*)::int AS n FROM deposit_transactions
+         WHERE accountnumber = $1 AND branch_id = $2
+           AND transaction_type = 'DEPOSIT' AND status IN ('PENDING', 'COMPLETED')`,
+        [String(accountNumber), branchId]
+      )
+      if (funded.n > 0 || (termAmount > 0 && parseFloat(account.clearbalance) >= termAmount)) {
+        await client.query("ROLLBACK")
+        return NextResponse.json(
+          { error: "This deposit has already been credited (or a credit is awaiting verification)" },
+          { status: 400 }
+        )
+      }
     }
 
-    // Create GL batch header
-    if (!selectedBatch || selectedBatch === 0) {
-      await client.query(`
-        INSERT INTO gl_batches (
-          business_date, branch_id, batch_id, voucher_id,
-          voucher_type, maker_id, status
-        ) VALUES ($1,$2,$3,$4,$5,$6,'PENDING')
-      `, [businessDate, branchId, batchId, voucherNo, voucherType, session.userId])
+    // RD: the selected installments must belong to this account and still be unpaid
+    // (an installment in a pending voucher is already marked paid)
+    if (isRd && installments.length > 0) {
+      const { rows: instRows } = await client.query(
+        `SELECT id, installment_amount, installment_paid_date
+         FROM rd_installment_details
+         WHERE id::text = ANY($1::text[]) AND accountnumber = $2 AND branch_id = $3
+         FOR UPDATE`,
+        [installments.map((i) => String(i.id)), accountNumber, branchId]
+      )
+      if (instRows.length !== installments.length) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: "Selected installments were not found for this account" }, { status: 400 })
+      }
+      if (instRows.some((r: any) => r.installment_paid_date)) {
+        await client.query("ROLLBACK")
+        return NextResponse.json(
+          { error: "One or more selected installments are already paid. Reload the account and try again." },
+          { status: 400 }
+        )
+      }
+      const expected = round2(
+        instRows.reduce((s: number, r: any) => s + (parseFloat(r.installment_amount) || 0), 0) +
+          installments.reduce((s, i) => s + i.penalty, 0)
+      )
+      if (Math.abs(expected - amt) > 0.01) {
+        await client.query("ROLLBACK")
+        return NextResponse.json(
+          { error: `Credit amount must equal the selected installments plus penalty (${expected.toFixed(2)})` },
+          { status: 400 }
+        )
+      }
     }
 
-    const txnNarration = narration || "Deposit Credit"
+    // Balance after this credit, counting credits still awaiting verification so the
+    // running balance stays in sequence
+    const { rows: [pending] } = await client.query(
+      `SELECT COALESCE(SUM(credit_amount), 0) AS total FROM deposit_transactions
+       WHERE accountnumber = $1 AND branch_id = $2
+         AND transaction_type = 'DEPOSIT' AND status = 'PENDING'`,
+      [String(accountNumber), branchId]
+    )
+    const newBalance = round2(parseFloat(account.clearbalance) + (parseFloat(pending.total) || 0) + amt)
 
-    // DR Savings Account(s) - Transfer from savings to deposit
-    if (debitAccounts && Array.isArray(debitAccounts) && debitAccounts.length > 0) {
-      for (const debit of debitAccounts) {
-        const debitAmt = parseFloat(debit.amount)
-        if (isNaN(debitAmt) || debitAmt <= 0) continue
-
-        // Get savings account details
+    // Default Transfer: lock and validate the member's source savings account(s)
+    const savingsSources: { accountNumber: string; amount: number; glAccount: string; newBalance: number }[] = []
+    if (isDefaultTransfer) {
+      for (const debit of debits) {
         const { rows: savingsRows } = await client.query(
           `SELECT sa.*, ss.savings_gl_account
            FROM savings_accounts sa
            JOIN savings_schemes ss ON ss.scheme_id = sa.scheme_id AND ss.branch_id = sa.branch_id
            WHERE sa.account_number = $1 AND sa.branch_id = $2
+             AND CAST(sa.membership_no AS VARCHAR) = $3
            FOR UPDATE`,
-          [debit.accountNumber, branchId]
+          [debit.accountNumber, branchId, String(account.membership_no)]
         )
 
         if (savingsRows.length === 0) {
           await client.query("ROLLBACK")
-          return NextResponse.json({ error: `Savings account ${debit.accountNumber} not found` }, { status: 404 })
+          return NextResponse.json({ error: `Savings account ${debit.accountNumber} not found for this member` }, { status: 404 })
         }
 
         const savingsAccount = savingsRows[0]
-        const savingsBalance = parseFloat(savingsAccount.available_balance)
 
-        if (debitAmt > savingsBalance) {
+        if (String(savingsAccount.account_status).toUpperCase() !== "ACTIVE") {
+          await client.query("ROLLBACK")
+          return NextResponse.json({ error: `Savings account ${debit.accountNumber} is not active` }, { status: 400 })
+        }
+
+        if (!savingsAccount.savings_gl_account) {
+          await client.query("ROLLBACK")
+          return NextResponse.json({ error: "Savings GL account is not configured for the savings scheme" }, { status: 400 })
+        }
+
+        const savingsBalance = parseFloat(savingsAccount.available_balance)
+        if (debit.amount > savingsBalance) {
           await client.query("ROLLBACK")
           return NextResponse.json({
-            error: `Insufficient balance in savings account ${debit.accountNumber}. Available: ${savingsBalance}, Required: ${debitAmt}`
+            error: `Insufficient balance in savings account ${debit.accountNumber}. Available: ${savingsBalance}, Required: ${debit.amount}`
           }, { status: 400 })
         }
 
-        const savingsGl = savingsAccount.savings_gl_account
-
-        // DR Savings GL (debit from savings - liability decreases)
-        await client.query(`
-          INSERT INTO gl_batch_lines (
-            branch_id, batch_id, business_date,
-            accountcode, ref_account_id,
-            debit_amount, credit_amount,
-            voucher_id, narration, created_by
-          ) VALUES ($1,$2,$3,$4,$5,$6,0,$7,$8,$9)
-        `, [
-          branchId, batchId, businessDate,
-          savingsGl, String(debit.accountNumber),
-          debitAmt,
-          voucherNo,
-          `Transfer to Deposit A/c ${accountNumber}`,
-          session.userId
-        ])
-
-        // Record savings transaction
-        const newSavingsBalance = savingsBalance - debitAmt
-        await client.query(`
-          INSERT INTO savings_transactions (
-            branch_id, account_number,
-            transaction_date, value_date,
-            transaction_type, voucher_type,
-            debit_amount, credit_amount, running_balance,
-            narration, voucher_no, gl_batch_id,
-            status, created_by
-          ) VALUES (
-            $1,$2,
-            $3,$3,
-            'WITHDRAWAL','TRANSFER',
-            $4,0,$5,
-            $6,$7,$8,
-            'PENDING',$9
-          )
-        `, [
-          branchId, debit.accountNumber,
-          businessDate,
-          debitAmt, newSavingsBalance,
-          `Transfer to Deposit A/c ${accountNumber}`,
-          voucherNo, batchId,
-          session.userId
-        ])
-
-        // Update savings account balance
-        await client.query(
-          `UPDATE savings_accounts
-           SET available_balance = $1, clear_balance = $1, updated_at = NOW()
-           WHERE account_number = $2 AND branch_id = $3`,
-          [newSavingsBalance, debit.accountNumber, branchId]
-        )
+        savingsSources.push({
+          accountNumber: debit.accountNumber,
+          amount: debit.amount,
+          glAccount: savingsAccount.savings_gl_account,
+          newBalance: round2(savingsBalance - debit.amount),
+        })
       }
-    } else if (voucherType === "CASH") {
-      // DR Cash/Bank (if CASH and no debit accounts)
-      await client.query(`
-        INSERT INTO gl_batch_lines (
-          branch_id, batch_id, business_date,
-          accountcode, ref_account_id,
-          debit_amount, credit_amount,
-          voucher_id, narration, created_by
-        ) VALUES ($1,$2,$3,$4,$5,$6,0,$7,$8,$9)
-      `, [
-        branchId, batchId, businessDate,
-        23100000, '0',
-        amt,
-        voucherNo,
-        txnNarration,
-        session.userId
-      ])
     }
 
-    // CR Deposit GL (Liability increases)
-    await client.query(`
-      INSERT INTO gl_batch_lines (
-        branch_id, batch_id, business_date,
-        accountcode, ref_account_id,
-        debit_amount, credit_amount,
-        voucher_id, narration, created_by
-      ) VALUES ($1,$2,$3,$4,$5,0,$6,$7,$8,$9)
-    `, [
-      branchId, batchId, businessDate,
-      depositGlAccount, String(accountNumber),
-      amt,
-      voucherNo,
-      txnNarration,
-      session.userId
-    ])
+    // GL batch + voucher: reuse the selected open batch (Bank Transfer), otherwise open a new one
+    let batchId: number
+    let voucherNo: number
+    if (existingBatchId) {
+      const locked = await lockOpenTransferBatch(client, { branchId, batchId: existingBatchId, businessDate })
+      if (locked.error) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: locked.error }, { status: 400 })
+      }
+      batchId = existingBatchId
+      voucherNo = locked.voucherNo!
+    } else {
+      ;({ batchId, voucherNo } = await openGlVoucher(client, {
+        branchId, businessDate, voucherType: glVoucherType, userId: session.userId,
+      }))
+    }
 
-    // Update deposit account balance
-    // await client.query(
-    //   `UPDATE deposit_account
-    //    SET clearbalance = $1
-    //    WHERE accountnumber = $2 AND branch_id = $3`,
-    //   [newBalance, accountNumber, branchId]
-    // )
+    const txnNarration = narration || "Deposit Credit"
+    const line = { branchId, batchId, businessDate, voucherNo, userId: session.userId }
 
-    // Record deposit transaction in module table
+    if (isDefaultTransfer) {
+      // DR Savings GL (liability decreases) — debit member's savings account(s)
+      const savingsNarration = `Transfer to Deposit A/c ${accountNumber}`
+      for (const source of savingsSources) {
+        await insertGlLine(client, {
+          ...line,
+          accountCode: source.glAccount, refAccountId: source.accountNumber,
+          debit: source.amount,
+          narration: savingsNarration,
+        })
+
+        // Pending savings debit. The account balance is set from running_balance when the
+        // voucher is verified (FAS → Verify Voucher), so it is not updated here.
+        await client.query(
+          `INSERT INTO savings_transactions (
+             branch_id, account_number,
+             transaction_date, value_date,
+             transaction_type, voucher_type,
+             debit_amount, credit_amount, running_balance,
+             narration, voucher_no, gl_batch_id,
+             status, created_by
+           ) VALUES (
+             $1,$2,
+             $3,$3,
+             'WITHDRAWAL','TRANSFER',
+             $4,0,$5,
+             $6,$7,$8,
+             'PENDING',$9
+           )`,
+          [
+            branchId, source.accountNumber,
+            businessDate,
+            source.amount, source.newBalance,
+            savingsNarration,
+            voucherNo, batchId,
+            session.userId,
+          ]
+        )
+      }
+    } else if (!isTransfer) {
+      // CASH: DR Cash (asset increases)
+      await insertGlLine(client, {
+        ...line,
+        accountCode: CASH_GL_ACCOUNT, refAccountId: "0",
+        debit: amt,
+        narration: txnNarration,
+      })
+    }
+    // TRANSFER: no contra line here — the batch stays open for the debit side to be posted
+
+    // CR Deposit GL (liability increases) — all voucher types
+    await insertGlLine(client, {
+      ...line,
+      accountCode: depositGlAccount, refAccountId: String(accountNumber),
+      credit: amt,
+      narration: txnNarration,
+    })
+
+    // Record deposit transaction in module table. The deposit balance is set from
+    // running_balance when the voucher is verified.
     await client.query(
       `INSERT INTO deposit_transactions (
          branch_id, accountnumber,
@@ -382,7 +470,7 @@ export async function POST(request: NextRequest) {
       [
         branchId, String(accountNumber),
         businessDate,
-        voucherType,
+        glVoucherType,
         amt, newBalance,
         txnNarration, voucherNo, batchId,
         session.userId,
@@ -390,10 +478,8 @@ export async function POST(request: NextRequest) {
     )
 
     // If RD, update paid installments count and mark selected installments as paid
-    if (account.deposittype === "R" || account.deposittype === "RECURING" || account.deposittype === "RECURRING") {
-      const installmentCount = selectedInstallments && selectedInstallments.length > 0
-        ? selectedInstallments.length
-        : 1
+    if (isRd) {
+      const installmentCount = installments.length > 0 ? installments.length : 1
 
       await client.query(
         `UPDATE recurring_deposit_details
@@ -403,17 +489,17 @@ export async function POST(request: NextRequest) {
         [installmentCount, String(installmentCount), accountNumber]
       )
 
-      if (selectedInstallments && selectedInstallments.length > 0) {
+      if (installments.length > 0) {
         // Mark specific selected installments as paid with their penalties
-        for (const inst of selectedInstallments) {
+        for (const inst of installments) {
           await client.query(
             `UPDATE rd_installment_details
              SET installment_paid_date = $1,
                  installment_voucher_no = $2,
                  penalty_collected = $3,
                  updated_at = NOW()
-             WHERE id = $4 AND branch_id = $5`,
-            [businessDate, voucherNo, Number(inst.penalty) || 0, inst.id, branchId]
+             WHERE id = $4 AND accountnumber = $5 AND branch_id = $6`,
+            [businessDate, voucherNo, inst.penalty, inst.id, accountNumber, branchId]
           )
         }
       } else {
@@ -422,7 +508,8 @@ export async function POST(request: NextRequest) {
           `SELECT id, installment_number FROM rd_installment_details
            WHERE accountnumber = $1 AND branch_id = $2 AND installment_paid_date IS NULL
            ORDER BY installment_number ASC
-           LIMIT 1`,
+           LIMIT 1
+           FOR UPDATE`,
           [accountNumber, branchId]
         )
 
@@ -441,12 +528,22 @@ export async function POST(request: NextRequest) {
 
     await client.query("COMMIT")
 
+    const fmt = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" })
+    const modeText = isDefaultTransfer
+      ? ` Debited from Savings A/c: ${savingsSources.map((s) => s.accountNumber).join(", ")}.`
+      : isTransfer
+        ? ` Bank Transfer batch is open — post the contra (debit) entry for ${fmt.format(amt)}.`
+        : ""
+
     return NextResponse.json({
       success: true,
       voucher_no: voucherNo,
       batch_id: batchId,
+      voucher_type: voucherType,
+      batch_open: isTransfer, // Bank Transfer batch still needs its contra entry
+      savings_account_nos: isDefaultTransfer ? savingsSources.map((s) => s.accountNumber) : [],
       newBalance,
-      message: `Credit of ${new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(amt)} successful. Batch: ${batchId}, Voucher: ${voucherNo}. New balance: ${new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(newBalance)}`,
+      message: `Credit of ${fmt.format(amt)} successful. Batch: ${batchId}, Voucher: ${voucherNo}.${modeText} New balance: ${fmt.format(newBalance)}`,
     })
   } catch (err: any) {
     await client.query("ROLLBACK")

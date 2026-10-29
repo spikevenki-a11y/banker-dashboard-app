@@ -129,6 +129,7 @@ type PropertyDetail = {
   ec_date_to?: string | null
   vao_details?: string | null
   revenue_village?: string | null
+  ec_years_obtained?: number | null
 }
 
 type VehicleDetail = {
@@ -394,6 +395,7 @@ function PropertySecurityPanel({ detail, isLand = false }: { detail: PropertyDet
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <InfoRow label="EC Date From" value={formatDate(detail.ec_date_from)} />
             <InfoRow label="EC Date To" value={formatDate(detail.ec_date_to)} />
+            <InfoRow label="No. of Years EC Obtained" value={detail.ec_years_obtained} />
             <InfoRow label="VAO Details" value={detail.vao_details} />
             <InfoRow label="Revenue Village" value={detail.revenue_village} />
           </div>
@@ -433,7 +435,9 @@ function PropertySecurityPanel({ detail, isLand = false }: { detail: PropertyDet
           <InfoRow label="Title Clear" value={detail.title_clear === true ? "Yes" : detail.title_clear === false ? "No" : null} />
           <InfoRow label="Legal Opinion By" value={detail.legal_opinion_by} />
           <InfoRow label="Legal Opinion Date" value={formatDate(detail.legal_opinion_date)} />
-          <InfoRow label="EC Date" value={formatDate(detail.encumbrance_cert_date)} />
+          {(!isLand || detail.encumbrance_cert_date) && (
+            <InfoRow label="EC Date" value={formatDate(detail.encumbrance_cert_date)} />
+          )}
         </div>
       </Section>
     </div>

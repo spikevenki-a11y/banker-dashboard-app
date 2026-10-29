@@ -63,9 +63,11 @@ import {
   Receipt,
   FileText,
   Home,
+  Eye,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { APPRAISER_ACCOUNT_TYPES } from "@/lib/appraiser-history"
+import { ViewMemberPopup } from "@/components/view-member-popup"
 
 type LoanAppraiser = {
   appraiser_id: number
@@ -173,6 +175,7 @@ export default function LoanDisbursementPage() {
   // Submit state
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
+  const [viewMemberOpen, setViewMemberOpen] = useState(false)
   const [successOpen, setSuccessOpen] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
   const [formError, setFormError] = useState("")
@@ -441,6 +444,9 @@ export default function LoanDisbursementPage() {
         (data.savings_account_no
           ? `Credited to Savings A/c: ${data.savings_account_no}\nBatch ID: ${data.batch_id}\n`
           : "") +
+        (data.batch_open
+          ? `Posted to GL Batch ${data.batch_id}. Post the credit entry to complete this batch.\n`
+          : "") +
         (data.appraiser_account_no
           ? `Appraiser charge credited to A/c: ${data.appraiser_account_no}\n`
           : "") +
@@ -603,10 +609,22 @@ export default function LoanDisbursementPage() {
                           Reference: {selectedLoan.reference_no} | Membership: {selectedLoan.membership_no}
                         </CardDescription>
                       </div>
-                      <Badge className="bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400">
-                        <CheckCircle2 className="mr-1 h-3 w-3" />
-                        Sanctioned
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setViewMemberOpen(true)}
+                          className="gap-2 bg-transparent"
+                        >
+                          <Eye className="h-4 w-4" />
+                          View Member Details
+                        </Button>
+                        <Badge className="bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400">
+                          <CheckCircle2 className="mr-1 h-3 w-3" />
+                          Sanctioned
+                        </Badge>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -850,10 +868,10 @@ export default function LoanDisbursementPage() {
                             <p className="text-xs text-muted-foreground">Payment Mode</p>
                             <p className="text-lg font-semibold">{PAYMENT_MODE_LABELS[disbursementMode]}</p>
                           </div>
-                          <div>
+                          {/* <div>
                             <p className="text-xs text-muted-foreground">Monthly EMI</p>
                             <p className="text-lg font-semibold">{formatCurrency(selectedLoan.emi_amount)}</p>
-                          </div>
+                          </div> */}
                         </div>
                       </div>
                     </div>
@@ -1157,6 +1175,11 @@ export default function LoanDisbursementPage() {
           </AlertDialogContent>
         </AlertDialog>
       </div>
+      <ViewMemberPopup
+        open={viewMemberOpen}
+        onOpenChange={setViewMemberOpen}
+        membershipNo={selectedLoan?.membership_no}
+      />
     </DashboardWrapper>
   )
 }

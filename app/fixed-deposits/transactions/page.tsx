@@ -161,7 +161,7 @@ function DepositAccountPanel({ accountNumber }: { accountNumber: string | null }
 
   // Transaction form
   const [narration, setNarration] = useState("")
-  const [voucherType, setVoucherType] = useState<"CASH" | "TRANSFER">()
+  const [voucherType, setVoucherType] = useState<"CASH" | "TRANSFER" | "DEFAULT_TRANSFER">()
   const [selectedBatch, setSelectedBatch] = useState<number>(0)
   const [isBatchChosen, setIsBatchChosen] = useState(false)
   const [isBatchPopupOpen, setIsBatchPopupOpen] = useState(false)
@@ -396,12 +396,12 @@ function DepositAccountPanel({ accountNumber }: { accountNumber: string | null }
     }
 
     const selectedDebits = debitEntries.filter((e) => e.selected && e.debitAmount)
-    if (voucherType === "TRANSFER") {
-      if (!isBatchChosen) {
-        setFormError("Please select a GL batch (new or existing).")
-        return
-      }
+    if (voucherType === "TRANSFER" && !isBatchChosen) {
+      setFormError("Please select a GL batch (new or existing).")
+      return
+    }
 
+    if (voucherType === "DEFAULT_TRANSFER") {
       if (selectedDebits.length === 0) {
         setFormError("Please select at least one savings account and enter debit amount.")
         return
@@ -439,8 +439,8 @@ function DepositAccountPanel({ accountNumber }: { accountNumber: string | null }
           amount: amt,
           narration: narration || "Deposit Credit",
           voucherType,
-          selectedBatch,
-          debitAccounts: voucherType === "TRANSFER"
+          selectedBatch: voucherType === "TRANSFER" ? selectedBatch : 0,
+          debitAccounts: voucherType === "DEFAULT_TRANSFER"
             ? selectedDebits.map((e) => ({
                 accountNumber: e.accountNumber,
                 amount: parseFloat(e.debitAmount),
@@ -811,10 +811,12 @@ function DepositAccountPanel({ accountNumber }: { accountNumber: string | null }
                   <Select
                     value={voucherType || ""}
                     onValueChange={(value) => {
-                      setVoucherType(value as "CASH" | "TRANSFER")
+                      setVoucherType(value as "CASH" | "TRANSFER" | "DEFAULT_TRANSFER")
                       if (value !== "TRANSFER") {
                         setSelectedBatch(0)
                         setIsBatchChosen(false)
+                      }
+                      if (value !== "DEFAULT_TRANSFER") {
                         setDebitEntries((prev) =>
                           prev.map((e) => ({ ...e, selected: false, debitAmount: "" }))
                         )
@@ -826,7 +828,8 @@ function DepositAccountPanel({ accountNumber }: { accountNumber: string | null }
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="CASH">Cash</SelectItem>
-                      <SelectItem value="TRANSFER">Transfer</SelectItem>
+                      <SelectItem value="TRANSFER">Bank Transfer</SelectItem>
+                      <SelectItem value="DEFAULT_TRANSFER">Default Transfer</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -914,7 +917,7 @@ function DepositAccountPanel({ accountNumber }: { accountNumber: string | null }
               <div className="flex gap-3 pt-2">
                 <Button
                   onClick={handleSubmit}
-                  disabled={isSubmitting || !voucherType || (isRd ? selectedInstallmentsList.length === 0 : !account.depositAmount) || (voucherType === "TRANSFER" && (!isBatchChosen || !debitMatchesCredit || hasDebitValidationError))}
+                  disabled={isSubmitting || !voucherType || (isRd ? selectedInstallmentsList.length === 0 : !account.depositAmount) || (voucherType === "TRANSFER" && !isBatchChosen) || (voucherType === "DEFAULT_TRANSFER" && (!debitMatchesCredit || hasDebitValidationError))}
                   className="gap-2"
                 >
                   {isSubmitting ? (
@@ -1056,7 +1059,7 @@ function DepositAccountPanel({ accountNumber }: { accountNumber: string | null }
         </Card>
 
         {/* Debit Account Card */}
-        {voucherType === "TRANSFER" && (isRd || account.depositAmount != account.balance) && (
+        {voucherType === "DEFAULT_TRANSFER" && (isRd || account.depositAmount != account.balance) && (
           <Card className={!isActive ? "pointer-events-none opacity-50" : ""}>
             <CardHeader className="pb-3">
               <div className="flex items-center gap-3">

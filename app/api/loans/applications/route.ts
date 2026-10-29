@@ -1,4 +1,6 @@
 import { getSession } from "@/lib/auth/session"
+import { getEcDateError, getEcYearsError } from "@/lib/land-security"
+import { calculateAge, getSchemeAgeError } from "@/lib/member-age"
 import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
@@ -171,7 +173,7 @@ export async function POST(request: NextRequest) {
 
     // Verify membership exists and is active
     const { rows: members } = await client.query(
-      `SELECT m.*, c.full_name 
+      `SELECT m.*, c.full_name, c.date_of_birth::text AS dob_text
        FROM memberships m 
        JOIN customers c ON m.customer_code = c.customer_code
        WHERE m.membership_no = $1 AND m.branch_id = $2 AND m.status = 'ACTIVE'`,
@@ -196,6 +198,19 @@ export async function POST(request: NextRequest) {
     }
 
     const scheme = schemes[0]
+
+    // Member age (as of the application date) must fall within the scheme's age limits
+    const ageAsOf = application_date || businessDate || new Date().toISOString().split('T')[0]
+    const ageError = getSchemeAgeError(
+      calculateAge(members[0].dob_text, ageAsOf),
+      scheme.minimum_age,
+      scheme.maximum_age,
+      scheme.scheme_name
+    )
+    if (ageError) {
+      await client.query("ROLLBACK")
+      return NextResponse.json({ error: ageError }, { status: 400 })
+    }
 
     // Validate loan amount against scheme limits
     if (loan_amount < parseFloat(scheme.minimum_loan_amount) || 
@@ -262,6 +277,16 @@ export async function POST(request: NextRequest) {
       if (suretyError) {
         await client.query("ROLLBACK")
         return NextResponse.json({ error: suretyError }, { status: 400 })
+      }
+    }
+
+    // Land — EC period must be complete and in order, years must be a sensible whole number
+    if (Number(security?.security_type_id) === 1) {
+      const landError = getEcDateError(security.ec_date_from, security.ec_date_to)
+        || getEcYearsError(security.ec_years_obtained)
+      if (landError) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: landError }, { status: 400 })
       }
     }
 
@@ -350,8 +375,8 @@ export async function POST(request: NextRequest) {
             registration_no, registration_date, document_type,
             guideline_value, market_value, encumbrance_cert_date,
             title_clear, legal_opinion_by, legal_opinion_date,
-            ec_date_from, ec_date_to, vao_details, revenue_village, created_at
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,NOW())`,
+            ec_date_from, ec_date_to, vao_details, revenue_village, ec_years_obtained, created_at
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,NOW())`,
           [
             securityId,
             isLand ? null : (security.property_type || 'RESIDENTIAL'),
@@ -371,7 +396,7 @@ export async function POST(request: NextRequest) {
             isLand ? null : (security.document_type || null),
             security.guideline_value || null,
             security.market_value || null,
-            security.encumbrance_cert_date || null,
+            isLand ? null : (security.encumbrance_cert_date || null),
             security.title_clear || null,
             security.legal_opinion_by || null,
             security.legal_opinion_date || null,
@@ -379,6 +404,7 @@ export async function POST(request: NextRequest) {
             isLand ? (security.ec_date_to || null) : null,
             isLand ? (security.vao_details || null) : null,
             isLand ? (security.revenue_village || null) : null,
+            isLand && security.ec_years_obtained ? Number(security.ec_years_obtained) : null,
           ]
         )
       } else if (typeId === 7) {

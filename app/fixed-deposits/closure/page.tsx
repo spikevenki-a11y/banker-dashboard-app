@@ -491,7 +491,7 @@ function DepositClosureContent() {
   const canSubmit = account &&
     voucherType &&
     effectivePayout >= 0 &&
-    (voucherType === "CASH" || (creditEntries.some((e) => e.selected) && creditMatchesPayout)) &&
+    (voucherType !== "DEFAULT_TRANSFER" || (creditEntries.some((e) => e.selected) && creditMatchesPayout)) &&
     !isSubmitting
 
   const handleConfirmClosure = () => {
@@ -502,7 +502,7 @@ function DepositClosureContent() {
       return
     }
 
-    if (voucherType === "TRANSFER") {
+    if (voucherType === "DEFAULT_TRANSFER") {
       const selectedCredits = creditEntries.filter((e) => e.selected && e.creditAmount)
       if (selectedCredits.length === 0) {
         setFormError("Please select at least one savings account and enter credit amount.")
@@ -541,7 +541,7 @@ function DepositClosureContent() {
           narration: narration || `Deposit Closure - A/c ${account.accountNumber}`,
           voucherType,
           selectedBatch: voucherType === "TRANSFER" ? selectedBatch : 0,
-          creditAccounts: voucherType === "TRANSFER" ? selectedCredits : [],
+          creditAccounts: voucherType === "DEFAULT_TRANSFER" ? selectedCredits : [],
         }),
       })
 
@@ -945,7 +945,8 @@ function DepositClosureContent() {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="CASH">Cash</SelectItem>
-                              <SelectItem value="TRANSFER">Transfer</SelectItem>
+                              <SelectItem value="TRANSFER">Bank Transfer</SelectItem>
+                              <SelectItem value="DEFAULT_TRANSFER">Default Transfer</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -959,7 +960,7 @@ function DepositClosureContent() {
                         </div>
                       </div>
 
-                      {/* GL Batch Selection - only for TRANSFER */}
+                      {/* GL Batch Selection - only for Bank Transfer */}
                       {voucherType === "TRANSFER" && (
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
@@ -1143,8 +1144,8 @@ function DepositClosureContent() {
                   </Card>
                 )}
 
-                {/* Credit Account Selection (for Transfer) */}
-                {closureAllowed && voucherType === "TRANSFER" && (
+                {/* Credit Account Selection (for Default Transfer) */}
+                {closureAllowed && voucherType === "DEFAULT_TRANSFER" && (
                   <Card>
                     <CardHeader className="pb-3">
                       <div className="flex items-center gap-3">
@@ -1797,6 +1798,12 @@ function DepositClosureContent() {
                           <span className="text-muted-foreground">Penalty Amount:</span>
                           <span className={`font-semibold ${effectivePenalty > 0 ? "text-red-600" : ""}`}>
                             {effectivePenalty > 0 ? `- ${formatCurrency(effectivePenalty)}` : formatCurrency(0)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Voucher Type:</span>
+                          <span className="font-medium">
+                            {voucherType === "CASH" ? "Cash" : voucherType === "TRANSFER" ? `Bank Transfer (${selectedBatch ? `Batch ${selectedBatch}` : "New Batch"})` : "Default Transfer"}
                           </span>
                         </div>
                         <div className="flex justify-between text-sm border-t border-border pt-2">
