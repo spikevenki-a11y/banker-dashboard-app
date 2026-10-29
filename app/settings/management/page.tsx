@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Users, Gem, ClipboardList, ShieldCheck } from "lucide-react"
+import { ArrowLeft, Users, Gem, ClipboardList, ShieldCheck, FilePlus2 } from "lucide-react"
 import { DashboardWrapper } from "../../_components/dashboard-wrapper"
 
 const managementCards = [
@@ -33,6 +33,15 @@ const managementCards = [
     color: "text-violet-600",
     bgColor: "bg-violet-50",
     href: "/settings/management/loan-scheme-security",
+  },
+  {
+    id: "add-loan-scheme",
+    title: "Add Loan Scheme",
+    description: "Assign loan schemes from the scheme master to this branch",
+    icon: FilePlus2,
+    color: "text-emerald-600",
+    bgColor: "bg-emerald-50",
+    href: "/settings/management/add-loan-scheme",
   },
 ]
 

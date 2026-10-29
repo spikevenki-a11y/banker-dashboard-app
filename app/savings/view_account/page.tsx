@@ -419,20 +419,31 @@ export default function ViewModifyAccountPage() {
     setAccount(null)
     setSearchError("")
     setPage(1)
+    const criteria = {
+      accountNumber: searchFields.account_number.trim(),
+      memberNumber: searchFields.membership_no.trim(),
+      memberName: searchFields.member_name.trim(),
+      fatherName: searchFields.father_name.trim(),
+      spouseName: searchFields.spouse_name.trim(),
+      aadhaarNumber: searchFields.aadhaar_number.trim(),
+      contactNo: searchFields.contact_no.trim(),
+    }
+    // Clear the search inputs; the results below stay visible
+    setSearchFields({
+      account_number: "",
+      membership_no: "",
+      member_name: "",
+      father_name: "",
+      spouse_name: "",
+      aadhaar_number: "",
+      contact_no: "",
+    })
     try {
       const res = await fetch("/api/savings/account-search", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          accountNumber: searchFields.account_number.trim(),
-          memberNumber: searchFields.membership_no.trim(),
-          memberName: searchFields.member_name.trim(),
-          fatherName: searchFields.father_name.trim(),
-          spouseName: searchFields.spouse_name.trim(),
-          aadhaarNumber: searchFields.aadhaar_number.trim(),
-          contactNo: searchFields.contact_no.trim(),
-        }),
+        body: JSON.stringify(criteria),
       })
 
       const data = await res.json()
@@ -572,9 +583,9 @@ export default function ViewModifyAccountPage() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-muted-foreground">Contact No.</Label>
+                    <Label className="text-xs font-medium text-muted-foreground">Phone No.</Label>
                     <Input
-                      placeholder="Enter contact no."
+                      placeholder="Enter Phone no."
                       value={searchFields.contact_no}
                       onChange={(e) => setSearchFields({ ...searchFields, contact_no: e.target.value })}
                       onKeyDown={(e) => e.key === "Enter" && handleAccountListSearch()}
@@ -1362,6 +1373,7 @@ export default function ViewModifyAccountPage() {
                             <TableHead className="font-semibold">Father's Name</TableHead>
                             <TableHead className="font-semibold">Spouse's Name</TableHead>
                             <TableHead className="font-semibold">Phone Number</TableHead>
+                            <TableHead className="font-semibold">Aadhaar Number</TableHead>
                             <TableHead className="font-semibold">Member No</TableHead>
                             <TableHead className="font-semibold">Scheme</TableHead>
                             <TableHead className="text-right font-semibold">Balance</TableHead>
@@ -1382,6 +1394,7 @@ export default function ViewModifyAccountPage() {
                               <TableCell className="text-sm text-muted-foreground">{result.father_name || "---"}</TableCell>
                               <TableCell className="text-sm text-muted-foreground">{result.spouse_name || "---"}</TableCell>
                               <TableCell className="text-sm text-muted-foreground">{result.mobile_no || "---"}</TableCell>
+                              <TableCell className="font-mono text-sm text-muted-foreground">{result.aadhaar_no?.trim() || "---"}</TableCell>
                               <TableCell className="font-mono text-sm">{result.membership_no}</TableCell>
                               <TableCell className="text-sm text-muted-foreground">{result.scheme_name}</TableCell>
                               <TableCell className="text-right font-mono text-sm font-semibold">
