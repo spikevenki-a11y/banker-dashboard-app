@@ -30,7 +30,7 @@ import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { MemberSummaryCard } from "@/components/member-summary-card"
 import { MemberSearchDialog } from "@/components/member-search-dialog"
 import { LoanSchemeDetailsCard, type LoanSchemeDetails } from "@/components/loan-scheme-details-card"
-import { getEcDateError, getEcYearsError, EC_YEARS_MAX } from "@/lib/land-security"
+import { getEcDateError, getEcYearsError, calculateEcYears } from "@/lib/land-security"
 import { calculateAge, getSchemeAgeError } from "@/lib/member-age"
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -323,7 +323,15 @@ export default function LoanApplicationPage() {
   const streamRef = useRef<MediaStream | null>(null)
 
   const sf = (key: keyof SecurityForm, value: any) =>
-    setSecurityForm((prev) => ({ ...prev, [key]: value }))
+    setSecurityForm((prev) => {
+      const next = { ...prev, [key]: value }
+      // No. of Years EC Obtained follows the EC period
+      if (key === "ec_date_from" || key === "ec_date_to") {
+        const years = calculateEcYears(next.ec_date_from, next.ec_date_to)
+        next.ec_years_obtained = years === null ? "" : String(years)
+      }
+      return next
+    })
 
   // Gold Details date fields default to the branch business date, editable afterwards
   const defaultSecurityForm = (): SecurityForm => ({
@@ -1513,7 +1521,8 @@ export default function LoanApplicationPage() {
                       <div className="rounded-lg border border-green-200 bg-green-50/30 p-4 space-y-4">
                         <p className="text-sm font-semibold text-green-800">Property Details</p>
 
-                        <div className={`grid gap-3 ${isLand ? "grid-cols-3" : "grid-cols-3"}`}>
+                        {/* All fields in one 3-column grid: every row holds 3 fields */}
+                        <div className="grid grid-cols-3 gap-3">
                           {!isLand && (
                             <div className="space-y-1">
                               <Label className="text-xs">Property Type *</Label>
@@ -1542,10 +1551,7 @@ export default function LoanApplicationPage() {
                             <Label className="text-xs">Land Area (Acres)</Label>
                             <Input className="h-8 text-xs" type="number" step="0.0001" value={securityForm.land_area_acres} onChange={(e) => sf("land_area_acres", e.target.value)} />
                           </div>
-                        </div>
-
                         {!isLand && (<>
-                        <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1">
                             <Label className="text-xs">Owner Name</Label>
                             <Input className="h-8 text-xs" placeholder="Property owner name" value={securityForm.owner_name} onChange={(e) => sf("owner_name", e.target.value)} />
@@ -1554,9 +1560,6 @@ export default function LoanApplicationPage() {
                             <Label className="text-xs">Address</Label>
                             <Input className="h-8 text-xs" placeholder="Street / door no" value={securityForm.address_line1} onChange={(e) => sf("address_line1", e.target.value)} />
                           </div>
-                        </div>
-
-                        <div className="grid grid-cols-4 gap-3">
                           <div className="space-y-1">
                             <Label className="text-xs">City</Label>
                             <Input className="h-8 text-xs" value={securityForm.city} onChange={(e) => sf("city", e.target.value)} />
@@ -1573,10 +1576,7 @@ export default function LoanApplicationPage() {
                             <Label className="text-xs">Pincode</Label>
                             <Input className="h-8 text-xs" maxLength={6} value={securityForm.pincode} onChange={(e) => sf("pincode", e.target.value)} />
                           </div>
-                        </div>
                         </>)}
-
-                        <div className={`grid gap-3 ${isLand ? "grid-cols-1" : "grid-cols-3"}`}>
                           {!isLand && (
                             <div className="space-y-1">
                               <Label className="text-xs">Land Area (Sqft)</Label>
@@ -1589,9 +1589,6 @@ export default function LoanApplicationPage() {
                               <Input className="h-8 text-xs" type="number" value={securityForm.built_up_area_sqft} onChange={(e) => sf("built_up_area_sqft", e.target.value)} />
                             </div>
                           )}
-                        </div>
-
-                        <div className={`grid gap-3 ${isLand ? "grid-cols-2" : "grid-cols-3"}`}>
                           <div className="space-y-1">
                             <Label className="text-xs">Registration No</Label>
                             <Input className="h-8 text-xs" placeholder="Deed / doc number" value={securityForm.registration_no} onChange={(e) => sf("registration_no", e.target.value)} />
@@ -1611,9 +1608,6 @@ export default function LoanApplicationPage() {
                               </Select>
                             </div>
                           )}
-                        </div>
-
-                        <div className={`grid gap-3 ${isLand ? "grid-cols-2" : "grid-cols-3"}`}>
                           <div className="space-y-1">
                             <Label className="text-xs">Guideline Value (₹)</Label>
                             <Input className="h-8 text-xs" type="number" value={securityForm.guideline_value} onChange={(e) => sf("guideline_value", e.target.value)} />
@@ -1628,11 +1622,7 @@ export default function LoanApplicationPage() {
                             <Label className="text-xs">Legal Opinion By</Label>
                             <Input className="h-8 text-xs" placeholder="Advocate name" value={securityForm.legal_opinion_by} onChange={(e) => sf("legal_opinion_by", e.target.value)} />
                           </div>
-                        </div>
-
-                        {isLand && (
-                          <div className="space-y-2">
-                          <div className="grid grid-cols-5 gap-3">
+                        {isLand && (<>
                             <div className="space-y-1">
                               <Label className="text-xs">EC Date From</Label>
                               <Input className="h-8 text-xs" type="date" aria-invalid={!!ecDateError || undefined} value={securityForm.ec_date_from} onChange={(e) => sf("ec_date_from", e.target.value)} />
@@ -1643,7 +1633,15 @@ export default function LoanApplicationPage() {
                             </div>
                             <div className="space-y-1">
                               <Label className="text-xs">No. of Years EC Obtained</Label>
-                              <Input className="h-8 text-xs" type="number" min={1} max={EC_YEARS_MAX} step={1} aria-invalid={!!ecYearsError || undefined} value={securityForm.ec_years_obtained} onChange={(e) => sf("ec_years_obtained", e.target.value)} />
+                              <Input
+                                className="h-8 text-xs bg-muted/50"
+                                readOnly
+                                tabIndex={-1}
+                                placeholder="Auto from EC dates"
+                                title="Calculated from EC Date From and EC Date To"
+                                aria-invalid={!!ecYearsError || undefined}
+                                value={securityForm.ec_years_obtained}
+                              />
                             </div>
                             <div className="space-y-1">
                               <Label className="text-xs">VAO Details</Label>
@@ -1653,11 +1651,11 @@ export default function LoanApplicationPage() {
                               <Label className="text-xs">Revenue Village</Label>
                               <Input className="h-8 text-xs" maxLength={150} placeholder="Revenue village" value={securityForm.revenue_village} onChange={(e) => sf("revenue_village", e.target.value)} />
                             </div>
-                          </div>
-                          {ecDateError && <p className="text-xs text-destructive">{ecDateError}</p>}
-                          {ecYearsError && <p className="text-xs text-destructive">{ecYearsError}</p>}
-                          </div>
-                        )}
+                        </>)}
+                        </div>
+
+                        {isLand && ecDateError && <p className="text-xs text-destructive">{ecDateError}</p>}
+                        {isLand && ecYearsError && <p className="text-xs text-destructive">{ecYearsError}</p>}
 
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input type="checkbox" className="h-4 w-4 rounded border-gray-300"

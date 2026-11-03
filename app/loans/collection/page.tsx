@@ -49,9 +49,11 @@ import {
   Banknote,
   History,
   X,
+  Users,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { Progress } from "@/components/ui/progress"
+import { MemberSearchDialog } from "@/components/member-search-dialog"
 
 type LoanAccountInfo = {
   loan_account_no: string
@@ -103,6 +105,17 @@ type Transaction = {
   remarks: string
 }
 
+// Number inputs on this screen: no spinner buttons, and no stepping with the
+// arrow keys or mouse wheel — values are typed in only
+const NO_SPINNER_CLASS =
+  "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+const noStepProps = {
+  onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault()
+  },
+  onWheel: (e: React.WheelEvent<HTMLInputElement>) => e.currentTarget.blur(),
+}
+
 function formatCurrency(val: number | string) {
   return `₹${Number(val).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
@@ -122,6 +135,7 @@ function LoanCollectionContent() {
   const [memberInfo, setMemberInfo] = useState<MemberInfo | null>(null)
   const [memberLoans, setMemberLoans] = useState<any[]>([])
   const [isSearching, setIsSearching] = useState(false)
+  const [searchDialogOpen, setSearchDialogOpen] = useState(false)
   const [accountInfo, setAccountInfo] = useState<LoanAccountInfo | null>(null)
   const [searchError, setSearchError] = useState("")
 
@@ -262,8 +276,8 @@ function LoanCollectionContent() {
   }
 
   // Search member by membership number
-  const searchMember = async () => {
-    const memNo = membershipNo.trim()
+  const searchMember = async (memberNoOverride?: string) => {
+    const memNo = (memberNoOverride ?? membershipNo).trim()
     if (!memNo) {
       setSearchError("Please enter membership number")
       return
@@ -542,11 +556,23 @@ function LoanCollectionContent() {
                       value={membershipNo}
                       onChange={(e) => setMembershipNo(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && searchMember()}
+                      className="flex-1"
                     />
-                    <Button onClick={searchMember} disabled={isSearching}>
+                    <Button onClick={() => searchMember()} disabled={isSearching} title="Load member">
                       {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                     </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setSearchDialogOpen(true)}
+                      disabled={isSearching}
+                      className="gap-2 bg-transparent"
+                    >
+                      <Users className="h-4 w-4" /> Search
+                    </Button>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Don&apos;t know the number? Use Search to find a member by name, father&apos;s name, phone, Aadhaar or ledger folio.
+                  </p>
                 </div>
                 {searchError && (
                   <p className="text-sm text-destructive">{searchError}</p>
@@ -757,10 +783,12 @@ function LoanCollectionContent() {
                         <Input
                           type="number"
                           min="0"
-                          step="0.01"
+                          step="1"
                           placeholder="Enter amount"
                           value={amount}
                           onChange={(e) => handleAmountChange(e.target.value)}
+                          className={NO_SPINNER_CLASS}
+                          {...noStepProps}
                         />
                       </div>
                       <div className="space-y-2">
@@ -794,6 +822,8 @@ function LoanCollectionContent() {
                               placeholder="0.00"
                               value={principalAmount}
                               onChange={(e) => handlePrincipalChange(e.target.value)}
+                              className={NO_SPINNER_CLASS}
+                              {...noStepProps}
                             />
                           </div>
                           <div className="space-y-1">
@@ -806,6 +836,8 @@ function LoanCollectionContent() {
                               placeholder="0.00"
                               value={interestAmount}
                               onChange={(e) => handleInterestChange(e.target.value)}
+                              className={NO_SPINNER_CLASS}
+                              {...noStepProps}
                             />
                           </div>
                         </div>
@@ -1017,6 +1049,17 @@ function LoanCollectionContent() {
         </div>
 
         {/* Success Dialog */}
+        {/* Member Search Dialog (shared with Loan Apply / Savings) */}
+        <MemberSearchDialog
+          open={searchDialogOpen}
+          onOpenChange={setSearchDialogOpen}
+          onSelect={(member) => {
+            setSearchDialogOpen(false)
+            setMembershipNo(String(member.membership_no))
+            searchMember(String(member.membership_no))
+          }}
+        />
+
         <AlertDialog open={successOpen} onOpenChange={setSuccessOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>

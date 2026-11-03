@@ -1,5 +1,5 @@
 import { getSession } from "@/lib/auth/session"
-import { getEcDateError, getEcYearsError } from "@/lib/land-security"
+import { getEcDateError, getEcYearsError, calculateEcYears } from "@/lib/land-security"
 import { calculateAge, getSchemeAgeError } from "@/lib/member-age"
 import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
@@ -284,6 +284,8 @@ export async function POST(request: NextRequest) {
 
     // Land — EC period must be complete and in order, years must be a sensible whole number
     if (Number(security?.security_type_id) === 1) {
+      // No. of Years EC Obtained is always derived from the EC period
+      security.ec_years_obtained = calculateEcYears(security.ec_date_from, security.ec_date_to)
       const landError = getEcDateError(security.ec_date_from, security.ec_date_to)
         || getEcYearsError(security.ec_years_obtained)
       if (landError) {

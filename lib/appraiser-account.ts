@@ -112,13 +112,16 @@ export async function creditAppraiserAccount(
   )
 
   if (account.account_type === "SAVINGS") {
-    const { rows: [bal] } = await client.query(
-      `UPDATE savings_accounts
-       SET available_balance = available_balance + $1, clear_balance = available_balance + $1, updated_at = NOW()
-       WHERE account_number = $2 AND branch_id = $3
-       RETURNING available_balance`,
-      [amount, account.account_number, branchId]
+    // Pending savings credit: the account balance is set from running_balance when the
+    // voucher is verified (FAS → Verify Voucher), and a rejected voucher leaves it untouched,
+    // so the balance is not updated here. The row is already locked by lockAppraiserAccount.
+    const { rows: [current] } = await client.query(
+      `SELECT available_balance FROM savings_accounts
+       WHERE account_number = $1 AND branch_id = $2`,
+      [account.account_number, branchId]
     )
+    if (!current) throw new Error(`Appraiser savings account ${account.account_number} was not found`)
+    const bal = { available_balance: Math.round((parseFloat(current.available_balance) + amount) * 100) / 100 }
 
     await client.query(
       `INSERT INTO savings_transactions (

@@ -104,6 +104,27 @@ const repaymentTypeOptions = [
 ]
 
 // Format currency
+// Number inputs in the sanction form: no spinner buttons, and no stepping with the
+// arrow keys or mouse wheel — values are typed in only
+const NO_SPINNER_CLASS =
+  "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+const noStepProps = {
+  onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault()
+  },
+  onWheel: (e: React.WheelEvent<HTMLInputElement>) => e.currentTarget.blur(),
+}
+
+// Due dates in the repayment schedule PDF: DD-MM-YYYY (e.g. 09-02-2027)
+const formatDueDatePdf = (value: string) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ""))
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`
+  const d = new Date(value)
+  if (isNaN(d.getTime())) return String(value || "")
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}`
+}
+
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -206,7 +227,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
         ["Tenure", `${tenureMonths} months`],
         ["Repayment Type", repaymentType.replace(/_/g, " ")],
         ["Moratorium", `${parseInt(moratoriumPeriod) || 0} months`],
-        ["EMI", formatCurrency(calculatedEMI || 0)],
+        // ["EMI", formatCurrency(calculatedEMI || 0)],
         ["Total Installments", String(emiSchedule.length)],
         ["Total Interest", formatCurrency(totalInterest || 0)],
         ["Total Payment", formatCurrency(totalPayment || 0)],
@@ -222,13 +243,23 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
       }
 
       const contentHtml = `
+        <style>
+          /* Fixed column widths so amounts at the larger font never wrap or overlap */
+          #pdf-body .rs-schedule { table-layout:fixed; }
+          #pdf-body .rs-schedule th, #pdf-body .rs-schedule td { white-space:nowrap; }
+        </style>
         <table>${detailRows.join("")}</table>
-        <table>
+        <table class="rs-schedule">
+          <colgroup>
+            <col style="width:8%" /><col style="width:16%" />
+            <col style="width:19%" /><col style="width:19%" />
+            <col style="width:19%" /><col style="width:19%" />
+          </colgroup>
           <thead>
             <tr>
               <th class="tc">No.</th><th>Due Date</th>
               <th class="tr">Principal</th><th class="tr">Interest</th>
-              <th class="tr">Total EMI</th><th class="tr">Balance</th>
+              <th class="tr">Total</th><th class="tr">Balance</th>
             </tr>
           </thead>
           <tbody>
@@ -236,7 +267,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
               .map(
                 (item) => `<tr>
                   <td class="tc">${item.installment_no}</td>
-                  <td>${new Date(item.due_date).toLocaleDateString("en-IN")}</td>
+                  <td>${formatDueDatePdf(item.due_date)}</td>
                   <td class="tr">${formatCurrency(item.principal)}</td>
                   <td class="tr">${formatCurrency(item.interest)}</td>
                   <td class="tr">${formatCurrency(item.total)}</td>
@@ -263,7 +294,9 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
         `Repayment Schedule ${selectedApp?.reference_no ?? ""}`.trim(),
         `Generated on ${generatedOn}`,
         branchInfo,
-        contentHtml
+        contentHtml,
+        // Larger text for readability; page breaks only between rows
+        { fontScale: 1.5, avoidRowSplit: true }
       )
     } catch (error) {
       console.error("Failed to download repayment schedule:", error)
@@ -722,7 +755,8 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                     value={sanctionedAmount}
                     onChange={(e) => setSanctionedAmount(e.target.value)}
                     aria-invalid={!!amountError}
-                    className={`pl-9 ${amountError ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                    className={`pl-9 ${NO_SPINNER_CLASS} ${amountError ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                    {...noStepProps}
                   />
                 </div>
                 {amountError ? (
@@ -743,7 +777,8 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                     step="0.01"
                     placeholder="Enter rate"
                     value={interestRate}
-                    className="pl-9"
+                    className={`pl-9 ${NO_SPINNER_CLASS}`}
+                    {...noStepProps}
                     disabled
                   />
                 </div>
@@ -759,6 +794,8 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                   type="number"
                   placeholder="Enter tenure"
                   value={tenureMonths}
+                  className={NO_SPINNER_CLASS}
+                  {...noStepProps}
                   disabled
                 />
                 <p className="text-xs text-muted-foreground">
@@ -773,6 +810,8 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                   placeholder="0"
                   value={moratoriumPeriod}
                   onChange={(e) => setMoratoriumPeriod(e.target.value)}
+                  className={NO_SPINNER_CLASS}
+                  {...noStepProps}
                 />
                 <p className="text-xs text-muted-foreground">Grace period before EMI starts</p>
               </div>
@@ -805,7 +844,8 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                   type="number"
                   value={numberOfInstallments}
                   readOnly
-                  className="bg-muted"
+                  className={`bg-muted ${NO_SPINNER_CLASS}`}
+                  {...noStepProps}
                 />
                 <p className="text-xs text-muted-foreground">Auto-calculated</p>
               </div>
@@ -1002,7 +1042,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
               <span className="text-muted-foreground">First Installment Date:</span>
               <span>{installmentStartDate ? new Date(installmentStartDate).toLocaleDateString("en-IN") : "-"}</span>
             </div>
-            <div className="flex justify-between text-sm border-t pt-2">
+            {/* <div className="flex justify-between text-sm border-t pt-2">
               <span className="font-semibold">
                 {repaymentType === "CLOSING_TIME" ? "Closing Amount:" :
                  repaymentType === "MONTHLY" ? "Monthly EMI:" :
@@ -1010,7 +1050,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                  repaymentType === "HALF_YEARLY" ? "Half-Yearly EMI:" : "Yearly EMI:"}
               </span>
               <span className="font-bold text-primary">{formatCurrency(calculatedEMI || 0)}</span>
-            </div>
+            </div> */}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowConfirmDialog(false)}>

@@ -801,7 +801,7 @@ export default function CustomerPage() {
 
                       {/* Contact details */}
                       <FormRow cols={2}>
-                        <Field id="phone" label="Mobile Number" required>
+                        {/* <Field id="phone" label="Mobile Number" required>
                           <div className="relative">
                             <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                             <Input
@@ -810,7 +810,7 @@ export default function CustomerPage() {
                               onChange={(e) => up({ phone: e.target.value.replace(/\D/g, "") })}
                             />
                           </div>
-                        </Field>
+                        </Field> */}
                         <Field id="alt_phone" label="Alternate Mobile" hint={altPhoneError ?? undefined}>
                           <div className="relative">
                             <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
