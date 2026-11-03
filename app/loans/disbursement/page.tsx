@@ -98,6 +98,7 @@ type SanctionedLoan = {
   mobile_no: string
   aadhaar_no: string
   scheme_name: string
+  scheme_id: number
   loan_type: string
   applied_loan_amount: number
   sanctioned_amount: number
@@ -217,6 +218,7 @@ export default function LoanDisbursementPage() {
         mobile_no: app.mobile_no || '',
         aadhaar_no: app.aadhaar_no || '',
         scheme_name: app.scheme_name,
+        scheme_id: app.scheme_id,
         loan_type: app.loan_type || 'Term Loan',
         applied_loan_amount: parseFloat(app.applied_loan_amount) || 0,
         sanctioned_amount: parseFloat(app.sanctioned_amount) || 0,
@@ -674,10 +676,10 @@ export default function LoanDisbursementPage() {
                         <p className="text-xs text-muted-foreground">Tenure</p>
                         <p className="mt-1 text-lg font-semibold">{selectedLoan.tenure_months} months</p>
                       </div>
-                      <div className="rounded-lg border-2 border-primary/20 p-3 bg-primary/5">
+                      {/* <div className="rounded-lg border-2 border-primary/20 p-3 bg-primary/5">
                         <p className="text-xs text-muted-foreground">Monthly EMI</p>
                         <p className="mt-1 text-xl font-bold text-primary">{formatCurrency(selectedLoan.emi_amount)}</p>
-                      </div>
+                      </div> */}
                     </div>
 
                     {/* Applied vs Sanctioned */}

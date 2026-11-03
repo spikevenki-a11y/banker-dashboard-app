@@ -70,6 +70,16 @@ type LoanAccountInfo = {
   application_status: string
 }
 
+type MemberInfo = {
+  membership_no: string | number
+  full_name: string
+  father_name?: string
+  mobile_no?: string
+  aadhaar_no?: string
+  member_type?: string
+  status?: string
+}
+
 type EMISchedule = {
   schedule_id: number
   installment_no: number
@@ -107,8 +117,10 @@ function LoanCollectionContent() {
   const searchParams = useSearchParams()
   const applicationId = searchParams.get("applicationId")
 
-  // Account lookup
-  const [loanAccountNo, setLoanAccountNo] = useState("")
+  // Member lookup → member's loan accounts → selected account
+  const [membershipNo, setMembershipNo] = useState("")
+  const [memberInfo, setMemberInfo] = useState<MemberInfo | null>(null)
+  const [memberLoans, setMemberLoans] = useState<any[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [accountInfo, setAccountInfo] = useState<LoanAccountInfo | null>(null)
   const [searchError, setSearchError] = useState("")
@@ -135,7 +147,6 @@ function LoanCollectionContent() {
 
   const applyAccountData = (acc: any, fallbackAccNo: string) => {
     const resolvedAccNo = acc.loan_account_no || fallbackAccNo
-    setLoanAccountNo(resolvedAccNo)
     setAccountInfo({
       loan_account_no: resolvedAccNo,
       reference_no: acc.reference_no,
@@ -173,7 +184,12 @@ function LoanCollectionContent() {
         const accData = await accRes.json()
         if (accData.error) throw new Error(accData.error)
         if (accData.accounts?.length > 0) {
-          const resolvedAccNo = applyAccountData(accData.accounts[0], "")
+          const acc = accData.accounts[0]
+          const resolvedAccNo = applyAccountData(acc, "")
+          if (acc.membership_no) {
+            setMembershipNo(String(acc.membership_no))
+            await loadMember(String(acc.membership_no))
+          }
           if (resolvedAccNo) {
             await fetchLoanDetails(resolvedAccNo)
           } else {
@@ -190,40 +206,107 @@ function LoanCollectionContent() {
     })()
   }, [applicationId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Search loan account
-  const searchLoanAccount = async () => {
-    if (!loanAccountNo.trim()) {
-      setSearchError("Please enter loan account number")
+  // Fetch the member's loan accounts (one row per loan application)
+  const loadMemberLoans = async (memNo: string): Promise<any[]> => {
+    const res = await fetch(`/api/loans/accounts?membershipNo=${encodeURIComponent(memNo)}`, {
+      credentials: "include",
+    })
+    const data = await res.json()
+    if (data.error) throw new Error(data.error)
+    const seen = new Set<string>()
+    const loans = (data.accounts || []).filter((a: any) => {
+      const key = String(a.loan_application_id)
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    setMemberLoans(loans)
+    return loans
+  }
+
+  // Fetch member details and their loan accounts
+  const loadMember = async (memNo: string) => {
+    const [memberRes, loans] = await Promise.all([
+      fetch("/api/savings/member-lookup", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ membership_no: memNo }),
+      }).then(async (r) => (r.ok ? r.json() : null)).catch(() => null),
+      loadMemberLoans(memNo),
+    ])
+
+    if (memberRes?.found) {
+      setMemberInfo(memberRes.member)
+    } else if (loans.length > 0) {
+      // Member is no longer active but still has loans to collect on
+      setMemberInfo({
+        membership_no: memNo,
+        full_name: loans[0].member_name,
+        mobile_no: loans[0].mobile_no,
+        status: "INACTIVE",
+      })
+    } else {
+      setMemberInfo(null)
+    }
+    return { found: !!memberRes?.found, loans }
+  }
+
+  const resetCollectionForm = () => {
+    setPrincipalAmount("")
+    setInterestAmount("")
+    setNarration("")
+    setSelectedInstallments([])
+    setPaymentMode("CASH")
+    setFormError("")
+  }
+
+  // Search member by membership number
+  const searchMember = async () => {
+    const memNo = membershipNo.trim()
+    if (!memNo) {
+      setSearchError("Please enter membership number")
       return
     }
 
     setIsSearching(true)
     setSearchError("")
+    setMemberInfo(null)
+    setMemberLoans([])
     setAccountInfo(null)
     setEmiSchedule([])
     setTransactions([])
+    resetCollectionForm()
 
     try {
-      const accRes = await fetch(
-        `/api/loans/accounts?loanAccountNo=${encodeURIComponent(loanAccountNo.trim())}`,
-        { credentials: "include" }
-      )
-      const accData = await accRes.json()
-
-      if (accData.error) throw new Error(accData.error)
-
-      if (accData.accounts && accData.accounts.length > 0) {
-        const resolvedAccNo = applyAccountData(accData.accounts[0], loanAccountNo.trim())
-        await fetchLoanDetails(resolvedAccNo)
-      } else {
-        setSearchError("Loan account not found")
+      const { found, loans } = await loadMember(memNo)
+      if (!found && loans.length === 0) {
+        setSearchError("No member found with this membership number")
+      } else if (loans.length === 0) {
+        setSearchError("No loan accounts found for this member")
       }
     } catch (error: any) {
-      setSearchError(error.message || "Failed to search loan account")
+      setSearchError(error.message || "Failed to search member")
     } finally {
       setIsSearching(false)
     }
   }
+
+  // Select one of the member's loan accounts for collection
+  const selectLoanAccount = async (acc: any) => {
+    if (!acc.loan_account_no) {
+      setSearchError("Loan account number not available. The loan may not have been fully disbursed.")
+      return
+    }
+    setSearchError("")
+    setEmiSchedule([])
+    setTransactions([])
+    resetCollectionForm()
+    applyAccountData(acc, "")
+    await fetchLoanDetails(String(acc.loan_account_no))
+  }
+
+  const isCollectible = (status?: string) => ["ACTIVE", "OVERDUE"].includes(String(status || "").toUpperCase())
 
   const fetchLoanDetails = async (accNo: string) => {
     setIsLoadingDetails(true)
@@ -258,6 +341,11 @@ function LoanCollectionContent() {
 
     if (breakupError) {
       setFormError(breakupError)
+      return
+    }
+
+    if (!isCollectible(accountInfo.application_status)) {
+      setFormError(`Collection is not allowed on a ${String(accountInfo.application_status).toLowerCase()} loan`)
       return
     }
 
@@ -304,6 +392,11 @@ function LoanCollectionContent() {
         outstanding_balance: data.outstanding_balance,
         application_status: data.loan_status
       } : null)
+
+      // Refresh the member's loan list (outstanding / status)
+      if (accountInfo.membership_no) {
+        loadMemberLoans(String(accountInfo.membership_no)).catch(() => {/* silent */})
+      }
 
     } catch (error: any) {
       setFormError(error.message)
@@ -435,26 +528,130 @@ function LoanCollectionContent() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Search className="h-5 w-5" />
-                  Search Loan Account
+                  Search Member
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Enter loan account number"
-                    value={loanAccountNo}
-                    onChange={(e) => setLoanAccountNo(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && searchLoanAccount()}
-                  />
-                  <Button onClick={searchLoanAccount} disabled={isSearching}>
-                    {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                  </Button>
+                <div className="space-y-2">
+                  <Label htmlFor="membership-no">Membership Number</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="membership-no"
+                      placeholder="Enter membership number"
+                      value={membershipNo}
+                      onChange={(e) => setMembershipNo(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && searchMember()}
+                    />
+                    <Button onClick={searchMember} disabled={isSearching}>
+                      {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                    </Button>
+                  </div>
                 </div>
                 {searchError && (
                   <p className="text-sm text-destructive">{searchError}</p>
                 )}
               </CardContent>
             </Card>
+
+            {/* Member Details Card */}
+            {memberInfo && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <User className="h-5 w-5" />
+                      Member Details
+                    </CardTitle>
+                    {memberInfo.status && (
+                      <Badge className={
+                        String(memberInfo.status).toUpperCase() === "ACTIVE"
+                          ? "bg-teal-100 text-teal-700"
+                          : "bg-gray-100 text-gray-700"
+                      }>
+                        {memberInfo.status}
+                      </Badge>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Member Name</span>
+                    <p className="font-medium">{memberInfo.full_name || "---"}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <span className="text-muted-foreground">Membership No</span>
+                      <p className="font-mono font-medium">{memberInfo.membership_no}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Mobile</span>
+                      <p className="font-medium">{memberInfo.mobile_no || "---"}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Father's Name</span>
+                      <p className="font-medium">{memberInfo.father_name || "---"}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Aadhaar</span>
+                      <p className="font-mono font-medium">{memberInfo.aadhaar_no?.trim() || "---"}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Member's Loan Accounts */}
+            {memberInfo && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CreditCard className="h-5 w-5" />
+                    Loan Accounts
+                  </CardTitle>
+                  <CardDescription>Select a loan account for collection</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {memberLoans.length === 0 ? (
+                    <p className="py-4 text-center text-sm text-muted-foreground">No loan accounts found for this member</p>
+                  ) : (
+                    memberLoans.map((loan) => {
+                      const accNo = loan.loan_account_no ? String(loan.loan_account_no) : ""
+                      const isSelected = !!accNo && accountInfo?.loan_account_no === accNo
+                      const status = String(loan.application_status || "")
+                      return (
+                        <button
+                          key={loan.loan_application_id}
+                          type="button"
+                          onClick={() => selectLoanAccount(loan)}
+                          disabled={!accNo || isLoadingDetails}
+                          className={`w-full rounded-lg border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                            isSelected ? "border-blue-400 bg-blue-50 dark:bg-blue-950/30" : "hover:bg-muted/50"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono text-sm font-medium">{accNo || "Not disbursed"}</span>
+                            <Badge className={
+                              status === "ACTIVE" ? "bg-teal-100 text-teal-700" :
+                              status === "OVERDUE" ? "bg-red-100 text-red-700" :
+                              "bg-gray-100 text-gray-700"
+                            }>
+                              {status}
+                            </Badge>
+                          </div>
+                          <p className="mt-1 truncate text-xs text-muted-foreground">
+                            {loan.scheme_name} · Ref {loan.reference_no}
+                          </p>
+                          <div className="mt-1 flex justify-between text-xs">
+                            <span className="text-muted-foreground">Sanctioned {formatCurrency(loan.sanctioned_amount || 0)}</span>
+                            <span className="font-semibold text-orange-600">O/S {formatCurrency(loan.outstanding_balance || 0)}</span>
+                          </div>
+                        </button>
+                      )
+                    })
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Account Info Card */}
             {accountInfo && (
@@ -630,6 +827,12 @@ function LoanCollectionContent() {
                       />
                     </div>
 
+                    {!isCollectible(accountInfo.application_status) && (
+                      <p className="rounded-md border border-amber-200 bg-amber-50 p-2 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+                        This loan is {String(accountInfo.application_status).toLowerCase()}. Collection is only allowed on active or overdue loans.
+                      </p>
+                    )}
+
                     {formError && (
                       <p className="text-sm text-destructive">{formError}</p>
                     )}
@@ -649,7 +852,10 @@ function LoanCollectionContent() {
                       >
                         Reset
                       </Button>
-                      <Button onClick={processCollection} disabled={isSubmitting}>
+                      <Button
+                        onClick={processCollection}
+                        disabled={isSubmitting || !isCollectible(accountInfo.application_status)}
+                      >
                         {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         <CreditCard className="mr-2 h-4 w-4" />
                         Record Payment
@@ -795,8 +1001,14 @@ function LoanCollectionContent() {
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-16">
                   <CreditCard className="h-16 w-16 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold text-muted-foreground">Search for a Loan Account</h3>
-                  <p className="text-sm text-muted-foreground">Enter loan account number to view details and record payments</p>
+                  <h3 className="text-lg font-semibold text-muted-foreground">
+                    {memberInfo ? "Select a Loan Account" : "Search for a Member"}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {memberInfo
+                      ? "Choose one of the member's loan accounts to view details and record payments"
+                      : "Enter a membership number to view the member's loan accounts"}
+                  </p>
                 </CardContent>
               </Card>
             )}

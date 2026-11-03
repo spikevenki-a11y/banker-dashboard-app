@@ -153,7 +153,7 @@ export async function POST(req: NextRequest) {
            $1::date,
            la.loan_outstanding,
            la.interest_rate,
-           ROUND(la.loan_outstanding * la.interest_rate / 100.0 / 365.0, 4),
+           ROUND( CAST(la.loan_outstanding  * la.interest_rate / 36500 AS NUMERIC),2),
            la.overdue_days,
            la.npa_flag,
            $2::uuid

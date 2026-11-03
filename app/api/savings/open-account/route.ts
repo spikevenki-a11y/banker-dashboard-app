@@ -2,6 +2,7 @@ import { getSession } from "@/lib/auth/session"
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
+import { cleanNominees, saveSavingsNominees } from "@/lib/savings-nominees"
 
 const OPERATION_TYPES = ["SINGLE", "EITHER_SURVIVOR", "JOINT_MINOR", "FORMER_SURVIVOR", "LATTER_SURVIVOR"]
 
@@ -15,9 +16,7 @@ export async function POST(req: Request) {
     const branchId = session.branch
     const businessDate: string = session.businessDate
     const { membership_no, scheme_id, opening_date, initial_deposit, nominees, ledger_folio_no, is_cheque_required, operation_type } = await req.json()
-    const nomineeList: { name: string; relation: string }[] = Array.isArray(nominees)
-      ? nominees.slice(0, 4)
-      : []
+    const nomineeList = cleanNominees(nominees)
 
     if (!membership_no || !scheme_id || !opening_date) {
       return NextResponse.json({ error: "Membership number, scheme, and opening date are required" }, { status: 400 })
@@ -67,18 +66,13 @@ export async function POST(req: Request) {
       [accountNumber, branchId, membership_no, scheme_id, opening_date, scheme.interest_rate, initial_deposit || 0, ledger_folio_no?.trim() || null, !!is_cheque_required, operation_type || "SINGLE"]
     )
 
-    // Insert nominees
-    for (let i = 0; i < nomineeList.length; i++) {
-      const { name, relation } = nomineeList[i]
-      if (name?.trim()) {
-        await client.query(
-          `INSERT INTO savings_account_nominees
-             (account_number, nominee_name, relation, nominee_order)
-           VALUES ($1, $2, $3, $4)`,
-          [accountNumber, name.trim(), relation, i + 1]
-        )
-      }
-    }
+    // Insert nominees (nominee_details, linked to the new account and its member)
+    await saveSavingsNominees(client, {
+      branchId,
+      accountNumber: insertResult.rows[0].account_number,
+      membershipNo: membership_no,
+      nominees: nomineeList,
+    })
 
     await client.query("COMMIT")
     console.log(insertResult.rows[0].account_number)
