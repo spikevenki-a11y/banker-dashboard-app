@@ -154,7 +154,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-white font-sans">
       <div className="relative overflow-hidden">
         <img
-          src="/images/login/background.png"
+          src="/images/login/banking.jpeg"
           alt=""
           aria-hidden="true"
           className="absolute inset-0 h-full w-full object-cover"

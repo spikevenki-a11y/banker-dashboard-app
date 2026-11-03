@@ -101,6 +101,7 @@ export async function POST(request: NextRequest) {
       `SELECT la.*, 
               ls.sanctioned_amount, ls.interest_rate, ls.loan_tenure_months, ls.payment_amount,
               lscheme.loan_gl_account, lscheme.interest_receivable_gl_account,
+              COALESCE(lscheme.appraiser_charge_allowed, false) AS scheme_appraiser_charge_allowed,
               m.membership_no as mem_no
        FROM loan_applications la
        JOIN loan_sanction_details ls ON la.loan_application_id = ls.loan_application_id
@@ -125,6 +126,12 @@ export async function POST(request: NextRequest) {
     if (disbursementAmt > parseFloat(app.sanctioned_amount)) {
       await client.query("ROLLBACK")
       return NextResponse.json({ error: "Disbursement amount cannot exceed sanctioned amount" }, { status: 400 })
+    }
+
+    // Appraiser charge is only allowed when the loan scheme permits it
+    if (appraiser_charge && parseFloat(appraiser_charge.charge_amount) > 0 && !app.scheme_appraiser_charge_allowed) {
+      await client.query("ROLLBACK")
+      return NextResponse.json({ error: "Appraiser charge is not allowed for this loan scheme" }, { status: 400 })
     }
 
     // Default Transfer: lock and validate the member's destination savings account

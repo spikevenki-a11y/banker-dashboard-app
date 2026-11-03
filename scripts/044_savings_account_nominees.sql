@@ -14,3 +14,6 @@ CREATE TABLE savings_account_nominees (
 );
 
 CREATE INDEX idx_san_account ON savings_account_nominees(account_number);
+
+
+drop table savings_account_nominees;

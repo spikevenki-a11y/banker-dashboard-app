@@ -2,8 +2,11 @@ import { getSession } from "@/lib/auth/session"
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
+import { cleanNominees, saveSavingsNominees } from "@/lib/savings-nominees"
 
 const OPERATION_TYPES = ["SINGLE", "EITHER_SURVIVOR", "JOINT_MINOR", "FORMER_SURVIVOR", "LATTER_SURVIVOR"]
+// Every operation type except SINGLE needs a secondary holder
+const needsSecondaryHolder = (op: string) => op !== "SINGLE"
 
 export async function POST(req: Request) {
   const session = await getSession()
@@ -14,10 +17,8 @@ export async function POST(req: Request) {
   try {
     const branchId = session.branch
     const businessDate: string = session.businessDate
-    const { membership_no, scheme_id, opening_date, initial_deposit, nominees, ledger_folio_no, is_cheque_required, operation_type } = await req.json()
-    const nomineeList: { name: string; relation: string }[] = Array.isArray(nominees)
-      ? nominees.slice(0, 4)
-      : []
+    const { membership_no, scheme_id, opening_date, initial_deposit, nominees, ledger_folio_no, is_cheque_required, operation_type, secondary_membership_no } = await req.json()
+    const nomineeList = cleanNominees(nominees)
 
     if (!membership_no || !scheme_id || !opening_date) {
       return NextResponse.json({ error: "Membership number, scheme, and opening date are required" }, { status: 400 })
@@ -25,6 +26,17 @@ export async function POST(req: Request) {
 
     if (operation_type && !OPERATION_TYPES.includes(operation_type)) {
       return NextResponse.json({ error: "Invalid operation type" }, { status: 400 })
+    }
+
+    const opType: string = operation_type || "SINGLE"
+    const secondaryNo = needsSecondaryHolder(opType) ? String(secondary_membership_no ?? "").trim() : ""
+    if (needsSecondaryHolder(opType)) {
+      if (!secondaryNo) {
+        return NextResponse.json({ error: "Secondary holder is required for this operation type" }, { status: 400 })
+      }
+      if (secondaryNo === String(membership_no).trim()) {
+        return NextResponse.json({ error: "Secondary holder must be a different member from the account holder" }, { status: 400 })
+      }
     }
 
     const dayendErr = await checkDayEndRestriction(branchId, businessDate)
@@ -46,6 +58,19 @@ export async function POST(req: Request) {
 
     const scheme = schemeResult.rows[0]
 
+    // Secondary holder must be an active member of this branch
+    if (secondaryNo) {
+      const { rows: secRows } = await client.query(
+        `SELECT membership_no FROM memberships
+         WHERE CAST(membership_no AS VARCHAR) = $1 AND branch_id = $2 AND status = 'ACTIVE'`,
+        [secondaryNo, branchId]
+      )
+      if (secRows.length === 0) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: `Secondary holder ${secondaryNo} is not an active member of this branch` }, { status: 400 })
+      }
+    }
+
     // Generate account number (branch_id + scheme_id + sequence)
     const seqResult = await client.query(
       `SELECT COALESCE(MAX(CAST(SUBSTRING(account_number FROM 11) AS INTEGER)), 0) + 1 as next_seq
@@ -61,23 +86,25 @@ export async function POST(req: Request) {
       `INSERT INTO savings_accounts (
         account_number, branch_id, membership_no, scheme_id,
         opening_date, interest_rate, available_balance, clear_balance, unclear_balance,
-        account_status, ref_no, is_cheque_required, operation_type, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, 0, 'ACTIVE', $8, $9, $10, NOW(), NOW())
+        account_status, ref_no, is_cheque_required, operation_type, secondary_membership_no, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, 0, 'ACTIVE', $8, $9, $10, $11, NOW(), NOW())
       RETURNING id, account_number`,
-      [accountNumber, branchId, membership_no, scheme_id, opening_date, scheme.interest_rate, initial_deposit || 0, ledger_folio_no?.trim() || null, !!is_cheque_required, operation_type || "SINGLE"]
+      [accountNumber, branchId, membership_no, scheme_id, opening_date, scheme.interest_rate, initial_deposit || 0, ledger_folio_no?.trim() || null, !!is_cheque_required, opType, secondaryNo || null]
     )
 
-    // Insert nominees
-    for (let i = 0; i < nomineeList.length; i++) {
-      const { name, relation } = nomineeList[i]
-      if (name?.trim()) {
-        await client.query(
-          `INSERT INTO savings_account_nominees
-             (account_number, nominee_name, relation, nominee_order)
-           VALUES ($1, $2, $3, $4)`,
-          [accountNumber, name.trim(), relation, i + 1]
-        )
-      }
+    // Insert nominees (nominee_details, linked to the new account and its member)
+    const nomineeErr = await saveSavingsNominees(client, {
+      branchId,
+      accountNumber: insertResult.rows[0].account_number,
+      holderMembershipNo: membership_no,
+      businessDate,
+      nominees: nomineeList,
+      requirePercentage: true,
+      requireTotal100: true,
+    })
+    if (nomineeErr) {
+      await client.query("ROLLBACK")
+      return NextResponse.json({ error: nomineeErr }, { status: 400 })
     }
 
     await client.query("COMMIT")

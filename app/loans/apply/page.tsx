@@ -1069,7 +1069,8 @@ export default function LoanApplicationPage() {
                           onValueChange={(v) => { setSelectedSchemeId(v); loadpurpose(v); loadSecurity(v); setSelectedSecurityId(""); setSecurityTypeError(""); setSecurityForm(emptySecurityForm) }}>
                           <SelectTrigger><SelectValue placeholder={loadingSchemes ? "Loading..." : !selectedLoanType ? "Select loan type first" : "Select a loan scheme"} /></SelectTrigger>
                           <SelectContent>
-                            {filteredSchemes.map((s) => <SelectItem key={s.scheme_id} value={String(s.scheme_id)}>{s.scheme_name} ({s.interest_rate}%)</SelectItem>)}
+                            {filteredSchemes.map((s) => <SelectItem key={s.scheme_id} value={String(s.scheme_id)}>{s.scheme_name} </SelectItem>)}
+                            {/* {filteredSchemes.map((s) => <SelectItem key={s.scheme_id} value={String(s.scheme_id)}>{s.scheme_name} ({s.interest_rate}%)</SelectItem>)} */}
                           </SelectContent>
                         </Select>
                       </div>

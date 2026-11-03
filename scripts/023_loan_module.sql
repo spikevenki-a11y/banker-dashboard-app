@@ -105,69 +105,52 @@ CREATE TABLE loan_transaction_details (
 );
 
 
-create table loan_schemes (
-  id uuid not null default gen_random_uuid(),
+create table public.loan_schemes (
+  id uuid not null default gen_random_uuid (),
   branch_id bigint not null,
-
   scheme_id integer not null,
-  scheme_name varchar(100) not null,
+  scheme_name text not null,
   scheme_description text null,
-
-  loan_type varchar(30) not null,
-
-  minimum_loan_amount numeric(14,2) not null default 0.00,
-  maximum_loan_amount numeric(14,2) not null default 0.00,
-
+  loan_type character varying(30) not null,
+  minimum_loan_amount numeric(14, 2) not null default 0.00,
+  maximum_loan_amount numeric(14, 2) not null default 0.00,
   minimum_period_months integer not null default 0,
   maximum_period_months integer not null default 0,
-
-  repayment_frequency varchar(20) not null default 'MONTHLY',
-  installment_calculation_method varchar(20) not null default 'EMI',
-
-  interest_policy_id varchar(20) not null,
-  interest_rate numeric(5,2) not null default 0.00,
-  interest_calculation_method varchar(20) not null default 'REDUCING_BALANCE',
-  interest_frequency varchar(20) not null default 'MONTHLY',
-  compounding_frequency varchar(20) null,
-
-  interest_rounding varchar(20) not null default 'NEAREST',
-  minimum_interest_payable numeric(14,2) not null default 0.00,
-
-  penal_interest_rate numeric(5,2) null default 0.00,
+  repayment_frequency character varying(20) not null default 'MONTHLY'::character varying,
+  installment_calculation_method character varying(20) not null default 'EMI'::character varying,
+  interest_policy_id character varying(20) not null,
+  interest_rate numeric(5, 2) not null default 0.00,
+  interest_calculation_method character varying(20) not null default 'REDUCING_BALANCE'::character varying,
+  interest_frequency character varying(20) not null default 'MONTHLY'::character varying,
+  compounding_frequency character varying(20) null,
+  interest_rounding character varying(20) not null default 'NEAREST'::character varying,
+  minimum_interest_payable numeric(14, 2) not null default 0.00,
+  penal_interest_rate numeric(5, 2) null default 0.00,
   penalty_grace_days integer null default 0,
-
-  processing_fee_percent numeric(5,2) null default 0.00,
-  processing_fee_min numeric(14,2) null default 0.00,
-  processing_fee_max numeric(14,2) null default 0.00,
-
+  processing_fee_percent numeric(5, 2) null default 0.00,
+  processing_fee_min numeric(14, 2) null default 0.00,
+  processing_fee_max numeric(14, 2) null default 0.00,
   prepayment_allowed boolean not null default true,
-  prepayment_penalty_percent numeric(5,2) null default 0.00,
-
+  prepayment_penalty_percent numeric(5, 2) null default 0.00,
   collateral_required boolean not null default false,
-
-  loan_gl_account varchar(20) not null,
-  interest_income_gl_account varchar(20) not null,
-  interest_receivable_gl_account varchar(20) not null,
-  penal_interest_gl_account varchar(20) null,
-  processing_fee_gl_account varchar(20) null,
-
+  loan_gl_account character varying(20) not null,
+  interest_income_gl_account character varying(20) not null,
+  interest_receivable_gl_account character varying(20) not null,
+  penal_interest_gl_account character varying(20) null,
+  processing_fee_gl_account character varying(20) null,
   minimum_age integer null default 18,
   maximum_age integer null default 70,
-
   is_staff_only boolean not null default false,
-
-  scheme_status varchar(20) not null default 'ACTIVE',
-
-  created_at timestamp without time zone default CURRENT_TIMESTAMP,
-  updated_at timestamp without time zone default CURRENT_TIMESTAMP,
-
+  scheme_status character varying(20) not null default 'ACTIVE'::character varying,
+  created_at timestamp without time zone null default CURRENT_TIMESTAMP,
+  updated_at timestamp without time zone null default CURRENT_TIMESTAMP,
+  processing_charge_allowed boolean not null default false,
+  processing_charge_code character varying(20) null,
+  appraiser_charge_allowed boolean not null default false,
+  appraiser_charge_code character varying(20) null, // appraisal_master - appraisal_master_id
   constraint loan_schemes_pkey primary key (id),
-  constraint loan_schemes_scheme_id_key unique (scheme_id),
-  constraint loan_schemes_scheme_name_key unique (scheme_name),
-  constraint loan_schemes_branch_id_fkey
-    foreign key (branch_id) references branchparameters(branch_id)
-
-) ;
+  constraint loan_schemes_branch_id_fkey foreign KEY (branch_id) references branchparameters (branch_id)
+) TABLESPACE pg_default;
 
 INSERT INTO public.chart_of_accounts
 (branch_id, accountcode, accountname, accounttypecode, isledger, parentaccountcode, accountbalance, isactive, createddate, modifieddate, serial_no)

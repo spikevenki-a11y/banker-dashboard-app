@@ -89,10 +89,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (!["CASH", "TRANSFER"].includes(payment_mode)) {
+      return NextResponse.json({ error: "Invalid payment mode" }, { status: 400 })
+    }
+
+    const payAmt = Math.round(parseFloat(payment_amount) * 100) / 100
+    if (!Number.isFinite(payAmt) || payAmt <= 0) {
+      return NextResponse.json({ error: "Payment amount must be greater than zero" }, { status: 400 })
+    }
+
     // Validate explicit breakup if provided
     if (principal_amount !== undefined && interest_amount !== undefined) {
-      const sum = parseFloat(principal_amount) + parseFloat(interest_amount)
-      if (Math.abs(sum - parseFloat(payment_amount)) > 0.01) {
+      const p = parseFloat(principal_amount)
+      const i = parseFloat(interest_amount)
+      if (!Number.isFinite(p) || !Number.isFinite(i) || p < 0 || i < 0) {
+        return NextResponse.json({ error: "Principal and Interest cannot be negative" }, { status: 400 })
+      }
+      const sum = p + i
+      if (Math.abs(sum - payAmt) > 0.01) {
         return NextResponse.json(
           { error: "Principal + Interest must equal total payment amount" },
           { status: 400 }
@@ -136,24 +150,45 @@ export async function POST(request: NextRequest) {
 
     const loanGL = loanInfo[0].loan_gl_account
     const interestGL = loanInfo[0].interest_income_gl_account
-    const loanApplicationId = loanInfo[0].loan_application_id  
+    const loanApplicationId = loanInfo[0].loan_application_id
+
+    // Lock the loan so concurrent collections on the same account are serialised
+    const { rows: [loanRow] } = await client.query(
+      `SELECT application_status FROM loan_applications
+       WHERE loan_application_id = $1 AND branch_id = $2
+       FOR UPDATE`,
+      [loanApplicationId, branchId]
+    )
+    if (!loanRow) {
+      await client.query("ROLLBACK")
+      return NextResponse.json({ error: "Loan account not found" }, { status: 404 })
+    }
+    if (!["ACTIVE", "OVERDUE"].includes(String(loanRow.application_status).toUpperCase())) {
+      await client.query("ROLLBACK")
+      return NextResponse.json(
+        { error: `Collection is not allowed on a ${String(loanRow.application_status).toLowerCase()} loan` },
+        { status: 400 }
+      )
+    }
 
     // Get pending installments
     let installmentsToProcess = []
     if (installment_numbers && installment_numbers.length > 0) {
       const { rows } = await client.query(
-        `SELECT * FROM loan_repayment_schedule_details 
+        `SELECT * FROM loan_repayment_schedule_details
          WHERE loan_account_no = $1 AND installment_no = ANY($2) AND payment_status IN ('PENDING', 'OVERDUE')
-         ORDER BY installment_no ASC`,
+         ORDER BY installment_no ASC
+         FOR UPDATE`,
         [loan_account_no, installment_numbers]
       )
       installmentsToProcess = rows
     } else {
       // Auto-select pending installments
       const { rows } = await client.query(
-        `SELECT * FROM loan_repayment_schedule_details 
+        `SELECT * FROM loan_repayment_schedule_details
          WHERE loan_account_no = $1 AND payment_status IN ('PENDING', 'OVERDUE')
-         ORDER BY installment_no ASC`,
+         ORDER BY installment_no ASC
+         FOR UPDATE`,
         [loan_account_no]
       )
       installmentsToProcess = rows
@@ -162,6 +197,17 @@ export async function POST(request: NextRequest) {
     if (installmentsToProcess.length === 0) {
       await client.query("ROLLBACK")
       return NextResponse.json({ error: "No pending installments found" }, { status: 400 })
+    }
+
+    // The payment cannot exceed the dues it is allocated against, otherwise the cash
+    // debit would be larger than the principal + interest credits
+    const totalDue = installmentsToProcess.reduce((s: number, r: any) => s + (parseFloat(r.total_installment) || 0), 0)
+    if (payAmt > totalDue + 0.01) {
+      await client.query("ROLLBACK")
+      return NextResponse.json(
+        { error: `Payment amount exceeds the pending dues (₹${totalDue.toFixed(2)})` },
+        { status: 400 }
+      )
     }
 
     // Create batch for GL entries
@@ -192,7 +238,7 @@ export async function POST(request: NextRequest) {
     `, [businessDate, branchId, batchId, voucherNo, payment_mode, session.userId])
 
     // Process payment across installments
-    let remainingAmount = parseFloat(payment_amount)
+    let remainingAmount = payAmt
     let totalPrincipalPaid = 0
     let totalInterestPaid = 0
     const paidInstallments = []
@@ -229,10 +275,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Use UI-provided breakup if supplied and valid, otherwise use schedule-derived totals
-    const finalPrincipalPaid =
-      principal_amount !== undefined ? parseFloat(principal_amount) : totalPrincipalPaid
-    const finalInterestPaid =
-      interest_amount !== undefined ? parseFloat(interest_amount) : totalInterestPaid
+    const finalPrincipalPaid = Math.round(
+      (principal_amount !== undefined ? parseFloat(principal_amount) : totalPrincipalPaid) * 100
+    ) / 100
+    const finalInterestPaid = Math.round(
+      (interest_amount !== undefined ? parseFloat(interest_amount) : totalInterestPaid) * 100
+    ) / 100
+
+    // Ledger consistency: DR Cash/Bank must equal CR Principal + CR Interest
+    if (Math.abs(finalPrincipalPaid + finalInterestPaid - payAmt) > 0.01) {
+      await client.query("ROLLBACK")
+      return NextResponse.json(
+        { error: "Principal + Interest must equal total payment amount" },
+        { status: 400 }
+      )
+    }
 
     // GL Entries
     // Debit Cash/Bank (Asset increases)
@@ -247,7 +304,7 @@ export async function POST(request: NextRequest) {
     `, [
       branchId, batchId, businessDate,
       cashGlAccount, '0',
-      payment_amount,
+      payAmt,
       voucherNo,
       narration || "Loan Repayment",
       session.userId
@@ -300,7 +357,14 @@ export async function POST(request: NextRequest) {
       [loan_account_no]
     )
     const currentBalance = parseFloat(balanceRows[0]?.balance || '0')
-    const newBalance = currentBalance - finalPrincipalPaid
+    if (finalPrincipalPaid > currentBalance + 0.01) {
+      await client.query("ROLLBACK")
+      return NextResponse.json(
+        { error: `Principal (₹${finalPrincipalPaid.toFixed(2)}) exceeds the outstanding balance (₹${currentBalance.toFixed(2)})` },
+        { status: 400 }
+      )
+    }
+    const newBalance = Math.round((currentBalance - finalPrincipalPaid) * 100) / 100
 
     // Insert loan transaction with split principal and interest
     await client.query(`

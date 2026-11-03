@@ -66,6 +66,9 @@ type AccountDetails = {
   ref_no: string | null
   is_cheque_required: boolean
   operation_type: string
+  secondary_membership_no?: string | number | null
+  secondary_holder_name?: string | null
+  secondary_holder_mobile?: string | null
   created_at: string
   updated_at: string
   scheme_name: string
@@ -117,6 +120,14 @@ type Transaction = {
 type Nominee = {
   name: string
   relation: string
+  // Carried through unchanged when nominees are modified (stored in nominee_details)
+  is_member?: boolean
+  membership_id?: string | null
+  dob?: string | null
+  gender?: string | null
+  age?: number | null
+  address?: string | null
+  percentage?: number | null
 }
 
 const NOMINEE_RELATIONS = ["Father", "Mother", "Spouse", "Son", "Daughter", "Brother", "Sister", "Other"]
@@ -261,7 +272,17 @@ export default function ViewModifyAccountPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
 
-      setAccount({ ...account, account_status: editStatus, ref_no: editRefNo, is_cheque_required: editChequeRequired, operation_type: editOperationType })
+      setAccount({
+        ...account,
+        account_status: editStatus,
+        ref_no: editRefNo,
+        is_cheque_required: editChequeRequired,
+        operation_type: editOperationType,
+        // a Single account has no secondary holder (cleared by the API too)
+        ...(editOperationType === "SINGLE"
+          ? { secondary_membership_no: null, secondary_holder_name: null, secondary_holder_mobile: null }
+          : {}),
+      })
       setIsEditing(false)
       setSuccessMessage(`The account ${account.account_number} has been updated successfully.`)
       setSuccessOpen(true)
@@ -298,7 +319,18 @@ export default function ViewModifyAccountPage() {
       })
       const data = await res.json()
       if (res.ok && data.success) {
-        setNominees((data.nominees || []).map((n: any) => ({ name: n.nominee_name, relation: n.relation })))
+        setNominees((data.nominees || []).map((n: any) => ({
+          name: n.nominee_name,
+          relation: n.relation,
+          is_member: !!n.is_member,
+          membership_id: n.membership_id ?? null,
+          dob: n.nominee_dob ?? null,
+          gender: n.nominee_gender ?? null,
+          age: n.nominee_age ?? null,
+          address: n.nominee_address ?? null,
+          // 0 = not set (nominees saved before the percentage field existed)
+          percentage: Number(n.nominee_percentage) > 0 ? Number(n.nominee_percentage) : null,
+        })))
       } else {
         setNominees([])
       }
@@ -733,6 +765,18 @@ export default function ViewModifyAccountPage() {
                                   </p>
                                 )}
                               </div>
+                              {account.operation_type !== "SINGLE" && account.secondary_membership_no && (
+                                <div>
+                                  <Label className="text-xs text-muted-foreground">Secondary Holder</Label>
+                                  <p className="mt-1 text-sm font-medium">
+                                    {account.secondary_holder_name || "---"}{" "}
+                                    <span className="font-mono text-muted-foreground">({account.secondary_membership_no})</span>
+                                  </p>
+                                  {account.secondary_holder_mobile && (
+                                    <p className="text-xs text-muted-foreground">{account.secondary_holder_mobile}</p>
+                                  )}
+                                </div>
+                              )}
                               <div>
                                 <Label className="text-xs text-muted-foreground">Ledger Folio No</Label>
                                 {isEditing ? (
@@ -1094,7 +1138,7 @@ export default function ViewModifyAccountPage() {
                                     </div>
                                     <div>
                                       <p className="text-sm font-medium">{n.name}</p>
-                                      <p className="text-xs text-muted-foreground">{n.relation}</p>
+                                      <p className="text-xs text-muted-foreground">{n.relation}{n.percentage ? ` · ${n.percentage}%` : ""}</p>
                                     </div>
                                   </div>
                                 ))}
@@ -1117,7 +1161,7 @@ export default function ViewModifyAccountPage() {
                                         </div>
                                         <div>
                                           <p className="text-sm font-medium">{n.name}</p>
-                                          <p className="text-xs text-muted-foreground">{n.relation}</p>
+                                          <p className="text-xs text-muted-foreground">{n.relation}{n.percentage ? ` · ${n.percentage}%` : ""}</p>
                                         </div>
                                       </div>
                                       <Button

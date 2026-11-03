@@ -51,6 +51,8 @@ export async function GET(request: NextRequest) {
         lscheme.minimum_period_months,
         lscheme.maximum_period_months,
         lscheme.loan_gl_account,
+        COALESCE(lscheme.appraiser_charge_allowed, false) AS appraiser_charge_allowed,
+        lscheme.appraiser_charge_code,
         m.customer_code,
         c.full_name as member_name,
         c.mobile_no
