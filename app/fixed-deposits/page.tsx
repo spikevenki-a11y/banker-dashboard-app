@@ -1,7 +1,6 @@
 "use client"
 
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth-context";
 import { UserPlus, Banknote, TrendingUp, ClipboardList, XCircle, RefreshCw } from "lucide-react";
@@ -74,9 +73,9 @@ export default function FixedDepositsDashboardPage() {
               </Card>
 
               <Card
-                className="relative flex flex-row transition-all"
+                className="cursor-pointer transition-all hover:shadow-lg hover:border-primary flex flex-row"
+                onClick={() => router.push("/fixed-deposits/application-status")}
               >
-                <Badge variant="secondary" className="absolute right-3 top-3 text-[10px]">Coming Soon</Badge>
                 <CardHeader className="pb-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
                     <ClipboardList className="h-6 w-6 text-primary" />
@@ -84,7 +83,7 @@ export default function FixedDepositsDashboardPage() {
                 </CardHeader>
                 <CardContent>
                   <CardTitle className="text-lg">Application Status</CardTitle>
-                  <CardDescription className="mt-1">View pending/approved/rejected Fixed Deposit applications</CardDescription>
+                  <CardDescription className="mt-1">View all deposit accounts and their current status</CardDescription>
                 </CardContent>
               </Card>
 

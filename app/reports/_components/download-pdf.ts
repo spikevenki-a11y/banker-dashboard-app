@@ -24,12 +24,23 @@ function stripAppStyles(clonedDoc: Document) {
  * across pages.  Both header and body are captured as high-DPI canvases so
  * the output is sharp at A4 print resolution.
  */
+export type DownloadPdfOptions = {
+  // Multiplies every font size and cell padding (default 1 = unchanged)
+  fontScale?: number
+  // Break pages only between table rows, so no row is cut across two pages
+  avoidRowSplit?: boolean
+}
+
 export async function downloadPdf(
   reportTitle: string,
   dateRange: string,
   branchInfo: BranchInfo | null,
-  contentHtml: string
+  contentHtml: string,
+  options: DownloadPdfOptions = {}
 ): Promise<void> {
+  const k = options.fontScale && options.fontScale > 0 ? options.fontScale : 1
+  const px = (n: number) => `${Math.round(n * k * 100) / 100}px`
+
   const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
     import("jspdf"),
     import("html2canvas"),
@@ -49,28 +60,28 @@ export async function downloadPdf(
   wrapper.style.cssText =
     `position:absolute;left:-10000px;top:0;` +
     `width:${CONTAINER_WIDTH_PX}px;background:#fff;` +
-    `font-family:Arial,sans-serif;font-size:12px;color:#111;`
+    `font-family:Arial,sans-serif;font-size:${px(12)};color:#111;`
 
   wrapper.innerHTML = `
     <div id="pdf-hdr" style="
         background:#fff;border-bottom:2px solid #111;
-        padding:8px 24px 6px;text-align:center;">
-      ${bank    ? `<div style="font-size:17px;font-weight:700;letter-spacing:.3px;">${bank}</div>`       : ""}
-      ${branch  ? `<div style="font-size:13px;font-weight:600;margin-top:1px;">${branch}</div>`          : ""}
-      ${address ? `<div style="font-size:10.5px;color:#555;margin-top:2px;">${address}</div>`            : ""}
-      ${contact ? `<div style="font-size:10.5px;color:#555;">${contact}</div>`                           : ""}
-      <div style="margin-top:5px;padding-top:5px;border-top:1px solid #ddd;">
-        <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">
+        padding:${px(8)} 24px ${px(6)};text-align:center;">
+      ${bank    ? `<div style="font-size:${px(17)};font-weight:700;letter-spacing:.3px;">${bank}</div>`       : ""}
+      ${branch  ? `<div style="font-size:${px(13)};font-weight:600;margin-top:1px;">${branch}</div>`          : ""}
+      ${address ? `<div style="font-size:${px(10.5)};color:#555;margin-top:2px;">${address}</div>`            : ""}
+      ${contact ? `<div style="font-size:${px(10.5)};color:#555;">${contact}</div>`                           : ""}
+      <div style="margin-top:${px(5)};padding-top:${px(5)};border-top:1px solid #ddd;">
+        <div style="font-size:${px(13)};font-weight:700;text-transform:uppercase;letter-spacing:.5px;">
           ${reportTitle}
         </div>
-        ${dateRange ? `<div style="font-size:11px;color:#555;margin-top:1px;">${dateRange}</div>` : ""}
+        ${dateRange ? `<div style="font-size:${px(11)};color:#555;margin-top:1px;">${dateRange}</div>` : ""}
       </div>
     </div>
-    <div id="pdf-body" style="padding:8px 20px 20px;">
+    <div id="pdf-body" style="padding:${px(8)} 20px 20px;">
       <style>
         #pdf-body * { box-sizing:border-box; }
-        #pdf-body table { width:100%;border-collapse:collapse;margin-top:8px; }
-        #pdf-body th,#pdf-body td { border:1px solid #ccc;padding:4px 7px;font-size:10.5px;text-align:left; }
+        #pdf-body table { width:100%;border-collapse:collapse;margin-top:${px(8)}; }
+        #pdf-body th,#pdf-body td { border:1px solid #ccc;padding:${px(4)} ${px(7)};font-size:${px(10.5)};text-align:left; }
         #pdf-body th { background:#f0f0f0;font-weight:600; }
         #pdf-body tfoot td { font-weight:bold;background:#f0f0f0; }
         #pdf-body .tr { text-align:right; }
@@ -82,8 +93,8 @@ export async function downloadPdf(
         #pdf-body .expense td { color:#b91c1c; }
         /* Hide Tailwind-specific classes that don't apply inside the canvas */
         #pdf-body .overflow-x-auto { overflow:visible; }
-        #pdf-body h1 { font-size:14px;font-weight:700;margin-bottom:2px; }
-        #pdf-body h2 { font-size:11px;color:#555;margin-bottom:8px; }
+        #pdf-body h1 { font-size:${px(14)};font-weight:700;margin-bottom:2px; }
+        #pdf-body h2 { font-size:${px(11)};color:#555;margin-bottom:${px(8)}; }
       </style>
       ${contentHtml}
     </div>
@@ -94,6 +105,14 @@ export async function downloadPdf(
   try {
     const hdrEl  = wrapper.querySelector<HTMLElement>("#pdf-hdr")!
     const bodyEl = wrapper.querySelector<HTMLElement>("#pdf-body")!
+
+    // Row bottoms (CSS px from the top of the body) — page breaks may only fall here
+    const bodyTop = bodyEl.getBoundingClientRect().top
+    const rowBreaksPx = options.avoidRowSplit
+      ? Array.from(bodyEl.querySelectorAll("tr"))
+          .map((tr) => tr.getBoundingClientRect().bottom - bodyTop)
+          .sort((a, b) => a - b)
+      : []
 
     const SCALE = 2
     const canvasOpts = { scale: SCALE, backgroundColor: "#ffffff", logging: false, useCORS: true, onclone: stripAppStyles }
@@ -108,7 +127,31 @@ export async function downloadPdf(
     const hdrHeightMM  = (hdrCanvas.height  / SCALE) * px2mm
     const bodyHeightMM = (bodyCanvas.height / SCALE) * px2mm
     const pageBodyMM   = A4_HEIGHT_MM - 2 * MARGIN_MM - hdrHeightMM
-    const totalPages   = Math.max(1, Math.ceil(bodyHeightMM / pageBodyMM))
+
+    // Page slices [startMM, endMM] of the body
+    const slices: [number, number][] = []
+    if (options.avoidRowSplit && rowBreaksPx.length > 0) {
+      const breaksMM = rowBreaksPx.map((b) => b * px2mm)
+      let start = 0
+      while (start < bodyHeightMM - 0.01) {
+        const limit = start + pageBodyMM
+        if (limit >= bodyHeightMM) {
+          slices.push([start, bodyHeightMM])
+          break
+        }
+        // Last row boundary that still fits on this page; fall back to a plain cut for a row taller than a page
+        const fit = breaksMM.filter((b) => b > start + 0.01 && b <= limit)
+        const end = fit.length > 0 ? fit[fit.length - 1] : limit
+        slices.push([start, end])
+        start = end
+      }
+    } else {
+      const pages = Math.max(1, Math.ceil(bodyHeightMM / pageBodyMM))
+      for (let page = 0; page < pages; page++) {
+        slices.push([page * pageBodyMM, Math.min(page * pageBodyMM + pageBodyMM, bodyHeightMM)])
+      }
+    }
+    const totalPages = Math.max(1, slices.length)
 
     const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" })
     const hdrImgData = hdrCanvas.toDataURL("image/png")
@@ -120,8 +163,7 @@ export async function downloadPdf(
       pdf.addImage(hdrImgData, "PNG", MARGIN_MM, MARGIN_MM, PRINTABLE_WIDTH_MM, hdrHeightMM)
 
       // Body slice for this page
-      const sliceStartMM  = page * pageBodyMM
-      const sliceEndMM    = Math.min(sliceStartMM + pageBodyMM, bodyHeightMM)
+      const [sliceStartMM, sliceEndMM] = slices[page] ?? [0, bodyHeightMM]
       const sliceMM       = sliceEndMM - sliceStartMM
       const sliceStartPx  = Math.round((sliceStartMM  / px2mm) * SCALE)
       const sliceHeightPx = Math.round((sliceMM       / px2mm) * SCALE)

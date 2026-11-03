@@ -959,7 +959,7 @@ export default function LoanDisbursementPage() {
                             onChange={(e) => ac("charge_amount", e.target.value)}
                           />
                         </div>
-                        <div className="space-y-2">
+                        {/* <div className="space-y-2">
                           <Label>Invoice / Receipt No</Label>
                           <Input
                             placeholder="Enter invoice or receipt number"
@@ -974,7 +974,7 @@ export default function LoanDisbursementPage() {
                             value={appraiserCharge.charge_remarks}
                             onChange={(e) => ac("charge_remarks", e.target.value)}
                           />
-                        </div>
+                        </div> */}
                       </div>
                     </CardContent>
                   </Card>

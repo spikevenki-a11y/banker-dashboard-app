@@ -730,6 +730,7 @@ export default function ViewMemberPage() {
                                     <TableHead className="font-semibold">Opening Date</TableHead>
                                     <TableHead className="text-right font-semibold">Balance</TableHead>
                                     <TableHead className="font-semibold">Status</TableHead>
+                                    <TableHead className="text-right font-semibold">Action</TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -742,7 +743,21 @@ export default function ViewMemberPage() {
                                         </div>
                                       </TableCell>
                                       <TableCell className="font-mono text-sm">{acc.account_number}</TableCell>
-                                      <TableCell className="text-sm text-muted-foreground">{acc.scheme_name}</TableCell>
+                                      <TableCell className="text-sm text-muted-foreground">
+                                        {acc.scheme_name}
+                                        {acc.interest_rate > 0 && <span className="text-xs"> · {acc.interest_rate}% p.a.</span>}
+                                        {acc.extra?.maturity_date && (
+                                          <div className="text-xs">
+                                            Matures {fmtDay(acc.extra.maturity_date)}
+                                            {acc.extra.maturity_amount ? ` · ${fmtInr(acc.extra.maturity_amount)}` : ""}
+                                          </div>
+                                        )}
+                                        {acc.extra?.total_installments != null && (
+                                          <div className="text-xs">
+                                            {acc.extra.paid_installments || 0}/{acc.extra.total_installments} installments paid
+                                          </div>
+                                        )}
+                                      </TableCell>
                                       <TableCell className="text-sm">
                                         {acc.opening_date
                                           ? new Date(acc.opening_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
@@ -754,14 +769,23 @@ export default function ViewMemberPage() {
                                       <TableCell>
                                         <Badge
                                           variant={acc.status === "ACTIVE" ? "default" : "secondary"}
-                                          className={
-                                            acc.status === "ACTIVE"
-                                              ? "bg-emerald-100 text-emerald-700 border-emerald-200 text-[10px]"
-                                              : "text-[10px]"
-                                          }
+                                          className={statusBadgeClass(acc.status, "asset")}
                                         >
                                           {acc.status}
                                         </Badge>
+                                      </TableCell>
+                                      <TableCell className="text-right">
+                                        {accountViewHref(acc) && (
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-7 gap-1 px-2 text-xs"
+                                            onClick={() => router.push(accountViewHref(acc)!)}
+                                          >
+                                            <Eye className="h-3.5 w-3.5" />
+                                            View
+                                          </Button>
+                                        )}
                                       </TableCell>
                                     </TableRow>
                                   ))}
@@ -794,9 +818,10 @@ export default function ViewMemberPage() {
                                     <TableHead className="font-semibold">Account Type</TableHead>
                                     <TableHead className="font-semibold">Account No.</TableHead>
                                     <TableHead className="font-semibold">Scheme</TableHead>
-                                    <TableHead className="font-semibold">Opening Date</TableHead>
+                                    <TableHead className="font-semibold">Disbursed On</TableHead>
                                     <TableHead className="text-right font-semibold">Outstanding</TableHead>
                                     <TableHead className="font-semibold">Status</TableHead>
+                                    <TableHead className="text-right font-semibold">Action</TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -808,8 +833,30 @@ export default function ViewMemberPage() {
                                           <span className="text-sm font-medium">{acc.account_type}</span>
                                         </div>
                                       </TableCell>
-                                      <TableCell className="font-mono text-sm">{acc.account_number}</TableCell>
-                                      <TableCell className="text-sm text-muted-foreground">{acc.scheme_name}</TableCell>
+                                      <TableCell className="font-mono text-sm">
+                                        {acc.account_number}
+                                        {acc.extra?.reference_no && (
+                                          <div className="text-[10px] text-muted-foreground">Ref {acc.extra.reference_no}</div>
+                                        )}
+                                      </TableCell>
+                                      <TableCell className="text-sm text-muted-foreground">
+                                        {acc.scheme_name}
+                                        {acc.interest_rate > 0 && <span className="text-xs"> · {acc.interest_rate}% p.a.</span>}
+                                        {acc.extra && (
+                                          <div className="text-xs">
+                                            Sanctioned {fmtInr(acc.extra.sanctioned_amount)}
+                                            {acc.extra.emi_amount ? ` · EMI ${fmtInr(acc.extra.emi_amount)}` : ""}
+                                          </div>
+                                        )}
+                                        {acc.status !== "CLOSED" && acc.extra?.next_due_date && (
+                                          <div className="text-xs">Next due {fmtDay(acc.extra.next_due_date)}</div>
+                                        )}
+                                        {Number(acc.extra?.overdue_installments) > 0 && (
+                                          <div className="text-xs font-medium text-red-600">
+                                            {acc.extra?.overdue_installments} overdue installment{Number(acc.extra?.overdue_installments) > 1 ? "s" : ""}
+                                          </div>
+                                        )}
+                                      </TableCell>
                                       <TableCell className="text-sm">
                                         {acc.opening_date
                                           ? new Date(acc.opening_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
@@ -821,14 +868,23 @@ export default function ViewMemberPage() {
                                       <TableCell>
                                         <Badge
                                           variant={acc.status === "ACTIVE" ? "default" : "secondary"}
-                                          className={
-                                            acc.status === "ACTIVE"
-                                              ? "bg-red-100 text-red-700 border-red-200 text-[10px]"
-                                              : "text-[10px]"
-                                          }
+                                          className={statusBadgeClass(acc.status, "liability")}
                                         >
                                           {acc.status}
                                         </Badge>
+                                      </TableCell>
+                                      <TableCell className="text-right">
+                                        {accountViewHref(acc) && (
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-7 gap-1 px-2 text-xs"
+                                            onClick={() => router.push(accountViewHref(acc)!)}
+                                          >
+                                            <Eye className="h-3.5 w-3.5" />
+                                            View
+                                          </Button>
+                                        )}
                                       </TableCell>
                                     </TableRow>
                                   ))}
@@ -876,6 +932,7 @@ export default function ViewMemberPage() {
                     <TableHeader>
                       <TableRow className="bg-muted/50">
                         <TableHead className="font-semibold">Membership No</TableHead>
+                        <TableHead className="font-semibold">Ledger No</TableHead>
                         <TableHead className="font-semibold">Name</TableHead>
                         <TableHead className="font-semibold">Father Name</TableHead>
                         <TableHead className="font-semibold">Phone</TableHead>
@@ -894,6 +951,9 @@ export default function ViewMemberPage() {
                         >
                           <TableCell className="font-mono text-sm font-medium">
                             {member.membership_no}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">
+                            {member.ledger_folio_number?.trim() || "---"}
                           </TableCell>
                           <TableCell>
                             <div>
@@ -1272,8 +1332,46 @@ function DetailField({
 }
 
 /* Icon for each account type */
+// Screen that shows an account's full details (none for share capital)
+function accountViewHref(acc: { account_type: string; account_number: string }): string | null {
+  const no = encodeURIComponent(acc.account_number)
+  switch (acc.account_type) {
+    case "Savings":
+      return `/savings/view_account?account=${no}`
+    case "Term Deposit":
+    case "Recurring Deposit":
+    case "Pigmy Deposit":
+      return `/fixed-deposits/view?account=${no}`
+    case "Loan":
+      return `/loans/${no}`
+    default:
+      return null
+  }
+}
+
+const fmtInr = (n: number | null | undefined) =>
+  Number(n || 0).toLocaleString("en-IN", { style: "currency", currency: "INR" })
+
+const fmtDay = (d: string | null | undefined) =>
+  d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "---"
+
+// Status badge colours shared by both tables
+function statusBadgeClass(status: string, side: "asset" | "liability") {
+  const s = String(status || "").toUpperCase()
+  if (s === "ACTIVE") {
+    return side === "asset"
+      ? "bg-emerald-100 text-emerald-700 border-emerald-200 text-[10px]"
+      : "bg-red-100 text-red-700 border-red-200 text-[10px]"
+  }
+  if (s === "OVERDUE") return "bg-red-600 text-white border-red-700 text-[10px]"
+  if (s === "MATURITY" || s === "MATURED") return "bg-orange-100 text-orange-700 border-orange-200 text-[10px]"
+  return "text-[10px]"
+}
+
 function AccountTypeIcon({ type }: { type: string }) {
   switch (type) {
+    case "Loan":
+      return <CreditCard className="h-4 w-4 text-red-500" />
     case "Savings":
       return <PiggyBank className="h-4 w-4 text-emerald-500" />
     case "Term Deposit":

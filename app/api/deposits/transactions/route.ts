@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
         da.id, da.accountnumber, da.deposittype, da.membership_no,
         da.accountopendate, da.rateofinterest, da.clearbalance, da.unclearbalance,
         da.accountstatus, da.schemeid,
+        ras.account_status_name,
         ds.scheme_name, ds.deposit_gl_account, ds.interest_expense_gl_account,
         ds.interest_payable_gl_account,
         c.full_name AS member_name,
@@ -38,6 +39,7 @@ export async function GET(request: NextRequest) {
         rd.nextinstalmentdate, rd.penalrate,
         pd.minimum_daily_amount, pd.collection_frequency
       FROM deposit_account da
+      LEFT JOIN ref_account_status ras ON ras.account_status_id = da.accountstatus
       LEFT JOIN memberships m ON m.membership_no = da.membership_no AND m.branch_id = da.branch_id
       LEFT JOIN customers c ON c.customer_code = m.customer_code
       LEFT JOIN deposit_schemes ds ON ds.scheme_id = da.schemeid AND ds.branch_id = da.branch_id
@@ -67,6 +69,7 @@ export async function GET(request: NextRequest) {
         dt.narration,
         dt.voucher_no,
         dt.gl_batch_id,
+        dt.status,
         dt.created_at,
         gb.status AS batch_status
       FROM deposit_transactions dt
@@ -108,6 +111,7 @@ export async function GET(request: NextRequest) {
         balance: Number(account.clearbalance),
         unclearBalance: Number(account.unclearbalance),
         accountStatus: account.accountstatus,
+        statusName: account.account_status_name || null,
         schemeId: account.schemeid,
         schemeName: account.scheme_name || "N/A",
         depositGlAccount: account.depositGl,

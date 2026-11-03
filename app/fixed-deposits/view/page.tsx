@@ -10,6 +10,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Progress } from "@/components/ui/progress"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import {
   ArrowLeft,
   Loader2,
@@ -25,6 +35,9 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   RefreshCw,
+  XCircle,
+  CheckCircle2,
+  Info,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 
@@ -38,6 +51,7 @@ type DepositAccount = {
   balance: number
   unclearBalance: number
   accountStatus: number
+  statusName?: string | null
   schemeId: number
   schemeName: string
   depositGlAccount: string
@@ -63,6 +77,8 @@ type Transaction = {
   narration: string
   voucher_no: string
   gl_batch_id: number
+  transaction_type?: string
+  status?: string | null
   batch_status: string
   voucher_type: string
   created_at: string
@@ -109,6 +125,20 @@ function getStatusColor(status: number) {
   }
 }
 
+// Calendar date "YYYY-MM-DD" of a date value (plain dates as is, timestamps in local time)
+function toYmd(value: string | null | undefined): string | null {
+  if (!value) return null
+  const s = String(value).trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+  const d = new Date(s)
+  if (isNaN(d.getTime())) return null
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+// Account statuses that can still be closed: Active (1), Matured (2 / 5 'Maturity')
+const OPEN_STATUSES = [1, 2, 5]
+
 function getDaysToMaturity(maturityDate: string | null) {
   if (!maturityDate) return null
   const now = new Date()
@@ -128,6 +158,23 @@ export default function ViewDepositDetailsPage() {
   const [totalTransactions, setTotalTransactions] = useState(0)
   const [error, setError] = useState("")
   const [activeTab, setActiveTab] = useState("overview")
+
+  // Current business date of the branch (not the browser date)
+  const [businessDate, setBusinessDate] = useState<string | null>(null)
+
+  // Reject Application
+  const [rejectOpen, setRejectOpen] = useState(false)
+  const [rejectReason, setRejectReason] = useState("")
+  const [isRejecting, setIsRejecting] = useState(false)
+  const [rejectError, setRejectError] = useState("")
+  const [actionMessage, setActionMessage] = useState("")
+
+  useEffect(() => {
+    fetch("/api/auth/identity", { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => setBusinessDate(toYmd(d?.businessDate)))
+      .catch(() => setBusinessDate(null))
+  }, [])
 
   useEffect(() => {
     if (accountParam) {
@@ -157,6 +204,35 @@ export default function ViewDepositDetailsPage() {
       setError("Failed to load account details. Please try again.")
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleRejectApplication = async () => {
+    if (!account) return
+    const reason = rejectReason.trim()
+    if (!reason) {
+      setRejectError("Please enter the reason for rejecting this application.")
+      return
+    }
+    setIsRejecting(true)
+    setRejectError("")
+    try {
+      const res = await fetch("/api/deposits/reject-application", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountNumber: account.accountNumber, reason }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to reject the application")
+      setRejectOpen(false)
+      setRejectReason("")
+      setActionMessage(data.message || "Application rejected.")
+      await fetchAccountData(account.accountNumber)
+    } catch (e: any) {
+      setRejectError(e.message || "Failed to reject the application")
+    } finally {
+      setIsRejecting(false)
     }
   }
 
@@ -225,7 +301,25 @@ export default function ViewDepositDetailsPage() {
     )
   }
 
-  const statusLabel = statusMap[account.accountStatus] || "Unknown"
+  const statusLabel = account.statusName || statusMap[account.accountStatus] || "Unknown"
+
+  // Which single action applies (by balance, and maturity vs the business date)
+  const balanceAmt = Number(account.balance) || 0
+  const maturityYmd = toYmd(account.maturityDate)
+  const isOpenAccount = OPEN_STATUSES.includes(account.accountStatus)
+  const hasPendingClosure = transactions.some(
+    (t) => t.transaction_type === "CLOSURE" && (t.status === "PENDING" || (!t.status && t.batch_status === "PENDING"))
+  )
+  let depositAction: "reject" | "premature" | "closure" | null = null
+  if (isOpenAccount && !hasPendingClosure) {
+    if (balanceAmt === 0) {
+      // Never funded: only an active application can be rejected
+      depositAction = account.accountStatus === 1 ? "reject" : null
+    } else if (balanceAmt > 0 && businessDate) {
+      // No maturity date (e.g. Pigmy) is treated as due for closure
+      depositAction = maturityYmd && maturityYmd > businessDate ? "premature" : "closure"
+    }
+  }
   const typeLabel = typeMap[account.depositType] || account.depositType
   const isActive = account.accountStatus === 1
   const daysToMaturity = getDaysToMaturity(account.maturityDate)
@@ -281,18 +375,101 @@ export default function ViewDepositDetailsPage() {
                   <Banknote className="mr-2 h-4 w-4" />
                   Transactions
                 </Button>
-                {(account.accountStatus === 1 || account.accountStatus === 2) && (
+                {depositAction === "reject" && (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => {
+                      setRejectReason("")
+                      setRejectError("")
+                      setRejectOpen(true)
+                    }}
+                  >
+                    <XCircle className="mr-2 h-4 w-4" />
+                    Reject Application
+                  </Button>
+                )}
+                {depositAction === "premature" && (
                   <Button
                     size="sm"
                     variant="destructive"
                     onClick={() => router.push(`/fixed-deposits/closure?account=${account.accountNumber}`)}
                   >
                     <FileText className="mr-2 h-4 w-4" />
-                    {account.accountStatus === 2 ? "Close Account" : "Premature Closure"}
+                    Premature Closure
+                  </Button>
+                )}
+                {depositAction === "closure" && (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => router.push(`/fixed-deposits/closure?account=${account.accountNumber}`)}
+                  >
+                    <FileText className="mr-2 h-4 w-4" />
+                    Closure
                   </Button>
                 )}
               </div>
             </div>
+
+            {actionMessage && (
+              <div className="mb-6 flex items-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-800 dark:border-teal-800 dark:bg-teal-950/30 dark:text-teal-300">
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                {actionMessage}
+              </div>
+            )}
+            {isOpenAccount && hasPendingClosure && (
+              <div className="mb-6 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+                <Info className="h-4 w-4 shrink-0" />
+                A closure for this account is awaiting verification (FAS → Verify Voucher). No further action is available until it is verified.
+              </div>
+            )}
+
+            {/* Reject Application confirmation */}
+            <AlertDialog open={rejectOpen} onOpenChange={(o) => !isRejecting && setRejectOpen(o)}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+                    <XCircle className="h-5 w-5" />
+                    Reject Application
+                  </AlertDialogTitle>
+                  <AlertDialogDescription asChild>
+                    <div className="space-y-3">
+                      <p>
+                        Reject deposit application <span className="font-mono font-medium">{account.accountNumber}</span> for{" "}
+                        {account.memberName}? The account has no balance and will be marked Rejected.
+                      </p>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="reject-reason" className="text-foreground">Reason *</Label>
+                        <Textarea
+                          id="reject-reason"
+                          rows={3}
+                          maxLength={500}
+                          placeholder="Why is this application being rejected?"
+                          value={rejectReason}
+                          onChange={(e) => {
+                            setRejectReason(e.target.value)
+                            setRejectError("")
+                          }}
+                        />
+                      </div>
+                      {rejectError && <p className="text-sm text-red-600">{rejectError}</p>}
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isRejecting}>Cancel</AlertDialogCancel>
+                  <Button
+                    variant="destructive"
+                    onClick={handleRejectApplication}
+                    disabled={isRejecting || !rejectReason.trim()}
+                  >
+                    {isRejecting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Reject Application
+                  </Button>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
             {/* Summary Cards */}
             <div className="mb-6 grid gap-4 md:grid-cols-4">

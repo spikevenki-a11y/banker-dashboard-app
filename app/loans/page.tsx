@@ -10,7 +10,7 @@ const loanOptions: { title: string; description: string; href: string; icon: Luc
   { title: "Loan Application", description: "Create new Loan Application", href: "/loans/apply", icon: FilePlus },
   { title: "Loan Sanction", description: "Approve / Sanction pending Loan Applications", href: "/loans/sanction", icon: BadgeCheck },
   { title: "Loan Disbursement", description: "Disburse sanctioned Loan amount", href: "/loans/disbursement", icon: Wallet },
-  { title: "Loan Collection", description: "Collect EMI / Loan repayments", href: "/loans/collection", icon: HandCoins },
+  { title: "Loan Collection", description: "Collect Loan repayments", href: "/loans/collection", icon: HandCoins },
   { title: "View / Reject Application", description: "View or Reject existing Loan Applications", href: "/loans/applications", icon: FileSearch },
 ]
 
@@ -29,8 +29,8 @@ export default function LoansDashboardPage() {
                 <h1 className="text-3xl font-bold tracking-tight text-foreground">Loan Management</h1>
                 <p className="text-muted-foreground">
                   {user?.role === "admin"
-                    ? "All branches - Process applications, track EMIs, and manage repayments"
-                    : `${user?.branch?.name || "Your branch"} - Process applications, track EMIs, and manage repayments`}
+                    ? "All branches - Process applications and manage repayments"
+                    : `${user?.branch?.name || "Your branch"} - Process applications and manage repayments`}
                 </p>
               </div>
             </div>

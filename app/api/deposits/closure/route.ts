@@ -248,10 +248,25 @@ export async function POST(request: NextRequest) {
 
     const account = accounts[0]
 
-    // Account must be active (1) or matured (2)
-    if (account.accountstatus !== 1 && account.accountstatus !== 2) {
+    // Account must be active (1) or matured (2, or 5 = 'Maturity' in ref_account_status)
+    if (account.accountstatus !== 1 && account.accountstatus !== 2 && account.accountstatus !== 5) {
       await client.query("ROLLBACK")
       return NextResponse.json({ error: "Account is already closed. Only active or matured accounts can be closed." }, { status: 400 })
+    }
+
+    // A closure already posted and awaiting verification must not be posted again
+    const { rows: [pendingClosure] } = await client.query(
+      `SELECT COUNT(*)::int AS n FROM deposit_transactions
+       WHERE accountnumber = $1 AND branch_id = $2
+         AND transaction_type = 'CLOSURE' AND status = 'PENDING'`,
+      [String(accountNumber), branchId]
+    )
+    if (pendingClosure.n > 0) {
+      await client.query("ROLLBACK")
+      return NextResponse.json(
+        { error: "A closure for this account is already awaiting verification (FAS → Verify Voucher)." },
+        { status: 400 }
+      )
     }
 
     const currentBalance = parseFloat(account.clearbalance)

@@ -368,8 +368,8 @@ export async function POST(request: NextRequest) {
         // DR Cash (income)
         await client.query(`
           INSERT INTO gl_batch_lines (branch_id, batch_id, business_date, accountcode, ref_account_id, debit_amount, credit_amount, voucher_id, narration, created_by)
-          VALUES ($1, $2, $3, '23100000', '0', $4, 0, $5, $6, $7)
-        `, [branchId, chargeBatchId, businessDate, chargeAmt, chargeVoucherNo, `Appraiser charge - ${app.reference_no}`, session.userId])
+          VALUES ($1, $2, $3, $4, '0', $5, 0, $6, $7, $8)
+        `, [branchId, chargeBatchId, businessDate, CASH_GL_ACCOUNT, chargeAmt, chargeVoucherNo, `Appraiser charge - ${app.reference_no}`, session.userId])
 
         // CR Appraiser Account
         await creditAppraiserAccount(client, {
