@@ -35,6 +35,9 @@ export async function GET(req: NextRequest) {
         sa.ref_no,
         sa.is_cheque_required,
         sa.operation_type,
+        sa.secondary_membership_no,
+        sec.full_name AS secondary_holder_name,
+        sec.mobile_no AS secondary_holder_mobile,
         sa.created_at,
         sa.updated_at,
         ss.scheme_name,
@@ -64,6 +67,8 @@ export async function GET(req: NextRequest) {
        JOIN memberships m ON sa.membership_no = m.membership_no AND sa.branch_id = m.branch_id
        JOIN customers c ON m.customer_code = c.customer_code
        join customer_address a on a.customer_code = c.customer_code
+       LEFT JOIN memberships sm ON sm.membership_no = sa.secondary_membership_no AND sm.branch_id = sa.branch_id
+       LEFT JOIN customers sec ON sec.customer_code = sm.customer_code
        WHERE sa.account_number = $1 AND sa.branch_id = $2`,
       [accountNumber, branchId]
     )
@@ -99,7 +104,10 @@ export async function PUT(req: NextRequest) {
 
     const { rowCount } = await pool.query(
       `UPDATE savings_accounts
-       SET account_status = $1, ref_no = $2, is_cheque_required = $3, operation_type = COALESCE($4, operation_type), updated_at = NOW()
+       SET account_status = $1, ref_no = $2, is_cheque_required = $3, operation_type = COALESCE($4, operation_type),
+           -- a Single account has no secondary holder
+           secondary_membership_no = CASE WHEN COALESCE($4, operation_type) = 'SINGLE' THEN NULL ELSE secondary_membership_no END,
+           updated_at = NOW()
        WHERE account_number = $5 AND branch_id = $6`,
       [account_status, ref_no?.trim() || null, !!is_cheque_required, operation_type || null, account_number, branchId]
     )

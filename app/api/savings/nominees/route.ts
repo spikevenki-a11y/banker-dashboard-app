@@ -19,6 +19,13 @@ export async function GET(req: NextRequest) {
     const { rows } = await pool.query(
       `SELECT nd.nominee_name,
               nd.nominee_relation AS relation,
+              nd.is_member,
+              nd.member_id AS membership_id,
+              TO_CHAR(nd.nominee_dob, 'YYYY-MM-DD') AS nominee_dob,
+              nd.nominee_gender,
+              nd.nominee_age,
+              nd.nominee_address,
+              nd.nominee_percentage::float AS nominee_percentage,
               ROW_NUMBER() OVER (ORDER BY nd.created_at ASC, nd.id ASC)::int AS nominee_order
        FROM nominee_details nd
        JOIN savings_accounts sa ON sa.account_number = nd.account_number
@@ -64,12 +71,17 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Account not found" }, { status: 404 })
     }
 
-    await saveSavingsNominees(client, {
+    const nomineeErr = await saveSavingsNominees(client, {
       branchId,
       accountNumber: String(account_number),
-      membershipNo: accountResult.rows[0].membership_no,
+      holderMembershipNo: accountResult.rows[0].membership_no,
+      businessDate: session.businessDate,
       nominees: nomineeList,
     })
+    if (nomineeErr) {
+      await client.query("ROLLBACK")
+      return NextResponse.json({ error: nomineeErr }, { status: 400 })
+    }
 
     await client.query("COMMIT")
 

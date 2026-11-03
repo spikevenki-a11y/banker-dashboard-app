@@ -517,12 +517,13 @@ function LoanCollectionContent() {
             Back to Loans
           </Button>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Loan Collection</h1>
-          <p className="text-muted-foreground">Record EMI payments and loan repayments</p>
+          <p className="text-muted-foreground">Record loan repayments</p>
+          {/* <p className="text-muted-foreground">Record EMI payments and loan repayments</p> */}
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Left: Search & Account Info */}
-          <div className="lg:col-span-1 space-y-6">
+          <div className="lg:col-span-3 space-y-6">
             {/* Search Card */}
             <Card>
               <CardHeader>
@@ -703,10 +704,10 @@ function LoanCollectionContent() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
+                    {/* <div>
                       <span className="text-muted-foreground">EMI Amount</span>
                       <p className="text-lg font-bold text-blue-600">{formatCurrency(accountInfo.emi_amount)}</p>
-                    </div>
+                    </div> */}
                     <div>
                       <span className="text-muted-foreground">Outstanding</span>
                       <p className="text-lg font-bold text-orange-600">{formatCurrency(accountInfo.outstanding_balance)}</p>
@@ -737,7 +738,7 @@ function LoanCollectionContent() {
           </div>
 
           {/* Right: Collection Form & Schedule */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-3 space-y-6">
             {accountInfo ? (
               <>
                 {/* Collection Form */}
@@ -745,7 +746,7 @@ function LoanCollectionContent() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Banknote className="h-5 w-5" />
-                      Record Payment
+                      Record Collection
                     </CardTitle>
                     <CardDescription>Enter payment details for loan collection</CardDescription>
                   </CardHeader>
@@ -763,7 +764,7 @@ function LoanCollectionContent() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Payment Mode *</Label>
+                        <Label>Voucher Type *</Label>
                         <Select value={paymentMode} onValueChange={(v) => setPaymentMode(v as "CASH" | "TRANSFER")}>
                           <SelectTrigger>
                             <SelectValue />
@@ -858,7 +859,7 @@ function LoanCollectionContent() {
                       >
                         {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         <CreditCard className="mr-2 h-4 w-4" />
-                        Record Payment
+                        save
                       </Button>
                     </div>
                   </CardContent>
@@ -867,8 +868,8 @@ function LoanCollectionContent() {
                 {/* EMI Schedule */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>EMI Schedule</CardTitle>
-                    <CardDescription>Click on pending EMIs to select for payment</CardDescription>
+                    <CardTitle>Repayment Schedule</CardTitle>
+                    <CardDescription>Click on pending repayments to select for payment</CardDescription>
                   </CardHeader>
                   <CardContent>
                     {isLoadingDetails ? (

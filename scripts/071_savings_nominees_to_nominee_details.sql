@@ -20,7 +20,7 @@ BEGIN
       CAST(sa.branch_id AS VARCHAR),
       san.account_number,
       false,
-      CAST(sa.membership_no AS VARCHAR),
+      NULL,  -- legacy nominees were not linked to a member
       LEFT(san.nominee_name, 100),
       san.relation,
       -- keep the original nominee order
