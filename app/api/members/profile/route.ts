@@ -7,6 +7,7 @@ import {
   pickSectionFields,
   validateMemberSection,
 } from "@/lib/member-profile-validation"
+import { readSectionSnapshot, recordSectionChanges } from "@/lib/member-edit-history"
 
 // Empty strings from the form are stored as NULL.
 const v = (x: unknown) => (x === undefined || x === null || String(x).trim() === "" ? null : String(x).trim())
@@ -34,7 +35,7 @@ export async function PUT(req: NextRequest) {
 
   const d = pickSectionFields(section, body.data || {})
   if (section === "kyc") {
-    d.pan_no = d.pan_no.toUpperCase()
+    d.pan_no = d.pan_no.trim().toUpperCase()
     d.passport_no = d.passport_no.toUpperCase()
   }
   const validationError = validateMemberSection(section, d)
@@ -54,6 +55,10 @@ export async function PUT(req: NextRequest) {
     const { customer_code } = mem
 
     await client.query("BEGIN")
+
+    // Edit history: stored values of this tab before the update
+    const historyIds = { customerCode: String(customer_code), membershipNo: String(membership_no), branchId: String(branchId) }
+    const before = await readSectionSnapshot(client, section, historyIds)
 
     if (section === "personal") {
       await client.query(
@@ -155,10 +160,36 @@ export async function PUT(req: NextRequest) {
       )
     }
 
+    // Edit history: record each field that actually changed (same transaction)
+    const after = await readSectionSnapshot(client, section, historyIds)
+    const changedCount = await recordSectionChanges(client, {
+      section,
+      before,
+      after,
+      branchId: String(branchId),
+      membershipNo: String(membership_no),
+      customerCode: String(customer_code),
+      userId: session.userId || null,
+      userName: session.fullName || null,
+    })
+
     await client.query("COMMIT")
-    return NextResponse.json({ success: true, section, message: `${label} updated successfully.` })
+    return NextResponse.json({
+      success: true,
+      section,
+      changed_fields: changedCount,
+      message: changedCount > 0 ? `${label} updated successfully.` : `No changes to ${label.toLowerCase()} were made.`,
+    })
   } catch (err: any) {
     await client.query("ROLLBACK").catch(() => {})
+    if (err?.code === "42P01" && /member_edit_history/.test(String(err?.message))) {
+      // History must be recorded, so the update is not saved without it
+      console.error("member_edit_history table missing — run scripts/076_member_edit_history.sql")
+      return NextResponse.json(
+        { error: "Edit history is not set up yet, so changes were not saved. Please contact the administrator." },
+        { status: 503 }
+      )
+    }
     if (err?.code === "23505") {
       return NextResponse.json(
         { error: "This KYC document number is already registered to another customer." },

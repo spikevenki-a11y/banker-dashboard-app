@@ -42,6 +42,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   AlertCircle,
+  History,
 } from "lucide-react"
 import { Ledger } from "next/font/google"
 import {
@@ -52,7 +53,10 @@ import {
 } from "@/components/customer-photo-signature"
 import {
   MEMBER_EDIT_SECTIONS,
+  MEMBER_FIELD_LABELS,
+  normalizePan,
   pickSectionFields,
+  validatePan,
   validateMemberSection,
   type MemberEditSection,
 } from "@/lib/member-profile-validation"
@@ -111,6 +115,17 @@ type MemberData = {
   eb_bill_no?: string
   other_document_name?: string
   other_document_no?: string
+}
+
+type EditHistoryRow = {
+  id: string
+  change_id: string
+  section: MemberEditSection
+  field_name: string
+  old_value: string | null
+  new_value: string | null
+  changed_by_name: string | null
+  changed_at: string
 }
 
 type NomineeItem = {
@@ -213,6 +228,40 @@ export default function ViewMemberPage() {
   const [sectionMsg, setSectionMsg] = useState<
     Partial<Record<MemberEditSection, { type: "success" | "error"; text: string }>>
   >({})
+
+  // Edit history (read-only)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historySection, setHistorySection] = useState<MemberEditSection | "">("")
+  const [historyRows, setHistoryRows] = useState<EditHistoryRow[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState("")
+
+  const loadHistory = async (section: MemberEditSection | "") => {
+    if (!selectedMember) return
+    setHistorySection(section)
+    setHistoryLoading(true)
+    setHistoryError("")
+    try {
+      const qs = new URLSearchParams({ membership_no: String(selectedMember.membership_no) })
+      if (section) qs.set("section", section)
+      const res = await fetch(`/api/members/edit-history?${qs}`, { credentials: "include" })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) throw new Error(data.error || "Failed to load edit history.")
+      setHistoryRows(data.history || [])
+      if (data.not_configured) setHistoryError("Edit history is not set up yet.")
+    } catch (e: any) {
+      setHistoryRows([])
+      setHistoryError(e?.message || "Failed to load edit history.")
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  const openHistory = (section: MemberEditSection | "" = editSection) => {
+    setHistoryOpen(true)
+    loadHistory(section)
+  }
+
 
   const openEdit = (member: MemberData) => {
     setEditForm({
@@ -585,12 +634,12 @@ export default function ViewMemberPage() {
         {selectedMember ? (
           /* Member Detail View */
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <Button variant="outline" size="sm" onClick={() => setSelectedMember(null)} className="gap-2">
                 <ArrowLeft className="h-3.5 w-3.5" />
                 Back to results
               </Button>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <Badge
                   variant={selectedMember.status?.toUpperCase() === "ACTIVE" ? "default" : "secondary"}
                   className={
@@ -604,6 +653,10 @@ export default function ViewMemberPage() {
                 <Button size="sm" variant="outline" className="gap-1.5" onClick={() => openEdit(selectedMember)}>
                   <Pencil className="h-3.5 w-3.5" />
                   Edit
+                </Button>
+                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => openHistory("")}>
+                  <History className="h-3.5 w-3.5" />
+                  Edit History
                 </Button>
               </div>
             </div>
@@ -1468,11 +1521,16 @@ export default function ViewMemberPage() {
                   <div className="space-y-1.5">
                     <Label className="text-xs">PAN No</Label>
                     <Input
-                      className="font-mono uppercase"
+                      className={`font-mono uppercase ${validatePan(editForm.pan_no) ? "border-destructive focus-visible:ring-destructive" : ""}`}
                       maxLength={10}
+                      placeholder="ABCDE1234F"
+                      aria-invalid={validatePan(editForm.pan_no) ? true : undefined}
                       value={editForm.pan_no}
-                      onChange={(e) => ef("pan_no", e.target.value.toUpperCase())}
+                      onChange={(e) => ef("pan_no", normalizePan(e.target.value))}
                     />
+                    {validatePan(editForm.pan_no) && (
+                      <p role="alert" className="text-xs text-destructive">{validatePan(editForm.pan_no)}</p>
+                    )}
                   </div>
                   <EditInput label="Ration Card No" k="ration_no" form={editForm} onChange={ef} />
                   <EditSelect
@@ -1565,6 +1623,10 @@ export default function ViewMemberPage() {
                   Next
                   <ChevronRight className="h-4 w-4" />
                 </Button>
+                <Button variant="outline" onClick={() => openHistory()} disabled={savingSection !== null} className="gap-1.5">
+                  <History className="h-4 w-4" />
+                  View History
+                </Button>
               </div>
               <div className="ml-auto flex flex-wrap justify-end gap-2">
                 <Button variant="outline" onClick={() => setEditOpen(false)} disabled={savingSection !== null}>
@@ -1584,6 +1646,93 @@ export default function ViewMemberPage() {
                 </Button>
               </div>
             </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* ── Edit History Dialog (read-only) ─────────────────────────── */}
+      <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+        <DialogContent className="flex h-[min(680px,calc(100dvh-2rem))] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl">
+          <DialogHeader className="shrink-0 px-6 pt-6 pb-3 pr-12">
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-4 w-4 shrink-0" />
+              Edit History — {selectedMember?.membership_no}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="mx-6 flex shrink-0 gap-1 overflow-x-auto border-b">
+            {([["", "All"], ...EDIT_TAB_ORDER.map((k) => [k, MEMBER_EDIT_SECTIONS[k].label.replace(" Details", "")])] as [MemberEditSection | "", string][]).map(
+              ([key, label]) => (
+                <button
+                  key={key || "all"}
+                  onClick={() => loadHistory(key)}
+                  className={`shrink-0 whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+                    historySection === key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {label}
+                </button>
+              )
+            )}
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+            {historyLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : historyError ? (
+              <p className="py-10 text-center text-sm text-destructive">{historyError}</p>
+            ) : historyRows.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
+                <History className="mb-2 h-8 w-8 opacity-20" />
+                <p className="text-sm">No changes recorded{historySection ? ` for ${MEMBER_EDIT_SECTIONS[historySection].label}` : ""}.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="whitespace-nowrap text-xs">Updated Date &amp; Time</TableHead>
+                      <TableHead className="whitespace-nowrap text-xs">Updated By</TableHead>
+                      <TableHead className="text-xs">Section</TableHead>
+                      <TableHead className="whitespace-nowrap text-xs">Field Name</TableHead>
+                      <TableHead className="whitespace-nowrap text-xs">Previous Value</TableHead>
+                      <TableHead className="whitespace-nowrap text-xs">Updated Value</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {historyRows.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell className="whitespace-nowrap text-xs">
+                          {new Date(r.changed_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-xs">{r.changed_by_name || "Unknown user"}</TableCell>
+                        <TableCell className="whitespace-nowrap text-xs">
+                          <Badge variant="outline" className="text-[10px] font-medium">
+                            {MEMBER_EDIT_SECTIONS[r.section]?.label.replace(" Details", "") || r.section}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-xs font-medium">
+                          {MEMBER_FIELD_LABELS[r.field_name] || r.field_name}
+                        </TableCell>
+                        <TableCell className="min-w-[140px] max-w-[240px] break-words text-xs text-muted-foreground">
+                          {r.old_value || <span className="italic">empty</span>}
+                        </TableCell>
+                        <TableCell className="min-w-[140px] max-w-[240px] break-words text-xs">
+                          {r.new_value || <span className="italic text-muted-foreground">empty</span>}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="shrink-0 border-t px-6 py-3">
+            <Button variant="outline" onClick={() => setHistoryOpen(false)}>
+              Close
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

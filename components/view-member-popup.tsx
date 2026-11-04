@@ -33,7 +33,9 @@ import {
   Banknote,
   Book,
   AlertCircle,
+  CheckCircle2,
 } from "lucide-react"
+import { CustomerImageFrame, useCustomerDocuments } from "@/components/customer-photo-signature"
 
 /**
  * Shape of a member record as returned by /api/memberships/view_member.
@@ -69,7 +71,43 @@ export type ViewMemberData = {
   ration_no?: string | null
   driving_license_no?: string | null
   customer_code?: string | null
+  join_date?: string | null
+  board_resolution_date?: string | null
+  alt_mobile_no?: string | null
+  marital_status?: string | null
+  occupation?: string | null
+  qualification?: string | null
+  qualification_details?: string | null
+  dccb_account_number?: string | null
+  address_email?: string | null
+  permanent_house_no?: string | null
+  permanent_street?: string | null
+  permanent_village?: string | null
+  permanent_thaluk?: string | null
+  permanent_district?: string | null
+  permanent_state?: string | null
+  permanent_pincode?: string | null
+  permanent_phone_no?: string | null
+  ration_card_type?: string | null
+  passport_no?: string | null
+  eb_bill_no?: string | null
+  other_document_name?: string | null
+  other_document_no?: string | null
   [key: string]: unknown
+}
+
+type NomineeItem = {
+  account_number: string
+  account_type?: string
+  nominee_name: string
+  nominee_relation: string
+  is_member: boolean
+  member_id: string | null
+  nominee_dob: string | null
+  nominee_gender: string | null
+  nominee_age: number | null
+  nominee_address: string | null
+  nominee_percentage: number | null
 }
 
 type AccountItem = {
@@ -89,7 +127,7 @@ type AccountSummary = {
   total_accounts: number
 }
 
-type TabKey = "personal" | "address" | "kyc" | "accounts"
+type TabKey = "personal" | "address" | "kyc" | "nominees" | "accounts"
 
 export type ViewMemberPopupProps = {
   /** Whether the popup is open. Controlled by the calling module. */
@@ -127,6 +165,12 @@ export function ViewMemberPopup({ open, onOpenChange, member: memberProp, member
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(false)
   const [accountsLoaded, setAccountsLoaded] = useState(false)
 
+  const [nominees, setNominees] = useState<NomineeItem[]>([])
+  const [isLoadingNominees, setIsLoadingNominees] = useState(false)
+  const [nomineesLoaded, setNomineesLoaded] = useState(false)
+
+  const memberDocs = useCustomerDocuments(open ? (member?.customer_code as string | undefined) : undefined)
+
   useEffect(() => {
     if (!open) return
     setActiveTab("personal")
@@ -134,6 +178,8 @@ export function ViewMemberPopup({ open, onOpenChange, member: memberProp, member
     setAssets([])
     setLiabilities([])
     setAccountSummary(null)
+    setNomineesLoaded(false)
+    setNominees([])
     setLoadError("")
 
     if (memberProp) {
@@ -190,6 +236,19 @@ export function ViewMemberPopup({ open, onOpenChange, member: memberProp, member
       })
   }, [activeTab, member, accountsLoaded])
 
+  useEffect(() => {
+    if (activeTab !== "nominees" || !member?.membership_no || nomineesLoaded) return
+    setIsLoadingNominees(true)
+    fetch(`/api/members/nominees?membership_no=${encodeURIComponent(member.membership_no)}`, { credentials: "include" })
+      .then((res) => res.json())
+      .then((data) => setNominees(data.success ? data.nominees || [] : []))
+      .catch(() => setNominees([]))
+      .finally(() => {
+        setIsLoadingNominees(false)
+        setNomineesLoaded(true)
+      })
+  }, [activeTab, member, nomineesLoaded])
+
   const formatAadhaar = (val?: string | null) => {
     if (!val) return "---"
     return `${val.slice(0, 4)} ${val.slice(4, 8)} ${val.slice(8)}`
@@ -199,6 +258,15 @@ export function ViewMemberPopup({ open, onOpenChange, member: memberProp, member
     const parts = [m.house_no, m.street, m.village, m.thaluk, m.district, m.state].filter(Boolean)
     const address = parts.join(", ")
     return m.pincode ? `${address} - ${m.pincode}` : address || "---"
+  }
+
+  const buildPermanentAddress = (m: ViewMemberData) => {
+    const parts = [
+      m.permanent_house_no, m.permanent_street, m.permanent_village,
+      m.permanent_thaluk, m.permanent_district, m.permanent_state,
+    ].filter(Boolean)
+    const address = parts.join(", ")
+    return m.permanent_pincode ? `${address} - ${m.permanent_pincode}` : address || "---"
   }
 
   return (
@@ -229,13 +297,13 @@ export function ViewMemberPopup({ open, onOpenChange, member: memberProp, member
             <div className="space-y-6">
               {/* Summary header */}
               <div className="rounded-xl border border-l-4 border-l-primary p-4 sm:p-5">
-                <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex min-w-0 items-start gap-4">
+                <div className="flex flex-col items-start gap-4 md:flex-row md:items-start md:justify-between">
+                  <div className="flex min-w-0 flex-1 items-start gap-4">
                     <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/10">
                       <User className="h-7 w-7 text-primary" />
                     </div>
                     <div className="min-w-0">
-                      <h2 className="truncate text-lg font-semibold text-foreground">{member.full_name || "---"}</h2>
+                      <h2 className="break-words text-lg font-semibold text-foreground">{member.full_name || "---"}</h2>
                       <p className="text-sm text-muted-foreground">S/o D/o {member.father_name || "---"}</p>
                       <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1.5">
@@ -248,10 +316,14 @@ export function ViewMemberPopup({ open, onOpenChange, member: memberProp, member
                         </span>
                         <span className="flex items-center gap-1.5">
                           <Mail className="h-3.5 w-3.5" />
-                          {member.email || "---"}
+                          {member.email || member.address_email || "---"}
                         </span>
                       </div>
                     </div>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap items-end gap-3">
+                    <CustomerImageFrame kind="photo" doc={memberDocs.docs.photo} loading={memberDocs.loading} />
+                    <CustomerImageFrame kind="signature" doc={memberDocs.docs.signature} loading={memberDocs.loading} />
                   </div>
                   <Badge
                     variant={member.status?.toUpperCase() === "ACTIVE" ? "default" : "secondary"}
@@ -282,6 +354,7 @@ export function ViewMemberPopup({ open, onOpenChange, member: memberProp, member
                       { key: "personal", label: "Personal", icon: User },
                       { key: "address", label: "Address", icon: MapPin },
                       { key: "kyc", label: "KYC Details", icon: Shield },
+                      { key: "nominees", label: "Nominees", icon: Users },
                       { key: "accounts", label: "Assets & Liabilities", icon: Wallet },
                     ] as const
                   ).map((tab) => (
@@ -289,7 +362,7 @@ export function ViewMemberPopup({ open, onOpenChange, member: memberProp, member
                       key={tab.key}
                       type="button"
                       onClick={() => setActiveTab(tab.key)}
-                      className={`flex shrink-0 items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+                      className={`flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
                         activeTab === tab.key
                           ? "border-primary text-primary"
                           : "border-transparent text-muted-foreground hover:text-foreground"
@@ -303,23 +376,49 @@ export function ViewMemberPopup({ open, onOpenChange, member: memberProp, member
 
                 <div className="pt-5">
                   {activeTab === "personal" && (
-                    <div className="grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
-                      <DetailField icon={User} label="Full Name" value={member.full_name} />
-                      <DetailField icon={Users} label="Father Name" value={member.father_name} />
-                      <DetailField icon={Users} label="Spouse Name" value={member.spouse_name} />
-                      <DetailField icon={Calendar} label="Date of Birth" value={member.date_of_birth} />
-                      <DetailField icon={User} label="Gender" value={member.gender} capitalize />
-                      <DetailField icon={Phone} label="Mobile" value={member.mobile_no || member.phone_no} />
-                      <DetailField icon={Mail} label="Email" value={member.email} />
-                      <DetailField icon={FileText} label="Board Resolution No." value={member.board_resolution_number} />
-                      <DetailField icon={Calendar} label="Board Resolution Date" value={member.boardresolutiondate} />
-                      <DetailField icon={Book} label="Caste" value={member.caste_category} />
+                    <div className="space-y-6">
+                      <DetailSection title="Personal Information">
+                        <DetailField icon={User} label="Full Name" value={member.full_name} />
+                        <DetailField icon={Users} label="Father Name" value={member.father_name} />
+                        <DetailField icon={Users} label="Spouse Name" value={member.spouse_name} />
+                        <DetailField icon={Calendar} label="Date of Birth" value={member.date_of_birth} />
+                        <DetailField icon={Calendar} label="Age" value={calcAge(member.date_of_birth)} />
+                        <DetailField icon={User} label="Gender" value={member.gender} capitalize />
+                        <DetailField icon={Users} label="Marital Status" value={member.marital_status} capitalize />
+                        <DetailField icon={Book} label="Caste Category" value={member.caste_category} />
+                        <DetailField icon={User} label="Customer Type" value={member.customer_type} capitalize />
+                        <DetailField icon={Hash} label="Customer Code" value={member.customer_code?.trim()} mono />
+                      </DetailSection>
+
+                      <DetailSection title="Occupation & Education">
+                        <DetailField icon={Building2} label="Occupation" value={member.occupation} capitalize />
+                        <DetailField icon={Book} label="Qualification" value={member.qualification} />
+                        <DetailField icon={FileText} label="Qualification Details" value={member.qualification_details} />
+                        <DetailField icon={Landmark} label="DCCB Account Number" value={member.dccb_account_number} mono />
+                      </DetailSection>
+
+                      <DetailSection title="Contact Details">
+                        <DetailField icon={Phone} label="Mobile" value={member.mobile_no || member.phone_no} />
+                        <DetailField icon={Phone} label="Alternate Mobile" value={member.alt_mobile_no} />
+                        <DetailField icon={Mail} label="Email" value={member.email || member.address_email} />
+                      </DetailSection>
+
+                      <DetailSection title="Membership Details">
+                        <DetailField icon={Hash} label="Membership No." value={member.membership_no} mono />
+                        <DetailField icon={Building2} label="Membership Class" value={member.membership_class} />
+                        <DetailField icon={User} label="Member Type" value={member.member_type} capitalize />
+                        <DetailField icon={CheckCircle2} label="Status" value={member.status} />
+                        <DetailField icon={Calendar} label="Join Date" value={member.join_date} />
+                        <DetailField icon={Book} label="Ledger Folio No." value={member.ledger_folio_number} mono />
+                        <DetailField icon={FileText} label="Board Resolution No." value={member.board_resolution_number} />
+                        <DetailField icon={Calendar} label="Board Resolution Date" value={member.board_resolution_date} />
+                      </DetailSection>
                     </div>
                   )}
 
                   {activeTab === "address" && (
                     <div className="space-y-6">
-                      <div className="grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+                      <DetailSection title="Current Address">
                         <DetailField icon={MapPin} label="House No." value={member.house_no} />
                         <DetailField icon={MapPin} label="Street" value={member.street} />
                         <DetailField icon={MapPin} label="Village" value={member.village} />
@@ -327,10 +426,26 @@ export function ViewMemberPopup({ open, onOpenChange, member: memberProp, member
                         <DetailField icon={MapPin} label="District" value={member.district} />
                         <DetailField icon={MapPin} label="State" value={member.state} />
                         <DetailField icon={Hash} label="Pincode" value={member.pincode} />
-                      </div>
+                        <DetailField icon={Phone} label="Phone" value={member.phone_no} />
+                      </DetailSection>
                       <div className="rounded-lg border bg-muted/30 p-4">
-                        <p className="text-xs font-medium text-muted-foreground">Full Address</p>
+                        <p className="text-xs font-medium text-muted-foreground">Full Current Address</p>
                         <p className="mt-1 text-sm text-foreground">{buildAddress(member)}</p>
+                      </div>
+
+                      <DetailSection title="Permanent Address">
+                        <DetailField icon={MapPin} label="House No." value={member.permanent_house_no} />
+                        <DetailField icon={MapPin} label="Street" value={member.permanent_street} />
+                        <DetailField icon={MapPin} label="Village" value={member.permanent_village} />
+                        <DetailField icon={MapPin} label="Taluk" value={member.permanent_thaluk} />
+                        <DetailField icon={MapPin} label="District" value={member.permanent_district} />
+                        <DetailField icon={MapPin} label="State" value={member.permanent_state} />
+                        <DetailField icon={Hash} label="Pincode" value={member.permanent_pincode} />
+                        <DetailField icon={Phone} label="Phone" value={member.permanent_phone_no} />
+                      </DetailSection>
+                      <div className="rounded-lg border bg-muted/30 p-4">
+                        <p className="text-xs font-medium text-muted-foreground">Full Permanent Address</p>
+                        <p className="mt-1 text-sm text-foreground">{buildPermanentAddress(member)}</p>
                       </div>
                     </div>
                   )}
@@ -340,7 +455,72 @@ export function ViewMemberPopup({ open, onOpenChange, member: memberProp, member
                       <DetailField icon={CreditCard} label="Aadhaar No." value={formatAadhaar(member.aadhaar_no)} mono />
                       <DetailField icon={CreditCard} label="PAN No." value={member.pan_no} mono />
                       <DetailField icon={FileText} label="Ration No." value={member.ration_no} />
+                      <DetailField icon={FileText} label="Ration Card Type" value={member.ration_card_type} />
                       <DetailField icon={CreditCard} label="Driving License No." value={member.driving_license_no} />
+                      <DetailField icon={CreditCard} label="Passport No." value={member.passport_no} mono />
+                      <DetailField icon={FileText} label="EB Bill No." value={member.eb_bill_no} />
+                      <DetailField
+                        icon={FileText}
+                        label={member.other_document_name ? `Others (${member.other_document_name})` : "Others"}
+                        value={member.other_document_no}
+                      />
+                    </div>
+                  )}
+
+                  {activeTab === "nominees" && (
+                    <div>
+                      {isLoadingNominees ? (
+                        <div className="flex items-center justify-center py-12">
+                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                          <span className="ml-2 text-sm text-muted-foreground">Loading nominees...</span>
+                        </div>
+                      ) : nominees.length === 0 ? (
+                        <div className="rounded-lg border border-dashed p-6 text-center">
+                          <Users className="mx-auto h-8 w-8 text-muted-foreground/30" />
+                          <p className="mt-2 text-sm text-muted-foreground">No nominees registered for this member.</p>
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto rounded-md border">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="bg-muted/50">
+                                <TableHead className="text-xs">Account</TableHead>
+                                <TableHead className="text-xs">Nominee Name</TableHead>
+                                <TableHead className="text-xs">Relation</TableHead>
+                                <TableHead className="text-xs">DOB / Age</TableHead>
+                                <TableHead className="text-xs">Gender</TableHead>
+                                <TableHead className="text-xs">Member</TableHead>
+                                <TableHead className="text-xs">Address</TableHead>
+                                <TableHead className="text-xs text-right">Share %</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {nominees.map((n, i) => (
+                                <TableRow key={`${n.account_number}-${i}`}>
+                                  <TableCell className="text-xs">
+                                    <p className="font-mono">{n.account_number}</p>
+                                    {n.account_type && <p className="text-muted-foreground">{n.account_type}</p>}
+                                  </TableCell>
+                                  <TableCell className="text-xs font-medium">{n.nominee_name || "---"}</TableCell>
+                                  <TableCell className="text-xs capitalize">{n.nominee_relation || "---"}</TableCell>
+                                  <TableCell className="whitespace-nowrap text-xs">
+                                    {n.nominee_dob || "---"}
+                                    {n.nominee_age != null && <span className="text-muted-foreground"> · {n.nominee_age} yrs</span>}
+                                  </TableCell>
+                                  <TableCell className="text-xs capitalize">{n.nominee_gender || "---"}</TableCell>
+                                  <TableCell className="text-xs">
+                                    {n.is_member ? `Yes${n.member_id ? ` (${n.member_id})` : ""}` : "No"}
+                                  </TableCell>
+                                  <TableCell className="max-w-[200px] text-xs">{n.nominee_address || "---"}</TableCell>
+                                  <TableCell className="text-right text-xs">
+                                    {n.nominee_percentage != null ? `${n.nominee_percentage}%` : "---"}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -412,6 +592,27 @@ export function ViewMemberPopup({ open, onOpenChange, member: memberProp, member
       </DialogContent>
     </Dialog>
   )
+}
+
+function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-4">
+      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</p>
+      <div className="grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">{children}</div>
+    </div>
+  )
+}
+
+/* Age in whole years from a YYYY-MM-DD date of birth */
+function calcAge(dob?: string | null): string {
+  if (!dob) return ""
+  const d = new Date(dob)
+  if (isNaN(d.getTime())) return ""
+  const now = new Date()
+  let age = now.getFullYear() - d.getFullYear()
+  const m = now.getMonth() - d.getMonth()
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--
+  return age >= 0 ? String(age) : ""
 }
 
 function StatTile({
