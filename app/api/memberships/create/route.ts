@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/auth/session"
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
+import { cleanNominees, saveSavingsNominees } from "@/lib/savings-nominees"
 
 export async function POST(req: Request) {
   const u = await getSession()
@@ -13,6 +14,7 @@ export async function POST(req: Request) {
     board_resolution_number,
     board_resolution_date,
     ledger_folio_number,
+    nominees,
   } = await req.json()
 
   /* -------------------- PERMISSION CHECK -------------------- */
@@ -130,6 +132,27 @@ export async function POST(req: Request) {
     )
 
     const membershipId = membership.id
+
+    /* -------------------- NOMINEES (optional) -------------------- */
+    // Stored in nominee_details, linked by (branch_id, account_number = membership_no).
+    // Same rules as savings accounts: member nominees must be active members of this
+    // branch, every nominee needs a percentage, and the total must be exactly 100%.
+    const nomineeList = cleanNominees(nominees)
+    if (nomineeList.length > 0) {
+      const nomineeError = await saveSavingsNominees(client, {
+        branchId: u.branch,
+        accountNumber: membershipNo,
+        holderMembershipNo: membershipNo,
+        businessDate: u.businessDate,
+        nominees: nomineeList,
+        requirePercentage: true,
+        requireTotal100: true,
+      })
+      if (nomineeError) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: nomineeError }, { status: 400 })
+      }
+    }
 
     /* -------------------- CREATE SHARE MASTER (NO MONEY) -------------------- */
     await client.query(

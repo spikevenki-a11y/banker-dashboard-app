@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
           ltd.transaction_type,
           'TRANSFER' as payment_method,
           COALESCE(ltd.debit_amount, 0) as debit_amount,
-          COALESCE(ltd.credit_amount, 0) as credit_amount,
+          COALESCE(ltd.credit_principal_amount, 0) as credit_amount,
           'APPROVED' as status,
           ltd.remarks as narration,
           ltd.loan_account_no as account_number,
@@ -180,7 +180,7 @@ export async function GET(request: NextRequest) {
 
         SELECT 
           COALESCE(ltd.debit_amount, 0) as debit_amount,
-          COALESCE(ltd.credit_amount, 0) as credit_amount
+          COALESCE(ltd.credit_principal_amount, 0) as credit_amount
         FROM loan_transaction_details ltd
         WHERE ltd.branch_id = $1 
           AND ltd.transaction_date BETWEEN $2 AND $3

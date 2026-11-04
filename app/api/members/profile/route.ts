@@ -1,21 +1,51 @@
 import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { getSession } from "@/lib/auth/session"
+import {
+  MEMBER_EDIT_SECTIONS,
+  isMemberEditSection,
+  pickSectionFields,
+  validateMemberSection,
+} from "@/lib/member-profile-validation"
 
+// Empty strings from the form are stored as NULL.
+const v = (x: unknown) => (x === undefined || x === null || String(x).trim() === "" ? null : String(x).trim())
+
+// Saves one Edit Member tab: body = { membership_no, section, data }.
+// Only the tables/columns belonging to that tab are touched.
 export async function PUT(req: NextRequest) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+  let body: any
+  try {
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
+  }
+
+  const { membership_no, section } = body || {}
+  if (!membership_no) {
+    return NextResponse.json({ error: "membership_no is required" }, { status: 400 })
+  }
+  if (!isMemberEditSection(section)) {
+    return NextResponse.json({ error: "A valid section is required" }, { status: 400 })
+  }
+
+  const d = pickSectionFields(section, body.data || {})
+  if (section === "kyc") {
+    d.pan_no = d.pan_no.toUpperCase()
+    d.passport_no = d.passport_no.toUpperCase()
+  }
+  const validationError = validateMemberSection(section, d)
+  if (validationError) {
+    return NextResponse.json({ error: validationError }, { status: 400 })
+  }
+
+  const label = MEMBER_EDIT_SECTIONS[section].label
+  const branchId = session.branch
   const client = await pool.connect()
   try {
-    const branchId = session.branch
-    const body = await req.json()
-    const { membership_no, personal, address, kyc, membership } = body
-
-    if (!membership_no) {
-      return NextResponse.json({ error: "membership_no is required" }, { status: 400 })
-    }
-
     const { rows: [mem] } = await client.query(
       `SELECT customer_code FROM memberships WHERE membership_no = $1 AND branch_id = $2`,
       [membership_no, branchId]
@@ -25,90 +55,118 @@ export async function PUT(req: NextRequest) {
 
     await client.query("BEGIN")
 
-    // Update core customer fields
-    await client.query(
-      `UPDATE customers SET
-         full_name = $1, father_name = $2, spouse_name = $3,
-         date_of_birth = $4, gender = $5, mobile_no = $6, email = $7,
-         occupation = $8, marital_status = $9,
-         caste_category = $10,
-         updated_at = NOW()
-       WHERE customer_code = $11`,
-      [
-        personal.full_name || null, personal.father_name || null, personal.spouse_name || null,
-        personal.date_of_birth || null, personal.gender || null, personal.mobile_no || null,
-        personal.email || null, personal.occupation || null, personal.marital_status || null,
-        personal.caste_category || null, customer_code,
-      ]
-    )
+    if (section === "personal") {
+      await client.query(
+        `UPDATE customers SET
+           full_name = $1, father_name = $2, spouse_name = $3,
+           date_of_birth = $4, gender = $5, mobile_no = $6, email = $7,
+           occupation = $8, marital_status = $9,
+           caste_category = $10,
+           alt_mobile_no = $11, qualification = $12, qualification_details = $13,
+           dccbaccountnumber = $14,
+           updated_at = NOW()
+         WHERE customer_code = $15`,
+        [
+          v(d.full_name), v(d.father_name), v(d.spouse_name),
+          v(d.date_of_birth), v(d.gender), v(d.mobile_no), v(d.email),
+          v(d.occupation), v(d.marital_status),
+          v(d.caste_category),
+          v(d.alt_mobile_no), v(d.qualification), v(d.qualification_details),
+          v(d.dccb_account_number),
+          customer_code,
+        ]
+      )
+    }
 
-    // Upsert address
-    await client.query(
-      `UPDATE customer_address
-      SET
-        house_no = $2,
-        street = $3,
-        village = $4,
-        thaluk = $5,
-        district = $6,
-        state = $7,
-        pincode = $8,
-        phone_no = $9
-      WHERE customer_code = $1`,
-      [
-        customer_code,
-        address.house_no || null,
-        address.street || null,
-        address.village || null,
-        address.thaluk || null,
-        address.district || null,
-        address.state || null,
-        address.pincode || null,
-        address.phone_no || null,
+    if (section === "address") {
+      // Current + permanent; create the row if the customer has none yet
+      const addressValues = [
+        v(d.house_no), v(d.street), v(d.village), v(d.thaluk),
+        v(d.district), v(d.state), v(d.pincode), v(d.phone_no),
+        v(d.permanent_house_no), v(d.permanent_street), v(d.permanent_village),
+        v(d.permanent_thaluk), v(d.permanent_district), v(d.permanent_state),
+        v(d.permanent_pincode), v(d.permanent_phone_no),
       ]
-    )
+      const addrUpdate = await client.query(
+        `UPDATE customer_address SET
+           house_no = $2, street = $3, village = $4, thaluk = $5,
+           district = $6, state = $7, pincode = $8, phone_no = $9,
+           permanent_house_no = $10, permanent_street = $11, permanent_village = $12,
+           permanent_thaluk = $13, permanent_district = $14, permanent_state = $15,
+           permanent_pincode = $16, permanent_phone_no = $17,
+           updated_at = NOW()
+         WHERE customer_code = $1`,
+        [customer_code, ...addressValues]
+      )
+      if (addrUpdate.rowCount === 0 && addressValues.some((x) => x !== null)) {
+        await client.query(
+          `INSERT INTO customer_address (
+             customer_code,
+             house_no, street, village, thaluk, district, state, pincode, phone_no,
+             permanent_house_no, permanent_street, permanent_village, permanent_thaluk,
+             permanent_district, permanent_state, permanent_pincode, permanent_phone_no
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+          [customer_code, ...addressValues]
+        )
+      }
+    }
 
-    // Upsert KYC (excluding aadhaar — immutable)
-    await client.query(
-      `UPDATE customer_kycdetails
-      SET
-        pan_no = $2,
-        ration_no = $3,
-        driving_license_no = $4,
-        updated_at = NOW()
-      WHERE customer_code = $1`,
-      [
-        customer_code,
-        kyc.pan_no ?? null,
-        kyc.ration_no ?? null,
-        kyc.driving_license_no ?? null
+    if (section === "kyc") {
+      // Aadhaar is immutable; create the row if the customer has none yet
+      const kycValues = [
+        v(d.pan_no), v(d.ration_no), v(d.ration_card_type), v(d.driving_license_no),
+        v(d.passport_no), v(d.eb_bill_no), v(d.other_document_name), v(d.other_document_no),
       ]
-    )
-    
-    // Update membership-level fields
-    await client.query(
-      `UPDATE memberships
-      SET
-        ledger_folio_number = $1,
-        board_resolution_number = $2,
-        board_resolution_date = $3
-      WHERE membership_no = $4
-        AND branch_id = $5`,
-      [
-        membership.ledger_folio_number ?? null,
-        membership.board_resolution_number ?? null,
-        membership.board_resolution_date ?? null,
-        membership_no,
-        branchId,
-      ]
-    )
+      const kycUpdate = await client.query(
+        `UPDATE customer_kycdetails SET
+           pan_no = $2, ration_no = $3, ration_card_type = $4, driving_license_no = $5,
+           passport_no = $6, eb_bill_no = $7, other_document_name = $8, other_document_no = $9,
+           updated_at = NOW()
+         WHERE customer_code = $1`,
+        [customer_code, ...kycValues]
+      )
+      if (kycUpdate.rowCount === 0 && kycValues.some((x) => x !== null)) {
+        await client.query(
+          `INSERT INTO customer_kycdetails (
+             customer_code, pan_no, ration_no, ration_card_type, driving_license_no,
+             passport_no, eb_bill_no, other_document_name, other_document_no
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+          [customer_code, ...kycValues]
+        )
+      }
+    }
+
+    if (section === "membership") {
+      await client.query(
+        `UPDATE memberships
+        SET
+          ledger_folio_number = $1,
+          board_resolution_number = $2,
+          board_resolution_date = $3
+        WHERE membership_no = $4
+          AND branch_id = $5`,
+        [
+          v(d.ledger_folio_number),
+          v(d.board_resolution_number),
+          v(d.board_resolution_date),
+          membership_no,
+          branchId,
+        ]
+      )
+    }
 
     await client.query("COMMIT")
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, section, message: `${label} updated successfully.` })
   } catch (err: any) {
-    await client.query("ROLLBACK")
-    console.error("Member profile PUT error:", err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    await client.query("ROLLBACK").catch(() => {})
+    if (err?.code === "23505") {
+      return NextResponse.json(
+        { error: "This KYC document number is already registered to another customer." },
+        { status: 409 }
+      )
+    }
+    console.error(`Member profile PUT (${section}) error:`, err)
+    return NextResponse.json({ error: `Failed to update ${label.toLowerCase()}.` }, { status: 500 })
   } finally {
     client.release()
   }

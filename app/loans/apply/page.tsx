@@ -1618,10 +1618,6 @@ export default function LoanApplicationPage() {
                               <Input className="h-8 text-xs" type="date" value={securityForm.encumbrance_cert_date} onChange={(e) => sf("encumbrance_cert_date", e.target.value)} />
                             </div>
                           )}
-                          <div className="space-y-1">
-                            <Label className="text-xs">Legal Opinion By</Label>
-                            <Input className="h-8 text-xs" placeholder="Advocate name" value={securityForm.legal_opinion_by} onChange={(e) => sf("legal_opinion_by", e.target.value)} />
-                          </div>
                         {isLand && (<>
                             <div className="space-y-1">
                               <Label className="text-xs">EC Date From</Label>
@@ -1652,6 +1648,11 @@ export default function LoanApplicationPage() {
                               <Input className="h-8 text-xs" maxLength={150} placeholder="Revenue village" value={securityForm.revenue_village} onChange={(e) => sf("revenue_village", e.target.value)} />
                             </div>
                         </>)}
+                        
+                          <div className="space-y-1">
+                            <Label className="text-xs">Legal Opinion By</Label>
+                            <Input className="h-8 text-xs" placeholder="Advocate name" value={securityForm.legal_opinion_by} onChange={(e) => sf("legal_opinion_by", e.target.value)} />
+                          </div>
                         </div>
 
                         {isLand && ecDateError && <p className="text-xs text-destructive">{ecDateError}</p>}

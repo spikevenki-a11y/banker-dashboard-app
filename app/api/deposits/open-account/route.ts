@@ -2,6 +2,7 @@ import { getSession } from "@/lib/auth/session"
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
+import { cleanNominees, depositNomineeAccountKey, saveSavingsNominees } from "@/lib/savings-nominees"
 
 export async function POST(req: Request) {
   const session = await getSession()
@@ -33,6 +34,7 @@ export async function POST(req: Request) {
       tds_applicable,
       nominee_name,
       nominee_relation,
+      nominees,
       // RD specific
       installment_amount,
       installment_frequency,
@@ -241,6 +243,28 @@ export async function POST(req: Request) {
     //   ) VALUES ($1, $2, $2, $3, 'OPENING', 'Deposit account opened', $4, 0, $4, 'ACTIVE', $5)`,
     //   [accountId, account_open_date, branchId, amt, userId]
     // )
+
+    // Nominees (optional) — same rules as savings accounts: member nominees must be
+    // active members of this branch, each needs a percentage, total exactly 100%.
+    // The older single { nominee_name, nominee_relation } shape is still accepted.
+    const nomineeList = cleanNominees(
+      Array.isArray(nominees) ? nominees : nominee_name ? [{ name: nominee_name, relation: nominee_relation }] : []
+    )
+    if (nomineeList.length > 0) {
+      const nomineeError = await saveSavingsNominees(client, {
+        branchId,
+        accountNumber: depositNomineeAccountKey(acctNum),
+        holderMembershipNo: membership_no,
+        businessDate: account_open_date || businessDate,
+        nominees: nomineeList,
+        requirePercentage: Array.isArray(nominees),
+        requireTotal100: Array.isArray(nominees),
+      })
+      if (nomineeError) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: nomineeError }, { status: 400 })
+      }
+    }
 
     await client.query("COMMIT")
 

@@ -22,6 +22,8 @@ import {
   Pencil, Phone, Mail, Building2,
 } from "lucide-react"
 import { DashboardWrapper } from "../_components/dashboard-wrapper"
+import { validateAdditionalKycDocs } from "@/lib/member-profile-validation"
+import { CUSTOMER_IMAGE_ACCEPT, checkCustomerImage, uploadCustomerDocument } from "@/components/customer-photo-signature"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -71,6 +73,10 @@ interface Customer {
   ration_card_type: string
   voter_id: string
   driving_license_no: string
+  passport_no: string
+  eb_bill_no: string
+  other_document_name: string
+  other_document_no: string
 }
 
 const initialCustomer: Customer = {
@@ -86,6 +92,7 @@ const initialCustomer: Customer = {
   permanant_taluk: "", permanant_district: "", permanant_state: "",
   permanant_pin_code: "", permanant_phone: "",
   pan_card_number: "", aadhar_id: "", ration_no: "", ration_card_type: "", voter_id: "", driving_license_no: "",
+  passport_no: "", eb_bill_no: "", other_document_name: "", other_document_no: "",
   caste: undefined, customer_type: undefined,
 }
 
@@ -96,6 +103,8 @@ interface CreatedCustomer {
   phone: string
   aadhar_id: string
   email: string
+  /** Photo/signature upload problems (the customer itself was created) */
+  upload_warnings?: string[]
 }
 
 type TabKey = "personal" | "address" | "kycdetails"
@@ -197,7 +206,7 @@ function UploadZone({
 }) {
   return (
     <label className="group cursor-pointer">
-      <input type="file" accept="image/*" hidden
+      <input type="file" accept={CUSTOMER_IMAGE_ACCEPT} hidden
         onChange={(e) => { const f = e.target.files?.[0]; if (f) onChange(f) }} />
       <div className="relative flex flex-col items-center gap-2">
         <div className={[
@@ -386,6 +395,17 @@ export default function CustomerPage() {
   const canSubmit = !isSubmitting && !altPhoneError && c.full_name.trim().length > 0
 
   const handleCreateCustomer = async () => {
+    const kycError = validateAdditionalKycDocs({
+      passport_no: c.passport_no.trim(),
+      eb_bill_no: c.eb_bill_no.trim(),
+      other_document_name: c.other_document_name.trim(),
+      other_document_no: c.other_document_no.trim(),
+    })
+    if (kycError) {
+      setActiveTab("kycdetails")
+      alert(kycError)
+      return
+    }
     setIsSubmitting(true)
     try {
       const res = await fetch("/api/customers/create", {
@@ -396,6 +416,14 @@ export default function CustomerPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
+
+      const uploadWarnings: string[] = []
+      for (const [type, file] of [["PHOTO", photo], ["SIGNATURE", signature]] as const) {
+        if (!file) continue
+        const up = await uploadCustomerDocument(data.customer_code, type, file)
+        if (!up.ok) uploadWarnings.push(up.error)
+      }
+
       setCreatedCustomer({
         customer_code: data.customer_code,
         full_name: c.full_name,
@@ -403,10 +431,13 @@ export default function CustomerPage() {
         phone: c.phone,
         aadhar_id: c.aadhar_id,
         email: c.email,
+        upload_warnings: uploadWarnings,
       })
       setIsSuccessOpen(true)
       setSameAsPermanent(false)
       setC(initialCustomer)
+      setPhoto(null)
+      setSignature(null)
       setPhotoPreview("")
       setSignaturePreview("")
     } catch (e: any) {
@@ -570,14 +601,22 @@ export default function CustomerPage() {
                   icon={Camera}
                   label="Photo"
                   sublabel="Upload"
-                  onChange={(f) => setPhoto(f)}
+                  onChange={(f) => {
+                    const err = checkCustomerImage(f, "Photo")
+                    if (err) { alert(err); return }
+                    setPhoto(f)
+                  }}
                 />
                 <UploadZone
                   preview={signaturePreview}
                   icon={PenTool}
                   label="Signature"
                   sublabel="Upload"
-                  onChange={(f) => setSignature(f)}
+                  onChange={(f) => {
+                    const err = checkCustomerImage(f, "Signature")
+                    if (err) { alert(err); return }
+                    setSignature(f)
+                  }}
                 />
               </div>
             </div>
@@ -936,6 +975,34 @@ export default function CustomerPage() {
                       onChange: (v: string) => up({ driving_license_no: v.toUpperCase() }),
                       required: false,
                     },
+                    {
+                      label: "Passport",
+                      icon: Building2,
+                      value: c.passport_no,
+                      placeholder: "e.g. A1234567",
+                      onChange: (v: string) => up({ passport_no: v.toUpperCase().slice(0, 8) }),
+                      maxLength: 8,
+                      required: false,
+                    },
+                    {
+                      label: "EB Bill",
+                      icon: Building2,
+                      value: c.eb_bill_no,
+                      placeholder: "EB service / consumer number",
+                      onChange: (v: string) => up({ eb_bill_no: v }),
+                      maxLength: 30,
+                      required: false,
+                    },
+                    {
+                      label: "Others",
+                      icon: Building2,
+                      type: "other" as const,
+                      value: c.other_document_no,
+                      placeholder: "Document number",
+                      onChange: (v: string) => up({ other_document_no: v }),
+                      maxLength: 50,
+                      required: false,
+                    },
                   ].map(({ label, value, placeholder, display, onChange, maxLength, required, type, options }, i, arr) => {
                     const entered = (value ?? "").trim().length > 0
                     return (
@@ -948,7 +1015,26 @@ export default function CustomerPage() {
                         ].join(" ")}
                       >
                         <span className="text-sm font-medium">{label}</span>
-                        {type === "select" ? (
+                        {type === "other" ? (
+                          <div className="flex max-w-xs flex-col gap-2 sm:flex-row">
+                            <Input
+                              placeholder="Document name"
+                              aria-label="Other document name"
+                              value={c.other_document_name}
+                              maxLength={100}
+                              onChange={(e) => up({ other_document_name: e.target.value })}
+                              className="h-8 text-sm"
+                            />
+                            <Input
+                              placeholder={placeholder}
+                              aria-label="Other document number"
+                              value={value ?? ""}
+                              maxLength={maxLength}
+                              onChange={(e) => onChange(e.target.value.replace(/\s/g, ""))}
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                        ) : type === "select" ? (
                           <Select value={value ?? ""} onValueChange={(v) => onChange(v)}>
                             <SelectTrigger className="h-8 text-sm max-w-xs">
                               <SelectValue placeholder={placeholder} />
@@ -1068,6 +1154,16 @@ export default function CustomerPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {createdCustomer?.upload_warnings && createdCustomer.upload_warnings.length > 0 && (
+            <div role="alert" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <p className="font-semibold">Customer created, but some images were not saved:</p>
+              <ul className="mt-1 list-disc pl-4">
+                {createdCustomer.upload_warnings.map((w) => <li key={w}>{w}</li>)}
+              </ul>
+              <p className="mt-1">After enrolling the member, you can upload them from Member Management → View Member → Edit.</p>
             </div>
           )}
 

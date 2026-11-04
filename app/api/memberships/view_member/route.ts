@@ -98,6 +98,8 @@ export async function POST(req: Request) {
             m.board_resolution_number,
             
             TO_CHAR(m.join_date, 'YYYY-MM-DD') AS boardResolutionDate ,
+            TO_CHAR(m.join_date, 'YYYY-MM-DD') AS join_date,
+            TO_CHAR(m.board_resolution_date, 'YYYY-MM-DD') AS board_resolution_date,
             m.status,
 
             c.full_name ,
@@ -107,10 +109,17 @@ export async function POST(req: Request) {
             c.customer_type,
             c.spouse_name,
             c.mobile_no,
+            c.alt_mobile_no,
             c.email,
             c.caste_category,
+            c.marital_status,
+            c.blood_group,
+            c.occupation,
+            c.qualification,
+            c.qualification_details,
+            c.dccbaccountnumber AS dccb_account_number,
 
-            -- Address
+            -- Address (current)
             ca.house_no,
             ca.street,
             ca.village,
@@ -118,14 +127,30 @@ export async function POST(req: Request) {
             ca.district,
             ca.state,
             ca.pincode,
-            ca.email,
+            ca.email AS address_email,
             ca.phone_no,
+
+            -- Address (permanent)
+            ca.permanent_house_no,
+            ca.permanent_street,
+            ca.permanent_village,
+            ca.permanent_thaluk,
+            ca.permanent_district,
+            ca.permanent_state,
+            ca.permanent_pincode,
+            ca.permanent_phone_no,
 
             -- KYC
             ck.aadhaar_no,
             ck.pan_no,
             ck.ration_no,
-            ck.driving_license_no
+            ck.ration_card_type,
+            ck.driving_license_no,
+            -- Read through JSON so the search keeps working before migration 075 adds these columns
+            to_jsonb(ck) ->> 'passport_no'         AS passport_no,
+            to_jsonb(ck) ->> 'eb_bill_no'          AS eb_bill_no,
+            to_jsonb(ck) ->> 'other_document_name' AS other_document_name,
+            to_jsonb(ck) ->> 'other_document_no'   AS other_document_no
 
 
 

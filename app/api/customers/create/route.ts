@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/auth/session"
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
+import { validateAdditionalKycDocs } from "@/lib/member-profile-validation"
 
 export async function POST(req: Request) {
   const u = await getSession()
@@ -10,6 +11,19 @@ export async function POST(req: Request) {
   
 
   const body = await req.json()
+
+  // Passport / EB Bill / Others KYC documents
+  const t = (x: unknown) => (x === undefined || x === null ? "" : String(x).trim())
+  const extraKyc = {
+    passport_no: t(body.passport_no).toUpperCase(),
+    eb_bill_no: t(body.eb_bill_no),
+    other_document_name: t(body.other_document_name),
+    other_document_no: t(body.other_document_no),
+  }
+  const extraKycError = validateAdditionalKycDocs(extraKyc)
+  if (extraKycError) {
+    return NextResponse.json({ error: extraKycError }, { status: 400 })
+  }
 
   // Permission check
   const { rowCount } = await pool.query(
@@ -120,7 +134,10 @@ export async function POST(req: Request) {
       body.ration_no ||
       body.ration_card_type ||
       body.driving_license_no ||
-      body.voter_id
+      body.voter_id ||
+      extraKyc.passport_no ||
+      extraKyc.eb_bill_no ||
+      extraKyc.other_document_no
     ) {
       await client.query(
         `
@@ -130,8 +147,12 @@ export async function POST(req: Request) {
           pan_no,
           ration_no,
           ration_card_type,
-          driving_license_no
-        ) VALUES ($1,$2,$3,$4,$5,$6)
+          driving_license_no,
+          passport_no,
+          eb_bill_no,
+          other_document_name,
+          other_document_no
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
       `,
         [
           code,
@@ -140,6 +161,10 @@ export async function POST(req: Request) {
           body.ration_no,
           body.ration_card_type || null,
           body.driving_license_no,
+          extraKyc.passport_no || null,
+          extraKyc.eb_bill_no || null,
+          extraKyc.other_document_name || null,
+          extraKyc.other_document_no || null,
         ]
       )
     }

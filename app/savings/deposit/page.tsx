@@ -56,6 +56,7 @@ import {
   ChevronRight,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
+import { MemberSummaryCard, useMemberSummary } from "@/components/member-summary-card"
 
 type AccountInfo = {
   account_number: string
@@ -109,6 +110,14 @@ export default function DepositPage() {
   const [accountNumber, setAccountNumber] = useState(accountFromParams || "")
   const [isSearching, setIsSearching] = useState(false)
   const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null)
+  // Member Summary card details for the account holder (shared with Loans → New Loan Application)
+  const summaryMember = useMemberSummary(accountInfo?.membership_no, accountInfo ? {
+    full_name: accountInfo.full_name,
+    father_name: accountInfo.father_name,
+    mobile_no: accountInfo.mobile_no,
+    member_type: accountInfo.member_type || "---",
+    status: accountInfo.account_status,
+  } : undefined)
   const [searchError, setSearchError] = useState("")
 
   // Membership number lookup
@@ -845,41 +854,8 @@ export default function DepositPage() {
 
               {/* Right Column - Summary Sidebar */}
               <div className="space-y-6">
-                {/* Account Summary */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <CardTitle className="text-sm font-medium">Account Summary</CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {accountInfo ? (
-                      <div className="space-y-3">
-                        <div>
-                          <p className="text-xs text-muted-foreground">Account Holder</p>
-                          <p className="text-sm font-semibold">{accountInfo.full_name}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Account No</p>
-                          <p className="text-sm font-mono font-semibold">{accountInfo.account_number}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Status</p>
-                          <Badge variant="outline" className={isActive ? "border-teal-300 text-teal-700" : "border-amber-300 text-amber-700"}>
-                            {accountInfo.account_status}
-                          </Badge>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Type</p>
-                          <Badge variant="outline">{accountInfo.member_type}</Badge>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">Search an account to see details</p>
-                    )}
-                  </CardContent>
-                </Card>
+                {/* Member Summary */}
+                <MemberSummaryCard memberInfo={summaryMember} />
 
                 {/* Scheme Info */}
                 <Card>

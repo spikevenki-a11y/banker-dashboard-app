@@ -8,6 +8,13 @@ import { calculateAge } from "@/lib/member-age"
 
 export const MAX_SAVINGS_NOMINEES = 4
 
+// Deposit (Term / RD / Pigmy) nominees share nominee_details with savings accounts.
+// Deposit account numbers can be identical to savings account numbers in the same
+// branch, so deposit rows are keyed with a "DEP" prefix to keep them separate.
+export const DEPOSIT_NOMINEE_PREFIX = "DEP"
+export const depositNomineeAccountKey = (accountNumber: string | number) =>
+  `${DEPOSIT_NOMINEE_PREFIX}${String(accountNumber).trim()}`
+
 export type SavingsNomineeInput = {
   name: string
   relation: string
