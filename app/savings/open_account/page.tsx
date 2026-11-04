@@ -141,7 +141,7 @@ type Scheme = {
 const OPERATION_TYPES = [
   { value: "SINGLE", label: "Single" },
   { value: "EITHER_SURVIVOR", label: "Either or Survivor" },
-  { value: "JOINT_MINOR", label: "Joint (with Minor)" },
+  { value: "JOINT_HOLDER", label: "Joint holder)" },
   { value: "FORMER_SURVIVOR", label: "Former or Survivor" },
   { value: "LATTER_SURVIVOR", label: "Latter or Survivor" },
 ]

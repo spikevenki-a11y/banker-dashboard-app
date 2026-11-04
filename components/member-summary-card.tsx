@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -22,6 +22,52 @@ export type MemberSummaryInfo = {
   mobile_no: string
   aadhaar_no: string
   ledger_folio_number?: string
+}
+
+// Loads the Member Summary card's details for a membership number, from the
+// same lookup Loans → New Loan Application uses. Until the lookup returns (or
+// if it fails), the page's own basic details in `fallback` are shown, so the
+// card never blocks the page's search or transaction flow.
+export function useMemberSummary(
+  membershipNo: string | null | undefined,
+  fallback?: Partial<MemberSummaryInfo>
+): MemberSummaryInfo | null {
+  const [loaded, setLoaded] = useState<MemberSummaryInfo | null>(null)
+  const no = membershipNo ? String(membershipNo).trim() : ""
+
+  useEffect(() => {
+    setLoaded(null)
+    if (!no) return
+    let cancelled = false
+    fetch("/api/savings/member-lookup", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ membership_no: no }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data?.found) setLoaded(data.member)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [no])
+
+  if (!no) return null
+  if (loaded && String(loaded.membership_no) === no) return loaded
+  return {
+    membership_no: no,
+    full_name: "",
+    member_type: "---",
+    membership_class: "",
+    status: "",
+    father_name: "",
+    mobile_no: "",
+    aadhaar_no: "",
+    ...fallback,
+  }
 }
 
 type MemberProfile = {

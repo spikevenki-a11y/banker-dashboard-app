@@ -55,6 +55,7 @@ import {
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { ViewMemberPopup } from "@/components/view-member-popup"
+import { MemberSummaryCard, useMemberSummary } from "@/components/member-summary-card"
 
 type MemberInfo = {
   membership_id: string
@@ -107,6 +108,13 @@ function ShareDepositContent() {
   const [memberNo, setMemberNo] = useState(initialMemberNo)
   const [isSearching, setIsSearching] = useState(false)
   const [memberInfo, setMemberInfo] = useState<MemberInfo | null>(null)
+  // Member Summary card details (shared with Loans → New Loan Application)
+  const summaryMember = useMemberSummary(memberInfo?.membership_no, memberInfo ? {
+    full_name: memberInfo.full_name,
+    membership_class: memberInfo.membership_class,
+    status: memberInfo.status,
+    mobile_no: memberInfo.phone,
+  } : undefined)
   const [searchError, setSearchError] = useState("")
 
   // Transaction form
@@ -612,40 +620,7 @@ function ShareDepositContent() {
               {/* Right Column - Summary Sidebar */}
               <div className="space-y-6">
                 {/* Member Summary */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <CardTitle className="text-sm font-medium">Member Summary</CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {memberInfo ? (
-                      <div className="space-y-3">
-                        <div>
-                          <p className="text-xs text-muted-foreground">Member Name</p>
-                          <p className="text-sm font-semibold">{memberInfo.full_name}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Membership No</p>
-                          <p className="text-sm font-mono font-semibold">{memberInfo.membership_no}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Status</p>
-                          <Badge variant="outline" className={isActive ? "border-teal-300 text-teal-700" : "border-amber-300 text-amber-700"}>
-                            {memberInfo.status}
-                          </Badge>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Member Class</p>
-                          <Badge variant="outline">{memberInfo.membership_class}</Badge>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">Search a member to see details</p>
-                    )}
-                  </CardContent>
-                </Card>
+                <MemberSummaryCard memberInfo={summaryMember} />
 
                 {/* Share Details */}
                 <Card>

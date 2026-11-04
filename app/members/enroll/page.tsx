@@ -20,9 +20,29 @@ import {
 } from "@/components/ui/alert-dialog"
 import {
   Camera, PenTool, ArrowLeft, ArrowUpCircle, Search, User, MapPin,
-  ShieldCheck, Building2, CheckCircle2, AlertCircle, Pencil, Phone,
+  ShieldCheck, Building2, CheckCircle2, AlertCircle, Pencil, Phone, Users,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
+import { customerDocumentUrl, useCustomerDocuments } from "@/components/customer-photo-signature"
+import { NomineeEditor, nomineeTotals, type NomineeEntry } from "@/components/nominee-editor"
+
+type OtherBranchMembership = {
+  membership_no: string
+  branch_id: string
+  branch_name: string
+  membership_class: string | null
+  member_type: string | null
+  status: string | null
+  join_date: string | null
+}
+
+// Class A = Member, Class B = Nominal Member (as assigned by /api/memberships/create)
+function membershipTypeLabel(m: OtherBranchMembership) {
+  const cls = (m.membership_class || "").trim().toUpperCase()
+  if (cls === "A") return "Member"
+  if (cls === "B") return "Nominal Member"
+  return m.member_type || "---"
+}
 
 type NewMemberForm = {
   spouse_name: string | number | readonly string[] | undefined
@@ -107,6 +127,38 @@ function Field({
   )
 }
 
+// Read-only customer detail (all saved customer information, display only)
+function InfoGrid({ children }: { children: React.ReactNode }) {
+  return <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">{children}</div>
+}
+
+function InfoItem({ label, value, mono, className }: { label: string; value?: string | null; mono?: boolean; className?: string }) {
+  const text = value === undefined || value === null || String(value).trim() === "" ? "---" : String(value)
+  return (
+    <div className={`min-w-0 rounded-md border bg-muted/40 px-3 py-2 ${className ?? ""}`}>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className={`mt-0.5 break-words text-sm font-medium ${mono ? "font-mono" : ""}`}>{text}</p>
+    </div>
+  )
+}
+
+function joinAddress(parts: (string | null | undefined)[], pincode?: string | null) {
+  const a = parts.filter((x) => x && String(x).trim()).join(", ")
+  if (!a && !pincode) return ""
+  return pincode ? `${a}${a ? " - " : ""}${pincode}` : a
+}
+
+function ageFrom(dob?: string | null) {
+  if (!dob) return ""
+  const d = new Date(dob)
+  if (isNaN(d.getTime())) return ""
+  const now = new Date()
+  let age = now.getFullYear() - d.getFullYear()
+  const m = now.getMonth() - d.getMonth()
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--
+  return age >= 0 ? String(age) : ""
+}
+
 function UploadZone({
   preview, icon: Icon, label, sublabel, onChange,
 }: {
@@ -160,6 +212,24 @@ export default function EnrollMemberPage() {
   const [signature, setSignature] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [signaturePreview, setSignaturePreview] = useState<string | null>(null)
+  // Full customer record from the Aadhaar lookup (display only; not sent on submit)
+  const [customerDetails, setCustomerDetails] = useState<Record<string, any> | null>(null)
+  const customerDocs = useCustomerDocuments(customerDetails?.customer_code)
+  const storedPhotoUrl = customerDocs.docs.photo ? customerDocumentUrl(customerDocs.docs.photo) : null
+  const storedSignatureUrl = customerDocs.docs.signature ? customerDocumentUrl(customerDocs.docs.signature) : null
+  const cd = customerDetails || {}
+  // Existing memberships of the found customer in other branches
+  const [otherMemberships, setOtherMemberships] = useState<OtherBranchMembership[]>([])
+  const [isOtherMembershipsOpen, setIsOtherMembershipsOpen] = useState(false)
+  // Nominees for the new membership (saved with it in nominee_details)
+  const [nominees, setNominees] = useState<NomineeEntry[]>([])
+  const [businessDate, setBusinessDate] = useState<string>("")
+  useEffect(() => {
+    fetch("/api/fas/get-login-date", { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => d?.businessDate && setBusinessDate(String(d.businessDate).slice(0, 10)))
+      .catch(() => {})
+  }, [])
 
   const [newMember, setNewMember] = useState<NewMemberForm>({
     aadhaar_no: "",
@@ -196,6 +266,26 @@ export default function EnrollMemberPage() {
     return () => URL.revokeObjectURL(url)
   }, [signature])
 
+  // Shows a popup when the customer already holds memberships in other branches.
+  // Any failure here is ignored so registration continues as normal.
+  const checkOtherBranchMemberships = async (customerCode?: string) => {
+    setOtherMemberships([])
+    if (!customerCode) return
+    try {
+      const res = await fetch(
+        `/api/memberships/other-branches?customer_code=${encodeURIComponent(String(customerCode).trim())}`,
+        { credentials: "include" }
+      )
+      const data = await res.json().catch(() => null)
+      if (res.ok && data?.success && data.memberships.length > 0) {
+        setOtherMemberships(data.memberships)
+        setIsOtherMembershipsOpen(true)
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   // Function to search by Aadhaar
   const searchByAadhaar = useCallback(async (aadhaarNo: string) => {
     if (!aadhaarNo || aadhaarNo.length < 12) {
@@ -203,6 +293,8 @@ export default function EnrollMemberPage() {
     }
 
     setIsSearching(true)
+    setCustomerDetails(null)
+    setNominees([])
     try {
       const response = await fetch("/api/customers/lookup", {
         method: "POST",
@@ -215,6 +307,7 @@ export default function EnrollMemberPage() {
 
       if (data.found && data.customer) {
         const customer = data.customer
+        setCustomerDetails(customer)
         setNewMember(prev => ({
           ...prev,
           aadhaar_no: aadhaarNo,
@@ -230,7 +323,7 @@ export default function EnrollMemberPage() {
           house_no: customer.house_no || "",
           street: customer.street || "",
           village: customer.village || "",
-          thaluk: customer.taluk || "",
+          thaluk: customer.thaluk || customer.taluk || "",
           district: customer.district || "",
           state: customer.state || "",
           pincode: customer.pincode || "",
@@ -241,6 +334,7 @@ export default function EnrollMemberPage() {
         }))
         setFieldsReadOnly(true)
         setMemberFieldsReadOnly(false)
+        checkOtherBranchMemberships(customer.customer_code)
         return true
       } else {
         setIsCustomerNotFoundOpen(true)
@@ -274,13 +368,18 @@ export default function EnrollMemberPage() {
   }
 
   const handleEnrollMember = async () => {
+    const totals = nomineeTotals(nominees)
+    if (!totals.ok) {
+      alert(`Nominee percentages must add up to exactly 100% (currently ${totals.total}%).`)
+      return
+    }
     setIsSubmitting(true)
     try {
       const res = await fetch("/api/memberships/create", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newMember),
+        body: JSON.stringify({ ...newMember, nominees }),
       })
 
       const data = await res.json()
@@ -311,6 +410,8 @@ export default function EnrollMemberPage() {
       })
       setFieldsReadOnly(true)
       setMemberFieldsReadOnly(true)
+      setCustomerDetails(null)
+      setNominees([])
     } catch (e: any) {
       alert("Failed to create member: " + e.message)
     } finally {
@@ -451,14 +552,14 @@ export default function EnrollMemberPage() {
               {/* Upload zones */}
               <div className="flex justify-end gap-5 sm:gap-4 shrink-0 space-y-2 col-span-1">
                 <UploadZone
-                  preview={photoPreview}
+                  preview={photoPreview || storedPhotoUrl}
                   icon={Camera}
                   label="Photo"
                   sublabel="Upload"
                   onChange={(f) => setPhoto(f)}
                 />
                 <UploadZone
-                  preview={signaturePreview}
+                  preview={signaturePreview || storedSignatureUrl}
                   icon={PenTool}
                   label="Signature"
                   sublabel="Upload"
@@ -474,7 +575,7 @@ export default function EnrollMemberPage() {
           <CardContent className="p-0">
             <Tabs defaultValue="personal" className="w-full">
               <div className="border-b px-6 pt-5">
-                <TabsList className="grid w-full max-w-md grid-cols-3 mb-5">
+                <TabsList className="mb-5 grid h-auto w-full max-w-2xl grid-cols-2 sm:grid-cols-4">
                   <TabsTrigger value="personal" className="gap-1.5 data-[state=active]:text-amber-700">
                     <User className="h-3.5 w-3.5" /> Personal Details
                   </TabsTrigger>
@@ -483,6 +584,10 @@ export default function EnrollMemberPage() {
                   </TabsTrigger>
                   <TabsTrigger value="kyc" className="gap-1.5 data-[state=active]:text-amber-700">
                     <ShieldCheck className="h-3.5 w-3.5" /> KYC Details
+                  </TabsTrigger>
+                  <TabsTrigger value="nominees" className="gap-1.5 data-[state=active]:text-amber-700">
+                    <Users className="h-3.5 w-3.5" /> Nominees
+                    {nominees.length > 0 && <span className="text-xs tabular-nums">({nominees.length})</span>}
                   </TabsTrigger>
                 </TabsList>
               </div>
@@ -526,6 +631,27 @@ export default function EnrollMemberPage() {
                   </FormRow>
                 </FieldGroup>
 
+                <FieldGroup title="Additional Details">
+                  <InfoGrid>
+                    <InfoItem label="Customer Code" value={cd.customer_code?.trim()} mono />
+                    <InfoItem label="Age" value={ageFrom(cd.date_of_birth)} />
+                    <InfoItem label="Marital Status" value={cd.marital_status} className="capitalize" />
+                    <InfoItem label="Caste Category" value={cd.caste_category} />
+                    <InfoItem label="Occupation" value={cd.occupation} />
+                    <InfoItem label="Qualification" value={cd.qualification} />
+                    <InfoItem label="Qualification Details" value={cd.qualification_details} />
+                    <InfoItem label="DCCB Account Number" value={cd.dccb_account_number} mono />
+                  </InfoGrid>
+                </FieldGroup>
+
+                <FieldGroup title="Contact Details" icon={Phone}>
+                  <InfoGrid>
+                    <InfoItem label="Mobile Number" value={cd.mobile_no} />
+                    <InfoItem label="Alternate Mobile" value={cd.alt_mobile_no} />
+                    <InfoItem label="Email" value={cd.email || cd.address_email} className="sm:col-span-2" />
+                  </InfoGrid>
+                </FieldGroup>
+
                 <FieldGroup title="Board Resolution & Ledger">
                   <FormRow cols={3}>
                     <Field label="Board Resolution Number">
@@ -555,7 +681,7 @@ export default function EnrollMemberPage() {
               </TabsContent>
 
               {/* ADDRESS TAB */}
-              <TabsContent value="address" className="p-6 mt-0">
+              <TabsContent value="address" className="p-6 mt-0 space-y-8">
                 <FieldGroup title="Address & Contact" icon={MapPin}>
                   <FormRow cols={3}>
                     <Field id="address" label="Address" className="sm:col-span-2">
@@ -580,10 +706,44 @@ export default function EnrollMemberPage() {
                     </Field>
                   </FormRow>
                 </FieldGroup>
+
+                <FieldGroup title="Current Address" icon={MapPin}>
+                  <InfoGrid>
+                    <InfoItem label="House / Door No." value={cd.house_no} />
+                    <InfoItem label="Street / Area" value={cd.street} />
+                    <InfoItem label="Village" value={cd.village} />
+                    <InfoItem label="Taluk" value={cd.thaluk} />
+                    <InfoItem label="District" value={cd.district} />
+                    <InfoItem label="State" value={cd.state} />
+                    <InfoItem label="PIN Code" value={cd.pincode} />
+                    <InfoItem label="Phone" value={cd.phone_no} />
+                  </InfoGrid>
+                </FieldGroup>
+
+                <FieldGroup title="Permanent Address" icon={MapPin}>
+                  <InfoGrid>
+                    <InfoItem label="House / Door No." value={cd.permanent_house_no} />
+                    <InfoItem label="Street / Area" value={cd.permanent_street} />
+                    <InfoItem label="Village" value={cd.permanent_village} />
+                    <InfoItem label="Taluk" value={cd.permanent_thaluk} />
+                    <InfoItem label="District" value={cd.permanent_district} />
+                    <InfoItem label="State" value={cd.permanent_state} />
+                    <InfoItem label="PIN Code" value={cd.permanent_pincode} />
+                    <InfoItem label="Phone" value={cd.permanent_phone_no} />
+                    <InfoItem
+                      label="Full Permanent Address"
+                      value={joinAddress(
+                        [cd.permanent_house_no, cd.permanent_street, cd.permanent_village, cd.permanent_thaluk, cd.permanent_district, cd.permanent_state],
+                        cd.permanent_pincode
+                      )}
+                      className="sm:col-span-2 lg:col-span-4"
+                    />
+                  </InfoGrid>
+                </FieldGroup>
               </TabsContent>
 
               {/* KYC TAB */}
-              <TabsContent value="kyc" className="p-6 mt-0">
+              <TabsContent value="kyc" className="p-6 mt-0 space-y-8">
                 <FieldGroup title="KYC Documents" icon={ShieldCheck}>
                   <FormRow cols={4}>
                     <Field label="Aadhaar Number">
@@ -632,6 +792,33 @@ export default function EnrollMemberPage() {
                     </Field>
                   </FormRow>
                 </FieldGroup>
+
+                <FieldGroup title="Other KYC Documents" icon={ShieldCheck}>
+                  <InfoGrid>
+                    <InfoItem label="Ration Card Type" value={cd.ration_card_type} />
+                    <InfoItem label="Passport Number" value={cd.passport_no} mono />
+                    <InfoItem label="EB Bill Number" value={cd.eb_bill_no} />
+                    <InfoItem
+                      label={cd.other_document_name ? `Others (${cd.other_document_name})` : "Others"}
+                      value={cd.other_document_no}
+                    />
+                  </InfoGrid>
+                </FieldGroup>
+              </TabsContent>
+
+              {/* NOMINEES TAB */}
+              <TabsContent value="nominees" className="p-6 mt-0">
+                <FieldGroup title="Nominee Details" icon={Users}>
+                  {memberFieldsReadOnly && (
+                    <p className="text-sm text-muted-foreground">Search a customer by Aadhaar to add nominees.</p>
+                  )}
+                  <NomineeEditor
+                    nominees={nominees}
+                    onChange={setNominees}
+                    asOfDate={businessDate || undefined}
+                    disabled={memberFieldsReadOnly}
+                  />
+                </FieldGroup>
               </TabsContent>
             </Tabs>
           </CardContent>
@@ -658,6 +845,63 @@ export default function EnrollMemberPage() {
           </Button>
         </div>
       </div>
+
+      {/* Existing memberships in other branches */}
+      <AlertDialog open={isOtherMembershipsOpen} onOpenChange={setIsOtherMembershipsOpen}>
+        <AlertDialogContent className="flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] flex-col sm:max-w-xl">
+          <AlertDialogHeader className="shrink-0">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100">
+                <Building2 className="h-6 w-6 text-amber-600" />
+              </div>
+              <div className="min-w-0 pt-0.5 text-left">
+                <AlertDialogTitle className="text-lg">Existing Memberships Found</AlertDialogTitle>
+                <AlertDialogDescription className="mt-0.5">
+                  {cd.full_name ? <span className="font-medium text-foreground">{cd.full_name}</span> : "This customer"} already
+                  holds {otherMemberships.length === 1 ? "a membership" : `${otherMemberships.length} memberships`} in other
+                  branches. You can still continue with the registration.
+                </AlertDialogDescription>
+              </div>
+            </div>
+          </AlertDialogHeader>
+
+          <div className="min-h-0 overflow-auto rounded-xl border">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-muted/60 text-left">
+                <tr>
+                  <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Branch Name</th>
+                  <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Membership Type</th>
+                  <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Join Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {otherMemberships.map((m) => (
+                  <tr key={`${m.branch_id}-${m.membership_no}`}>
+                    <td className="px-4 py-2.5">
+                      <p className="font-medium">{m.branch_name}</p>
+                      <p className="font-mono text-xs text-muted-foreground">{m.membership_no}</p>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <p>{membershipTypeLabel(m)}</p>
+                      {m.status && <p className="text-xs text-muted-foreground">{m.status}</p>}
+                    </td>
+                    <td className="px-4 py-2.5 whitespace-nowrap">{m.join_date || "---"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <AlertDialogFooter className="mt-2 shrink-0">
+            <AlertDialogAction
+              onClick={() => setIsOtherMembershipsOpen(false)}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              Continue Registration
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Customer Not Found Dialog */}
       <AlertDialog open={isCustomerNotFoundOpen} onOpenChange={setIsCustomerNotFoundOpen}>

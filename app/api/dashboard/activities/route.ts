@@ -71,7 +71,7 @@ export async function GET(request: Request) {
             WHEN ltd.transaction_type = 'EMI' THEN 'EMI Payment'
             ELSE ltd.transaction_type
           END as action,
-          COALESCE(ltd.debit_amount, 0) + COALESCE(ltd.credit_amount, 0) as amount,
+          COALESCE(ltd.debit_amount, 0) + COALESCE(ltd.credit_principal_amount, 0) as amount,
           'completed' as status,
           'loans' as module
         FROM loan_transaction_details ltd

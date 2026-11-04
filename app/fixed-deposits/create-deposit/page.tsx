@@ -23,8 +23,9 @@ import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, Table
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts"
-import { ArrowLeft, Search, Loader2, CheckCircle2, User, Banknote, Calendar, Wallet, TrendingUp, TrendingDown, Shield, ShieldCheck, RefreshCw, Info, Users, X, Eye, MapPin, Camera, PenTool, BarChart3 } from "lucide-react"
+import { ArrowLeft, Search, Loader2, CheckCircle2, User, Banknote, Calendar, Wallet, TrendingUp, TrendingDown, Shield, ShieldCheck, RefreshCw, Info, Users, X, Eye, MapPin, Camera, PenTool, BarChart3, Printer } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
+import { NomineeEditor, nomineeTotals, type NomineeEntry } from "@/components/nominee-editor"
 
 type MemberInfo = {
   membership_no: string
@@ -145,6 +146,10 @@ export default function CreateDepositPage() {
   const [memberSearch, setMemberSearch] = useState("")
   const [isSearching, setIsSearching] = useState(false)
   const [memberInfo, setMemberInfo] = useState<MemberInfo | null>(null)
+  // A different depositor starts with an empty nominee list
+  useEffect(() => {
+    setNominees([])
+  }, [memberInfo?.membership_no])
   const [memberError, setMemberError] = useState("")
   const [savingsAccounts, setSavingsAccounts] = useState<SavingsAccount[]>([])
   const [isFetchingSavings, setIsFetchingSavings] = useState(false)
@@ -177,8 +182,8 @@ export default function CreateDepositPage() {
   const [prematureClosureAllowed, setPrematureClosureAllowed] = useState(true)
   const [prematurePenalRate, setPrematurePenalRate] = useState("")
   const [tdsApplicable, setTdsApplicable] = useState(false)
-  const [nomineeFullName, setNomineeFullName] = useState("")
-  const [nomineeRelation, setNomineeRelation] = useState("")
+  // Nominees (up to 4) — same behaviour as Savings → Open Savings Account
+  const [nominees, setNominees] = useState<NomineeEntry[]>([])
 
   // RD specific
   const [installmentAmount, setInstallmentAmount] = useState("")
@@ -502,6 +507,101 @@ const getLogindate = async () => {
   const maturityCalc = depositType === "TERM" ? calculateMaturity() : null
   const interestPayableSeries = depositType === "TERM" && maturityCalc ? getInterestPayableSeries() : []
 
+  // Prints the Interest Payable Chart as a clean, standalone page (no popup controls).
+  // Rendered into a hidden iframe so the app layout and dialog never appear in print.
+  const handlePrintInterestChart = () => {
+    if (interestPayableSeries.length === 0) return
+    const esc = (v: unknown) =>
+      String(v ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!)
+    const inr = (n: number) => Number(n || 0).toLocaleString("en-IN", { style: "currency", currency: "INR" })
+    const total = interestPayableSeries.reduce((sum, p) => sum + p.interestPayable, 0)
+    const freqLabel = interestPayoutFrequency.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
+    const period = [
+      Number(periodMonths) > 0 ? `${Number(periodMonths)} month${Number(periodMonths) === 1 ? "" : "s"}` : "",
+      Number(periodDays) > 0 ? `${Number(periodDays)} day${Number(periodDays) === 1 ? "" : "s"}` : "",
+    ].filter(Boolean).join(" ") || "---"
+
+    const details: [string, string][] = [
+      ["Member Name", memberInfo?.full_name || "---"],
+      ["Membership No", memberInfo?.membership_no || "---"],
+      ["Scheme", selectedScheme ? `${selectedScheme.scheme_name} - ${depositTypeLabel(selectedScheme.deposit_type)}` : "---"],
+      ["Deposit Amount", inr(Number(depositAmount))],
+      ["Rate of Interest", `${Number(rateOfInterest) || selectedScheme?.interest_rate || 0}% p.a.`],
+      ["Deposit Period", period],
+      ["Opening Date", openingDate ? formatDate(openingDate) : "---"],
+      ["Maturity Date", maturityCalc?.maturityDate ? formatDate(maturityCalc.maturityDate) : "---"],
+      ["Payout Frequency", freqLabel],
+      ["Maturity Amount", maturityCalc ? inr(maturityCalc.maturityAmount) : "---"],
+    ]
+
+    const rows =
+      interestPayableSeries.length > 1
+        ? interestPayableSeries
+            .map(
+              (p) =>
+                `<tr><td>${esc(p.period)}</td><td>${esc(p.dateLabel)}</td><td class="num">${esc(p.days)}</td><td class="num">${esc(inr(p.interestPayable))}</td></tr>`
+            )
+            .join("")
+        : `<tr><td>At Maturity</td><td>${esc(interestPayableSeries[0].dateLabel)}</td><td class="num">${esc(interestPayableSeries[0].days ?? "")}</td><td class="num">${esc(inr(interestPayableSeries[0].interestPayable))}</td></tr>`
+
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Interest Payable Chart</title>
+<style>
+  @page { size: A4 portrait; margin: 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #111; font-size: 12px; margin: 0; }
+  h1 { font-size: 18px; margin: 0 0 2px; }
+  .sub { color: #555; margin: 0 0 14px; }
+  .details { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px; border: 1px solid #ccc; border-radius: 6px; padding: 10px 12px; margin-bottom: 14px; }
+  .details div { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px dotted #ddd; padding: 3px 0; }
+  .details span:first-child { color: #555; }
+  .details span:last-child { font-weight: 600; text-align: right; }
+  table { width: 100%; border-collapse: collapse; }
+  thead { display: table-header-group; }
+  tr { page-break-inside: avoid; }
+  th, td { border: 1px solid #bbb; padding: 6px 8px; text-align: left; }
+  th { background: #f1f1f1; font-weight: 700; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  tfoot td { font-weight: 700; background: #fafafa; }
+  .foot { margin-top: 12px; color: #777; font-size: 10px; }
+</style></head><body>
+<h1>Interest Payable Chart</h1>
+<p class="sub">${esc(
+      interestPayableSeries.length > 1
+        ? `Interest payable at each ${freqLabel.toLowerCase()} payout across the deposit term.`
+        : "Interest is paid out once, in full, at maturity."
+    )}</p>
+<div class="details">${details.map(([k, v]) => `<div><span>${esc(k)}</span><span>${esc(v)}</span></div>`).join("")}</div>
+<table>
+  <thead><tr><th>Payout Period</th><th>Payout Date</th><th class="num">Days</th><th class="num">Interest Payable</th></tr></thead>
+  <tbody>${rows}</tbody>
+  <tfoot><tr><td colspan="3">Total Interest Payable</td><td class="num">${esc(inr(total))}</td></tr></tfoot>
+</table>
+<p class="foot">Printed on ${esc(formatDate(new Date()))}. Figures are indicative until the deposit is created.</p>
+</body></html>`
+
+    const iframe = document.createElement("iframe")
+    iframe.setAttribute("aria-hidden", "true")
+    iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden"
+    document.body.appendChild(iframe)
+    const doc = iframe.contentDocument
+    const win = iframe.contentWindow
+    if (!doc || !win) {
+      iframe.remove()
+      return
+    }
+    doc.open()
+    doc.write(html)
+    doc.close()
+    const cleanup = () => setTimeout(() => iframe.remove(), 500)
+    win.addEventListener("afterprint", cleanup, { once: true })
+    setTimeout(() => {
+      win.focus()
+      win.print()
+      // Fallback for browsers that don't fire afterprint on iframes
+      setTimeout(() => iframe.isConnected && iframe.remove(), 60000)
+    }, 50)
+  }
+
   // Compute total days for display using actual calendar days in the selected period
   const totalDays = getPeriodEndInfo(Number(periodMonths) || 0, Number(periodDays) || 0).totalDays
 
@@ -552,6 +652,11 @@ const getLogindate = async () => {
 
   const handleSubmit = async () => {
     if (!memberInfo || !selectedScheme) return
+    const totals = nomineeTotals(nominees)
+    if (!totals.ok) {
+      alert(`Nominee percentages must add up to exactly 100% (currently ${totals.total}%).`)
+      return
+    }
     setIsSubmitting(true)
 
     try {
@@ -572,8 +677,7 @@ const getLogindate = async () => {
         interest_calc_method: interestCalcMethod,
         premature_penal_rate: Number(prematurePenalRate) || 0,
         tds_applicable: tdsApplicable,
-        nominee_name: nomineeFullName,
-        nominee_relation: nomineeRelation,
+        nominees,
       }
 
       if (depositType === "RECURRING") {
@@ -1078,35 +1182,13 @@ const getLogindate = async () => {
                         {/* Nominee */}
                         <div>
                           <h4 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wide">Nominee Details (Optional)</h4>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="nominee-name">Nominee Name</Label>
-                              <Input
-                                id="nominee-name"
-                                placeholder="Enter nominee full name"
-                                value={nomineeFullName}
-                                onChange={(e) => setNomineeFullName(e.target.value)}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="nominee-relation">Relationship</Label>
-                              <Select value={nomineeRelation} onValueChange={setNomineeRelation}>
-                                <SelectTrigger id="nominee-relation">
-                                  <SelectValue placeholder="Select relation" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="SPOUSE">Spouse</SelectItem>
-                                  <SelectItem value="SON">Son</SelectItem>
-                                  <SelectItem value="DAUGHTER">Daughter</SelectItem>
-                                  <SelectItem value="FATHER">Father</SelectItem>
-                                  <SelectItem value="MOTHER">Mother</SelectItem>
-                                  <SelectItem value="BROTHER">Brother</SelectItem>
-                                  <SelectItem value="SISTER">Sister</SelectItem>
-                                  <SelectItem value="OTHER">Other</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
+                          <NomineeEditor
+                            nominees={nominees}
+                            onChange={setNominees}
+                            asOfDate={openingDate || undefined}
+                            excludeMembershipNo={memberInfo?.membership_no}
+                            excludeMessage="The deposit holder cannot be their own nominee."
+                          />
                         </div>
                       </>
                     )}
@@ -1242,35 +1324,13 @@ const getLogindate = async () => {
                         {/* Nominee for RD */}
                         <div>
                           <h4 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wide">Nominee Details (Optional)</h4>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="nominee-name-rd">Nominee Name</Label>
-                              <Input
-                                id="nominee-name-rd"
-                                placeholder="Enter nominee full name"
-                                value={nomineeFullName}
-                                onChange={(e) => setNomineeFullName(e.target.value)}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="nominee-relation-rd">Relationship</Label>
-                              <Select value={nomineeRelation} onValueChange={setNomineeRelation}>
-                                <SelectTrigger id="nominee-relation-rd">
-                                  <SelectValue placeholder="Select relation" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="SPOUSE">Spouse</SelectItem>
-                                  <SelectItem value="SON">Son</SelectItem>
-                                  <SelectItem value="DAUGHTER">Daughter</SelectItem>
-                                  <SelectItem value="FATHER">Father</SelectItem>
-                                  <SelectItem value="MOTHER">Mother</SelectItem>
-                                  <SelectItem value="BROTHER">Brother</SelectItem>
-                                  <SelectItem value="SISTER">Sister</SelectItem>
-                                  <SelectItem value="OTHER">Other</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
+                          <NomineeEditor
+                            nominees={nominees}
+                            onChange={setNominees}
+                            asOfDate={openingDate || undefined}
+                            excludeMembershipNo={memberInfo?.membership_no}
+                            excludeMessage="The deposit holder cannot be their own nominee."
+                          />
                         </div>
                       </>
                     )}
@@ -1293,33 +1353,13 @@ const getLogindate = async () => {
                         </div>
                         <div>
                           <h4 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wide">Nominee Details (Optional)</h4>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="nominee-name-p">Nominee Name</Label>
-                              <Input
-                                id="nominee-name-p"
-                                placeholder="Enter nominee full name"
-                                value={nomineeFullName}
-                                onChange={(e) => setNomineeFullName(e.target.value)}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="nominee-relation-p">Relationship</Label>
-                              <Select value={nomineeRelation} onValueChange={setNomineeRelation}>
-                                <SelectTrigger id="nominee-relation-p">
-                                  <SelectValue placeholder="Select relation" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="SPOUSE">Spouse</SelectItem>
-                                  <SelectItem value="SON">Son</SelectItem>
-                                  <SelectItem value="DAUGHTER">Daughter</SelectItem>
-                                  <SelectItem value="FATHER">Father</SelectItem>
-                                  <SelectItem value="MOTHER">Mother</SelectItem>
-                                  <SelectItem value="OTHER">Other</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
+                          <NomineeEditor
+                            nominees={nominees}
+                            onChange={setNominees}
+                            asOfDate={openingDate || undefined}
+                            excludeMembershipNo={memberInfo?.membership_no}
+                            excludeMessage="The deposit holder cannot be their own nominee."
+                          />
                         </div>
                       </>
                     )}
@@ -1807,7 +1847,17 @@ const getLogindate = async () => {
                   )}
                 </div>
 
-                <div className="flex justify-end border-t pt-3">
+                <div className="flex justify-end gap-2 border-t pt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handlePrintInterestChart}
+                    disabled={interestPayableSeries.length === 0}
+                    className="gap-1.5 bg-transparent"
+                  >
+                    <Printer className="h-3.5 w-3.5" />
+                    Print
+                  </Button>
                   <Button variant="outline" size="sm" onClick={() => setInterestChartOpen(false)} className="bg-transparent">
                     Close
                   </Button>
