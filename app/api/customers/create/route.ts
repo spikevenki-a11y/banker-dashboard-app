@@ -1,7 +1,7 @@
 import { getSession } from "@/lib/auth/session"
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
-import { validateAdditionalKycDocs } from "@/lib/member-profile-validation"
+import { validateAdditionalKycDocs, validatePan } from "@/lib/member-profile-validation"
 
 export async function POST(req: Request) {
   const u = await getSession()
@@ -20,6 +20,13 @@ export async function POST(req: Request) {
     other_document_name: t(body.other_document_name),
     other_document_no: t(body.other_document_no),
   }
+  // PAN: uppercase, then must match ABCDE1234F
+  body.pan_card_number = t(body.pan_card_number).toUpperCase() || null
+  const panError = validatePan(body.pan_card_number)
+  if (panError) {
+    return NextResponse.json({ error: panError }, { status: 400 })
+  }
+
   const extraKycError = validateAdditionalKycDocs(extraKyc)
   if (extraKycError) {
     return NextResponse.json({ error: extraKycError }, { status: 400 })

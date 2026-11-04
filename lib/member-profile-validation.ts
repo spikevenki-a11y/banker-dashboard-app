@@ -34,6 +34,26 @@ export const MEMBER_EDIT_SECTIONS: Record<MemberEditSection, { label: string; fi
   },
 }
 
+/** Display names for edit-history entries */
+export const MEMBER_FIELD_LABELS: Record<string, string> = {
+  full_name: "Full Name", father_name: "Father Name", spouse_name: "Spouse Name",
+  date_of_birth: "Date of Birth", gender: "Gender", marital_status: "Marital Status",
+  caste_category: "Caste Category", occupation: "Occupation", qualification: "Qualification",
+  qualification_details: "Qualification Details", dccb_account_number: "DCCB Account Number",
+  mobile_no: "Mobile No", alt_mobile_no: "Alternate Mobile", email: "Email",
+  house_no: "House No", street: "Street", village: "Village", thaluk: "Taluk",
+  district: "District", state: "State", pincode: "Pincode", phone_no: "Phone No",
+  permanent_house_no: "Permanent House No", permanent_street: "Permanent Street",
+  permanent_village: "Permanent Village", permanent_thaluk: "Permanent Taluk",
+  permanent_district: "Permanent District", permanent_state: "Permanent State",
+  permanent_pincode: "Permanent Pincode", permanent_phone_no: "Permanent Phone No",
+  pan_no: "PAN No", ration_no: "Ration Card No", ration_card_type: "Ration Card Type",
+  driving_license_no: "Driving License No", passport_no: "Passport No", eb_bill_no: "EB Bill No",
+  other_document_name: "Others — Document Name", other_document_no: "Others — Document No",
+  ledger_folio_number: "Ledger Folio No", board_resolution_number: "Board Resolution No",
+  board_resolution_date: "Board Resolution Date",
+}
+
 export function isMemberEditSection(x: unknown): x is MemberEditSection {
   return typeof x === "string" && Object.prototype.hasOwnProperty.call(MEMBER_EDIT_SECTIONS, x)
 }
@@ -52,6 +72,25 @@ const DIGITS_10 = /^\d{10}$/
 const DIGITS_6 = /^\d{6}$/
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PAN = /^[A-Z]{5}[0-9]{4}[A-Z]$/
+
+/** PAN as typed → uppercase, letters/digits only, at most 10 characters. */
+export function normalizePan(value: unknown): string {
+  return String(value ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10)
+}
+
+/**
+ * Indian PAN format ABCDE1234F: 5 letters, 4 digits, 1 letter (10 characters).
+ * Returns an error message, or null when valid or empty (PAN is optional).
+ */
+export function validatePan(value: unknown): string | null {
+  const pan = String(value ?? "").trim().toUpperCase()
+  if (!pan) return null
+  if (pan.length !== 10) return "PAN number must be exactly 10 characters (e.g. ABCDE1234F)."
+  if (!/^[A-Z]{5}/.test(pan)) return "PAN number: the first 5 characters must be letters (A–Z)."
+  if (!/^[A-Z]{5}[0-9]{4}/.test(pan)) return "PAN number: characters 6 to 9 must be digits (0–9)."
+  if (!PAN.test(pan)) return "PAN number: the last character must be a letter (A–Z)."
+  return null
+}
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
 function isFutureOrInvalidDate(value: string): "invalid" | "future" | null {
@@ -113,7 +152,8 @@ export function validateMemberSection(section: MemberEditSection, d: Record<stri
       return null
     }
     case "kyc": {
-      if (d.pan_no && !PAN.test(d.pan_no.toUpperCase())) return "PAN number must be in the format ABCDE1234F."
+      const panError = validatePan(d.pan_no)
+      if (panError) return panError
       if (d.driving_license_no && d.driving_license_no.length > 20) return "Driving license number must be 20 characters or fewer."
       return validateAdditionalKycDocs(d)
     }

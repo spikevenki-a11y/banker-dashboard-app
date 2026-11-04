@@ -22,7 +22,7 @@ import {
   Pencil, Phone, Mail, Building2,
 } from "lucide-react"
 import { DashboardWrapper } from "../_components/dashboard-wrapper"
-import { validateAdditionalKycDocs } from "@/lib/member-profile-validation"
+import { normalizePan, validateAdditionalKycDocs, validatePan } from "@/lib/member-profile-validation"
 import { CUSTOMER_IMAGE_ACCEPT, checkCustomerImage, uploadCustomerDocument } from "@/components/customer-photo-signature"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -395,6 +395,12 @@ export default function CustomerPage() {
   const canSubmit = !isSubmitting && !altPhoneError && c.full_name.trim().length > 0
 
   const handleCreateCustomer = async () => {
+    const panError = validatePan(c.pan_card_number)
+    if (panError) {
+      setActiveTab("kycdetails")
+      alert(panError)
+      return
+    }
     const kycError = validateAdditionalKycDocs({
       passport_no: c.passport_no.trim(),
       eb_bill_no: c.eb_bill_no.trim(),
@@ -938,8 +944,10 @@ export default function CustomerPage() {
                       icon: Building2,
                       value: c.pan_card_number,
                       placeholder: "ABCDE1234F",
-                      onChange: (v: string) => up({ pan_card_number: v.toUpperCase() }),
+                      onChange: (v: string) => up({ pan_card_number: normalizePan(v) }),
+                      maxLength: 10,
                       required: false,
+                      error: validatePan(c.pan_card_number),
                     },
                     {
                       label: "Ration Card",
@@ -1003,7 +1011,7 @@ export default function CustomerPage() {
                       maxLength: 50,
                       required: false,
                     },
-                  ].map(({ label, value, placeholder, display, onChange, maxLength, required, type, options }, i, arr) => {
+                  ].map(({ label, value, placeholder, display, onChange, maxLength, required, type, options, error }: any, i: number, arr: any[]) => {
                     const entered = (value ?? "").trim().length > 0
                     return (
                       <div
@@ -1046,16 +1054,24 @@ export default function CustomerPage() {
                             </SelectContent>
                           </Select>
                         ) : (
-                          <Input
-                            placeholder={placeholder}
-                            value={display ?? value ?? ""}
-                            maxLength={maxLength}
-                            onChange={(e) => onChange(e.target.value.replace(/\s/g, ""))}
-                            className="h-8 text-sm max-w-xs"
-                          />
+                          <div className="max-w-xs space-y-1">
+                            <Input
+                              placeholder={placeholder}
+                              value={display ?? value ?? ""}
+                              maxLength={maxLength}
+                              aria-invalid={error ? true : undefined}
+                              onChange={(e) => onChange(e.target.value.replace(/\s/g, ""))}
+                              className={`h-8 text-sm ${error ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                            />
+                            {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+                          </div>
                         )}
                         <div className="flex justify-center">
-                          {entered ? (
+                          {entered && error ? (
+                            <Badge variant="outline" className="border-destructive/40 text-[10px] font-semibold text-destructive">
+                              Invalid
+                            </Badge>
+                          ) : entered ? (
                             <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-50 text-[10px] font-semibold">
                               <Check className="h-2.5 w-2.5 mr-1" /> Entered
                             </Badge>
