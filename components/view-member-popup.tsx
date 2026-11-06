@@ -221,9 +221,22 @@ export function ViewMemberPopup({ open, onOpenChange, member: memberProp, member
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
-          setAssets(data.assets || [])
-          setLiabilities(data.liabilities || [])
-          setAccountSummary(data.summary || null)
+          // The API reports from the member's side; this popup shows the bank's side:
+          //   bank assets      = member's loans (outstanding balances owed to the bank)
+          //   bank liabilities = member's savings, deposits and shares (held by the bank)
+          setAssets(data.liabilities || [])
+          setLiabilities(data.assets || [])
+          const s = data.summary
+          setAccountSummary(
+            s
+              ? {
+                  ...s,
+                  total_assets: s.total_liabilities,
+                  total_liabilities: s.total_assets,
+                  net_worth: Math.round((s.total_liabilities - s.total_assets) * 100) / 100,
+                }
+              : null
+          )
         }
       })
       .catch(() => {
@@ -538,7 +551,7 @@ export function ViewMemberPopup({ open, onOpenChange, member: memberProp, member
                               <div className="rounded-lg border bg-emerald-50 p-4">
                                 <div className="flex items-center gap-2">
                                   <TrendingUp className="h-4 w-4 text-emerald-600" />
-                                  <p className="text-xs font-medium text-emerald-700">Total Assets</p>
+                                  <p className="text-xs font-medium text-emerald-700">Bank Assets</p>
                                 </div>
                                 <p className="mt-2 text-lg font-bold text-emerald-800">
                                   {accountSummary.total_assets.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
@@ -547,21 +560,21 @@ export function ViewMemberPopup({ open, onOpenChange, member: memberProp, member
                               <div className="rounded-lg border bg-red-50 p-4">
                                 <div className="flex items-center gap-2">
                                   <TrendingDown className="h-4 w-4 text-red-600" />
-                                  <p className="text-xs font-medium text-red-700">Total Liabilities</p>
+                                  <p className="text-xs font-medium text-red-700">Bank Liabilities</p>
                                 </div>
                                 <p className="mt-2 text-lg font-bold text-red-800">
                                   {accountSummary.total_liabilities.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
                                 </p>
                               </div>
-                              <div className="rounded-lg border bg-blue-50 p-4">
+                              {/* <div className="rounded-lg border bg-blue-50 p-4">
                                 <div className="flex items-center gap-2">
                                   <Landmark className="h-4 w-4 text-blue-600" />
-                                  <p className="text-xs font-medium text-blue-700">Net Worth</p>
+                                  <p className="text-xs font-medium text-blue-700">Net Position</p>
                                 </div>
                                 <p className="mt-2 text-lg font-bold text-blue-800">
                                   {accountSummary.net_worth.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
                                 </p>
-                              </div>
+                              </div> */}
                               <div className="rounded-lg border bg-muted/50 p-4">
                                 <div className="flex items-center gap-2">
                                   <Wallet className="h-4 w-4 text-muted-foreground" />
@@ -572,8 +585,8 @@ export function ViewMemberPopup({ open, onOpenChange, member: memberProp, member
                             </div>
                           )}
 
-                          <AccountsTable title="Assets" icon={PiggyBank} accent="emerald" items={assets} emptyLabel="No asset accounts found" />
-                          <AccountsTable title="Liabilities" icon={Banknote} accent="red" items={liabilities} emptyLabel="No liability accounts found" />
+                          <AccountsTable title="Bank Assets" icon={Banknote} accent="emerald" items={assets} emptyLabel="No loan accounts found" />
+                          <AccountsTable title="Bank Liabilities" icon={PiggyBank} accent="red" items={liabilities} emptyLabel="No savings, deposit or share accounts found" />
                         </>
                       )}
                     </div>

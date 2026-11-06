@@ -817,6 +817,7 @@ export default function EnrollMemberPage() {
                     onChange={setNominees}
                     asOfDate={businessDate || undefined}
                     disabled={memberFieldsReadOnly}
+                    showMemberSearch
                   />
                 </FieldGroup>
               </TabsContent>

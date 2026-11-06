@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -246,11 +246,22 @@ export default function OpenSavingsAccountPage() {
   const [draftMemberLoaded, setDraftMemberLoaded] = useState(false) // member details filled from lookup
   const [draftMemberLoading, setDraftMemberLoading] = useState(false)
   const [draftNomineeError, setDraftNomineeError] = useState("")
+  // Membership ID last looked up, so leaving the field again does not re-fetch it
+  const [draftLookedUpNo, setDraftLookedUpNo] = useState("")
+  // Bumped whenever the Membership ID changes, so a slower earlier lookup is ignored
+  const nomineeLookupSeq = useRef(0)
 
   // Member search popup is shared: account holder (default) or nominee
   const [searchTarget, setSearchTarget] = useState<"holder" | "nominee" | "secondary">("holder")
 
   const canAddNominee = nominees.length < MAX_NOMINEES
+
+  // Forget the current lookup (and ignore any still in flight)
+  const cancelNomineeLookup = () => {
+    nomineeLookupSeq.current++
+    setDraftLookedUpNo("")
+    setDraftMemberLoading(false)
+  }
 
   const clearDraftPersonal = () => {
     setDraftNomineeName("")
@@ -268,6 +279,7 @@ export default function OpenSavingsAccountPage() {
     setDraftIsMember(false)
     setDraftMembershipId("")
     setDraftNomineeError("")
+    cancelNomineeLookup()
   }
 
   const handleDraftIsMemberChange = (checked: boolean) => {
@@ -275,6 +287,7 @@ export default function OpenSavingsAccountPage() {
     setDraftMembershipId("")
     setDraftNomineeError("")
     clearDraftPersonal()
+    cancelNomineeLookup()
   }
 
   // Manual entry: derive age from date of birth
@@ -288,6 +301,8 @@ export default function OpenSavingsAccountPage() {
   const loadNomineeMember = async (memberNo: string) => {
     const no = memberNo.trim()
     if (!no) return
+    const seq = ++nomineeLookupSeq.current
+    setDraftLookedUpNo(no)
     setDraftNomineeError("")
     clearDraftPersonal()
     setDraftMembershipId(no)
@@ -305,6 +320,7 @@ export default function OpenSavingsAccountPage() {
     try {
       const res = await fetch(`/api/members/profile?membership_no=${encodeURIComponent(no)}`, { credentials: "include" })
       const data = await res.json()
+      if (seq !== nomineeLookupSeq.current) return // Membership ID changed meanwhile
       if (!res.ok || !data.found) {
         setDraftNomineeError("No member found with this membership number.")
         return
@@ -322,10 +338,17 @@ export default function OpenSavingsAccountPage() {
       setDraftAddress(formatNomineeAddress(p))
       setDraftMemberLoaded(true)
     } catch {
-      setDraftNomineeError("Failed to load member details. Please try again.")
+      if (seq === nomineeLookupSeq.current) setDraftNomineeError("Failed to load member details. Please try again.")
     } finally {
-      setDraftMemberLoading(false)
+      if (seq === nomineeLookupSeq.current) setDraftMemberLoading(false)
     }
+  }
+
+  // Membership ID field left (or Enter pressed): look the member up once per value
+  const handleNomineeMembershipBlur = () => {
+    const no = draftMembershipId.trim()
+    if (!draftIsMember || !no || no === draftLookedUpNo) return
+    loadNomineeMember(no)
   }
 
   // Nominee percentage: greater than 0 and not more than 100
@@ -1043,29 +1066,30 @@ const getLogindate = async () => {
                         <div className="space-y-1.5">
                           <Label htmlFor="draft-nominee-membership" className="text-xs">Membership ID</Label>
                           <div className="flex gap-2">
-                            <Input
-                              id="draft-nominee-membership"
-                              placeholder={draftIsMember ? "Enter membership number" : "Tick Is Member to enable"}
-                              value={draftMembershipId}
-                              disabled={!draftIsMember}
-                              onChange={(e) => {
-                                setDraftMembershipId(e.target.value)
-                                if (draftMemberLoaded) clearDraftPersonal()
-                                setDraftNomineeError("")
-                              }}
-                              onKeyDown={(e) => e.key === "Enter" && loadNomineeMember(draftMembershipId)}
-                            />
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              className="shrink-0 bg-white"
-                              disabled={!draftIsMember || !draftMembershipId.trim() || draftMemberLoading}
-                              onClick={() => loadNomineeMember(draftMembershipId)}
-                              title="Load member"
-                            >
-                              {draftMemberLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                            </Button>
+                            <div className="relative flex-1">
+                              <Input
+                                id="draft-nominee-membership"
+                                placeholder={draftIsMember ? "Enter membership number" : "Tick Is Member to enable"}
+                                value={draftMembershipId}
+                                disabled={!draftIsMember}
+                                className={draftMemberLoading ? "pr-9" : undefined}
+                                onChange={(e) => {
+                                  // A changed or cleared ID drops the previously loaded member
+                                  setDraftMembershipId(e.target.value)
+                                  clearDraftPersonal()
+                                  setDraftNomineeError("")
+                                  cancelNomineeLookup()
+                                }}
+                                onBlur={handleNomineeMembershipBlur}
+                                onKeyDown={(e) => e.key === "Enter" && handleNomineeMembershipBlur()}
+                              />
+                              {draftMemberLoading && (
+                                <Loader2
+                                  className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground"
+                                  aria-label="Loading member"
+                                />
+                              )}
+                            </div>
                             <Button
                               type="button"
                               variant="outline"

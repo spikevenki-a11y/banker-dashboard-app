@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
+import { useState, useEffect, useRef, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -49,11 +49,11 @@ import {
   Banknote,
   History,
   X,
-  Users,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { Progress } from "@/components/ui/progress"
 import { MemberSearchDialog } from "@/components/member-search-dialog"
+import { MemberSummaryCard, type MemberSummaryInfo } from "@/components/member-summary-card"
 
 type LoanAccountInfo = {
   loan_account_no: string
@@ -306,6 +306,30 @@ function LoanCollectionContent() {
     }
   }
 
+  // Load the member when the user leaves the Membership Number field
+  // (skipped when empty, already loading, or that member is already shown)
+  const handleMembershipBlur = () => {
+    const memNo = membershipNo.trim()
+    if (!memNo || isSearching) return
+    if (memberInfo && String(memberInfo.membership_no) === memNo) return
+    searchMember(memNo)
+  }
+
+  // Member Summary card details, from the member already loaded above
+  const memberSummary: MemberSummaryInfo | null = memberInfo
+    ? {
+        membership_no: String(memberInfo.membership_no),
+        full_name: memberInfo.full_name || "",
+        father_name: memberInfo.father_name || "",
+        mobile_no: memberInfo.mobile_no || "",
+        aadhaar_no: memberInfo.aadhaar_no || "",
+        member_type: memberInfo.member_type || "---",
+        membership_class: (memberInfo as any).membership_class || "",
+        status: memberInfo.status || "",
+        ledger_folio_number: (memberInfo as any).ledger_folio_number,
+      }
+    : null
+
   // Select one of the member's loan accounts for collection
   const selectLoanAccount = async (acc: any) => {
     if (!acc.loan_account_no) {
@@ -320,13 +344,19 @@ function LoanCollectionContent() {
     await fetchLoanDetails(String(acc.loan_account_no))
   }
 
+  const loanDetailsSeq = useRef(0)
+
   const isCollectible = (status?: string) => ["ACTIVE", "OVERDUE"].includes(String(status || "").toUpperCase())
 
   const fetchLoanDetails = async (accNo: string) => {
+    // Only the latest request may update the screen, so switching accounts
+    // quickly never shows an earlier account's schedule or history
+    const seq = ++loanDetailsSeq.current
     setIsLoadingDetails(true)
     try {
       const res = await fetch(`/api/loans/repayment?loanAccountNo=${encodeURIComponent(accNo)}`)
       const data = await res.json()
+      if (seq !== loanDetailsSeq.current) return
 
       if (!data.error) {
         setEmiSchedule(data.schedule || [])
@@ -336,7 +366,7 @@ function LoanCollectionContent() {
     } catch (error) {
       console.error("Failed to fetch loan details:", error)
     } finally {
-      setIsLoadingDetails(false)
+      if (seq === loanDetailsSeq.current) setIsLoadingDetails(false)
     }
   }
 
@@ -536,96 +566,46 @@ function LoanCollectionContent() {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
-          {/* Left: Search & Account Info */}
-          <div className="lg:col-span-3 space-y-6">
-            {/* Search Card */}
+          {/* Left: Membership search & loan accounts (same layout as New Loan Application) */}
+          <div className="space-y-6 lg:col-span-2">
+            {/* Member Information */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Search className="h-5 w-5" />
-                  Search Member
-                </CardTitle>
+                <CardTitle className="text-lg">Member Information</CardTitle>
+                <CardDescription>Search for the member by membership number</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="membership-no">Membership Number</Label>
+                  <Label htmlFor="membership-no">Membership Number *</Label>
                   <div className="flex gap-2">
                     <Input
                       id="membership-no"
                       placeholder="Enter membership number"
                       value={membershipNo}
                       onChange={(e) => setMembershipNo(e.target.value)}
+                      onBlur={handleMembershipBlur}
                       onKeyDown={(e) => e.key === "Enter" && searchMember()}
                       className="flex-1"
                     />
-                    <Button onClick={() => searchMember()} disabled={isSearching} title="Load member">
-                      {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                    </Button>
                     <Button
                       variant="outline"
                       onClick={() => setSearchDialogOpen(true)}
                       disabled={isSearching}
                       className="gap-2 bg-transparent"
                     >
-                      <Users className="h-4 w-4" /> Search
+                      <Search className="h-4 w-4" /> Search
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Don&apos;t know the number? Use Search to find a member by name, father&apos;s name, phone, Aadhaar or ledger folio.
-                  </p>
+                  {isSearching && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Loading member details...
+                    </div>
+                  )}
+                  {searchError && <p className="text-sm text-red-500">{searchError}</p>}
                 </div>
-                {searchError && (
-                  <p className="text-sm text-destructive">{searchError}</p>
-                )}
               </CardContent>
             </Card>
-
-            {/* Member Details Card */}
-            {memberInfo && (
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                      <User className="h-5 w-5" />
-                      Member Details
-                    </CardTitle>
-                    {memberInfo.status && (
-                      <Badge className={
-                        String(memberInfo.status).toUpperCase() === "ACTIVE"
-                          ? "bg-teal-100 text-teal-700"
-                          : "bg-gray-100 text-gray-700"
-                      }>
-                        {memberInfo.status}
-                      </Badge>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Member Name</span>
-                    <p className="font-medium">{memberInfo.full_name || "---"}</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <span className="text-muted-foreground">Membership No</span>
-                      <p className="font-mono font-medium">{memberInfo.membership_no}</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Mobile</span>
-                      <p className="font-medium">{memberInfo.mobile_no || "---"}</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Father's Name</span>
-                      <p className="font-medium">{memberInfo.father_name || "---"}</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Aadhaar</span>
-                      <p className="font-mono font-medium">{memberInfo.aadhaar_no?.trim() || "---"}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
 
             {/* Member's Loan Accounts */}
             {memberInfo && (
@@ -641,46 +621,69 @@ function LoanCollectionContent() {
                   {memberLoans.length === 0 ? (
                     <p className="py-4 text-center text-sm text-muted-foreground">No loan accounts found for this member</p>
                   ) : (
-                    memberLoans.map((loan) => {
-                      const accNo = loan.loan_account_no ? String(loan.loan_account_no) : ""
-                      const isSelected = !!accNo && accountInfo?.loan_account_no === accNo
-                      const status = String(loan.application_status || "")
-                      return (
-                        <button
-                          key={loan.loan_application_id}
-                          type="button"
-                          onClick={() => selectLoanAccount(loan)}
-                          disabled={!accNo || isLoadingDetails}
-                          className={`w-full rounded-lg border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-                            isSelected ? "border-blue-400 bg-blue-50 dark:bg-blue-950/30" : "hover:bg-muted/50"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-mono text-sm font-medium">{accNo || "Not disbursed"}</span>
-                            <Badge className={
-                              status === "ACTIVE" ? "bg-teal-100 text-teal-700" :
-                              status === "OVERDUE" ? "bg-red-100 text-red-700" :
-                              "bg-gray-100 text-gray-700"
-                            }>
-                              {status}
-                            </Badge>
-                          </div>
-                          <p className="mt-1 truncate text-xs text-muted-foreground">
-                            {loan.scheme_name} · Ref {loan.reference_no}
-                          </p>
-                          <div className="mt-1 flex justify-between text-xs">
-                            <span className="text-muted-foreground">Sanctioned {formatCurrency(loan.sanctioned_amount || 0)}</span>
-                            <span className="font-semibold text-orange-600">O/S {formatCurrency(loan.outstanding_balance || 0)}</span>
-                          </div>
-                        </button>
-                      )
-                    })
+                    <>
+                      <Label htmlFor="loan-account-select">
+                        Loan Account ({memberLoans.length} found)
+                      </Label>
+                      <Select
+                        value={accountInfo?.loan_account_no ? String(accountInfo.loan_account_no) : ""}
+                        onValueChange={(accNo) => {
+                          const loan = memberLoans.find((l) => String(l.loan_account_no) === accNo)
+                          if (loan && accNo !== String(accountInfo?.loan_account_no ?? "")) selectLoanAccount(loan)
+                        }}
+                      >
+                        <SelectTrigger id="loan-account-select" className="h-auto min-h-10 w-full py-2 text-left">
+                          <SelectValue placeholder="Select a loan account" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {memberLoans.map((loan) => {
+                            const accNo = loan.loan_account_no ? String(loan.loan_account_no) : ""
+                            const status = String(loan.application_status || "")
+                            return (
+                              <SelectItem
+                                key={loan.loan_application_id}
+                                // Loans without an account number (not disbursed) are listed but can't be picked
+                                value={accNo || `not-disbursed-${loan.loan_application_id}`}
+                                disabled={!accNo}
+                              >
+                                <div className="flex min-w-0 flex-col gap-0.5 py-0.5">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-mono text-sm font-medium">{accNo || "Not disbursed"}</span>
+                                    <Badge className={
+                                      status === "ACTIVE" ? "bg-teal-100 text-teal-700" :
+                                      status === "OVERDUE" ? "bg-red-100 text-red-700" :
+                                      "bg-gray-100 text-gray-700"
+                                    }>
+                                      {status}
+                                    </Badge>
+                                  </div>
+                                  <span className="truncate text-xs text-muted-foreground">
+                                    {loan.scheme_name} · Ref {loan.reference_no} · O/S {formatCurrency(loan.outstanding_balance || 0)}
+                                  </span>
+                                </div>
+                              </SelectItem>
+                            )
+                          })}
+                        </SelectContent>
+                      </Select>
+                      {isLoadingDetails && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Loading loan details...
+                        </div>
+                      )}
+                    </>
                   )}
                 </CardContent>
               </Card>
             )}
+          </div>
 
-            {/* Account Info Card */}
+          {/* Right: Member Summary (shared with New Loan Application) */}
+          <div className="space-y-6 lg:row-span-2">
+            <MemberSummaryCard memberInfo={memberSummary} />
+
+            {/* Loan Details — below Member Summary */}
             {accountInfo && (
               <Card>
                 <CardHeader>
@@ -761,10 +764,68 @@ function LoanCollectionContent() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Transaction History — below Loan Details */}
+            {accountInfo && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <History className="h-5 w-5" />
+                    Transaction History
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingDetails ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    </div>
+                  ) : transactions.length === 0 ? (
+                    <p className="text-center py-8 text-muted-foreground">No transactions found</p>
+                  ) : (
+                    <div className="max-h-[300px] overflow-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Voucher</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Debit</TableHead>
+                            <TableHead>Principal</TableHead>
+                            <TableHead>Interest</TableHead>
+                            <TableHead>Balance</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {transactions.map((txn) => (
+                            <TableRow key={txn.id}>
+                              <TableCell>{formatDate(txn.transaction_date)}</TableCell>
+                              <TableCell className="font-mono">{txn.voucher_no}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{txn.transaction_type}</Badge>
+                              </TableCell>
+                              <TableCell className="text-red-600">
+                                {parseFloat(txn.debit_amount?.toString()) > 0 ? formatCurrency(txn.debit_amount) : '---'}
+                              </TableCell>
+                              <TableCell className="text-teal-600">
+                                {parseFloat(txn.credit_principal_amount?.toString()) > 0 ? formatCurrency(txn.credit_principal_amount) : '---'}
+                              </TableCell>
+                              <TableCell className="text-teal-600">
+                                {parseFloat(txn.credit_interest_amount?.toString()) > 0 ? formatCurrency(txn.credit_interest_amount) : '---'}
+                              </TableCell>
+                              <TableCell className="font-mono">{formatCurrency(txn.balance_after_transaction)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
 
-          {/* Right: Collection Form & Schedule */}
-          <div className="lg:col-span-3 space-y-6">
+          {/* Collection Form & Schedule */}
+          <div className="lg:col-span-2 space-y-6">
             {accountInfo ? (
               <>
                 {/* Collection Form */}
@@ -957,62 +1018,6 @@ function LoanCollectionContent() {
                                     {emi.payment_status}
                                   </Badge>
                                 </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Transaction History */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <History className="h-5 w-5" />
-                      Transaction History
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {isLoadingDetails ? (
-                      <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-6 w-6 animate-spin" />
-                      </div>
-                    ) : transactions.length === 0 ? (
-                      <p className="text-center py-8 text-muted-foreground">No transactions found</p>
-                    ) : (
-                      <div className="max-h-[300px] overflow-y-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Date</TableHead>
-                              <TableHead>Voucher</TableHead>
-                              <TableHead>Type</TableHead>
-                              <TableHead>Debit</TableHead>
-                              <TableHead>Principal</TableHead>
-                              <TableHead>Interest</TableHead>
-                              <TableHead>Balance</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {transactions.map((txn) => (
-                              <TableRow key={txn.id}>
-                                <TableCell>{formatDate(txn.transaction_date)}</TableCell>
-                                <TableCell className="font-mono">{txn.voucher_no}</TableCell>
-                                <TableCell>
-                                  <Badge variant="outline">{txn.transaction_type}</Badge>
-                                </TableCell>
-                                <TableCell className="text-red-600">
-                                  {parseFloat(txn.debit_amount?.toString()) > 0 ? formatCurrency(txn.debit_amount) : '---'}
-                                </TableCell>
-                                <TableCell className="text-teal-600">
-                                  {parseFloat(txn.credit_principal_amount?.toString()) > 0 ? formatCurrency(txn.credit_principal_amount) : '---'}
-                                </TableCell>
-                                <TableCell className="text-teal-600">
-                                  {parseFloat(txn.credit_interest_amount?.toString()) > 0 ? formatCurrency(txn.credit_interest_amount) : '---'}
-                                </TableCell>
-                                <TableCell className="font-mono">{formatCurrency(txn.balance_after_transaction)}</TableCell>
                               </TableRow>
                             ))}
                           </TableBody>

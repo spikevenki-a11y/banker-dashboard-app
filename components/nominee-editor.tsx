@@ -1,6 +1,6 @@
 "use client"
 
-import { useId, useState } from "react"
+import { useId, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2, Plus, Search, Trash2, UserPlus } from "lucide-react"
+import { MemberSearchDialog } from "@/components/member-search-dialog"
 import { calculateAge } from "@/lib/member-age"
 
 // Nominee list + entry form — same behaviour as Savings Management → Open Savings
@@ -55,6 +56,7 @@ export function NomineeEditor({
   excludeMembershipNo,
   excludeMessage = "The applicant cannot be their own nominee.",
   disabled = false,
+  showMemberSearch = false,
 }: {
   nominees: NomineeEntry[]
   onChange: (next: NomineeEntry[]) => void
@@ -64,6 +66,8 @@ export function NomineeEditor({
   excludeMembershipNo?: string | null
   excludeMessage?: string
   disabled?: boolean
+  /** Show a Search Member button (member search popup) next to Membership ID */
+  showMemberSearch?: boolean
 }) {
   const [draftNomineeName, setDraftNomineeName] = useState("")
   const [draftNomineeRelation, setDraftNomineeRelation] = useState("")
@@ -77,12 +81,24 @@ export function NomineeEditor({
   const [draftMemberLoaded, setDraftMemberLoaded] = useState(false) // member details filled from lookup
   const [draftMemberLoading, setDraftMemberLoading] = useState(false)
   const [draftNomineeError, setDraftNomineeError] = useState("")
+  // Membership ID last looked up, so leaving the field again does not re-fetch it
+  const [draftLookedUpNo, setDraftLookedUpNo] = useState("")
+  // Bumped whenever the Membership ID changes, so a slower earlier lookup is ignored
+  const nomineeLookupSeq = useRef(0)
+  const [memberSearchOpen, setMemberSearchOpen] = useState(false)
   // Unique ids so several editors can be on one page
   const uid = useId()
   const fid = (name: string) => `nominee-${name}-${uid}`
 
   const asOf = asOfDate || new Date()
   const canAddNominee = nominees.length < MAX_NOMINEES
+
+  // Forget the current lookup (and ignore any still in flight)
+  const cancelNomineeLookup = () => {
+    nomineeLookupSeq.current++
+    setDraftLookedUpNo("")
+    setDraftMemberLoading(false)
+  }
 
   const clearDraftPersonal = () => {
     setDraftNomineeName("")
@@ -100,6 +116,7 @@ export function NomineeEditor({
     setDraftIsMember(false)
     setDraftMembershipId("")
     setDraftNomineeError("")
+    cancelNomineeLookup()
   }
 
   const handleDraftIsMemberChange = (checked: boolean) => {
@@ -107,6 +124,7 @@ export function NomineeEditor({
     setDraftMembershipId("")
     setDraftNomineeError("")
     clearDraftPersonal()
+    cancelNomineeLookup()
   }
 
   // Manual entry: derive age from date of birth
@@ -120,6 +138,8 @@ export function NomineeEditor({
   const loadNomineeMember = async (memberNo: string) => {
     const no = memberNo.trim()
     if (!no) return
+    const seq = ++nomineeLookupSeq.current
+    setDraftLookedUpNo(no)
     setDraftNomineeError("")
     clearDraftPersonal()
     setDraftMembershipId(no)
@@ -137,6 +157,7 @@ export function NomineeEditor({
     try {
       const res = await fetch(`/api/members/profile?membership_no=${encodeURIComponent(no)}`, { credentials: "include" })
       const data = await res.json()
+      if (seq !== nomineeLookupSeq.current) return // Membership ID changed meanwhile
       if (!res.ok || !data.found) {
         setDraftNomineeError("No member found with this membership number.")
         return
@@ -154,10 +175,17 @@ export function NomineeEditor({
       setDraftAddress(formatNomineeAddress(p))
       setDraftMemberLoaded(true)
     } catch {
-      setDraftNomineeError("Failed to load member details. Please try again.")
+      if (seq === nomineeLookupSeq.current) setDraftNomineeError("Failed to load member details. Please try again.")
     } finally {
-      setDraftMemberLoading(false)
+      if (seq === nomineeLookupSeq.current) setDraftMemberLoading(false)
     }
+  }
+
+  // Membership ID field left (or Enter pressed): look the member up once per value
+  const handleNomineeMembershipBlur = () => {
+    const no = draftMembershipId.trim()
+    if (!draftIsMember || !no || no === draftLookedUpNo) return
+    loadNomineeMember(no)
   }
 
   // Nominee percentage: greater than 0 and not more than 100
@@ -301,30 +329,42 @@ export function NomineeEditor({
           <div className="space-y-1.5">
             <Label htmlFor={fid("membership")} className="text-xs">Membership ID</Label>
             <div className="flex gap-2">
-              <Input
-                id={fid("membership")}
-                placeholder={draftIsMember ? "Enter membership number" : "Tick Is Member to enable"}
-                value={draftMembershipId}
-                disabled={!draftIsMember}
-                onChange={(e) => {
-                  setDraftMembershipId(e.target.value)
-                  if (draftMemberLoaded) clearDraftPersonal()
-                  setDraftNomineeError("")
-                }}
-                onKeyDown={(e) => e.key === "Enter" && loadNomineeMember(draftMembershipId)}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="shrink-0 bg-white"
-                disabled={!draftIsMember || !draftMembershipId.trim() || draftMemberLoading}
-                onClick={() => loadNomineeMember(draftMembershipId)}
-                title="Load member"
-                aria-label="Load member"
-              >
-                {draftMemberLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-              </Button>
+              <div className="relative flex-1">
+                <Input
+                  id={fid("membership")}
+                  placeholder={draftIsMember ? "Enter membership number" : "Tick Is Member to enable"}
+                  value={draftMembershipId}
+                  disabled={!draftIsMember}
+                  className={draftMemberLoading ? "pr-9" : undefined}
+                  onChange={(e) => {
+                    // A changed or cleared ID drops the previously loaded member
+                    setDraftMembershipId(e.target.value)
+                    clearDraftPersonal()
+                    setDraftNomineeError("")
+                    cancelNomineeLookup()
+                  }}
+                  onBlur={handleNomineeMembershipBlur}
+                  onKeyDown={(e) => e.key === "Enter" && handleNomineeMembershipBlur()}
+                />
+                {draftMemberLoading && (
+                  <Loader2
+                    className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground"
+                    aria-label="Loading member"
+                  />
+                )}
+              </div>
+              {showMemberSearch && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="shrink-0 gap-1.5 bg-white"
+                  disabled={!draftIsMember}
+                  onClick={() => setMemberSearchOpen(true)}
+                >
+                  <Search className="h-4 w-4" />
+                  Search Member
+                </Button>
+              )}
             </div>
           </div>
 
@@ -434,6 +474,16 @@ export function NomineeEditor({
             Add Nominee
           </Button>
         </div>
+      )}
+
+      {showMemberSearch && (
+        <MemberSearchDialog
+          open={memberSearchOpen}
+          onOpenChange={setMemberSearchOpen}
+          excludeMembershipNo={excludeMembershipNo ? String(excludeMembershipNo) : undefined}
+          // Picked member goes through the same lookup and checks as a typed Membership ID
+          onSelect={(member) => loadNomineeMember(String(member.membership_no))}
+        />
       )}
     </div>
   )

@@ -487,9 +487,23 @@ export default function ViewMemberPage() {
       })
       const data = await res.json()
       if (data.success) {
-        setAssets(data.assets || [])
-        setLiabilities(data.liabilities || [])
-        setAccountSummary(data.summary || null)
+        // The API reports from the member's side; this screen shows the bank's side,
+        // so the two sides are swapped here:
+        //   bank assets      = member's loans (money owed to the bank)
+        //   bank liabilities = member's savings, deposits and shares (money the bank holds)
+        setAssets(data.liabilities || [])
+        setLiabilities(data.assets || [])
+        const s = data.summary
+        setAccountSummary(
+          s
+            ? {
+                ...s,
+                total_assets: s.total_liabilities,
+                total_liabilities: s.total_assets,
+                net_worth: Math.round((s.total_liabilities - s.total_assets) * 100) / 100,
+              }
+            : null
+        )
       }
     } catch {
       setAssets([])
@@ -931,7 +945,7 @@ export default function ViewMemberPage() {
                             <div className="rounded-lg border bg-emerald-50 p-4">
                               <div className="flex items-center gap-2">
                                 <TrendingUp className="h-4 w-4 text-emerald-600" />
-                                <p className="text-xs font-medium text-emerald-700">Total Assets</p>
+                                <p className="text-xs font-medium text-emerald-700">Bank Assets</p>
                               </div>
                               <p className="mt-2 text-lg font-bold text-emerald-800">
                                 {accountSummary.total_assets.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
@@ -940,21 +954,21 @@ export default function ViewMemberPage() {
                             <div className="rounded-lg border bg-red-50 p-4">
                               <div className="flex items-center gap-2">
                                 <TrendingDown className="h-4 w-4 text-red-600" />
-                                <p className="text-xs font-medium text-red-700">Total Liabilities</p>
+                                <p className="text-xs font-medium text-red-700">Bank Liabilities</p>
                               </div>
                               <p className="mt-2 text-lg font-bold text-red-800">
                                 {accountSummary.total_liabilities.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
                               </p>
                             </div>
-                            <div className="rounded-lg border bg-blue-50 p-4">
+                            {/* <div className="rounded-lg border bg-blue-50 p-4">
                               <div className="flex items-center gap-2">
                                 <Landmark className="h-4 w-4 text-blue-600" />
-                                <p className="text-xs font-medium text-blue-700">Net Worth</p>
+                                <p className="text-xs font-medium text-blue-700">Net Position</p>
                               </div>
                               <p className="mt-2 text-lg font-bold text-blue-800">
                                 {accountSummary.net_worth.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
                               </p>
-                            </div>
+                            </div> */}
                             <div className="rounded-lg border bg-muted/50 p-4">
                               <div className="flex items-center gap-2">
                                 <Wallet className="h-4 w-4 text-muted-foreground" />
@@ -967,11 +981,11 @@ export default function ViewMemberPage() {
                           </div>
                         )}
 
-                        {/* Assets Section */}
+                        {/* Bank Assets — member's loans */}
                         <div className="space-y-3">
                           <div className="flex items-center gap-2">
-                            <PiggyBank className="h-5 w-5 text-emerald-600" />
-                            <h3 className="text-base font-semibold text-foreground">Assets</h3>
+                            <Banknote className="h-5 w-5 text-emerald-600" />
+                            <h3 className="text-base font-semibold text-foreground">Bank Assets</h3>
                             <Badge variant="outline" className="text-xs">
                               {assets.length} account{assets.length !== 1 ? "s" : ""}
                             </Badge>
@@ -979,7 +993,7 @@ export default function ViewMemberPage() {
 
                           {assets.length === 0 ? (
                             <div className="rounded-lg border border-dashed p-6 text-center">
-                              <PiggyBank className="mx-auto h-8 w-8 text-muted-foreground/30" />
+                              <Banknote className="mx-auto h-8 w-8 text-muted-foreground/30" />
                               <p className="mt-2 text-sm text-muted-foreground">No asset accounts found</p>
                             </div>
                           ) : (
@@ -990,8 +1004,8 @@ export default function ViewMemberPage() {
                                     <TableHead className="font-semibold">Account Type</TableHead>
                                     <TableHead className="font-semibold">Account No.</TableHead>
                                     <TableHead className="font-semibold">Scheme</TableHead>
-                                    <TableHead className="font-semibold">Opening Date</TableHead>
-                                    <TableHead className="text-right font-semibold">Balance</TableHead>
+                                    <TableHead className="font-semibold">Disbursed On</TableHead>
+                                    <TableHead className="text-right font-semibold">Outstanding</TableHead>
                                     <TableHead className="font-semibold">Status</TableHead>
                                     <TableHead className="text-right font-semibold">Action</TableHead>
                                   </TableRow>
@@ -1005,19 +1019,27 @@ export default function ViewMemberPage() {
                                           <span className="text-sm font-medium">{acc.account_type}</span>
                                         </div>
                                       </TableCell>
-                                      <TableCell className="font-mono text-sm">{acc.account_number}</TableCell>
+                                      <TableCell className="font-mono text-sm">
+                                        {acc.account_number}
+                                        {acc.extra?.reference_no && (
+                                          <div className="text-[10px] text-muted-foreground">Ref {acc.extra.reference_no}</div>
+                                        )}
+                                      </TableCell>
                                       <TableCell className="text-sm text-muted-foreground">
                                         {acc.scheme_name}
                                         {acc.interest_rate > 0 && <span className="text-xs"> · {acc.interest_rate}% p.a.</span>}
-                                        {acc.extra?.maturity_date && (
+                                        {acc.extra && (
                                           <div className="text-xs">
-                                            Matures {fmtDay(acc.extra.maturity_date)}
-                                            {acc.extra.maturity_amount ? ` · ${fmtInr(acc.extra.maturity_amount)}` : ""}
+                                            Sanctioned {fmtInr(acc.extra.sanctioned_amount)}
+                                            {acc.extra.emi_amount ? ` · EMI ${fmtInr(acc.extra.emi_amount)}` : ""}
                                           </div>
                                         )}
-                                        {acc.extra?.total_installments != null && (
-                                          <div className="text-xs">
-                                            {acc.extra.paid_installments || 0}/{acc.extra.total_installments} installments paid
+                                        {acc.status !== "CLOSED" && acc.extra?.next_due_date && (
+                                          <div className="text-xs">Next due {fmtDay(acc.extra.next_due_date)}</div>
+                                        )}
+                                        {Number(acc.extra?.overdue_installments) > 0 && (
+                                          <div className="text-xs font-medium text-red-600">
+                                            {acc.extra?.overdue_installments} overdue installment{Number(acc.extra?.overdue_installments) > 1 ? "s" : ""}
                                           </div>
                                         )}
                                       </TableCell>
@@ -1058,11 +1080,11 @@ export default function ViewMemberPage() {
                           )}
                         </div>
 
-                        {/* Liabilities Section */}
+                        {/* Bank Liabilities — member's savings, deposits & shares */}
                         <div className="space-y-3">
                           <div className="flex items-center gap-2">
-                            <Banknote className="h-5 w-5 text-red-600" />
-                            <h3 className="text-base font-semibold text-foreground">Liabilities</h3>
+                            <PiggyBank className="h-5 w-5 text-red-600" />
+                            <h3 className="text-base font-semibold text-foreground">Bank Liabilities</h3>
                             <Badge variant="outline" className="text-xs">
                               {liabilities.length} account{liabilities.length !== 1 ? "s" : ""}
                             </Badge>
@@ -1070,7 +1092,7 @@ export default function ViewMemberPage() {
 
                           {liabilities.length === 0 ? (
                             <div className="rounded-lg border border-dashed p-6 text-center">
-                              <Banknote className="mx-auto h-8 w-8 text-muted-foreground/30" />
+                              <PiggyBank className="mx-auto h-8 w-8 text-muted-foreground/30" />
                               <p className="mt-2 text-sm text-muted-foreground">No liability accounts found</p>
                             </div>
                           ) : (
@@ -1081,8 +1103,8 @@ export default function ViewMemberPage() {
                                     <TableHead className="font-semibold">Account Type</TableHead>
                                     <TableHead className="font-semibold">Account No.</TableHead>
                                     <TableHead className="font-semibold">Scheme</TableHead>
-                                    <TableHead className="font-semibold">Disbursed On</TableHead>
-                                    <TableHead className="text-right font-semibold">Outstanding</TableHead>
+                                    <TableHead className="font-semibold">Opening Date</TableHead>
+                                    <TableHead className="text-right font-semibold">Balance</TableHead>
                                     <TableHead className="font-semibold">Status</TableHead>
                                     <TableHead className="text-right font-semibold">Action</TableHead>
                                   </TableRow>
@@ -1096,27 +1118,19 @@ export default function ViewMemberPage() {
                                           <span className="text-sm font-medium">{acc.account_type}</span>
                                         </div>
                                       </TableCell>
-                                      <TableCell className="font-mono text-sm">
-                                        {acc.account_number}
-                                        {acc.extra?.reference_no && (
-                                          <div className="text-[10px] text-muted-foreground">Ref {acc.extra.reference_no}</div>
-                                        )}
-                                      </TableCell>
+                                      <TableCell className="font-mono text-sm">{acc.account_number}</TableCell>
                                       <TableCell className="text-sm text-muted-foreground">
                                         {acc.scheme_name}
                                         {acc.interest_rate > 0 && <span className="text-xs"> · {acc.interest_rate}% p.a.</span>}
-                                        {acc.extra && (
+                                        {acc.extra?.maturity_date && (
                                           <div className="text-xs">
-                                            Sanctioned {fmtInr(acc.extra.sanctioned_amount)}
-                                            {acc.extra.emi_amount ? ` · EMI ${fmtInr(acc.extra.emi_amount)}` : ""}
+                                            Matures {fmtDay(acc.extra.maturity_date)}
+                                            {acc.extra.maturity_amount ? ` · ${fmtInr(acc.extra.maturity_amount)}` : ""}
                                           </div>
                                         )}
-                                        {acc.status !== "CLOSED" && acc.extra?.next_due_date && (
-                                          <div className="text-xs">Next due {fmtDay(acc.extra.next_due_date)}</div>
-                                        )}
-                                        {Number(acc.extra?.overdue_installments) > 0 && (
-                                          <div className="text-xs font-medium text-red-600">
-                                            {acc.extra?.overdue_installments} overdue installment{Number(acc.extra?.overdue_installments) > 1 ? "s" : ""}
+                                        {acc.extra?.total_installments != null && (
+                                          <div className="text-xs">
+                                            {acc.extra.paid_installments || 0}/{acc.extra.total_installments} installments paid
                                           </div>
                                         )}
                                       </TableCell>
