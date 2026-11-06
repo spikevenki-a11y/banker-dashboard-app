@@ -1,6 +1,12 @@
 import { getSession } from "@/lib/auth/session"
 import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
+import {
+  buildRepaymentSchedule,
+  effectiveFrequency,
+  isRepaymentFrequency,
+  isRepaymentMethod,
+} from "@/lib/loan-repayment-schedule"
 
 // POST: Approve or Reject a loan application
 export async function POST(request: NextRequest) {
@@ -22,8 +28,8 @@ export async function POST(request: NextRequest) {
       loan_tenure_months,
       moratorium_period,
       remarks,
-      repayment_type,
-      number_of_installments,
+      repayment_method,   // Repayment Type: ON_MATURITY | FIXED_PRINCIPAL
+      repayment_type,     // Repayment Frequency: MONTHLY ... CLOSING_TIME
       installment_start_date
     } = body
 
@@ -76,22 +82,34 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Sanctioned amount cannot exceed the applied amount" }, { status: 400 })
       }
 
-      // Calculate EMI
-      const P = parseFloat(sanctioned_amount)
-      const R = parseFloat(interest_rate) / 12 / 100
-      const N = parseInt(loan_tenure_months)
-      
-      let emiAmount = 0
-        if(repayment_type === 'CLOSING_TIME'){
-          emiAmount = sanctioned_amount
-      }else{
-        if (R > 0) {
-          emiAmount = (P * R * Math.pow(1 + R, N)) / (Math.pow(1 + R, N) - 1)
-        } else {
-          emiAmount = P / N
-        }
-        emiAmount = Math.round(emiAmount * 100) / 100
+      // Repayment Type + Frequency (On Maturity always repays at Closing Time)
+      if (!isRepaymentMethod(repayment_method)) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: "Please select a valid repayment type" }, { status: 400 })
       }
+      if (repayment_method === "FIXED_PRINCIPAL" && !isRepaymentFrequency(repayment_type)) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: "Please select a valid repayment frequency" }, { status: 400 })
+      }
+      const repaymentFrequency = effectiveFrequency(repayment_method, repayment_type)
+
+      // Same schedule the disbursement will save; its first instalment is stored as
+      // payment_amount (On Maturity: the maturity amount)
+      const schedule = buildRepaymentSchedule({
+        principal: parseFloat(sanctioned_amount),
+        annualRate: parseFloat(interest_rate),
+        tenureMonths: parseInt(loan_tenure_months),
+        moratoriumMonths: parseInt(moratorium_period) || 0,
+        method: repayment_method,
+        frequency: repaymentFrequency,
+        startDate: businessDate,
+      })
+      if (schedule.length === 0) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: "Could not build the repayment schedule — check amount, rate and tenure" }, { status: 400 })
+      }
+      const emiAmount = schedule[0].total
+      const number_of_installments = schedule.length
       // Generate sanction ID
       const { rows: seqResult } = await client.query(
         `SELECT COALESCE(MAX(sanction_id), 0) + 1 as next_id FROM loan_sanction_details`
@@ -104,11 +122,14 @@ export async function POST(request: NextRequest) {
         `INSERT INTO loan_sanction_details (
           sanction_id, loan_application_id, sanctioned_amount, sanction_date,
           interest_rate, loan_tenure_months, payment_amount, moratorium_period,
-          sanction_status, approved_by, remarks, created_at,repayment_type,number_of_installments,installment_start_date,branch_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'SANCTIONED', $9, $10, NOW(), $11, $12, $13, $14)`,
+          sanction_status, approved_by, remarks, created_at,repayment_type,number_of_installments,installment_start_date,branch_id,
+          repayment_method
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'SANCTIONED', $9, $10, NOW(), $11, $12, $13, $14, $15)`,
         [
           sanctionId, loan_application_id, sanctioned_amount, businessDate,
-          interest_rate, loan_tenure_months, emiAmount, moratorium_period || 0, session.userId, remarks || '', repayment_type, number_of_installments, installment_start_date, session.branch
+          interest_rate, loan_tenure_months, emiAmount, moratorium_period || 0, session.userId, remarks || '', repaymentFrequency, number_of_installments,
+          installment_start_date || schedule[0].due_date, session.branch,
+          repayment_method
         ]
       )
 

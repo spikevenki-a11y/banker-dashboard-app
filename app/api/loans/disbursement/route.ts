@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
 import { creditAppraiserAccount, lockAppraiserAccount, type AppraiserAccount } from "@/lib/appraiser-account"
+import { buildRepaymentSchedule, isRepaymentMethod } from "@/lib/loan-repayment-schedule"
 
 // CASH          — DR Loan, CR Cash; balanced voucher.
 // TRANSFER      — DR Loan only, posted into a selected open batch (or a new one). The batch
@@ -100,6 +101,8 @@ export async function POST(request: NextRequest) {
     const { rows: apps } = await client.query(
       `SELECT la.*, 
               ls.sanctioned_amount, ls.interest_rate, ls.loan_tenure_months, ls.payment_amount,
+              ls.repayment_method, ls.repayment_type AS sanction_repayment_frequency,
+              ls.moratorium_period AS sanction_moratorium_period,
               lscheme.loan_gl_account, lscheme.interest_receivable_gl_account,
               COALESCE(lscheme.appraiser_charge_allowed, false) AS scheme_appraiser_charge_allowed,
               m.membership_no as mem_no
@@ -413,8 +416,8 @@ export async function POST(request: NextRequest) {
     // Generate repayment schedule
     const P = parseFloat(app.sanctioned_amount)
     const R = parseFloat(app.interest_rate) / 12 / 100
-    const N = parseInt(app.loan_tenure_months)
-    const emi = parseFloat(app.payment_amount)
+    let N = parseInt(app.loan_tenure_months)
+    let emi = parseFloat(app.payment_amount)
 
     let balance = P
     const startDate = new Date(businessDate)
@@ -422,7 +425,38 @@ export async function POST(request: NextRequest) {
         `SELECT COALESCE(MAX(schedule_id), 0) + 1 as next_id FROM loan_repayment_schedule_details`
       )
     let nextScheduleId = schedSeq[0].next_id
-    
+
+    if (isRepaymentMethod(app.repayment_method)) {
+      // Sanctioned with a Repayment Type: build the schedule from the sanctioned
+      // type and frequency (same calculation as the Loan Sanction preview)
+      const schedule = buildRepaymentSchedule({
+        principal: P,
+        annualRate: parseFloat(app.interest_rate),
+        tenureMonths: parseInt(app.loan_tenure_months),
+        moratoriumMonths: parseInt(app.sanction_moratorium_period) || 0,
+        method: app.repayment_method,
+        frequency: app.sanction_repayment_frequency,
+        startDate: businessDate,
+      })
+      if (schedule.length === 0) {
+        throw new Error("Could not build the repayment schedule for this loan")
+      }
+      for (const row of schedule) {
+        await client.query(`
+          INSERT INTO loan_repayment_schedule_details (
+            schedule_id, loan_account_no, installment_no, due_date,
+            principal_amount, interest_amount, total_installment,
+            balance_principal, payment_status, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING', NOW())
+        `, [
+          nextScheduleId, loanAccountNo, row.installment_no, row.due_date,
+          row.principal, row.interest, row.total, row.balance,
+        ])
+      }
+      N = schedule.length
+      emi = schedule[0].total
+    } else {
+    // Sanctioned before Repayment Type existed: earlier monthly EMI schedule (unchanged)
     for (let i = 1; i <= N; i++) {
       const interestAmt = balance * R
       const principalAmt = emi - interestAmt
@@ -446,6 +480,7 @@ export async function POST(request: NextRequest) {
         Math.round(emi * 100) / 100,
         Math.round(balance * 100) / 100
       ])
+    }
     }
 
     //update loan application outstanding balance

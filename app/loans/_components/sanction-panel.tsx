@@ -39,6 +39,18 @@ import {
 } from "lucide-react"
 import { useBranchInfo } from "@/app/reports/_components/use-branch-info"
 import { downloadPdf } from "@/app/reports/_components/download-pdf"
+import {
+  buildRepaymentSchedule,
+  effectiveFrequency,
+  repaymentFrequencyLabel,
+  repaymentMethodLabel,
+  DEFAULT_FIXED_PRINCIPAL_FREQUENCY,
+  DEFAULT_REPAYMENT_METHOD,
+  REPAYMENT_FREQUENCY_OPTIONS,
+  REPAYMENT_METHOD_OPTIONS,
+  type RepaymentFrequency,
+  type RepaymentMethod,
+} from "@/lib/loan-repayment-schedule"
 
 // Sanction form for one pending loan application: application details, sanction terms,
 // EMI calculation, repayment schedule (with PDF), approve/reject. Shared by
@@ -94,15 +106,6 @@ interface SanctionPanelProps {
   onCancel: () => void
 }
 
-// Repayment type options
-const repaymentTypeOptions = [
-  { value: "CLOSING_TIME", label: "Closing Time", periodsPerYear: 0 },
-  { value: "MONTHLY", label: "Monthly", periodsPerYear: 12 },
-  { value: "QUARTERLY", label: "Quarterly", periodsPerYear: 4 },
-  { value: "HALF_YEARLY", label: "Half Yearly", periodsPerYear: 2 },
-  { value: "YEARLY", label: "Yearly", periodsPerYear: 1 },
-]
-
 // Format currency
 // Number inputs in the sanction form: no spinner buttons, and no stepping with the
 // arrow keys or mouse wheel — values are typed in only
@@ -133,17 +136,6 @@ const formatCurrency = (amount: number) => {
   }).format(amount)
 }
 
-// Repayment type pre-selected for every application; the user can change it
-const DEFAULT_REPAYMENT_TYPE = "CLOSING_TIME"
-
-// Calculate number of installments based on tenure and repayment type
-const calculateInstallments = (tenureInMonths: number, type: string): number => {
-  if (type === "CLOSING_TIME") return 1
-  const option = repaymentTypeOptions.find(o => o.value === type)
-  if (!option || option.periodsPerYear === 0) return 1
-  return Math.ceil((tenureInMonths / 12) * option.periodsPerYear)
-}
-
 export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCancel }: SanctionPanelProps) {
   // Identity for business date
   const [identity, setIdentity] = useState<{ businessDate?: string } | null>(null)
@@ -159,7 +151,12 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
   const [remarks, setRemarks] = useState("")
 
   // Repayment details
-  const [repaymentType, setRepaymentType] = useState(DEFAULT_REPAYMENT_TYPE)
+  // Repayment Type (On Maturity / Fixed Principal) and Repayment Frequency;
+  // On Maturity always repays at Closing Time
+  const [repaymentMethod, setRepaymentMethod] = useState<RepaymentMethod>(DEFAULT_REPAYMENT_METHOD)
+  const [repaymentFrequency, setRepaymentFrequency] = useState<RepaymentFrequency>(
+    effectiveFrequency(DEFAULT_REPAYMENT_METHOD, null)
+  )
   const [numberOfInstallments, setNumberOfInstallments] = useState(0)
   const [installmentStartDate, setInstallmentStartDate] = useState("")
 
@@ -182,33 +179,14 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formError, setFormError] = useState("")
 
-  // Calculate first installment date
-  const calculateFirstInstallmentDate = (type: string, moratorium: number): string => {
-    const today = identity?.businessDate ? new Date(identity.businessDate) : new Date()
-    let monthsToAdd = moratorium
-
-    switch (type) {
-      case "CLOSING_TIME":
-        monthsToAdd += parseInt(tenureMonths) || 1
-        break
-      case "MONTHLY":
-        monthsToAdd += 1
-        break
-      case "QUARTERLY":
-        monthsToAdd += 3
-        break
-      case "HALF_YEARLY":
-        monthsToAdd += 6
-        break
-      case "YEARLY":
-        monthsToAdd += 12
-        break
-      default:
-        monthsToAdd += 1
-    }
-
-    today.setMonth(today.getMonth() + monthsToAdd)
-    return today.toISOString().split("T")[0]
+  // Repayment Type change: On Maturity fixes the frequency to Closing Time;
+  // Fixed Principal starts on Monthly and lets the user pick any frequency
+  const handleRepaymentMethodChange = (value: string) => {
+    const method = value as RepaymentMethod
+    setRepaymentMethod(method)
+    setRepaymentFrequency(
+      method === "ON_MATURITY" ? "CLOSING_TIME" : DEFAULT_FIXED_PRINCIPAL_FREQUENCY
+    )
   }
 
   // Builds the PDF from the same emiSchedule rows shown in the Repayment Schedule dialog
@@ -225,7 +203,8 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
         ["Sanctioned Amount", formatCurrency(Number(sanctionedAmount) || 0)],
         ["Interest Rate", `${interestRate}% p.a.`],
         ["Tenure", `${tenureMonths} months`],
-        ["Repayment Type", repaymentType.replace(/_/g, " ")],
+        ["Repayment Type", repaymentMethodLabel(repaymentMethod)],
+        ["Repayment Frequency", repaymentFrequencyLabel(repaymentFrequency)],
         ["Moratorium", `${parseInt(moratoriumPeriod) || 0} months`],
         // ["EMI", formatCurrency(calculatedEMI || 0)],
         ["Total Installments", String(emiSchedule.length)],
@@ -333,7 +312,6 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
     setFormError("")
 
     // Pre-fill form with applied values
-    const defaultTenure = app.minimum_period_months || 12
     setSanctionedAmount(app.applied_loan_amount.toString())
     setInterestRate(app.scheme_interest_rate?.toString() || "12")
     setTenureMonths(app.loan_tenure_months.toString())
@@ -344,22 +322,37 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
     setTotalPayment(null)
     setEmiSchedule([])
 
-    // Default repayment type
-    setRepaymentType(DEFAULT_REPAYMENT_TYPE)
-    setNumberOfInstallments(calculateInstallments(defaultTenure, DEFAULT_REPAYMENT_TYPE))
-    setInstallmentStartDate(calculateFirstInstallmentDate(DEFAULT_REPAYMENT_TYPE, 0))
+    // Default repayment type (installment count / first date follow from the schedule)
+    setRepaymentMethod(DEFAULT_REPAYMENT_METHOD)
+    setRepaymentFrequency(effectiveFrequency(DEFAULT_REPAYMENT_METHOD, null))
+    setNumberOfInstallments(0)
+    setInstallmentStartDate("")
 
     fetchSecurityDetails(app.loan_application_id).finally(() => setLoadingDetails(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Calculate EMI based on repayment type
+  // Repayment calculation + schedule preview — same calculation the disbursement
+  // uses for the saved schedule (lib/loan-repayment-schedule)
   const calculateEMI = useCallback(() => {
     const P = parseFloat(sanctionedAmount)
     const annualRate = parseFloat(interestRate)
     const tenureInMonths = parseInt(tenureMonths)
 
-    if (isNaN(P) || isNaN(annualRate) || isNaN(tenureInMonths) || P <= 0 || tenureInMonths <= 0) {
+    const schedule =
+      isNaN(P) || isNaN(annualRate) || isNaN(tenureInMonths) || P <= 0 || tenureInMonths <= 0
+        ? []
+        : buildRepaymentSchedule({
+            principal: P,
+            annualRate,
+            tenureMonths: tenureInMonths,
+            moratoriumMonths: parseInt(moratoriumPeriod) || 0,
+            method: repaymentMethod,
+            frequency: repaymentFrequency,
+            startDate: identity?.businessDate || new Date(),
+          })
+
+    if (schedule.length === 0) {
       setCalculatedEMI(null)
       setTotalInterest(null)
       setTotalPayment(null)
@@ -367,91 +360,23 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
       return
     }
 
-    // Calculate number of installments based on repayment type
-    const numInstallments = calculateInstallments(tenureInMonths, repaymentType)
-    setNumberOfInstallments(numInstallments)
-
-    // Calculate installment start date
-    const moratorium = parseInt(moratoriumPeriod) || 0
-    setInstallmentStartDate(calculateFirstInstallmentDate(repaymentType, moratorium))
-
-    // Get months per period based on repayment type
-    let monthsPerPeriod = 1
-    switch (repaymentType) {
-      case "CLOSING_TIME":
-        monthsPerPeriod = tenureInMonths
-        break
-      case "MONTHLY":
-        monthsPerPeriod = 1
-        break
-      case "QUARTERLY":
-        monthsPerPeriod = 3
-        break
-      case "HALF_YEARLY":
-        monthsPerPeriod = 6
-        break
-      case "YEARLY":
-        monthsPerPeriod = 12
-        break
-    }
-
-    // Calculate periodic interest rate
-    const periodicRate = (annualRate / 12 / 100) * monthsPerPeriod
-    const N = repaymentType === "CLOSING_TIME" ? 1 : numInstallments
-
-    let emi: number
-    if (repaymentType === "CLOSING_TIME") {
-      // For closing time, total = principal + interest for full tenure
-      const totalInterestAmount = P * (annualRate / 100) * (tenureInMonths / 12)
-      emi = P + totalInterestAmount
-    } else if (periodicRate > 0) {
-      emi = (P * periodicRate * Math.pow(1 + periodicRate, N)) / (Math.pow(1 + periodicRate, N) - 1)
-    } else {
-      emi = P / N
-    }
-
-    emi = Math.round(emi * 100) / 100
-    const totalPay = emi * N
-    const totalInt = totalPay - P
-
-    setCalculatedEMI(emi)
+    const totalInt = schedule.reduce((s, r) => s + r.interest, 0)
+    const totalPay = schedule.reduce((s, r) => s + r.total, 0)
+    setNumberOfInstallments(schedule.length)
+    setInstallmentStartDate(schedule[0].due_date)
+    // First instalment (On Maturity: the maturity amount; Fixed Principal: the largest instalment)
+    setCalculatedEMI(schedule[0].total)
     setTotalInterest(Math.round(totalInt * 100) / 100)
     setTotalPayment(Math.round(totalPay * 100) / 100)
-
-    // Generate repayment schedule
-    const schedule: EMIScheduleItem[] = []
-    let balance = P
-    const today = identity?.businessDate ? new Date(identity.businessDate) : new Date()
-    const moratoriumPeriodVal = parseInt(moratoriumPeriod) || 0
-
-    for (let i = 1; i <= N; i++) {
-      const dueDate = new Date(today)
-      dueDate.setMonth(dueDate.getMonth() + (i * monthsPerPeriod) + moratoriumPeriodVal)
-
-      const interestForPeriod = balance * periodicRate
-      const principalForPeriod = emi - interestForPeriod
-      balance = Math.max(0, balance - principalForPeriod)
-
-      schedule.push({
-        installment_no: i,
-        due_date: dueDate.toISOString().split("T")[0],
-        principal: Math.round(principalForPeriod * 100) / 100,
-        interest: Math.round(interestForPeriod * 100) / 100,
-        total: emi,
-        balance: Math.round(balance * 100) / 100,
-      })
-    }
-
     setEmiSchedule(schedule)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sanctionedAmount, interestRate, tenureMonths, moratoriumPeriod, repaymentType, identity])
+  }, [sanctionedAmount, interestRate, tenureMonths, moratoriumPeriod, repaymentMethod, repaymentFrequency, identity])
 
   // Auto-calculate when values change
   useEffect(() => {
     if (sanctionedAmount && interestRate && tenureMonths) {
       calculateEMI()
     }
-  }, [sanctionedAmount, interestRate, tenureMonths, moratoriumPeriod, repaymentType, calculateEMI])
+  }, [sanctionedAmount, interestRate, tenureMonths, moratoriumPeriod, repaymentMethod, repaymentFrequency, calculateEMI])
 
   // Inline validation for the Sanctioned Amount field
   const getAmountError = (): string => {
@@ -527,8 +452,8 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
           interest_rate: parseFloat(interestRate),
           loan_tenure_months: parseInt(tenureMonths),
           moratorium_period: parseInt(moratoriumPeriod) || 0,
-          repayment_type: repaymentType,
-          number_of_installments: numberOfInstallments,
+          repayment_method: repaymentMethod,
+          repayment_type: repaymentFrequency,
           installment_start_date: installmentStartDate,
           remarks: remarks,
         }),
@@ -817,16 +742,16 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
               </div>
             </div>
 
-            {/* Row 3: Repayment Type */}
-            <div className="grid gap-4 sm:grid-cols-3">
+            {/* Row 3: Repayment Type & Frequency */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div className="space-y-2">
                 <Label htmlFor="repayment-type">Repayment Type *</Label>
-                <Select value={repaymentType} onValueChange={setRepaymentType}>
+                <Select value={repaymentMethod} onValueChange={handleRepaymentMethodChange}>
                   <SelectTrigger id="repayment-type">
                     <SelectValue placeholder="Select repayment type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {repaymentTypeOptions.map((option) => (
+                    {REPAYMENT_METHOD_OPTIONS.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>
@@ -834,7 +759,31 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Default: Closing Time
+                  {repaymentMethod === "ON_MATURITY"
+                    ? "Principal and interest repaid at the end of the tenure"
+                    : "Equal principal each instalment, plus interest on the balance"}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="repayment-frequency">Repayment Frequency *</Label>
+                <Select
+                  value={repaymentFrequency}
+                  onValueChange={(v) => setRepaymentFrequency(v as RepaymentFrequency)}
+                  disabled={repaymentMethod === "ON_MATURITY"}
+                >
+                  <SelectTrigger id="repayment-frequency">
+                    <SelectValue placeholder="Select repayment frequency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {REPAYMENT_FREQUENCY_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {repaymentMethod === "ON_MATURITY" ? "Fixed to Closing Time for On Maturity" : "How often instalments are due"}
                 </p>
               </div>
               <div className="space-y-2">
@@ -866,15 +815,14 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
               <div className="rounded-lg border-2 border-teal-200 bg-teal-50 dark:border-teal-900 dark:bg-teal-950/20 p-4">
                 <h4 className="text-sm font-medium mb-3 flex items-center gap-2 text-teal-700 dark:text-teal-400">
                   <TrendingUp className="h-4 w-4" />
-                  {repaymentType === "CLOSING_TIME" ? "Repayment Calculation" : "EMI Calculation"}
+                  Repayment Calculation
                 </h4>
                 <div className="grid gap-4 sm:grid-cols-4">
                   <div>
                     <p className="text-xs text-muted-foreground">
-                      {repaymentType === "CLOSING_TIME" ? "Closing Amount" :
-                       repaymentType === "MONTHLY" ? "Monthly EMI" :
-                       repaymentType === "QUARTERLY" ? "Quarterly EMI" :
-                       repaymentType === "HALF_YEARLY" ? "Half-Yearly EMI" : "Yearly EMI"}
+                      {emiSchedule.length <= 1
+                        ? "Amount Due at Closing"
+                        : `First Instalment (${repaymentFrequencyLabel(repaymentFrequency)})`}
                     </p>
                     <p className="text-lg font-bold text-teal-700 dark:text-teal-400">{formatCurrency(calculatedEMI)}</p>
                   </div>
@@ -891,7 +839,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                     <p className="text-lg font-semibold">{numberOfInstallments}</p>
                   </div>
                 </div>
-                {repaymentType !== "CLOSING_TIME" && (
+                {emiSchedule.length > 1 && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -1032,7 +980,11 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Repayment Type:</span>
-              <span>{repaymentTypeOptions.find(o => o.value === repaymentType)?.label || repaymentType}</span>
+              <span>{repaymentMethodLabel(repaymentMethod)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Repayment Frequency:</span>
+              <span>{repaymentFrequencyLabel(repaymentFrequency)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">No. of Installments:</span>
