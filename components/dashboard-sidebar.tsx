@@ -172,24 +172,36 @@ export function DashboardSidebar() {
           collapsed ? "justify-center" : "pl-6 pr-3",
         )}
       >
-        {/* Collapsed (wide screens): the expand button takes the logo's place */}
-        {!(collapsed && !isNarrow) && <Building2 className="h-6 w-6 shrink-0 text-sidebar-primary" />}
-        {!collapsed && <span className="ml-2 text-lg font-semibold text-sidebar-foreground">NextZen</span>}
-
-        {/* Collapse / expand toggle — hidden on narrow screens, where the sidebar stays collapsed */}
-        {!isNarrow && (
+        {collapsed && !isNarrow ? (
+          // Collapsed (wide screens): the logo stays visible; hovering or focusing it
+          // swaps in the expand icon, and clicking expands the sidebar
           <button
             type="button"
             onClick={toggle}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            aria-expanded={!collapsed}
-            className={cn(
-              "flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              !collapsed && "ml-auto",
-            )}
+            title="Expand sidebar"
+            aria-label="Expand sidebar"
+            aria-expanded={false}
+            className="group relative flex h-10 w-10 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-sidebar-accent focus-visible:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
           >
-            {collapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+            <Building2 className="h-6 w-6 text-sidebar-primary transition-all duration-200 group-hover:scale-75 group-hover:opacity-0 group-focus-visible:scale-75 group-focus-visible:opacity-0" />
+            <PanelLeftOpen className="absolute h-5 w-5 scale-75 text-sidebar-accent-foreground opacity-0 transition-all duration-200 group-hover:scale-100 group-hover:opacity-100 group-focus-visible:scale-100 group-focus-visible:opacity-100" />
+          </button>
+        ) : (
+          <Building2 className="h-6 w-6 shrink-0 text-sidebar-primary" />
+        )}
+        {!collapsed && <span className="ml-2 text-lg font-semibold text-sidebar-foreground">NextZen</span>}
+
+        {/* Collapse toggle — shown when expanded; hidden on narrow screens, where the sidebar stays collapsed */}
+        {!isNarrow && !collapsed && (
+          <button
+            type="button"
+            onClick={toggle}
+            title="Collapse sidebar"
+            aria-label="Collapse sidebar"
+            aria-expanded={true}
+            className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          >
+            <PanelLeftClose className="h-5 w-5" />
           </button>
         )}
       </div>

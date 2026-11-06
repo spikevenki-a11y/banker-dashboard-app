@@ -620,12 +620,12 @@ export default function LoanDisbursementPage() {
                           className="gap-2 bg-transparent"
                         >
                           <Eye className="h-4 w-4" />
-                          View Member Details
+                          {/* View Member Details */}
                         </Button>
-                        <Badge className="bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400">
+                        {/* <Badge className="bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400">
                           <CheckCircle2 className="mr-1 h-3 w-3" />
                           Sanctioned
-                        </Badge>
+                        </Badge> */}
                       </div>
                     </div>
                   </CardHeader>

@@ -319,11 +319,12 @@ export function MemberSummaryCard({ memberInfo }: { memberInfo: MemberSummaryInf
                 <TabsTrigger value="address" className="gap-1.5 text-xs">
                   <MapPin className="h-3.5 w-3.5" />Address & KYC
                 </TabsTrigger>
+                {/* Banker's perspective: loans are bank assets, deposits are bank liabilities */}
                 <TabsTrigger value="assets" className="gap-1.5 text-xs">
-                  <TrendingUp className="h-3.5 w-3.5" />Assets
+                  <TrendingUp className="h-3.5 w-3.5" />Bank Assets
                 </TabsTrigger>
                 <TabsTrigger value="liabilities" className="gap-1.5 text-xs">
-                  <TrendingDown className="h-3.5 w-3.5" />Liabilities
+                  <TrendingDown className="h-3.5 w-3.5" />Bank Liabilities
                 </TabsTrigger>
               </TabsList>
 
@@ -428,14 +429,15 @@ export function MemberSummaryCard({ memberInfo }: { memberInfo: MemberSummaryInf
                 )}
               </TabsContent>
 
-              {/* ── Assets ───────────────────────────────────────── */}
-              <TabsContent value="assets" className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+              {/* ── Bank Liabilities: member's savings, deposits & shares ── */}
+              <TabsContent value="liabilities" className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
                 {viewMemberSummary && (
                   <div className="grid grid-cols-3 gap-3">
                     {[
-                      { label: "Total Assets",      value: fmt(viewMemberSummary.total_assets),      color: "text-teal-700 bg-teal-50 border-teal-200" },
+                      // total_assets / total_liabilities come from the member-side API, so they are swapped here
+                      { label: "Total Liabilities", value: fmt(viewMemberSummary.total_assets),      color: "text-red-700 bg-red-50 border-red-200" },
                       { label: "Total Accounts",    value: String(viewMemberAssets.length),          color: "text-blue-700 bg-blue-50 border-blue-200" },
-                      { label: "Net Worth",         value: fmt(viewMemberSummary.net_worth),         color: "text-green-700 bg-green-50 border-green-200" },
+                      // { label: "Net Position",      value: fmt(Number(viewMemberSummary.total_liabilities || 0) - Number(viewMemberSummary.total_assets || 0)), color: "text-green-700 bg-green-50 border-green-200" },
                     ].map(({ label, value, color }) => (
                       <div key={label} className={`rounded-lg border p-3 text-center ${color}`}>
                         <p className="text-xs opacity-70">{label}</p>
@@ -481,13 +483,13 @@ export function MemberSummaryCard({ memberInfo }: { memberInfo: MemberSummaryInf
                 ) : (
                   <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
                     <TrendingUp className="h-8 w-8 opacity-20 mb-2" />
-                    <p className="text-sm">No assets found for this member.</p>
+                    <p className="text-sm">No savings, deposit or share accounts found for this member.</p>
                   </div>
                 )}
               </TabsContent>
 
-              {/* ── Liabilities ──────────────────────────────────── */}
-              <TabsContent value="liabilities" className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+              {/* ── Bank Assets: member's loans & outstanding balances ── */}
+              <TabsContent value="assets" className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
                 {viewMemberLoans.length > 0 ? (
                   <>
                     <div className="grid grid-cols-3 gap-3">
@@ -497,7 +499,7 @@ export function MemberSummaryCard({ memberInfo }: { memberInfo: MemberSummaryInf
                         const totalOverdue = viewMemberLoans.reduce((s, l) => s + Number(l.overdue_installments || 0), 0)
                         return [
                           { label: "Active Loans",       value: String(activeLoans.length),  color: "text-orange-700 bg-orange-50 border-orange-200" },
-                          { label: "Total Outstanding",  value: fmt(totalOutstanding),        color: "text-red-700 bg-red-50 border-red-200" },
+                          { label: "Total Outstanding",  value: fmt(totalOutstanding),        color: "text-teal-700 bg-teal-50 border-teal-200" },
                           { label: "Overdue EMIs",       value: String(totalOverdue),         color: totalOverdue > 0 ? "text-red-700 bg-red-50 border-red-200" : "text-green-700 bg-green-50 border-green-200" },
                         ].map(({ label, value, color }) => (
                           <div key={label} className={`rounded-lg border p-3 text-center ${color}`}>
