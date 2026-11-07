@@ -73,14 +73,16 @@ create table ref_account_status (
     account_status_name varchar(255) not null unique
 );
 
-INSERT INTO ref_account_status (account_status_name) VALUES
-('Active'),
-('Freeze'),
-('Inactive'),
-('Dormant'),
-('Maturity'),
-('Partial Debit Freeze'),
-('Partial Credit Freeze'),
-('Lien'),
-('Closed'),
-('Premature Closure');
+INSERT INTO public.ref_account_status (account_status_id, account_status_name) 
+VALUES (0, 'Pending'), 
+        (1, 'Active'), 
+        (2, 'Freeze'), 
+        (3, 'Inactive'), 
+        (4, 'Dormant'), 
+        (5, 'Maturity'), 
+        (6, 'Partial Debit Freeze'), 
+        (7, 'Partial Credit Freeze'), 
+        (8, 'Lien'), 
+        (9, 'Closed'), 
+        (10, 'Premature Closure')
+        (11, 'Rejected');

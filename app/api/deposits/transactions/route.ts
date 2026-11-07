@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/auth/session"
 import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
+import { DEPOSIT_CREDIT_STATUSES } from "@/lib/deposit-account-status"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
 import { openGlVoucher, lockOpenTransferBatch, insertGlLine, type GlVoucherType } from "@/lib/gl-voucher"
 
@@ -251,9 +252,11 @@ export async function POST(request: NextRequest) {
 
     const account = accounts[0]
 
-    if (account.accountstatus !== 1) {
+    // Pending accounts take their initial deposit; the account turns Active when
+    // that credit is verified (FAS → Verify Voucher)
+    if (!DEPOSIT_CREDIT_STATUSES.includes(Number(account.accountstatus))) {
       await client.query("ROLLBACK")
-      return NextResponse.json({ error: "Account is not active. Only active accounts can receive deposits." }, { status: 400 })
+      return NextResponse.json({ error: "Account is not active. Only pending or active accounts can receive deposits." }, { status: 400 })
     }
 
     const depositGlAccount = account.deposit_gl_account

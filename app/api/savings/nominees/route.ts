@@ -25,6 +25,7 @@ export async function GET(req: NextRequest) {
               nd.nominee_gender,
               nd.nominee_age,
               nd.nominee_address,
+              nd.nominee_phone,
               nd.nominee_percentage::float AS nominee_percentage,
               ROW_NUMBER() OVER (ORDER BY nd.created_at ASC, nd.id ASC)::int AS nominee_order
        FROM nominee_details nd

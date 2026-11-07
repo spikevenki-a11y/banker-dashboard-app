@@ -38,7 +38,20 @@ export async function PUT(req: NextRequest) {
     d.pan_no = d.pan_no.trim().toUpperCase()
     d.passport_no = d.passport_no.toUpperCase()
   }
-  const validationError = validateMemberSection(section, d)
+  // KYC: the PAN 5th character is checked against the member's saved full name
+  let holderName: string | null = null
+  if (section === "kyc" && d.pan_no) {
+    const { rows: [holder] } = await pool.query(
+      `SELECT c.full_name
+       FROM memberships m
+       JOIN customers c ON c.customer_code = m.customer_code
+       WHERE m.membership_no = $1 AND m.branch_id = $2`,
+      [membership_no, session.branch]
+    )
+    holderName = holder?.full_name ?? null
+  }
+
+  const validationError = validateMemberSection(section, d, holderName)
   if (validationError) {
     return NextResponse.json({ error: validationError }, { status: 400 })
   }

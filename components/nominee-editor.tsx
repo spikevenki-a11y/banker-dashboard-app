@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, Plus, Search, Trash2, UserPlus } from "lucide-react"
 import { MemberSearchDialog } from "@/components/member-search-dialog"
 import { calculateAge } from "@/lib/member-age"
+import { isValidNomineePhone, normaliseNomineePhone } from "@/lib/savings-nominees"
 
 // Nominee list + entry form — same behaviour as Savings Management → Open Savings
 // Account → Nominee Details (Is Member lookup, auto-filled member details, manual
@@ -27,6 +28,7 @@ export type NomineeEntry = {
   gender: string | null
   age: number | null
   address: string | null
+  phone: string | null
   percentage: number | null
 }
 
@@ -77,9 +79,11 @@ export function NomineeEditor({
   const [draftGender, setDraftGender] = useState("")
   const [draftAge, setDraftAge] = useState("")
   const [draftAddress, setDraftAddress] = useState("")
+  const [draftPhone, setDraftPhone] = useState("") // editable; filled from the member record for a member nominee
   const [draftPercentage, setDraftPercentage] = useState("")
   const [draftMemberLoaded, setDraftMemberLoaded] = useState(false) // member details filled from lookup
   const [draftMemberLoading, setDraftMemberLoading] = useState(false)
+  const [draftMemberNotFound, setDraftMemberNotFound] = useState(false) // lookup found no member: manual entry allowed
   const [draftNomineeError, setDraftNomineeError] = useState("")
   // Membership ID last looked up, so leaving the field again does not re-fetch it
   const [draftLookedUpNo, setDraftLookedUpNo] = useState("")
@@ -106,7 +110,9 @@ export function NomineeEditor({
     setDraftGender("")
     setDraftAge("")
     setDraftAddress("")
+    setDraftPhone("")
     setDraftMemberLoaded(false)
+    setDraftMemberNotFound(false)
   }
 
   const resetDraftNominee = () => {
@@ -160,6 +166,7 @@ export function NomineeEditor({
       if (seq !== nomineeLookupSeq.current) return // Membership ID changed meanwhile
       if (!res.ok || !data.found) {
         setDraftNomineeError("No member found with this membership number.")
+        setDraftMemberNotFound(true)
         return
       }
       const p = data.profile
@@ -170,9 +177,12 @@ export function NomineeEditor({
       const age = p.date_of_birth ? calculateAge(p.date_of_birth, asOf) : null
       setDraftNomineeName(p.full_name || "")
       setDraftDob(p.date_of_birth || "")
-      setDraftGender(p.gender || "")
+      // Match the gender options (Male / Female / Other) so an editable gender select shows it
+      const g = String(p.gender || "").trim()
+      setDraftGender(["Male", "Female", "Other"].find((o) => o.toLowerCase() === g.toLowerCase()) || g)
       setDraftAge(age !== null && age >= 0 ? String(age) : "")
       setDraftAddress(formatNomineeAddress(p))
+      setDraftPhone(p.mobile_no ? String(p.mobile_no).trim() : "")
       setDraftMemberLoaded(true)
     } catch {
       if (seq === nomineeLookupSeq.current) setDraftNomineeError("Failed to load member details. Please try again.")
@@ -198,19 +208,32 @@ export function NomineeEditor({
         : ""
   const draftPctValid = draftPercentage.trim() !== "" && !draftPctError
 
+  // Nominee phone (optional): 10 digits when given
+  const draftPhoneValue = normaliseNomineePhone(draftPhone)
+  const draftPhoneError =
+    draftPhoneValue && !isValidNomineePhone(draftPhoneValue) ? "Phone number must be 10 digits." : ""
+
+  // Member nominee: once a member is loaded, name, DOB, gender, age and address come
+  // from the member record and are read-only (phone and relationship stay editable).
+  // With Is Member ticked but no member loaded, the details stay locked while a
+  // Membership ID is pending, and open for manual entry when the ID is cleared or no
+  // member was found — such a nominee is saved as a non-member nominee.
+  const draftAsMember = draftIsMember && draftMemberLoaded
+  const detailsLocked = draftIsMember && !(draftMembershipId.trim() === "" || draftMemberNotFound)
+
   const draftReady =
     !disabled &&
     draftPctValid &&
-    (draftIsMember
-      ? draftMemberLoaded && !!draftNomineeRelation
-      : !!draftNomineeName.trim() && !!draftNomineeRelation)
+    !draftPhoneError &&
+    !!draftNomineeRelation &&
+    (draftAsMember || (!detailsLocked && !!draftNomineeName.trim()))
 
   const totals = nomineeTotals(nominees)
 
   const handleAddNominee = () => {
     if (!draftReady) return
     const age = draftAge === "" ? null : Number(draftAge)
-    if (!draftIsMember && age !== null && (!Number.isInteger(age) || age < 0 || age > 150)) {
+    if (!draftAsMember && age !== null && (!Number.isInteger(age) || age < 0 || age > 150)) {
       setDraftNomineeError("Age must be a whole number between 0 and 150.")
       return
     }
@@ -219,12 +242,13 @@ export function NomineeEditor({
       {
         name: draftNomineeName.trim(),
         relation: draftNomineeRelation,
-        is_member: draftIsMember,
-        membership_id: draftIsMember ? draftMembershipId.trim() : null,
+        is_member: draftAsMember,
+        membership_id: draftAsMember ? draftMembershipId.trim() : null,
         dob: draftDob || null,
         gender: draftGender || null,
         age,
         address: draftAddress.trim() || null,
+        phone: draftPhoneValue || null,
         percentage: Math.round(draftPctNum * 100) / 100,
       },
     ])
@@ -266,6 +290,7 @@ export function NomineeEditor({
                       n.gender,
                       n.age !== null && n.age !== undefined ? `${n.age} yrs` : null,
                       n.dob,
+                      n.phone ? `Ph ${n.phone}` : null,
                       n.percentage ? `${n.percentage}%` : null,
                     ].filter(Boolean).join(" · ")}
                   </p>
@@ -373,9 +398,9 @@ export function NomineeEditor({
               <Label htmlFor={fid("name")} className="text-xs">Nominee Name</Label>
               <Input
                 id={fid("name")}
-                placeholder={draftIsMember ? "Filled from member record" : "Enter nominee name"}
+                placeholder={detailsLocked ? "Filled from member record" : "Enter nominee name"}
                 value={draftNomineeName}
-                disabled={draftIsMember}
+                disabled={detailsLocked}
                 onChange={(e) => setDraftNomineeName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleAddNominee()}
               />
@@ -399,7 +424,7 @@ export function NomineeEditor({
                 id={fid("dob")}
                 type="date"
                 value={draftDob}
-                disabled={draftIsMember}
+                disabled={detailsLocked}
                 max={asOfDate || undefined}
                 onChange={(e) => handleDraftDobChange(e.target.value)}
               />
@@ -407,7 +432,7 @@ export function NomineeEditor({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor={fid("gender")} className="text-xs">Gender</Label>
-                {draftIsMember ? (
+                {detailsLocked ? (
                   <Input id={fid("gender")} value={draftGender} disabled placeholder="—" />
                 ) : (
                   <Select value={draftGender} onValueChange={setDraftGender}>
@@ -431,7 +456,7 @@ export function NomineeEditor({
                   max="150"
                   step="1"
                   value={draftAge}
-                  disabled={draftIsMember || !!draftDob}
+                  disabled={detailsLocked || !!draftDob}
                   onChange={(e) => setDraftAge(e.target.value)}
                 />
               </div>
@@ -450,18 +475,36 @@ export function NomineeEditor({
               />
               {draftPctError && <p className="text-xs text-red-600">{draftPctError}</p>}
             </div>
+            <div className="space-y-1.5">
+              <Label htmlFor={fid("phone")} className="text-xs">Phone Number</Label>
+              <Input
+                id={fid("phone")}
+                type="tel"
+                inputMode="numeric"
+                maxLength={15}
+                placeholder={draftAsMember ? "Filled from member record" : "Enter 10-digit phone number"}
+                value={draftPhone}
+                onChange={(e) => setDraftPhone(e.target.value)}
+              />
+              {draftPhoneError && <p className="text-xs text-red-600">{draftPhoneError}</p>}
+            </div>
             <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor={fid("address")} className="text-xs">Address</Label>
               <Input
                 id={fid("address")}
-                placeholder={draftIsMember ? "Filled from member record" : "Enter nominee address"}
+                placeholder={detailsLocked ? "Filled from member record" : "Enter nominee address"}
                 value={draftAddress}
-                disabled={draftIsMember}
+                disabled={detailsLocked}
                 onChange={(e) => setDraftAddress(e.target.value)}
               />
             </div>
           </div>
           {draftNomineeError && <p className="text-xs text-red-600">{draftNomineeError}</p>}
+          {draftIsMember && draftMemberNotFound && (
+            <p className="text-xs text-muted-foreground">
+              Enter the nominee&apos;s details manually — they will be saved as a non-member nominee.
+            </p>
+          )}
           <Button
             type="button"
             size="sm"

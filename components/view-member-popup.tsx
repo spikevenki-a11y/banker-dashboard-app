@@ -107,6 +107,7 @@ type NomineeItem = {
   nominee_gender: string | null
   nominee_age: number | null
   nominee_address: string | null
+  nominee_phone?: string | null
   nominee_percentage: number | null
 }
 
@@ -503,6 +504,7 @@ export function ViewMemberPopup({ open, onOpenChange, member: memberProp, member
                                 <TableHead className="text-xs">DOB / Age</TableHead>
                                 <TableHead className="text-xs">Gender</TableHead>
                                 <TableHead className="text-xs">Member</TableHead>
+                                <TableHead className="text-xs">Phone</TableHead>
                                 <TableHead className="text-xs">Address</TableHead>
                                 <TableHead className="text-xs text-right">Share %</TableHead>
                               </TableRow>
@@ -524,6 +526,7 @@ export function ViewMemberPopup({ open, onOpenChange, member: memberProp, member
                                   <TableCell className="text-xs">
                                     {n.is_member ? `Yes${n.member_id ? ` (${n.member_id})` : ""}` : "No"}
                                   </TableCell>
+                                  <TableCell className="whitespace-nowrap font-mono text-xs">{n.nominee_phone || "---"}</TableCell>
                                   <TableCell className="max-w-[200px] text-xs">{n.nominee_address || "---"}</TableCell>
                                   <TableCell className="text-right text-xs">
                                     {n.nominee_percentage != null ? `${n.nominee_percentage}%` : "---"}

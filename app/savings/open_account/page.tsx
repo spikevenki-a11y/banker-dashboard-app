@@ -24,6 +24,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ArrowLeft, Search, Loader2, CheckCircle2, User, CreditCard, Banknote, Users, X, Eye, MapPin, ShieldCheck, TrendingUp, TrendingDown, UserPlus, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Home, Camera, PenTool } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { calculateAge } from "@/lib/member-age"
+import { isValidNomineePhone, normaliseNomineePhone } from "@/lib/savings-nominees"
 
 type MemberInfo = {
   membership_no: string
@@ -49,6 +50,7 @@ type Nominee = {
   gender: string | null
   age: number | null
   address: string | null
+  phone: string | null
   percentage: number | null
 }
 
@@ -141,7 +143,7 @@ type Scheme = {
 const OPERATION_TYPES = [
   { value: "SINGLE", label: "Single" },
   { value: "EITHER_SURVIVOR", label: "Either or Survivor" },
-  { value: "JOINT_HOLDER", label: "Joint holder)" },
+  { value: "JOINT_HOLDER", label: "Joint holder" },
   { value: "FORMER_SURVIVOR", label: "Former or Survivor" },
   { value: "LATTER_SURVIVOR", label: "Latter or Survivor" },
 ]
@@ -242,9 +244,11 @@ export default function OpenSavingsAccountPage() {
   const [draftGender, setDraftGender] = useState("")
   const [draftAge, setDraftAge] = useState("")
   const [draftAddress, setDraftAddress] = useState("")
+  const [draftPhone, setDraftPhone] = useState("") // editable; filled from the member record for a member nominee
   const [draftPercentage, setDraftPercentage] = useState("")
   const [draftMemberLoaded, setDraftMemberLoaded] = useState(false) // member details filled from lookup
   const [draftMemberLoading, setDraftMemberLoading] = useState(false)
+  const [draftMemberNotFound, setDraftMemberNotFound] = useState(false) // lookup found no member: manual entry allowed
   const [draftNomineeError, setDraftNomineeError] = useState("")
   // Membership ID last looked up, so leaving the field again does not re-fetch it
   const [draftLookedUpNo, setDraftLookedUpNo] = useState("")
@@ -269,7 +273,9 @@ export default function OpenSavingsAccountPage() {
     setDraftGender("")
     setDraftAge("")
     setDraftAddress("")
+    setDraftPhone("")
     setDraftMemberLoaded(false)
+    setDraftMemberNotFound(false)
   }
 
   const resetDraftNominee = () => {
@@ -323,6 +329,7 @@ export default function OpenSavingsAccountPage() {
       if (seq !== nomineeLookupSeq.current) return // Membership ID changed meanwhile
       if (!res.ok || !data.found) {
         setDraftNomineeError("No member found with this membership number.")
+        setDraftMemberNotFound(true)
         return
       }
       const p = data.profile
@@ -336,6 +343,7 @@ export default function OpenSavingsAccountPage() {
       setDraftGender(p.gender || "")
       setDraftAge(age !== null && age >= 0 ? String(age) : "")
       setDraftAddress(formatNomineeAddress(p))
+      setDraftPhone(p.mobile_no ? String(p.mobile_no).trim() : "")
       setDraftMemberLoaded(true)
     } catch {
       if (seq === nomineeLookupSeq.current) setDraftNomineeError("Failed to load member details. Please try again.")
@@ -361,11 +369,24 @@ export default function OpenSavingsAccountPage() {
         : ""
   const draftPctValid = draftPercentage.trim() !== "" && !draftPctError
 
+  // Nominee phone (optional): 10 digits when given
+  const draftPhoneValue = normaliseNomineePhone(draftPhone)
+  const draftPhoneError =
+    draftPhoneValue && !isValidNomineePhone(draftPhoneValue) ? "Phone number must be 10 digits." : ""
+
+  // Member nominee: once a member is loaded, name, DOB, gender, age and address come
+  // from the member record and are read-only (phone and relationship stay editable).
+  // With Is Member ticked but no member loaded, the details stay locked while a
+  // Membership ID is pending, and open for manual entry when the ID is cleared or no
+  // member was found — such a nominee is saved as a non-member nominee.
+  const draftAsMember = draftIsMember && draftMemberLoaded
+  const detailsLocked = draftIsMember && !(draftMembershipId.trim() === "" || draftMemberNotFound)
+
   const draftReady =
     draftPctValid &&
-    (draftIsMember
-      ? draftMemberLoaded && !!draftNomineeRelation
-      : !!draftNomineeName.trim() && !!draftNomineeRelation)
+    !draftPhoneError &&
+    !!draftNomineeRelation &&
+    (draftAsMember || (!detailsLocked && !!draftNomineeName.trim()))
 
   // Total nominee percentage — must be exactly 100% when any nominee is added
   const nomineeTotalHundredths = nominees.reduce((s, n) => s + Math.round((n.percentage || 0) * 100), 0)
@@ -376,7 +397,7 @@ export default function OpenSavingsAccountPage() {
   const handleAddNominee = () => {
     if (!draftReady) return
     const age = draftAge === "" ? null : Number(draftAge)
-    if (!draftIsMember && age !== null && (!Number.isInteger(age) || age < 0 || age > 150)) {
+    if (!draftAsMember && age !== null && (!Number.isInteger(age) || age < 0 || age > 150)) {
       setDraftNomineeError("Age must be a whole number between 0 and 150.")
       return
     }
@@ -385,12 +406,13 @@ export default function OpenSavingsAccountPage() {
       {
         name: draftNomineeName.trim(),
         relation: draftNomineeRelation,
-        is_member: draftIsMember,
-        membership_id: draftIsMember ? draftMembershipId.trim() : null,
+        is_member: draftAsMember,
+        membership_id: draftAsMember ? draftMembershipId.trim() : null,
         dob: draftDob || null,
         gender: draftGender || null,
         age,
         address: draftAddress.trim() || null,
+        phone: draftPhoneValue || null,
         percentage: Math.round(draftPctNum * 100) / 100,
       },
     ])
@@ -1004,7 +1026,8 @@ const getLogindate = async () => {
                                     n.gender,
                                     n.age !== null && n.age !== undefined ? `${n.age} yrs` : null,
                                     n.dob,
-                                    n.percentage ? `${n.percentage}%` : null,
+                                    n.phone ? `Ph ${n.phone}` : null,
+                      n.percentage ? `${n.percentage}%` : null,
                                   ].filter(Boolean).join(" · ")}
                                 </p>
                                 {n.address && <p className="text-xs text-muted-foreground">{n.address}</p>}
@@ -1110,9 +1133,9 @@ const getLogindate = async () => {
                             <Label htmlFor="draft-nominee-name" className="text-xs">Nominee Name</Label>
                             <Input
                               id="draft-nominee-name"
-                              placeholder={draftIsMember ? "Filled from member record" : "Enter nominee name"}
+                              placeholder={detailsLocked ? "Filled from member record" : "Enter nominee name"}
                               value={draftNomineeName}
-                              disabled={draftIsMember}
+                              disabled={detailsLocked}
                               onChange={(e) => setDraftNomineeName(e.target.value)}
                               onKeyDown={(e) => e.key === "Enter" && handleAddNominee()}
                             />
@@ -1141,7 +1164,7 @@ const getLogindate = async () => {
                               id="draft-nominee-dob"
                               type="date"
                               value={draftDob}
-                              disabled={draftIsMember}
+                              disabled={detailsLocked}
                               max={openingDate || undefined}
                               onChange={(e) => handleDraftDobChange(e.target.value)}
                             />
@@ -1149,7 +1172,7 @@ const getLogindate = async () => {
                           <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1.5">
                               <Label htmlFor="draft-nominee-gender" className="text-xs">Gender</Label>
-                              {draftIsMember ? (
+                              {detailsLocked ? (
                                 <Input id="draft-nominee-gender" value={draftGender} disabled placeholder="—" />
                               ) : (
                                 <Select value={draftGender} onValueChange={setDraftGender}>
@@ -1173,7 +1196,7 @@ const getLogindate = async () => {
                                 max="150"
                                 step="1"
                                 value={draftAge}
-                                disabled={draftIsMember || !!draftDob}
+                                disabled={detailsLocked || !!draftDob}
                                 onChange={(e) => setDraftAge(e.target.value)}
                               />
                             </div>
@@ -1192,19 +1215,37 @@ const getLogindate = async () => {
                             />
                             {draftPctError && <p className="text-xs text-red-600">{draftPctError}</p>}
                           </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="draft-nominee-phone" className="text-xs">Phone Number</Label>
+                            <Input
+                              id="draft-nominee-phone"
+                              type="tel"
+                              inputMode="numeric"
+                              maxLength={15}
+                              placeholder={draftAsMember ? "Filled from member record" : "Enter 10-digit phone number"}
+                              value={draftPhone}
+                              onChange={(e) => setDraftPhone(e.target.value)}
+                            />
+                            {draftPhoneError && <p className="text-xs text-red-600">{draftPhoneError}</p>}
+                          </div>
                           <div className="col-span-2 space-y-1.5">
                             <Label htmlFor="draft-nominee-address" className="text-xs">Address</Label>
                             <Input
                               id="draft-nominee-address"
-                              placeholder={draftIsMember ? "Filled from member record" : "Enter nominee address"}
+                              placeholder={detailsLocked ? "Filled from member record" : "Enter nominee address"}
                               value={draftAddress}
-                              disabled={draftIsMember}
+                              disabled={detailsLocked}
                               onChange={(e) => setDraftAddress(e.target.value)}
                             />
                           </div>
                         </div>
                         {draftNomineeError && (
                           <p className="text-xs text-red-600">{draftNomineeError}</p>
+                        )}
+                        {draftIsMember && draftMemberNotFound && (
+                          <p className="text-xs text-muted-foreground">
+                            Enter the nominee&apos;s details manually — they will be saved as a non-member nominee.
+                          </p>
                         )}
                         <Button
                           size="sm"

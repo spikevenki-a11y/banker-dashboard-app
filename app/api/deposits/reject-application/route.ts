@@ -1,11 +1,11 @@
 import { getSession } from "@/lib/auth/session"
 import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
+import { DEPOSIT_CREDIT_STATUSES } from "@/lib/deposit-account-status"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
 
 // POST: Reject a deposit application — an account that was opened but never funded.
 // Fixed Deposits → Application Status → Deposit View → Reject Application.
-const ACTIVE_STATUS = 1
 const MAX_REASON_LENGTH = 500
 
 export async function POST(request: NextRequest) {
@@ -61,9 +61,11 @@ export async function POST(request: NextRequest) {
     }
     const account = accounts[0]
 
-    if (Number(account.accountstatus) !== ACTIVE_STATUS) {
+    // Pending (awaiting the initial deposit) — or Active, for accounts opened before
+    // the Pending status was introduced
+    if (!DEPOSIT_CREDIT_STATUSES.includes(Number(account.accountstatus))) {
       await client.query("ROLLBACK")
-      return NextResponse.json({ error: "Only an open (active) deposit application can be rejected" }, { status: 400 })
+      return NextResponse.json({ error: "Only an open (pending or active) deposit application can be rejected" }, { status: 400 })
     }
 
     if (Number(account.clearbalance) !== 0 || Number(account.unclearbalance) !== 0) {

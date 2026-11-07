@@ -23,13 +23,14 @@ export async function GET(req: NextRequest) {
               nd.nominee_gender,
               nd.nominee_age,
               nd.nominee_address,
+              nd.nominee_phone,
               nd.nominee_percentage::float AS nominee_percentage,
               nd.created_at, nd.id`
     // Nominees registered on the membership itself (account_number = membership_no),
     // on the member's savings accounts, and on their deposit accounts ('DEP' prefix)
     const { rows } = await pool.query(
       `SELECT account_number, account_type, nominee_name, nominee_relation, is_member, member_id,
-              nominee_dob, nominee_gender, nominee_age, nominee_address, nominee_percentage
+              nominee_dob, nominee_gender, nominee_age, nominee_address, nominee_phone, nominee_percentage
        FROM (
          SELECT 'Membership' AS account_type, 0 AS sort_group, ${cols}
          FROM nominee_details nd

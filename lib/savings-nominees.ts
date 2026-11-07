@@ -24,8 +24,17 @@ export type SavingsNomineeInput = {
   gender: string | null
   age: number | null
   address: string | null
+  phone: string | null // nominee phone number; member nominees default to the member's mobile number
   percentage: number | null // share of the nominee, > 0 and <= 100
 }
+
+// Nominee phone number: 10 digits (same rule as member mobile numbers). Spaces,
+// dashes and a leading +91 are ignored.
+export const normaliseNomineePhone = (v: unknown): string => {
+  const digits = String(v ?? "").replace(/[\s-]/g, "")
+  return digits.replace(/^\+91(?=\d{10}$)/, "")
+}
+export const isValidNomineePhone = (v: string) => /^\d{10}$/.test(v)
 
 const str = (v: unknown) => (typeof v === "string" ? v.trim() : v == null ? "" : String(v).trim())
 
@@ -50,6 +59,7 @@ export function cleanNominees(nominees: unknown): SavingsNomineeInput[] {
         gender: str(n?.gender) || null,
         age: age !== null && Number.isFinite(age) ? age : null,
         address: str(n?.address) || null,
+        phone: normaliseNomineePhone(n?.phone) || null,
         percentage: pct,
       }
     })
@@ -88,7 +98,7 @@ export async function saveSavingsNominees(
   const rows: {
     is_member: boolean; member_id: string | null; name: string; relation: string
     dob: string | null; gender: string | null; age: number; address: string | null
-    percentage: number
+    phone: string | null; percentage: number
   }[] = []
   const seenMembers = new Set<string>()
 
@@ -112,7 +122,7 @@ export async function saveSavingsNominees(
       seenMembers.add(memberId)
 
       const { rows: found } = await client.query(
-        `SELECT c.full_name, c.gender, TO_CHAR(c.date_of_birth, 'YYYY-MM-DD') AS date_of_birth,
+        `SELECT c.full_name, c.gender, c.mobile_no, TO_CHAR(c.date_of_birth, 'YYYY-MM-DD') AS date_of_birth,
                 ca.house_no, ca.street, ca.village, ca.thaluk, ca.district, ca.state, ca.pincode
          FROM memberships m
          JOIN customers c ON c.customer_code = m.customer_code
@@ -124,16 +134,38 @@ export async function saveSavingsNominees(
       if (found.length === 0) return `${label}: member ${memberId} not found in this branch`
 
       const m = found[0]
-      const age = calculateAge(m.date_of_birth, asOf)
+      // Details as entered (screens may let the user edit the member's details),
+      // otherwise from the member's record. The member reference is always kept.
+      const dob = n.dob || m.date_of_birth || null
+      if (dob && dob !== m.date_of_birth) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(dob) || isNaN(new Date(dob).getTime())) {
+          return `${label}: invalid date of birth`
+        }
+      }
+      let age: number | null = dob ? calculateAge(dob, asOf) : n.age
+      if (dob && dob !== m.date_of_birth && (age === null || age < 0)) {
+        return `${label}: date of birth cannot be in the future`
+      }
+      if (!dob && age !== null && (!Number.isInteger(age) || age < 0 || age > 150)) {
+        return `${label}: age must be a whole number between 0 and 150`
+      }
+      // Phone: as entered (it is editable), otherwise the member's mobile number.
+      // The member's own number is accepted as-is, even if it predates the 10-digit rule.
+      const memberMobile = normaliseNomineePhone(m.mobile_no)
+      const phone = n.phone || memberMobile || null
+      if (phone && phone !== memberMobile && !isValidNomineePhone(phone)) {
+        return `${label}: phone number must be 10 digits`
+      }
       rows.push({
         is_member: true,
         member_id: memberId,
-        name: String(m.full_name || "").trim() || n.name,
+        name: n.name || String(m.full_name || "").trim(),
         relation: n.relation,
-        dob: m.date_of_birth || null,
-        gender: m.gender || null,
+        dob,
+        gender: n.gender || m.gender || null,
         age: age !== null && age >= 0 ? age : 0,
-        address: formatMemberAddress(m) || null,
+        address: n.address || formatMemberAddress(m) || null,
+        phone,
         percentage,
       })
     } else {
@@ -150,6 +182,9 @@ export async function saveSavingsNominees(
       if (age !== null && (!Number.isInteger(age) || age < 0 || age > 150)) {
         return `${label}: age must be a whole number between 0 and 150`
       }
+      if (n.phone && !isValidNomineePhone(n.phone)) {
+        return `${label}: phone number must be 10 digits`
+      }
       rows.push({
         is_member: false,
         member_id: null,
@@ -159,6 +194,7 @@ export async function saveSavingsNominees(
         gender: n.gender,
         age: age ?? 0,
         address: n.address,
+        phone: n.phone,
         percentage,
       })
     }
@@ -187,12 +223,12 @@ export async function saveSavingsNominees(
       `INSERT INTO nominee_details (
          branch_id, account_number, is_member, member_id,
          nominee_name, nominee_relation, nominee_dob, nominee_gender,
-         nominee_age, nominee_address, nominee_percentage, created_at, updated_at
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, clock_timestamp(), clock_timestamp())`,
+         nominee_age, nominee_address, nominee_percentage, nominee_phone, created_at, updated_at
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, clock_timestamp(), clock_timestamp())`,
       [
         branchId, accountNumber, r.is_member, r.member_id ? r.member_id.slice(0, 20) : null,
         r.name.slice(0, 100), r.relation.slice(0, 50), r.dob, r.gender ? r.gender.slice(0, 10) : null,
-        r.age, r.address, r.percentage,
+        r.age, r.address, r.percentage, r.phone ? r.phone.slice(0, 15) : null,
       ]
     )
   }

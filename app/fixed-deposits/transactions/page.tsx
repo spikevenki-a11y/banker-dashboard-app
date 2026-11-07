@@ -135,6 +135,7 @@ const depositTypeLabels: Record<string, string> = {
 }
 
 const statusLabels: Record<number, string> = {
+  0: "Pending",
   1: "Active",
   2: "Matured",
   3: "Closed",
@@ -505,6 +506,9 @@ function DepositAccountPanel({ accountNumber }: { accountNumber: string | null }
   }
 
   const isActive = account.accountStatus === 1
+  // Pending accounts take their initial deposit (they turn Active once it is verified)
+  const isPending = account.accountStatus === 0
+  const canReceiveDeposit = isActive || isPending
   const typeLabel = depositTypeLabels[account.depositType] || account.depositType
 
   return (
@@ -783,7 +787,7 @@ function DepositAccountPanel({ accountNumber }: { accountNumber: string | null }
 
         {/* Credit Transaction Form */}
         {(isRd || account.depositAmount != account.balance) && (
-          <Card className={!isActive ? "pointer-events-none opacity-50" : ""}>
+          <Card className={!canReceiveDeposit ? "pointer-events-none opacity-50" : ""}>
             <CardHeader>
               <div className="flex items-center gap-3">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-100 text-sm font-bold text-teal-700">
@@ -798,10 +802,16 @@ function DepositAccountPanel({ accountNumber }: { accountNumber: string | null }
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {!isActive && (
+              {!canReceiveDeposit && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
-                  Transactions are only allowed on active accounts. Current status:{" "}
+                  Transactions are only allowed on pending or active accounts. Current status:{" "}
                   <strong>{statusLabels[account.accountStatus] || "Unknown"}</strong>
+                </div>
+              )}
+              {isPending && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                  This account is <strong>Pending</strong> until its initial deposit is completed. It becomes Active
+                  once the deposit voucher is verified.
                 </div>
               )}
 
@@ -1060,7 +1070,7 @@ function DepositAccountPanel({ accountNumber }: { accountNumber: string | null }
 
         {/* Debit Account Card */}
         {voucherType === "DEFAULT_TRANSFER" && (isRd || account.depositAmount != account.balance) && (
-          <Card className={!isActive ? "pointer-events-none opacity-50" : ""}>
+          <Card className={!canReceiveDeposit ? "pointer-events-none opacity-50" : ""}>
             <CardHeader className="pb-3">
               <div className="flex items-center gap-3">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-sm font-bold text-amber-700">
@@ -1314,7 +1324,7 @@ function MembershipAccountFlow({
     setAccounts([])
     setSelectedAccount("")
     try {
-      const res = await fetch(`/api/deposits/by-member?membership_no=${encodeURIComponent(no)}&zero_balance=1`, {
+      const res = await fetch(`/api/deposits/by-member?membership_no=${encodeURIComponent(no)}&zero_balance=1&statuses=0,1`, {
         credentials: "include",
       })
       const data = await res.json()

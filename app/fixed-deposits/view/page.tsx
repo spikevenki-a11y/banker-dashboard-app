@@ -85,6 +85,7 @@ type Transaction = {
 }
 
 const statusMap: Record<number, string> = {
+  0: "Pending",
   1: "Active",
   2: "Matured",
   3: "Closed",
@@ -137,7 +138,21 @@ function toYmd(value: string | null | undefined): string | null {
 }
 
 // Account statuses that can still be closed: Active (1), Matured (2 / 5 'Maturity')
-const OPEN_STATUSES = [1, 2, 5]
+const OPEN_STATUSES = [0, 1, 2, 5]
+
+// Closed, Matured / Maturity and Rejected accounts take no transactions. Checked on the
+// stored status — the ref_account_status name for deposit_account.accountstatus, plus
+// the stored ids — never on the label shown on screen.
+const NO_TRANSACTION_STATUS_NAMES = ["CLOSED", "PREMATURE CLOSURE", "PREMATURE CLOSED", "MATURITY", "MATURED", "REJECTED"]
+// 3 = closed by Deposit Closure (FAS → Verify Voucher); 5 = Maturity, 9 = Closed,
+// 10 = Premature Closure, 11 = Rejected in ref_account_status
+const NO_TRANSACTION_STATUS_IDS = [3, 5, 9, 10, 11]
+
+function allowsTransactions(account: { accountStatus: number; statusName?: string | null }) {
+  const name = String(account.statusName || "").trim().toUpperCase()
+  if (name && NO_TRANSACTION_STATUS_NAMES.includes(name)) return false
+  return !NO_TRANSACTION_STATUS_IDS.includes(Number(account.accountStatus))
+}
 
 function getDaysToMaturity(maturityDate: string | null) {
   if (!maturityDate) return null
@@ -313,8 +328,8 @@ export default function ViewDepositDetailsPage() {
   let depositAction: "reject" | "premature" | "closure" | null = null
   if (isOpenAccount && !hasPendingClosure) {
     if (balanceAmt === 0) {
-      // Never funded: only an active application can be rejected
-      depositAction = account.accountStatus === 1 ? "reject" : null
+      // Never funded: a pending (or older active) application can be rejected
+      depositAction = account.accountStatus === 0 || account.accountStatus === 1 ? "reject" : null
     } else if (balanceAmt > 0 && businessDate) {
       // No maturity date (e.g. Pigmy) is treated as due for closure
       depositAction = maturityYmd && maturityYmd > businessDate ? "premature" : "closure"
@@ -322,6 +337,7 @@ export default function ViewDepositDetailsPage() {
   }
   const typeLabel = typeMap[account.depositType] || account.depositType
   const isActive = account.accountStatus === 1
+  const canTransact = allowsTransactions(account)
   const daysToMaturity = getDaysToMaturity(account.maturityDate)
   const progressPercent =
     account.totalInstallments && account.paidInstallments
@@ -368,13 +384,15 @@ export default function ViewDepositDetailsPage() {
                   <RefreshCw className="mr-2 h-4 w-4" />
                   Refresh
                 </Button>
-                <Button
-                  size="sm"
-                  onClick={() => router.push(`/fixed-deposits/transactions?account=${account.accountNumber}`)}
-                >
-                  <Banknote className="mr-2 h-4 w-4" />
-                  Transactions
-                </Button>
+                {canTransact && (
+                  <Button
+                    size="sm"
+                    onClick={() => router.push(`/fixed-deposits/transactions?account=${account.accountNumber}`)}
+                  >
+                    <Banknote className="mr-2 h-4 w-4" />
+                    Transactions
+                  </Button>
+                )}
                 {depositAction === "reject" && (
                   <Button
                     size="sm"
@@ -739,15 +757,17 @@ export default function ViewDepositDetailsPage() {
                               {totalTransactions} transaction{totalTransactions !== 1 ? "s" : ""} found
                             </CardDescription>
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => router.push(`/fixed-deposits/transactions?account=${account.accountNumber}`)}
-                            className="bg-transparent"
-                          >
-                            <Banknote className="mr-2 h-4 w-4" />
-                            New Transaction
-                          </Button>
+                          {canTransact && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => router.push(`/fixed-deposits/transactions?account=${account.accountNumber}`)}
+                              className="bg-transparent"
+                            >
+                              <Banknote className="mr-2 h-4 w-4" />
+                              New Transaction
+                            </Button>
+                          )}
                         </div>
                       </CardHeader>
                       <CardContent>
@@ -982,15 +1002,17 @@ export default function ViewDepositDetailsPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start bg-transparent"
-                      size="sm"
-                      onClick={() => router.push(`/fixed-deposits/transactions?account=${account.accountNumber}`)}
-                    >
-                      <Banknote className="mr-2 h-4 w-4" />
-                      Process Transaction
-                    </Button>
+                    {canTransact && (
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start bg-transparent"
+                        size="sm"
+                        onClick={() => router.push(`/fixed-deposits/transactions?account=${account.accountNumber}`)}
+                      >
+                        <Banknote className="mr-2 h-4 w-4" />
+                        Process Transaction
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       className="w-full justify-start bg-transparent"

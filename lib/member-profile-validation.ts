@@ -78,17 +78,74 @@ export function normalizePan(value: unknown): string {
   return String(value ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10)
 }
 
+/** PAN 4th character — the holder type */
+export const PAN_HOLDER_TYPES: Record<string, string> = {
+  C: "Company",
+  P: "Person",
+  H: "Hindu Undivided Family (HUF)",
+  F: "Firm",
+  A: "Association of Persons (AOP)",
+  T: "Trust",
+  B: "Body of Individuals (BOI)",
+  L: "Local Authority",
+  J: "Artificial Juridical Person",
+  G: "Government",
+}
+
+// Name split into words of letters only (dots, commas etc. separate words)
+const nameWords = (name: string) =>
+  name.toUpperCase().replace(/[^A-Z]+/g, " ").trim().split(" ").filter(Boolean)
+
+/**
+ * Letters the PAN's 5th character may be, given the holder's name.
+ * - Person (P): first letter of the surname (last word of the name). Initials
+ *   ("R. Kumar", "Kumar R") are also accepted, as an initial often stands for the
+ *   surname / family name recorded on the PAN.
+ * - Others: first letter of the entity / trust / organisation name, ignoring a
+ *   leading "M/s" or "The".
+ */
+export function panFifthCharOptions(holderType: string, holderName: string): string[] {
+  if (holderType === "P") {
+    const words = nameWords(holderName)
+    if (words.length === 0) return []
+    const letters = new Set([words[words.length - 1][0]])
+    for (const w of words) if (w.length === 1) letters.add(w)
+    return [...letters]
+  }
+  const entity = holderName.trim().replace(/^(M\/S\.?|MESSRS\.?)\s*/i, "").replace(/^THE\s+/i, "")
+  const words = nameWords(entity)
+  return words.length ? [words[0][0]] : []
+}
+
 /**
  * Indian PAN format ABCDE1234F: 5 letters, 4 digits, 1 letter (10 characters).
+ * 4th character: holder type (C, P, H, F, A, T, B, L, J, G).
+ * 5th character: checked against holderName when it is given (see panFifthCharOptions).
  * Returns an error message, or null when valid or empty (PAN is optional).
  */
-export function validatePan(value: unknown): string | null {
+export function validatePan(value: unknown, holderName?: string | null): string | null {
   const pan = String(value ?? "").trim().toUpperCase()
   if (!pan) return null
   if (pan.length !== 10) return "PAN number must be exactly 10 characters (e.g. ABCDE1234F)."
   if (!/^[A-Z]{5}/.test(pan)) return "PAN number: the first 5 characters must be letters (A–Z)."
   if (!/^[A-Z]{5}[0-9]{4}/.test(pan)) return "PAN number: characters 6 to 9 must be digits (0–9)."
   if (!PAN.test(pan)) return "PAN number: the last character must be a letter (A–Z)."
+
+  const holderType = pan[3]
+  if (!PAN_HOLDER_TYPES[holderType]) {
+    return `PAN number: the 4th character "${holderType}" is not a valid holder type. Use C (Company), P (Person), H (HUF), F (Firm), A (AOP), T (Trust), B (BOI), L (Local Authority), J (Artificial Juridical Person) or G (Government).`
+  }
+
+  const name = String(holderName ?? "").trim()
+  if (name) {
+    const allowed = panFifthCharOptions(holderType, name)
+    if (allowed.length > 0 && !allowed.includes(pan[4])) {
+      const expected = allowed.map((l) => `"${l}"`).join(" or ")
+      return holderType === "P"
+        ? `PAN number: the 5th character "${pan[4]}" must be the first letter of the holder's surname (${expected} for "${name}").`
+        : `PAN number: the 5th character "${pan[4]}" must be the first letter of the ${PAN_HOLDER_TYPES[holderType]} name (${expected} for "${name}").`
+    }
+  }
   return null
 }
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
@@ -127,8 +184,15 @@ export function validateAdditionalKycDocs(d: {
   return null
 }
 
-/** Returns the first validation error for the section, or null when valid. */
-export function validateMemberSection(section: MemberEditSection, d: Record<string, string>): string | null {
+/**
+ * Returns the first validation error for the section, or null when valid.
+ * holderName: the member's saved full name, used for the PAN 5th-character check (KYC tab).
+ */
+export function validateMemberSection(
+  section: MemberEditSection,
+  d: Record<string, string>,
+  holderName?: string | null
+): string | null {
   switch (section) {
     case "personal": {
       if (!d.full_name) return "Full name is required."
@@ -152,7 +216,7 @@ export function validateMemberSection(section: MemberEditSection, d: Record<stri
       return null
     }
     case "kyc": {
-      const panError = validatePan(d.pan_no)
+      const panError = validatePan(d.pan_no, holderName)
       if (panError) return panError
       if (d.driving_license_no && d.driving_license_no.length > 20) return "Driving license number must be 20 characters or fewer."
       return validateAdditionalKycDocs(d)
