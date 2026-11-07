@@ -321,10 +321,10 @@ export function MemberSummaryCard({ memberInfo }: { memberInfo: MemberSummaryInf
                 </TabsTrigger>
                 {/* Banker's perspective: loans are bank assets, deposits are bank liabilities */}
                 <TabsTrigger value="assets" className="gap-1.5 text-xs">
-                  <TrendingUp className="h-3.5 w-3.5" />Bank Assets
+                  <TrendingUp className="h-3.5 w-3.5" />Assets
                 </TabsTrigger>
                 <TabsTrigger value="liabilities" className="gap-1.5 text-xs">
-                  <TrendingDown className="h-3.5 w-3.5" />Bank Liabilities
+                  <TrendingDown className="h-3.5 w-3.5" />Liabilities
                 </TabsTrigger>
               </TabsList>
 

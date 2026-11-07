@@ -115,6 +115,17 @@ type MemberData = {
   eb_bill_no?: string
   other_document_name?: string
   other_document_no?: string
+  religion?: string | null
+  annual_income?: string | number | null
+  dccb_branch?: string | null
+  voter_id?: string | null
+}
+
+// Annual income as ₹ with Indian digit grouping; N/A when not recorded
+function formatAnnualIncome(v?: string | number | null) {
+  if (v === null || v === undefined || String(v).trim() === "") return "N/A"
+  const n = Number(v)
+  return Number.isFinite(n) ? `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}` : String(v)
 }
 
 type EditHistoryRow = {
@@ -796,6 +807,7 @@ export default function ViewMemberPage() {
                       <DetailField icon={User} label="Gender" value={selectedMember.gender} capitalize />
                       <DetailField icon={Users} label="Marital Status" value={selectedMember.marital_status} capitalize />
                       <DetailField icon={Book} label="Caste Category" value={selectedMember.caste_category} />
+                      <DetailField icon={Book} label="Religion" value={selectedMember.religion || "N/A"} />
                       <DetailField icon={User} label="Customer Type" value={selectedMember.customer_type} capitalize />
                       <DetailField icon={Hash} label="Customer Code" value={selectedMember.customer_code?.trim()} mono />
                     </DetailSection>
@@ -804,7 +816,9 @@ export default function ViewMemberPage() {
                       <DetailField icon={Building2} label="Occupation" value={selectedMember.occupation} capitalize />
                       <DetailField icon={Book} label="Qualification" value={selectedMember.qualification} />
                       <DetailField icon={FileText} label="Qualification Details" value={selectedMember.qualification_details} />
+                      <DetailField icon={CreditCard} label="Annual Income" value={formatAnnualIncome(selectedMember.annual_income)} />
                       <DetailField icon={Landmark} label="DCCB Account Number" value={selectedMember.dccb_account_number} mono />
+                      <DetailField icon={Landmark} label="DCCB Branch" value={selectedMember.dccb_branch || "N/A"} />
                     </DetailSection>
 
                     <DetailSection title="Contact Details">
@@ -867,6 +881,7 @@ export default function ViewMemberPage() {
                     <DetailField icon={FileText} label="Ration No." value={selectedMember.ration_no} />
                     <DetailField icon={FileText} label="Ration Card Type" value={selectedMember.ration_card_type} />
                     <DetailField icon={CreditCard} label="Driving License No." value={selectedMember.driving_license_no} />
+                    <DetailField icon={CreditCard} label="Voter ID" value={selectedMember.voter_id || "N/A"} mono />
                     <DetailField icon={CreditCard} label="Passport No." value={selectedMember.passport_no} mono />
                     <DetailField icon={FileText} label="EB Bill No." value={selectedMember.eb_bill_no} />
                     <DetailField
@@ -949,7 +964,7 @@ export default function ViewMemberPage() {
                             <div className="rounded-lg border bg-emerald-50 p-4">
                               <div className="flex items-center gap-2">
                                 <TrendingUp className="h-4 w-4 text-emerald-600" />
-                                <p className="text-xs font-medium text-emerald-700">Bank Assets</p>
+                                <p className="text-xs font-medium text-emerald-700">Assets</p>
                               </div>
                               <p className="mt-2 text-lg font-bold text-emerald-800">
                                 {accountSummary.total_assets.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
@@ -958,7 +973,7 @@ export default function ViewMemberPage() {
                             <div className="rounded-lg border bg-red-50 p-4">
                               <div className="flex items-center gap-2">
                                 <TrendingDown className="h-4 w-4 text-red-600" />
-                                <p className="text-xs font-medium text-red-700">Bank Liabilities</p>
+                                <p className="text-xs font-medium text-red-700">Liabilities</p>
                               </div>
                               <p className="mt-2 text-lg font-bold text-red-800">
                                 {accountSummary.total_liabilities.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
