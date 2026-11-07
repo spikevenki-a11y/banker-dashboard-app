@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Users, Gem, ClipboardList, ShieldCheck, FilePlus2 } from "lucide-react"
+import { ArrowLeft, Users, Gem, ClipboardList, ShieldCheck, FilePlus2, Target } from "lucide-react"
 import { DashboardWrapper } from "../../_components/dashboard-wrapper"
 
 const managementCards = [
@@ -42,6 +42,15 @@ const managementCards = [
     color: "text-emerald-600",
     bgColor: "bg-emerald-50",
     href: "/settings/management/add-loan-scheme",
+  },
+  {
+    id: "loan-purpose-mapping",
+    title: "Loan Purpose Mapping",
+    description: "Maintain loan purposes and map which purposes each loan scheme allows",
+    icon: Target,
+    color: "text-rose-600",
+    bgColor: "bg-rose-50",
+    href: "/settings/management/loan-purpose-mapping",
   },
 ]
 

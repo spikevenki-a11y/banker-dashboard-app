@@ -49,6 +49,7 @@ import {
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { ViewMemberPopup } from "@/components/view-member-popup"
+import { isValidNomineePhone, normaliseNomineePhone } from "@/lib/savings-nominees"
 
 type AccountDetails = {
   id: string
@@ -127,6 +128,7 @@ type Nominee = {
   gender?: string | null
   age?: number | null
   address?: string | null
+  phone?: string | null
   percentage?: number | null
 }
 
@@ -170,6 +172,7 @@ export default function ViewModifyAccountPage() {
   const [isEditingNominees, setIsEditingNominees] = useState(false)
   const [editNomineeList, setEditNomineeList] = useState<Nominee[]>([])
   const [draftNomineeName, setDraftNomineeName] = useState("")
+  const [draftNomineePhone, setDraftNomineePhone] = useState("")
   const [draftNomineeRelation, setDraftNomineeRelation] = useState("")
   const [isSavingNominees, setIsSavingNominees] = useState(false)
   const [nomineeError, setNomineeError] = useState("")
@@ -328,6 +331,7 @@ export default function ViewModifyAccountPage() {
           gender: n.nominee_gender ?? null,
           age: n.nominee_age ?? null,
           address: n.nominee_address ?? null,
+          phone: n.nominee_phone ?? null,
           // 0 = not set (nominees saved before the percentage field existed)
           percentage: Number(n.nominee_percentage) > 0 ? Number(n.nominee_percentage) : null,
         })))
@@ -344,6 +348,7 @@ export default function ViewModifyAccountPage() {
   const handleEditNomineesStart = () => {
     setEditNomineeList(nominees.map((n) => ({ ...n })))
     setDraftNomineeName("")
+    setDraftNomineePhone("")
     setDraftNomineeRelation("")
     setNomineeError("")
     setIsEditingNominees(true)
@@ -353,15 +358,30 @@ export default function ViewModifyAccountPage() {
     setIsEditingNominees(false)
     setNomineeError("")
     setDraftNomineeName("")
+    setDraftNomineePhone("")
     setDraftNomineeRelation("")
   }
 
+  // New nominee's phone (optional): 10 digits when given
+  const draftNomineePhoneValue = normaliseNomineePhone(draftNomineePhone)
+  const draftNomineePhoneError =
+    draftNomineePhoneValue && !isValidNomineePhone(draftNomineePhoneValue) ? "Phone number must be 10 digits." : ""
+
   const handleAddDraftNominee = () => {
-    if (!draftNomineeName.trim() || !draftNomineeRelation) return
+    if (!draftNomineeName.trim() || !draftNomineeRelation || draftNomineePhoneError) return
     if (editNomineeList.length >= MAX_NOMINEES) return
-    setEditNomineeList((prev) => [...prev, { name: draftNomineeName.trim(), relation: draftNomineeRelation }])
+    setEditNomineeList((prev) => [
+      ...prev,
+      { name: draftNomineeName.trim(), relation: draftNomineeRelation, phone: normaliseNomineePhone(draftNomineePhone) || null },
+    ])
     setDraftNomineeName("")
+    setDraftNomineePhone("")
     setDraftNomineeRelation("")
+  }
+
+  // Phone of a nominee already in the edit list (editable for every nominee)
+  const handleEditNomineePhone = (idx: number, value: string) => {
+    setEditNomineeList((prev) => prev.map((n, i) => (i === idx ? { ...n, phone: value } : n)))
   }
 
   const handleRemoveDraftNominee = (idx: number) => {
@@ -370,6 +390,13 @@ export default function ViewModifyAccountPage() {
 
   const handleSaveNominees = async () => {
     if (!account) return
+
+    const listToSave = editNomineeList.map((n) => ({ ...n, phone: normaliseNomineePhone(n.phone) || null }))
+    const badPhone = listToSave.findIndex((n) => n.phone && !isValidNomineePhone(n.phone))
+    if (badPhone >= 0) {
+      setNomineeError(`Nominee ${badPhone + 1}: phone number must be 10 digits.`)
+      return
+    }
 
     setIsSavingNominees(true)
     setNomineeError("")
@@ -380,14 +407,14 @@ export default function ViewModifyAccountPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           account_number: account.account_number,
-          nominees: editNomineeList,
+          nominees: listToSave,
         }),
       })
 
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
 
-      setNominees(editNomineeList)
+      setNominees(listToSave)
       setIsEditingNominees(false)
       setSuccessMessage(`Nominee details for account ${account.account_number} have been updated successfully.`)
       setSuccessOpen(true)
@@ -1138,7 +1165,9 @@ export default function ViewModifyAccountPage() {
                                     </div>
                                     <div>
                                       <p className="text-sm font-medium">{n.name}</p>
-                                      <p className="text-xs text-muted-foreground">{n.relation}{n.percentage ? ` · ${n.percentage}%` : ""}</p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {n.relation}{n.phone ? ` · Ph ${n.phone}` : ""}{n.percentage ? ` · ${n.percentage}%` : ""}
+                                      </p>
                                     </div>
                                   </div>
                                 ))}
@@ -1162,6 +1191,16 @@ export default function ViewModifyAccountPage() {
                                         <div>
                                           <p className="text-sm font-medium">{n.name}</p>
                                           <p className="text-xs text-muted-foreground">{n.relation}{n.percentage ? ` · ${n.percentage}%` : ""}</p>
+                                          <Input
+                                            type="tel"
+                                            inputMode="numeric"
+                                            maxLength={15}
+                                            value={n.phone ?? ""}
+                                            onChange={(e) => handleEditNomineePhone(idx, e.target.value)}
+                                            placeholder="Phone number"
+                                            aria-label={`Nominee ${idx + 1} phone number`}
+                                            className="mt-1 h-7 w-44 text-xs"
+                                          />
                                         </div>
                                       </div>
                                       <Button
@@ -1212,12 +1251,25 @@ export default function ViewModifyAccountPage() {
                                         </SelectContent>
                                       </Select>
                                     </div>
+                                    <div className="space-y-1.5">
+                                      <Label className="text-xs">Phone Number</Label>
+                                      <Input
+                                        type="tel"
+                                        inputMode="numeric"
+                                        maxLength={15}
+                                        value={draftNomineePhone}
+                                        onChange={(e) => setDraftNomineePhone(e.target.value)}
+                                        placeholder="Enter 10-digit phone number"
+                                        onKeyDown={(e) => e.key === "Enter" && handleAddDraftNominee()}
+                                      />
+                                      {draftNomineePhoneError && <p className="text-xs text-red-600">{draftNomineePhoneError}</p>}
+                                    </div>
                                   </div>
                                   <Button
                                     size="sm"
                                     variant="outline"
                                     onClick={handleAddDraftNominee}
-                                    disabled={!draftNomineeName.trim() || !draftNomineeRelation}
+                                    disabled={!draftNomineeName.trim() || !draftNomineeRelation || !!draftNomineePhoneError}
                                     className="gap-1.5 bg-white border-teal-300 text-teal-700 hover:bg-teal-50 hover:text-teal-800"
                                   >
                                     <UserPlus className="h-3.5 w-3.5" />

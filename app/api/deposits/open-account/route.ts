@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/auth/session"
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
+import { DEPOSIT_STATUS } from "@/lib/deposit-account-status"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
 import { cleanNominees, depositNomineeAccountKey, saveSavingsNominees } from "@/lib/savings-nominees"
 
@@ -129,7 +130,7 @@ export async function POST(req: Request) {
       ) VALUES (
         $1, $2, $3, $4, $5,
         $6, $6, 0, 0,
-        $7, $8, 1,
+        $7, $8, $10,
         $9, CURRENT_DATE
       ) RETURNING accountnumber`,
       [
@@ -142,6 +143,8 @@ export async function POST(req: Request) {
         interest,
         tds_applicable === true ? "Y" : (scheme.tds_applicable ? "Y" : "N"),
         userId,
+        // Opened as Pending; becomes Active when the initial deposit is verified
+        DEPOSIT_STATUS.PENDING,
       ]
     )
 

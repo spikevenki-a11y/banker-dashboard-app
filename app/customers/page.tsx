@@ -395,7 +395,7 @@ export default function CustomerPage() {
   const canSubmit = !isSubmitting && !altPhoneError && c.full_name.trim().length > 0
 
   const handleCreateCustomer = async () => {
-    const panError = validatePan(c.pan_card_number)
+    const panError = validatePan(c.pan_card_number, c.full_name)
     if (panError) {
       setActiveTab("kycdetails")
       alert(panError)
@@ -947,7 +947,7 @@ export default function CustomerPage() {
                       onChange: (v: string) => up({ pan_card_number: normalizePan(v) }),
                       maxLength: 10,
                       required: false,
-                      error: validatePan(c.pan_card_number),
+                      error: validatePan(c.pan_card_number, c.full_name),
                     },
                     {
                       label: "Ration Card",

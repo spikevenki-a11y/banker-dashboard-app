@@ -20,9 +20,10 @@ export async function POST(req: Request) {
     other_document_name: t(body.other_document_name),
     other_document_no: t(body.other_document_no),
   }
-  // PAN: uppercase, then must match ABCDE1234F
+  // PAN: uppercase, then must match ABCDE1234F, a valid holder type (4th character)
+  // and the holder's name (5th character)
   body.pan_card_number = t(body.pan_card_number).toUpperCase() || null
-  const panError = validatePan(body.pan_card_number)
+  const panError = validatePan(body.pan_card_number, t(body.full_name))
   if (panError) {
     return NextResponse.json({ error: panError }, { status: 400 })
   }

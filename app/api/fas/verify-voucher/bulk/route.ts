@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
+import { activatePendingDepositAccount } from "@/lib/deposit-account-status"
 import { PoolClient } from "pg"
 import { getSession } from "@/lib/auth/session"
 
@@ -126,6 +127,10 @@ async function processBatch(
            WHERE accountnumber = $2 AND branch_id = $3`,
           [txn.running_balance, txn.accountnumber, branchId]
         )
+        // Initial deposit completed: Pending → Active (no-op for any other status)
+        if (txn.transaction_type === "DEPOSIT") {
+          await activatePendingDepositAccount(client, { accountNumber: txn.accountnumber, branchId: branchId })
+        }
       }
     }
 

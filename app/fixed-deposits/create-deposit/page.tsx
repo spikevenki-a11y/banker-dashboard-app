@@ -1188,6 +1188,7 @@ const getLogindate = async () => {
                             asOfDate={openingDate || undefined}
                             excludeMembershipNo={memberInfo?.membership_no}
                             excludeMessage="The deposit holder cannot be their own nominee."
+                            showMemberSearch
                           />
                         </div>
                       </>

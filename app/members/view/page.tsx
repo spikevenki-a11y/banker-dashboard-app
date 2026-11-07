@@ -139,6 +139,7 @@ type NomineeItem = {
   nominee_gender: string | null
   nominee_age: number | null
   nominee_address: string | null
+  nominee_phone?: string | null
   nominee_percentage: number | null
 }
 
@@ -338,7 +339,8 @@ export default function ViewMemberPage() {
       data.passport_no = data.passport_no.toUpperCase()
     }
 
-    const validationError = validateMemberSection(section, data)
+    // KYC: the PAN 5th character is checked against the member's saved name (same as the server)
+    const validationError = validateMemberSection(section, data, selectedMember.full_name)
     if (validationError) {
       setSectionMsg((prev) => ({ ...prev, [section]: { type: "error", text: validationError } }))
       return
@@ -898,6 +900,7 @@ export default function ViewMemberPage() {
                               <TableHead className="text-xs">Age</TableHead>
                               <TableHead className="text-xs">Gender</TableHead>
                               <TableHead className="text-xs">Member</TableHead>
+                              <TableHead className="text-xs">Phone</TableHead>
                               <TableHead className="text-xs">Address</TableHead>
                               <TableHead className="text-xs text-right">Share %</TableHead>
                             </TableRow>
@@ -917,6 +920,7 @@ export default function ViewMemberPage() {
                                 <TableCell className="text-xs">
                                   {n.is_member ? `Yes${n.member_id ? ` (${n.member_id})` : ""}` : "No"}
                                 </TableCell>
+                                <TableCell className="whitespace-nowrap font-mono text-xs">{n.nominee_phone || "---"}</TableCell>
                                 <TableCell className="max-w-[220px] text-xs">{n.nominee_address || "---"}</TableCell>
                                 <TableCell className="text-right text-xs">
                                   {n.nominee_percentage != null ? `${n.nominee_percentage}%` : "---"}
@@ -1535,15 +1539,15 @@ export default function ViewMemberPage() {
                   <div className="space-y-1.5">
                     <Label className="text-xs">PAN No</Label>
                     <Input
-                      className={`font-mono uppercase ${validatePan(editForm.pan_no) ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                      className={`font-mono uppercase ${validatePan(editForm.pan_no, selectedMember?.full_name) ? "border-destructive focus-visible:ring-destructive" : ""}`}
                       maxLength={10}
                       placeholder="ABCDE1234F"
-                      aria-invalid={validatePan(editForm.pan_no) ? true : undefined}
+                      aria-invalid={validatePan(editForm.pan_no, selectedMember?.full_name) ? true : undefined}
                       value={editForm.pan_no}
                       onChange={(e) => ef("pan_no", normalizePan(e.target.value))}
                     />
-                    {validatePan(editForm.pan_no) && (
-                      <p role="alert" className="text-xs text-destructive">{validatePan(editForm.pan_no)}</p>
+                    {validatePan(editForm.pan_no, selectedMember?.full_name) && (
+                      <p role="alert" className="text-xs text-destructive">{validatePan(editForm.pan_no, selectedMember?.full_name)}</p>
                     )}
                   </div>
                   <EditInput label="Ration Card No" k="ration_no" form={editForm} onChange={ef} />

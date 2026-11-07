@@ -13,16 +13,17 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const schemeId = searchParams.get("schemeId")
 
-    let query = `select lspm.purpose_id , lpm.purpose_name from loan_scheme_purpose_mapping lspm
-      left join loan_purpose_master lpm on lpm.purpose_id = lspm.purpose_id
-      WHERE lspm.branch_id = $1
+    // Only active purposes are offered on new applications
+    let query = `select distinct lspm.purpose_id , lpm.purpose_name from loan_scheme_purpose_mapping lspm
+      join loan_purpose_master lpm on lpm.purpose_id = lspm.purpose_id
+      WHERE lspm.branch_id = $1 AND lpm.is_active = TRUE
     `
     const params: any[] = [branchId]
     if (schemeId) {
       params.push(schemeId)
-      query += ` AND scheme_id = $${params.length}`
+      query += ` AND lspm.scheme_id = $${params.length}`
     }
-
+    query += ` ORDER BY lspm.purpose_id`
 
 
     const { rows: schemes } = await pool.query(query, params)
