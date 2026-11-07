@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, Suspense } from "react"
+import { useState, useRef, useEffect, Suspense, Fragment } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -25,14 +25,15 @@ const fmtAmt = (n: number | string | null | undefined) =>
 const fmtDate = (d: string | null) =>
   d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"
 
-const REPORT_META: Record<string, { label: string; description: string; isSingleDate?: boolean }> = {
+// isSingleDate: "As of" a date (balances to that date). isSingleDay: one specific date only.
+const REPORT_META: Record<string, { label: string; description: string; isSingleDate?: boolean; isSingleDay?: boolean }> = {
   "general-ledger": { label: "General Ledger Report",    description: "All GL entries grouped by account code" },
   "trial-balance":  { label: "Trial Balance",            description: "Net debit/credit balance per account" },
   "profit-loss":    { label: "Profit & Loss Statement",  description: "Income and expense accounts for the period" },
   "balance-sheet":  { label: "Balance Sheet",            description: "Assets and liabilities as of date", isSingleDate: true },
   "cash-book":      { label: "Cash Book",                description: "All cash account transactions with running balance" },
   "bank-book":      { label: "Bank Book",                description: "All bank account transactions" },
-  "day-book":       { label: "Day Book",                 description: "All GL transactions for the selected date range" },
+  "day-book":       { label: "Day Book",                 description: "Passed GL transactions for the selected date, by parent head", isSingleDay: true },
   "journal":        { label: "Journal Register",         description: "Voucher-level summary of all GL batches" },
   "expense":        { label: "Expense Report",           description: "Transactions posted to expense accounts" },
   "income":         { label: "Income Report",            description: "Transactions posted to income accounts" },
@@ -57,11 +58,13 @@ function AccountingReportContent() {
   const [pdfLoading, setPdfLoading] = useState(false)
 
   async function fetchReport() {
-    if (!fromDate) { setError("Please select a from date"); return }
+    if (!fromDate) { setError(meta.isSingleDay ? "Please select a date" : "Please select a from date"); return }
     openTabRef.current = false
     setLoading(true); setError(""); setRows([]); setSummary(null); setFetched(false)
     try {
-      const p = new URLSearchParams({ type, from_date: fromDate, to_date: toDate || fromDate })
+      const p = meta.isSingleDay
+        ? new URLSearchParams({ type, date: fromDate })
+        : new URLSearchParams({ type, from_date: fromDate, to_date: toDate || fromDate })
       const res = await fetch(`/api/reports/accounting?${p}`, { credentials: "include" })
       const data = await res.json()
       if (!res.ok) { setError(data.error || "Failed to load report"); return }
@@ -78,7 +81,9 @@ function AccountingReportContent() {
     openPrintWindow(meta.label, dateLabel, branchInfo, printRef.current.innerHTML)
   }
 
-  const dateLabel = meta.isSingleDate
+  const dateLabel = meta.isSingleDay
+    ? (fromDate ? fmtDate(fromDate) : "")
+    : meta.isSingleDate
     ? `As of ${fmtDate(toDate || fromDate)}`
     : fromDate && toDate
     ? `${fmtDate(fromDate)} to ${fmtDate(toDate)}`
@@ -131,10 +136,10 @@ function AccountingReportContent() {
           <CardContent className="pt-6">
             <div className="flex flex-wrap items-end gap-4">
               <div className="space-y-1">
-                <Label className="text-xs">{meta.isSingleDate ? "As of Date" : "From Date"} *</Label>
+                <Label className="text-xs">{meta.isSingleDay ? "Date" : meta.isSingleDate ? "As of Date" : "From Date"} *</Label>
                 <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="w-40" />
               </div>
-              {!meta.isSingleDate && (
+              {!meta.isSingleDate && !meta.isSingleDay && (
                 <div className="space-y-1">
                   <Label className="text-xs">To Date</Label>
                   <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="w-40" />
@@ -173,7 +178,7 @@ function AccountingReportContent() {
                 {rows.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                     <BookOpen className="h-12 w-12 opacity-30 mb-3" />
-                    <p>No data found for the selected period</p>
+                    <p>{meta.isSingleDay ? "No transactions found for the selected date" : "No data found for the selected period"}</p>
                   </div>
                 ) : (
                   <ReportTable type={type} rows={rows} summary={summary} />
@@ -190,8 +195,10 @@ function AccountingReportContent() {
 function ReportTable({ type, rows, summary }: { type: string; rows: any[]; summary: any }) {
   switch (type) {
     case "general-ledger":
+      return <GLTable rows={rows} summary={summary} />
+
     case "day-book":
-      return <GLTable rows={rows} summary={summary} showAccount={type === "day-book"} />
+      return <DayBookTable rows={rows} summary={summary} />
 
     case "trial-balance":
       return <TrialBalanceTable rows={rows} summary={summary} />
@@ -262,6 +269,87 @@ function GLTable({ rows, summary, showAccount }: { rows: any[]; summary: any; sh
         <TableFooter>
           <TableRow>
             <TableCell colSpan={showAccount ? 8 : 7} className="text-xs font-bold">Total ({summary?.entries || rows.length} entries)</TableCell>
+            <TableCell className="text-xs text-right font-bold font-mono">{fmtAmt(summary?.totalDebit)}</TableCell>
+            <TableCell className="text-xs text-right font-bold font-mono">{fmtAmt(summary?.totalCredit)}</TableCell>
+          </TableRow>
+        </TableFooter>
+      </Table>
+    </div>
+  )
+}
+
+/* ── Day Book ──────────────────────────────────────────────────────────────
+   Passed vouchers only, grouped by Parent Head. The API returns the rows already
+   in Chart of Accounts order, so groups are taken in the order they arrive. */
+function DayBookTable({ rows, summary }: { rows: any[]; summary: any }) {
+  const groups: { key: string; code: any; name: string; rows: any[]; dr: number; cr: number }[] = []
+  for (const r of rows) {
+    const key = String(r.parent_head_code ?? "—")
+    let g = groups[groups.length - 1]
+    if (!g || g.key !== key) {
+      g = { key, code: r.parent_head_code, name: r.parent_head_name || "Unmapped Accounts", rows: [], dr: 0, cr: 0 }
+      groups.push(g)
+    }
+    g.rows.push(r)
+    g.dr += Number(r.debit_amount || 0)
+    g.cr += Number(r.credit_amount || 0)
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-muted/50">
+            <TableHead className="text-xs">Date</TableHead>
+            <TableHead className="text-xs">Voucher</TableHead>
+            <TableHead className="text-xs">Type</TableHead>
+            <TableHead className="text-xs">Batch</TableHead>
+            <TableHead className="text-xs font-mono">Account Code</TableHead>
+            <TableHead className="text-xs">Account Name</TableHead>
+            <TableHead className="text-xs">Narration</TableHead>
+            <TableHead className="text-xs">Status</TableHead>
+            <TableHead className="text-xs text-right">Debit (₹)</TableHead>
+            <TableHead className="text-xs text-right">Credit (₹)</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {groups.map((g) => (
+            <Fragment key={g.key}>
+              <TableRow className="bg-muted/30 hover:bg-muted/30">
+                <TableCell colSpan={10} className="text-xs font-semibold">
+                  {g.code != null && <span className="mr-2 font-mono text-muted-foreground">{g.code}</span>}
+                  {g.name}
+                </TableCell>
+              </TableRow>
+              {g.rows.map((r, i) => (
+                <TableRow key={i} className="hover:bg-muted/30">
+                  <TableCell className="text-xs whitespace-nowrap">{fmtDate(r.business_date)}</TableCell>
+                  <TableCell className="text-xs font-mono">{r.voucher_no}</TableCell>
+                  <TableCell className="text-xs"><Badge variant="outline" className="text-[10px]">{r.voucher_type}</Badge></TableCell>
+                  <TableCell className="text-xs font-mono">{r.batch_id}</TableCell>
+                  <TableCell className="text-xs font-mono">{r.accountcode}</TableCell>
+                  <TableCell className="text-xs">{r.accountname || "—"}</TableCell>
+                  <TableCell className="text-xs max-w-48 truncate">{r.narration || "—"}</TableCell>
+                  <TableCell className="text-xs">
+                    <Badge variant="outline" className="text-[10px] text-teal-700 border-teal-300">Passed</Badge>
+                  </TableCell>
+                  <TableCell className="text-xs text-right font-mono">{fmt(r.debit_amount)}</TableCell>
+                  <TableCell className="text-xs text-right font-mono">{fmt(r.credit_amount)}</TableCell>
+                </TableRow>
+              ))}
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={8} className="text-xs text-right font-medium text-muted-foreground">
+                  {g.name} total
+                </TableCell>
+                <TableCell className="text-xs text-right font-semibold font-mono">{fmtAmt(g.dr)}</TableCell>
+                <TableCell className="text-xs text-right font-semibold font-mono">{fmtAmt(g.cr)}</TableCell>
+              </TableRow>
+            </Fragment>
+          ))}
+        </TableBody>
+        <TableFooter>
+          <TableRow>
+            <TableCell colSpan={8} className="text-xs font-bold">Total ({summary?.entries || rows.length} entries)</TableCell>
             <TableCell className="text-xs text-right font-bold font-mono">{fmtAmt(summary?.totalDebit)}</TableCell>
             <TableCell className="text-xs text-right font-bold font-mono">{fmtAmt(summary?.totalCredit)}</TableCell>
           </TableRow>

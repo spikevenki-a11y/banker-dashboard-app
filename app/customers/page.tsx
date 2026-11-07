@@ -22,7 +22,7 @@ import {
   Pencil, Phone, Mail, Building2,
 } from "lucide-react"
 import { DashboardWrapper } from "../_components/dashboard-wrapper"
-import { normalizePan, validateAdditionalKycDocs, validatePan } from "@/lib/member-profile-validation"
+import { normalizePan, validateAadhaar, validateAdditionalKycDocs, validatePan } from "@/lib/member-profile-validation"
 import { CUSTOMER_IMAGE_ACCEPT, checkCustomerImage, uploadCustomerDocument } from "@/components/customer-photo-signature"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -395,6 +395,12 @@ export default function CustomerPage() {
   const canSubmit = !isSubmitting && !altPhoneError && c.full_name.trim().length > 0
 
   const handleCreateCustomer = async () => {
+    const aadhaarError = validateAadhaar(c.aadhar_id)
+    if (aadhaarError) {
+      setActiveTab("kycdetails")
+      alert(aadhaarError)
+      return
+    }
     const panError = validatePan(c.pan_card_number, c.full_name)
     if (panError) {
       setActiveTab("kycdetails")
@@ -938,6 +944,7 @@ export default function CustomerPage() {
                       onChange: (v: string) => up({ aadhar_id: v.replace(/\D/g, "").slice(0, 12) }),
                       maxLength: 14,
                       required: true,
+                      error: validateAadhaar(c.aadhar_id),
                     },
                     {
                       label: "PAN Card",

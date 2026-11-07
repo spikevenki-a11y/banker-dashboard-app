@@ -1,7 +1,7 @@
 import { getSession } from "@/lib/auth/session"
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
-import { validateAdditionalKycDocs, validatePan } from "@/lib/member-profile-validation"
+import { normalizeAadhaar, validateAadhaar, validateAdditionalKycDocs, validatePan } from "@/lib/member-profile-validation"
 
 export async function POST(req: Request) {
   const u = await getSession()
@@ -26,6 +26,13 @@ export async function POST(req: Request) {
   const panError = validatePan(body.pan_card_number, t(body.full_name))
   if (panError) {
     return NextResponse.json({ error: panError }, { status: 400 })
+  }
+
+  // Aadhaar: spaces trimmed, then 12 digits + Verhoeff checksum
+  body.aadhar_id = normalizeAadhaar(body.aadhar_id) || null
+  const aadhaarError = validateAadhaar(body.aadhar_id)
+  if (aadhaarError) {
+    return NextResponse.json({ error: aadhaarError }, { status: 400 })
   }
 
   const extraKycError = validateAdditionalKycDocs(extraKyc)
@@ -61,6 +68,21 @@ export async function POST(req: Request) {
     } = await client.query(
       `SELECT LPAD(nextval('customer_code_seq')::text, 8, '0') AS code`
     )
+
+    /* -------- Duplicate Aadhaar (one customer per Aadhaar, as the unique index enforces) -------- */
+    if (body.aadhar_id) {
+      const dup = await client.query(
+        `SELECT 1 FROM customer_kycdetails WHERE TRIM(aadhaar_no) = $1 LIMIT 1`,
+        [body.aadhar_id]
+      )
+      if ((dup.rowCount ?? 0) > 0) {
+        await client.query("ROLLBACK")
+        return NextResponse.json(
+          { error: "A customer with this Aadhaar number already exists" },
+          { status: 409 }
+        )
+      }
+    }
 
     /* -------- Insert Customers (core only) -------- */
     await client.query(

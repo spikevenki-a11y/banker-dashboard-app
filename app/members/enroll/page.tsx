@@ -817,7 +817,6 @@ export default function EnrollMemberPage() {
                     onChange={setNominees}
                     asOfDate={businessDate || undefined}
                     disabled={memberFieldsReadOnly}
-                    showMemberSearch
                   />
                 </FieldGroup>
               </TabsContent>
@@ -884,7 +883,7 @@ export default function EnrollMemberPage() {
                     </td>
                     <td className="px-4 py-2.5">
                       <p>{membershipTypeLabel(m)}</p>
-                      {m.status && <p className="text-xs text-muted-foreground">{m.status}</p>}
+                        {m.status && <p className="text-xs text-muted-foreground">{m.membership_class} Class</p>}
                     </td>
                     <td className="px-4 py-2.5 whitespace-nowrap">{m.join_date || "---"}</td>
                   </tr>
