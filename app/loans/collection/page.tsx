@@ -555,14 +555,16 @@ function LoanCollectionContent() {
   return (
     <DashboardWrapper>
       <div className="min-h-screen bg-background p-6">
-        <div className="mb-6">
-          <Button variant="ghost" onClick={() => router.push("/loans")} className="mb-4">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Loans
+        {/* Header — same Back button as Loan Sanction */}
+        <div className="mb-6 flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => router.push("/loans")} aria-label="Back to Loans" title="Back to Loans">
+            <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Loan Collection</h1>
-          <p className="text-muted-foreground">Record loan repayments</p>
-          {/* <p className="text-muted-foreground">Record EMI payments and loan repayments</p> */}
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">Loan Collection</h1>
+            <p className="text-sm text-muted-foreground">Record loan repayments</p>
+            {/* <p className="text-muted-foreground">Record EMI payments and loan repayments</p> */}
+          </div>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">

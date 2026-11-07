@@ -1646,7 +1646,7 @@ const getLogindate = async () => {
                           {[
                             { label: "Total Assets",      value: fmt(viewMemberSummary.total_assets),      color: "text-teal-700 bg-teal-50 border-teal-200" },
                             { label: "Total Accounts",    value: String(viewMemberAssets.length),          color: "text-blue-700 bg-blue-50 border-blue-200" },
-                            { label: "Net Worth",         value: fmt(viewMemberSummary.net_worth),         color: "text-green-700 bg-green-50 border-green-200" },
+                            // { label: "Net Worth",         value: fmt(viewMemberSummary.net_worth),         color: "text-green-700 bg-green-50 border-green-200" },
                           ].map(({ label, value, color }) => (
                             <div key={label} className={`rounded-lg border p-3 text-center ${color}`}>
                               <p className="text-xs opacity-70">{label}</p>

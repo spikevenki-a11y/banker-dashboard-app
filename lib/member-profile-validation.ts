@@ -231,3 +231,59 @@ export function validateMemberSection(
     }
   }
 }
+
+// ── Aadhaar (UIDAI) ─────────────────────────────────────────────────────────
+// 12 digits, first digit 2–9, last digit a Verhoeff check digit over the first 11.
+
+const VERHOEFF_D = [
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+  [1, 2, 3, 4, 0, 6, 7, 8, 9, 5],
+  [2, 3, 4, 0, 1, 7, 8, 9, 5, 6],
+  [3, 4, 0, 1, 2, 8, 9, 5, 6, 7],
+  [4, 0, 1, 2, 3, 9, 5, 6, 7, 8],
+  [5, 9, 8, 7, 6, 0, 4, 3, 2, 1],
+  [6, 5, 9, 8, 7, 1, 0, 4, 3, 2],
+  [7, 6, 5, 9, 8, 2, 1, 0, 4, 3],
+  [8, 7, 6, 5, 9, 3, 2, 1, 0, 4],
+  [9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
+]
+const VERHOEFF_P = [
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+  [1, 5, 7, 6, 2, 8, 3, 0, 9, 4],
+  [5, 8, 0, 3, 7, 9, 6, 1, 4, 2],
+  [8, 9, 1, 6, 0, 4, 3, 5, 2, 7],
+  [9, 4, 5, 3, 1, 2, 6, 8, 7, 0],
+  [4, 2, 8, 6, 5, 7, 3, 9, 0, 1],
+  [2, 7, 9, 3, 8, 0, 6, 4, 1, 5],
+  [7, 0, 4, 6, 9, 1, 3, 2, 5, 8],
+]
+
+/** True when the digit string (check digit last) passes the Verhoeff checksum. */
+export function verhoeffValid(digits: string): boolean {
+  if (!/^\d+$/.test(digits)) return false
+  let c = 0
+  const rev = digits.split("").reverse()
+  for (let i = 0; i < rev.length; i++) {
+    c = VERHOEFF_D[c][VERHOEFF_P[i % 8][Number(rev[i])]]
+  }
+  return c === 0
+}
+
+/** Strips spaces (and dashes) the user may type between the digit groups. */
+export function normalizeAadhaar(value: unknown): string {
+  return value === undefined || value === null ? "" : String(value).replace(/[\s-]/g, "")
+}
+
+/**
+ * Aadhaar check: exactly 12 digits, cannot start with 0 or 1, and must pass the
+ * Verhoeff checksum. Returns an error message, or null when valid or empty.
+ */
+export function validateAadhaar(value: unknown): string | null {
+  const a = normalizeAadhaar(value)
+  if (!a) return null
+  if (!/^\d+$/.test(a)) return "Aadhaar number must contain digits only"
+  if (a.length !== 12) return "Aadhaar number must be exactly 12 digits"
+  if (/^[01]/.test(a)) return "Aadhaar number cannot start with 0 or 1"
+  if (!verhoeffValid(a)) return "Invalid Aadhaar number — checksum verification failed. Please check the number and re-enter."
+  return null
+}

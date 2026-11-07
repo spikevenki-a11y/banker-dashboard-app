@@ -196,7 +196,29 @@ export async function GET(req: NextRequest) {
       }
 
       case "day-book": {
+        // Day Book covers one business date only (?date=YYYY-MM-DD; from_date still accepted)
+        const dayDate = searchParams.get("date") || searchParams.get("from_date") || today
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(dayDate)) {
+          return NextResponse.json({ error: "Please select a valid date" }, { status: 400 })
+        }
+        // Passed vouchers only: checker approval (FAS → Verify Voucher) sets COMPLETED;
+        // APPROVED / PASSED / POSTED are accepted as the same "passed" state.
+        // Pending, Rejected, Cancelled, etc. are excluded here, so totals use passed vouchers only.
+        //
+        // Lines are grouped under their Parent Head (the posted account's parent in the
+        // Chart of Accounts), ordered as the COA tree shows them: depth-first, siblings by
+        // account code — the same sequence as Settings → Chart of Accounts.
         const { rows: data } = await pool.query(`
+          WITH RECURSIVE coa_tree AS (
+            SELECT accountcode, ARRAY[accountcode] AS sort_path
+            FROM chart_of_accounts
+            WHERE branch_id = $1 AND COALESCE(parentaccountcode, 0) = 0
+            UNION ALL
+            SELECT c.accountcode, t.sort_path || c.accountcode
+            FROM chart_of_accounts c
+            JOIN coa_tree t ON c.parentaccountcode = t.accountcode
+            WHERE c.branch_id = $1 AND NOT c.accountcode = ANY(t.sort_path)
+          )
           SELECT
             gb.business_date,
             gb.batch_id,
@@ -205,6 +227,8 @@ export async function GET(req: NextRequest) {
             gb.status,
             gbl.accountcode,
             coa.accountname,
+            ph.accountcode AS parent_head_code,
+            ph.accountname AS parent_head_name,
             gbl.narration,
             gbl.debit_amount,
             gbl.credit_amount
@@ -213,10 +237,16 @@ export async function GET(req: NextRequest) {
             ON gbl.branch_id = gb.branch_id AND gbl.batch_id = gb.batch_id
           LEFT JOIN chart_of_accounts coa
             ON coa.accountcode = gbl.accountcode AND coa.branch_id = gbl.branch_id
+          LEFT JOIN chart_of_accounts ph
+            ON ph.branch_id = gbl.branch_id
+           AND ph.accountcode = COALESCE(NULLIF(coa.parentaccountcode, 0), gbl.accountcode)
+          LEFT JOIN coa_tree pt ON pt.accountcode = ph.accountcode
           WHERE gbl.branch_id = $1
-            AND gb.business_date BETWEEN $2 AND $3
-          ORDER BY gb.business_date, gb.batch_id, gbl.accountcode
-        `, [branchId, fromDate, toDate])
+            AND gb.business_date::date = $2::date
+            AND UPPER(TRIM(gb.status)) = ANY($3::text[])
+          ORDER BY pt.sort_path NULLS LAST, ph.accountcode NULLS LAST,
+                   gb.batch_id, gbl.accountcode
+        `, [branchId, dayDate, ["COMPLETED", "APPROVED", "PASSED", "POSTED"]])
         rows = data
         const totDR = data.reduce((s: number, r: any) => s + Number(r.debit_amount || 0), 0)
         const totCR = data.reduce((s: number, r: any) => s + Number(r.credit_amount || 0), 0)
