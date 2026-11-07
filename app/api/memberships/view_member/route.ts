@@ -118,6 +118,10 @@ export async function POST(req: Request) {
             c.qualification,
             c.qualification_details,
             c.dccbaccountnumber AS dccb_account_number,
+            -- Read through JSON so the search keeps working before migration 079 adds these columns
+            to_jsonb(c) ->> 'religion'      AS religion,
+            to_jsonb(c) ->> 'annual_income' AS annual_income,
+            to_jsonb(c) ->> 'dccb_branch'   AS dccb_branch,
 
             -- Address (current)
             ca.house_no,
@@ -150,7 +154,8 @@ export async function POST(req: Request) {
             to_jsonb(ck) ->> 'passport_no'         AS passport_no,
             to_jsonb(ck) ->> 'eb_bill_no'          AS eb_bill_no,
             to_jsonb(ck) ->> 'other_document_name' AS other_document_name,
-            to_jsonb(ck) ->> 'other_document_no'   AS other_document_no
+            to_jsonb(ck) ->> 'other_document_no'   AS other_document_no,
+            to_jsonb(ck) ->> 'voter_id'            AS voter_id
 
 
 

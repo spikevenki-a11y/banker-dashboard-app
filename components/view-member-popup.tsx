@@ -588,8 +588,8 @@ export function ViewMemberPopup({ open, onOpenChange, member: memberProp, member
                             </div>
                           )}
 
-                          <AccountsTable title="Bank Assets" icon={Banknote} accent="emerald" items={assets} emptyLabel="No loan accounts found" />
-                          <AccountsTable title="Bank Liabilities" icon={PiggyBank} accent="red" items={liabilities} emptyLabel="No savings, deposit or share accounts found" />
+                          <AccountsTable title="Assets" icon={Banknote} accent="emerald" items={assets} emptyLabel="No loan accounts found" />
+                          <AccountsTable title="Liabilities" icon={PiggyBank} accent="red" items={liabilities} emptyLabel="No savings, deposit or share accounts found" />
                         </>
                       )}
                     </div>

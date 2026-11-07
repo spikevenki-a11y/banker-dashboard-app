@@ -177,6 +177,31 @@ export async function POST(req: Request) {
       )
     }
 
+    /* -------- Religion / Annual Income / DCCB Branch / Voter ID (migration 079) -------- */
+    // Saved separately inside a savepoint so customer creation still works if
+    // migration 079 has not been run yet (the values are then skipped).
+    const income = Number(body.anual_income ?? body.annual_income)
+    await client.query("SAVEPOINT extra_customer_details")
+    try {
+      await client.query(
+        `UPDATE customers SET religion = $2, annual_income = $3, dccb_branch = $4 WHERE customer_code = $1`,
+        [
+          code,
+          t(body.religion) || null,
+          t(body.anual_income ?? body.annual_income) !== "" && Number.isFinite(income) && income >= 0 ? income : null,
+          t(body.dccb_Branch ?? body.dccb_branch) || null,
+        ]
+      )
+      const voterId = t(body.voter_id).toUpperCase()
+      if (voterId) {
+        await client.query(`UPDATE customer_kycdetails SET voter_id = $2 WHERE customer_code = $1`, [code, voterId])
+      }
+      await client.query("RELEASE SAVEPOINT extra_customer_details")
+    } catch (err) {
+      await client.query("ROLLBACK TO SAVEPOINT extra_customer_details")
+      console.warn("Religion/income/DCCB branch/voter ID not saved — run scripts/079:", (err as Error).message)
+    }
+
     await client.query("COMMIT")
 
     return NextResponse.json({
