@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate as formatDisplayDate } from "@/lib/date-format"
 import { useState, useEffect, useCallback, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import useSWR from "swr"
@@ -69,7 +70,7 @@ function formatCurrency(val: number | null | undefined) {
 
 function formatDate(val: string | null | undefined) {
   if (!val) return "--"
-  return new Date(val).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+  return formatDisplayDate(val)
 }
 
 const actionContext: Record<string, { title: string; description: string; presetStatus?: string }> = {

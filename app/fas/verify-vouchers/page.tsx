@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate } from "@/lib/date-format"
 import { useState, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -257,7 +258,7 @@ export default function VerifyVouchersPage() {
     new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 }).format(n)
 
   const fmtDate = (d: string) =>
-    new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+    formatDate(d)
 
   return (
     <DashboardWrapper>

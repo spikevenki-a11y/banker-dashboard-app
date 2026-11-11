@@ -2,6 +2,7 @@ import { getSession } from "@/lib/auth/session"
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
+import { parseSelectedBatch, validateSelectedBatch, BatchValidationError } from "@/lib/validate-batch"
 
 export async function POST(req: Request) {
   const u = await getSession()
@@ -69,23 +70,24 @@ export async function POST(req: Request) {
         ? cfg.a_class_share_gl_account
         : cfg.b_class_share_gl_account
 
-    /* ---------------- BATCH ID ---------------- */
+    /* ---------------- BATCH ---------------- */
     let batchId = 0
-    if (selectedBatch && selectedBatch !== 0) {
-        batchId = selectedBatch
+    let voucherNo = 0
+    const selectedBatchId = parseSelectedBatch(selectedBatch)
+
+    if (selectedBatchId > 0) {
+      const batch = await validateSelectedBatch(client, selectedBatchId, u)
+      batchId = batch.batch_id
+      voucherNo = batch.voucher_id
     } else {
-    const { rows: [batch] } = await client.query(`
+      const { rows: [batch] } = await client.query(`
         UPDATE gl_batch_sequences
         SET last_batch_id = last_batch_id + 1
         WHERE branch_id = $1
         RETURNING last_batch_id
       `, [u.branch])
-
       batchId = batch.last_batch_id
-    }
-    /* ---------------- VOUCHER NO ---------------- */
-    let voucherNo = 0
-     if (!selectedBatch || selectedBatch === 0) {
+
       const { rows: [voucher] } = await client.query(`
         INSERT INTO voucher_sequences (branch_id, business_date, last_voucher_no)
         VALUES ($1, $2, 1)
@@ -93,33 +95,22 @@ export async function POST(req: Request) {
         DO UPDATE SET last_voucher_no = voucher_sequences.last_voucher_no + 1
         RETURNING last_voucher_no
       `, [u.branch, businessDate])
-        voucherNo = voucher.last_voucher_no
-     } else {
-      const { rows: [lvo] } = await client.query(`
-          select voucher_id from gl_batches
-          where branch_id = $1 and batch_id = $2
-      `, [u.branch, batchId])
-        voucherNo = lvo.voucher_id
-     }
+      voucherNo = voucher.last_voucher_no
 
-    /* ---------------- GL BATCH ---------------- */
-    console.log('selectedBatch', selectedBatch);
-    console.log('batchId', batchId);
-    if (!selectedBatch && selectedBatch === 0) {
       await client.query(`
         INSERT INTO gl_batches (
           business_date,
           branch_id,
           batch_id,
           voucher_id,
-          voucher_type,   
+          voucher_type,
           maker_id,
           status
         ) VALUES (
           $1,$2,$3,$4,$5,$6,'PENDING'
         )
-      `, [businessDate,u.branch, batchId, voucherNo, voucher_type, u.userId])
-     }
+      `, [businessDate, u.branch, batchId, voucherNo, voucher_type, u.userId])
+    }
 
     /* ---------------- GL LINES ---------------- */
     // DR Cash / Bank
@@ -221,7 +212,8 @@ export async function POST(req: Request) {
 
   } catch (e: any) {
     await client.query("ROLLBACK")
-    return NextResponse.json({ error: e.message }, { status: 400 })
+    const status = e instanceof BatchValidationError ? e.status : 400
+    return NextResponse.json({ error: e.message }, { status })
   } finally {
     client.release()
   }

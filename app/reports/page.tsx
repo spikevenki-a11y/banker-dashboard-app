@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate, formatDateTime } from "@/lib/date-format"
 import { useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -505,11 +506,7 @@ export default function ReportsPage() {
                   <div className="flex justify-between">
                     <span className="font-medium text-muted-foreground">Date:</span>
                     <span className="font-semibold">
-                      {new Date(pvData.voucher.businessDate).toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
+                      {formatDate(pvData.voucher.businessDate)}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -541,12 +538,12 @@ export default function ReportsPage() {
                         </TableCell>
                         <TableCell className="text-right text-xs font-mono">
                           {line.debitAmount > 0
-                            ? new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 }).format(line.debitAmount)
+                            ? new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(line.debitAmount)
                             : "-"}
                         </TableCell>
                         <TableCell className="text-right text-xs font-mono">
                           {line.creditAmount > 0
-                            ? new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 }).format(line.creditAmount)
+                            ? new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(line.creditAmount)
                             : "-"}
                         </TableCell>
                       </TableRow>
@@ -556,10 +553,10 @@ export default function ReportsPage() {
                     <TableRow>
                       <TableCell colSpan={3} className="text-xs font-bold">Total</TableCell>
                       <TableCell className="text-right text-xs font-bold font-mono">
-                        {new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 }).format(pvData.totals.totalDebit)}
+                        {new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(pvData.totals.totalDebit)}
                       </TableCell>
                       <TableCell className="text-right text-xs font-bold font-mono">
-                        {new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 }).format(pvData.totals.totalCredit)}
+                        {new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(pvData.totals.totalCredit)}
                       </TableCell>
                     </TableRow>
                   </TableFooter>
@@ -603,13 +600,7 @@ export default function ReportsPage() {
                 {/* Footer */}
                 <div className="footer-note mt-6 border-t border-border pt-2 text-center text-[10px] text-muted-foreground">
                   This is a computer-generated voucher. Printed on{" "}
-                  {new Date().toLocaleDateString("en-IN", {
-                    day: "2-digit",
-                    month: "short",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
+                  {formatDateTime(new Date())}
                 </div>
               </div>
             </div>

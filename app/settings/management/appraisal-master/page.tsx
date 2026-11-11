@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate as formatDisplayDate } from "@/lib/date-format"
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -29,7 +30,7 @@ interface AppraisalMaster {
   slab_count: number
 }
 
-const formatDate = (value: string | null) => (value ? new Date(value).toLocaleDateString("en-IN") : "-")
+const formatDate = (value: string | null) => (value ? formatDisplayDate(value) : "-")
 
 const emptyForm = {
   appraisal_name: "",

@@ -2,20 +2,19 @@ import { getSession } from "@/lib/auth/session"
 import { NextRequest, NextResponse } from 'next/server'
 import pool from "@/lib/connection/db"
 
+// Balances are deliberately not updatable here; they only change through GL vouchers.
 const UPDATABLE_FIELDS = [
   "account_name",
   "gl_account_code",
   "opening_date",
   "closing_date",
-  "opening_balance",
-  "current_balance",
   "account_status",
   "description",
 ]
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
       
@@ -71,10 +70,13 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   try {
-    const accountNumber = params.id
+    const { id: accountNumber } = await params
     const body = await request.json()
 
     const keys = UPDATABLE_FIELDS.filter((field) => field in body)
@@ -86,9 +88,9 @@ export async function PUT(
 
     const result = await pool.query(
       `UPDATE income_accounts SET ${setClause}, updated_at = CURRENT_TIMESTAMP
-       WHERE account_number = $${keys.length + 1}
+       WHERE account_number = $${keys.length + 1} AND branch_id = $${keys.length + 2}
        RETURNING *`,
-      [...values, accountNumber]
+      [...values, accountNumber, session.branch]
     )
 
     const updatedAccount = result.rows[0]

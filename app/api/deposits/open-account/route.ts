@@ -4,6 +4,7 @@ import pool from "@/lib/connection/db"
 import { DEPOSIT_STATUS } from "@/lib/deposit-account-status"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
 import { cleanNominees, depositNomineeAccountKey, saveSavingsNominees } from "@/lib/savings-nominees"
+import { computeTermMaturity, findApplicablePolicy, memberAgeOn, termPeriod, type AppliedPolicy } from "@/lib/fd-interest-policy"
 
 export async function POST(req: Request) {
   const session = await getSession()
@@ -93,9 +94,50 @@ export async function POST(req: Request) {
     const amt = Number(deposit_amount) || 0
     const months = Number(period_months) || 0
     const days = Number(period_days) || 0
-    const interest = Number(rate_of_interest) || Number(scheme.interest_rate) || 0
+    let interest = Number(rate_of_interest) || Number(scheme.interest_rate) || 0
 
-    if (deposit_type === "TERM" && amt > 0) {
+    // Fixed deposit: the interest policy in force for this scheme, opening date and
+    // tenure decides the rate and rules (Settings → Interest Policy Configuration).
+    // Without one, the scheme rate and the existing calculation apply as before.
+    let appliedPolicy: AppliedPolicy | null = null
+    // Age on the opening date and the category it gives; stored with the deposit
+    let memberAgeAtOpening: number | null = null
+    let interestCategory: "REGULAR" | "SENIOR_CITIZEN" | null = null
+    if (deposit_type === "TERM" && amt > 0 && (months > 0 || days > 0)) {
+      const { rows: dobRows } = await client.query(
+        `SELECT TO_CHAR(c.date_of_birth, 'YYYY-MM-DD') AS dob
+           FROM memberships m JOIN customers c ON c.customer_code = m.customer_code
+          WHERE CAST(m.membership_no AS VARCHAR) = $1 AND m.branch_id = $2
+          LIMIT 1`,
+        [String(membership_no), branchId]
+      )
+      appliedPolicy = await findApplicablePolicy(client, {
+        branchId,
+        schemeId: Number(scheme_id),
+        openDate: account_open_date,
+        tenureDays: termPeriod(account_open_date, months, days).totalDays,
+        dateOfBirth: dobRows[0]?.dob ?? null,
+      })
+      if (appliedPolicy) interest = appliedPolicy.interest_rate
+      memberAgeAtOpening = memberAgeOn(dobRows[0]?.dob ?? null, account_open_date)
+      interestCategory = appliedPolicy?.interest_category ?? "REGULAR"
+    }
+
+    if (deposit_type === "TERM" && amt > 0 && appliedPolicy) {
+      const result = computeTermMaturity({
+        principal: amt,
+        annualRate: interest,
+        openDate: account_open_date,
+        months,
+        days,
+        compounding: appliedPolicy.compounding_frequency,
+        rounding: appliedPolicy.maturity_rounding,
+        // Compounding only for cumulative deposits (interest paid at maturity)
+        cumulative: (interest_payout_frequency || "ON_MATURITY") === "ON_MATURITY",
+      })
+      maturityAmount = result.maturityAmount
+      maturityDate = result.maturityDate
+    } else if (deposit_type === "TERM" && amt > 0) {
       // Simple interest maturity calculation using real calendar month lengths
       // (28/29/30/31 days), rather than assuming every month is 30 days
       const openDate = new Date(account_open_date)
@@ -126,12 +168,16 @@ export async function POST(req: Request) {
         branch_id, schemeid, deposittype, accountnumber, membership_no,
         valuedate, accountopendate, clearbalance, unclearbalance,
         rateofinterest, tdsapplicable, accountstatus,
-        createdby, createddate
+        createdby, createddate,
+        interest_policy_version_id, interest_policy_snapshot,
+        interest_category, member_age_at_opening
       ) VALUES (
         $1, $2, $3, $4, $5,
         $6, $6, 0, 0,
         $7, $8, $10,
-        $9, CURRENT_DATE
+        $9, CURRENT_DATE,
+        $11, $12::jsonb,
+        $13, $14
       ) RETURNING accountnumber`,
       [
         branchId,
@@ -145,6 +191,11 @@ export async function POST(req: Request) {
         userId,
         // Opened as Pending; becomes Active when the initial deposit is verified
         DEPOSIT_STATUS.PENDING,
+        // The policy terms this deposit keeps, whatever later happens to the policy
+        appliedPolicy?.version_id ?? null,
+        appliedPolicy ? JSON.stringify(appliedPolicy) : null,
+        interestCategory,
+        memberAgeAtOpening,
       ]
     )
 
@@ -172,7 +223,7 @@ export async function POST(req: Request) {
           Number(renewal_period_months) || 0,
           Number(renewal_period_days) || 0,
           renewal_with_interest === true ? "Y" : "N",
-          Number(premature_penal_rate) || 0,
+          appliedPolicy ? appliedPolicy.premature_penal_rate : Number(premature_penal_rate) || 0,
         ]
       )
     } else if (deposit_type === "RECURRING") {
@@ -279,6 +330,12 @@ export async function POST(req: Request) {
       maturity_amount: maturityAmount,
       deposit_amount: amt,
       installment_amount: deposit_type === "RECURRING" ? Number(installment_amount) || 0 : null,
+      interest_rate: interest,
+      interest_category: interestCategory,
+      member_age_at_opening: memberAgeAtOpening,
+      interest_policy: appliedPolicy
+        ? { policy_name: appliedPolicy.policy_name, version_no: appliedPolicy.version_no, senior_citizen_applied: appliedPolicy.senior_citizen_applied }
+        : null,
     })
   } catch (error: any) {
     await client.query("ROLLBACK")

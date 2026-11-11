@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { activatePendingDepositAccount } from "@/lib/deposit-account-status"
 import { getSession } from "@/lib/auth/session"
+import { applyApprovedShareTransactions } from "@/lib/share-balance"
 
 export async function POST(req: Request) {
   const u = await getSession()
@@ -98,21 +99,8 @@ export async function POST(req: Request) {
         [batchId, u.branch]
       )
 
-      const { rows: shareTxns } = await client.query(
-        `SELECT membership_no, credit_amount, debit_amount
-         FROM member_share_transactions
-         WHERE gl_batch_id = $1 AND branch_id = $2 AND status = 'COMPLETED'`,
-        [batchId, u.branch]
-      )
-      for (const st of shareTxns) {
-        const netShare = parseFloat(st.credit_amount || "0") - parseFloat(st.debit_amount || "0")
-        await client.query(
-          `UPDATE member_shares
-           SET share_balance = COALESCE(share_balance, 0) + $1, updated_at = NOW()
-           WHERE membership_no = $2 AND branch_id = $3 AND status = 'ACTIVE'`,
-          [netShare, st.membership_no, u.branch]
-        )
-      }
+      // Re-checks each member's balance: a withdrawal can't take it below zero.
+      await applyApprovedShareTransactions(client, batchId, u.branch)
 
       // ── 4. Bank-level modules with batch_id (borrowings, investments, bank_accounts) ──
       // These modules set status = 'COMPLETED' and update master balances at transaction

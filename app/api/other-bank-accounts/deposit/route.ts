@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
+import { parseSelectedBatch, validateSelectedBatch, BatchValidationError } from "@/lib/validate-batch"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
 import { getSession } from "@/lib/auth/session"
 
@@ -63,13 +64,10 @@ export async function POST(request: NextRequest) {
     let batchId: number
     let voucherNo: number
 
-    if (selected_batch && selected_batch > 0) {
-      batchId = selected_batch
-      const { rows: [existingBatch] } = await client.query(
-        `SELECT voucher_id FROM gl_batches WHERE batch_id = $1 AND branch_id = $2 AND status = 'PENDING'`,
-        [batchId, branchId]
-      )
-      if (!existingBatch) throw new Error("Selected GL batch not found or already verified")
+    const selectedBatchId = parseSelectedBatch(selected_batch)
+    if (selectedBatchId > 0) {
+      const existingBatch = await validateSelectedBatch(client, selectedBatchId, session)
+      batchId = existingBatch.batch_id
       voucherNo = existingBatch.voucher_id
     } else {
       const { rows: [batchRow] } = await client.query(
@@ -166,6 +164,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     await client.query("ROLLBACK")
+    if (error instanceof BatchValidationError) return NextResponse.json({ error: error.message }, { status: error.status })
     console.error("Other Bank Accounts Deposit POST error:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   } finally {

@@ -1,4 +1,5 @@
 import type { PoolClient } from "pg"
+import { validateSelectedBatch, BatchValidationError } from "@/lib/validate-batch"
 
 // GL batch/voucher helpers following the Loans → Loan Disbursement posting logic.
 
@@ -39,27 +40,25 @@ export async function openGlVoucher(
   return { batchId: Number(batch.last_batch_id), voucherNo: Number(voucher.last_voucher_no) }
 }
 
-// Locks an existing batch for a Transfer posting. It must be an open (PENDING) transfer
-// batch of this branch and business date. Returns its voucher number or an error message.
+// Locks an existing batch for a Transfer posting. It must pass validateSelectedBatch
+// (this branch, business date and maker, still PENDING) and be a transfer batch.
+// Returns its voucher number or an error message.
 export async function lockOpenTransferBatch(
   client: PoolClient,
-  opts: { branchId: number | string; batchId: number; businessDate: string }
+  opts: { branchId: number | string; batchId: number; businessDate: string; userId: number | string }
 ): Promise<{ voucherNo?: number; error?: string }> {
-  const { rows } = await client.query(
-    `SELECT voucher_id, voucher_type, status, business_date::text AS business_date
-     FROM gl_batches
-     WHERE branch_id = $1 AND batch_id = $2
-     FOR UPDATE`,
-    [opts.branchId, opts.batchId]
-  )
-  const b = rows[0]
-  if (!b) return { error: `GL batch ${opts.batchId} not found` }
-  if (b.status !== "PENDING") return { error: `GL batch ${opts.batchId} is already ${String(b.status).toLowerCase()}` }
-  if (b.voucher_type !== "TRANSFER") return { error: `GL batch ${opts.batchId} is not a transfer batch` }
-  if (b.business_date !== String(opts.businessDate).slice(0, 10)) {
-    return { error: `GL batch ${opts.batchId} belongs to another business date` }
+  try {
+    const b = await validateSelectedBatch(client, opts.batchId, {
+      branch: opts.branchId,
+      businessDate: opts.businessDate,
+      userId: opts.userId,
+    })
+    if (b.voucher_type !== "TRANSFER") return { error: `GL batch ${opts.batchId} is not a transfer batch` }
+    return { voucherNo: b.voucher_id }
+  } catch (e) {
+    if (e instanceof BatchValidationError) return { error: e.message }
+    throw e
   }
-  return { voucherNo: Number(b.voucher_id) }
 }
 
 export async function insertGlLine(

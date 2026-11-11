@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate } from "@/lib/date-format"
 import { useState, useEffect, useCallback } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -817,6 +818,7 @@ export default function EnrollMemberPage() {
                     onChange={setNominees}
                     asOfDate={businessDate || undefined}
                     disabled={memberFieldsReadOnly}
+                    showMemberSearch
                   />
                 </FieldGroup>
               </TabsContent>
@@ -885,7 +887,7 @@ export default function EnrollMemberPage() {
                       <p>{membershipTypeLabel(m)}</p>
                         {m.status && <p className="text-xs text-muted-foreground">{m.membership_class} Class</p>}
                     </td>
-                    <td className="px-4 py-2.5 whitespace-nowrap">{m.join_date || "---"}</td>
+                    <td className="px-4 py-2.5 whitespace-nowrap">{formatDate(m.join_date, "---")}</td>
                   </tr>
                 ))}
               </tbody>

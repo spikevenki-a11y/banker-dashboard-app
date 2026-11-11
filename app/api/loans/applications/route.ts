@@ -4,6 +4,7 @@ import { calculateAge, getSchemeAgeError } from "@/lib/member-age"
 import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
+import { calculateMaxSanctionAmount, getCurrentGoldGuideline } from "@/lib/gold-guideline"
 
 // GET: Fetch all loan applications
 export async function GET(request: NextRequest) {
@@ -55,7 +56,18 @@ export async function GET(request: NextRequest) {
         lscheme.appraiser_charge_code,
         m.customer_code,
         c.full_name as member_name,
-        c.mobile_no
+        c.mobile_no,
+        -- Gold security cap (Guidelines Value per Gram × Net Weight); null when not gold
+        (SELECT SUM(gd.max_sanction_amount)::float8
+           FROM loan_securities sec
+           JOIN security_gold_details gd ON gd.security_id = sec.id
+          WHERE sec.loan_application_id = la.loan_application_id
+            AND sec.branch_id = la.branch_id) AS gold_max_sanction_amount,
+        (SELECT MAX(gd.guideline_value_per_gram)::float8
+           FROM loan_securities sec
+           JOIN security_gold_details gd ON gd.security_id = sec.id
+          WHERE sec.loan_application_id = la.loan_application_id
+            AND sec.branch_id = la.branch_id) AS gold_guideline_value_per_gram
       FROM loan_applications la
       LEFT JOIN loan_sanction_details ls ON la.loan_application_id = ls.loan_application_id and la.branch_id = ls.branch_id
       LEFT JOIN loan_schemes lscheme ON la.scheme_id = lscheme.scheme_id
@@ -319,14 +331,33 @@ export async function POST(request: NextRequest) {
       const typeId = Number(security.security_type_id)
 
       if (typeId === 6) {
+        // Maximum Sanction Amount = Guidelines Value per Gram × Net Weight, using the
+        // branch's current guidelines value (not the value sent by the browser)
+        const guideline = await getCurrentGoldGuideline(client, branchId)
+        if (!guideline) {
+          await client.query("ROLLBACK")
+          return NextResponse.json(
+            { error: "The Gold Guidelines Value per Gram is not set. Please set it in Settings → Management → Gold Guidelines Value." },
+            { status: 400 }
+          )
+        }
+        // Net weight from the gold items when given (gross − disallowed), else the summary value
+        const items: any[] = Array.isArray(security.gold_items) ? security.gold_items : []
+        const netWeight = items.length > 0
+          ? Math.max(0, items.reduce((s, i) => s + (Number(i.gross_weight_grams) || 0), 0)
+              - items.reduce((s, i) => s + (Number(i.stone_weight_grams) || 0), 0))
+          : Number(security.net_weight_grams) || 0
+        const maxSanctionAmount = calculateMaxSanctionAmount(guideline.value_per_gram, netWeight)
+
         // Gold — summary record
         await client.query(
           `INSERT INTO security_gold_details (
             security_id, gold_form, purity_karat, number_of_items,
             gross_weight_grams, stone_weight_grams, net_weight_grams,
             packet_no, appraiser_name, appraiser_license_no, appraisal_date,
-            gold_rate_per_gram, gold_rate_date, market_value, storage_location, created_at
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW())`,
+            gold_rate_per_gram, gold_rate_date, market_value, storage_location, created_at,
+            guideline_value_per_gram, max_sanction_amount
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW(),$16,$17)`,
           [
             securityId,
             security.gold_form || 'ORNAMENTS',
@@ -343,6 +374,8 @@ export async function POST(request: NextRequest) {
             security.gold_rate_date || null,
             security.market_value || null,
             security.storage_location || null,
+            guideline.value_per_gram,
+            maxSanctionAmount,
           ]
         )
 

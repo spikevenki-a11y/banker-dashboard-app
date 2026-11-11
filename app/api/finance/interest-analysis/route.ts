@@ -1,73 +1,91 @@
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
+import { getSession } from "@/lib/auth/session"
 
 export async function GET() {
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const branchId = session.branch
+
   try {
     // Get interest analysis by category
-    
+
     // Savings interest (paid to depositors - expense)
     const savingsInterestQuery = await pool.query(`
-      SELECT 
+      SELECT
         COALESCE(SUM(et.debit_amount), 0) as interest_paid
       FROM expense_transactions et
       JOIN expense_accounts ea ON et.account_number = ea.account_number
-      WHERE ea.account_name ILIKE '%savings%interest%'
-        OR et.description ILIKE '%savings%interest%'
-    `)
+      WHERE et.branch_id = $1
+        AND ea.branch_id = $1
+        AND (ea.account_name ILIKE '%savings%interest%'
+          OR et.description ILIKE '%savings%interest%')
+    `, [branchId])
 
     // FD interest (paid to depositors - expense)
     const fdInterestQuery = await pool.query(`
-      SELECT 
+      SELECT
         COALESCE(SUM(et.debit_amount), 0) as interest_paid
       FROM expense_transactions et
       JOIN expense_accounts ea ON et.account_number = ea.account_number
-      WHERE ea.account_name ILIKE '%deposit%interest%'
-        OR ea.account_name ILIKE '%fd%interest%'
-        OR et.description ILIKE '%fd%interest%'
-        OR et.description ILIKE '%fixed%deposit%interest%'
-    `)
+      WHERE et.branch_id = $1
+        AND ea.branch_id = $1
+        AND (ea.account_name ILIKE '%deposit%interest%'
+          OR ea.account_name ILIKE '%fd%interest%'
+          OR et.description ILIKE '%fd%interest%'
+          OR et.description ILIKE '%fixed%deposit%interest%')
+    `, [branchId])
 
     // Loan interest (earned from borrowers - income)
     const loanInterestQuery = await pool.query(`
-      SELECT 
+      SELECT
         COALESCE(SUM(it.credit_amount), 0) as interest_earned
       FROM income_transactions it
       JOIN income_accounts ia ON it.account_number = ia.account_number
-      WHERE ia.account_name ILIKE '%loan%interest%'
-        OR it.description ILIKE '%loan%interest%'
-    `)
+      WHERE it.branch_id = $1
+        AND ia.branch_id = $1
+        AND (ia.account_name ILIKE '%loan%interest%'
+          OR it.description ILIKE '%loan%interest%')
+    `, [branchId])
 
     // Borrowing interest (paid on borrowings - expense)
     const borrowingInterestQuery = await pool.query(`
-      SELECT 
+      SELECT
         COALESCE(SUM(interest_amount), 0) as interest_paid
       FROM borrowing_transactions
       WHERE interest_amount > 0
-    `)
+        AND branch_id = $1
+    `, [branchId])
 
     // Get all income account totals
     const allIncomeQuery = await pool.query(`
-      SELECT 
+      SELECT
         ia.account_name,
         COALESCE(SUM(it.credit_amount), 0) as total_income
       FROM income_accounts ia
-      LEFT JOIN income_transactions it ON ia.account_number = it.account_number
+      LEFT JOIN income_transactions it
+        ON ia.account_number = it.account_number
+        AND it.branch_id = $1
       WHERE ia.account_status = 'active'
+        AND ia.branch_id = $1
       GROUP BY ia.account_name
       ORDER BY total_income DESC
-    `)
+    `, [branchId])
 
     // Get all expense account totals
     const allExpenseQuery = await pool.query(`
-      SELECT 
+      SELECT
         ea.account_name,
         COALESCE(SUM(et.debit_amount), 0) as total_expense
       FROM expense_accounts ea
-      LEFT JOIN expense_transactions et ON ea.account_number = et.account_number
+      LEFT JOIN expense_transactions et
+        ON ea.account_number = et.account_number
+        AND et.branch_id = $1
       WHERE ea.account_status = 'active'
+        AND ea.branch_id = $1
       GROUP BY ea.account_name
       ORDER BY total_expense DESC
-    `)
+    `, [branchId])
 
     const savingsInterestPaid = parseFloat(savingsInterestQuery.rows[0]?.interest_paid || 0)
     const fdInterestPaid = parseFloat(fdInterestQuery.rows[0]?.interest_paid || 0)

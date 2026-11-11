@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate } from "@/lib/date-format"
 import { useState, useRef, useEffect, Suspense, Fragment } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -23,7 +24,7 @@ const fmtAmt = (n: number | string | null | undefined) =>
   `₹${Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 const fmtDate = (d: string | null) =>
-  d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"
+  d ? formatDate(d) : "—"
 
 // isSingleDate: "As of" a date (balances to that date). isSingleDay: one specific date only.
 const REPORT_META: Record<string, { label: string; description: string; isSingleDate?: boolean; isSingleDay?: boolean }> = {

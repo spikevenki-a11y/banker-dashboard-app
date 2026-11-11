@@ -3,6 +3,7 @@ import pool from "@/lib/connection/db"
 import { activatePendingDepositAccount } from "@/lib/deposit-account-status"
 import { PoolClient } from "pg"
 import { getSession } from "@/lib/auth/session"
+import { applyApprovedShareTransactions } from "@/lib/share-balance"
 
 // ── Core logic extracted so it can run per-batch ─────────────────────────
 async function processBatch(
@@ -84,20 +85,8 @@ async function processBatch(
        WHERE gl_batch_id = $1 AND branch_id = $2 AND status = 'PENDING'`,
       [batchId, branchId]
     )
-    const { rows: shareTxns } = await client.query(
-      `SELECT membership_no, credit_amount, debit_amount FROM member_share_transactions
-       WHERE gl_batch_id = $1 AND branch_id = $2 AND status = 'COMPLETED'`,
-      [batchId, branchId]
-    )
-    for (const st of shareTxns) {
-      const net = parseFloat(st.credit_amount || "0") - parseFloat(st.debit_amount || "0")
-      await client.query(
-        `UPDATE member_shares
-         SET share_balance = COALESCE(share_balance, 0) + $1, updated_at = NOW()
-         WHERE membership_no = $2 AND branch_id = $3 AND status = 'ACTIVE'`,
-        [net, st.membership_no, branchId]
-      )
-    }
+    // Re-checks each member's balance: a withdrawal can't take it below zero.
+    await applyApprovedShareTransactions(client, batchId, branchId)
 
     // 4. Deposit transactions → COMPLETED + update deposit account
     await client.query(

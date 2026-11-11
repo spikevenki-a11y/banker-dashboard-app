@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate as formatDisplayDate } from "@/lib/date-format"
 import { useState, useEffect, useCallback, useRef } from "react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -151,15 +152,12 @@ export default function DailyTransactionsReportPage() {
       style: "currency",
       currency: "INR",
       minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(amount)
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    })
+    return formatDisplayDate(dateString)
   }
 
   const getStatusBadge = (status: string) => {

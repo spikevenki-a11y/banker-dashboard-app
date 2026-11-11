@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
+import { parseSelectedBatch, validateSelectedBatch, BatchValidationError } from "@/lib/validate-batch"
 import { getSession } from "@/lib/auth/session"
 
 export async function POST(req: NextRequest) {
@@ -161,8 +162,9 @@ export async function POST(req: NextRequest) {
     if (charge > 0) {
       const narration = `Locker Breaking Charge - ${locker.locker_no}`
 
-      if (selected_batch && selected_batch !== 0) {
-        batchId = selected_batch
+      const selectedBatchId = parseSelectedBatch(selected_batch)
+      if (selectedBatchId > 0) {
+        batchId = (await validateSelectedBatch(client, selectedBatchId, session)).batch_id
         const { rows: [lvo] } = await client.query(
           `SELECT voucher_id FROM gl_batches WHERE branch_id = $1 AND batch_id = $2`,
           [branchId, batchId]
@@ -249,6 +251,7 @@ export async function POST(req: NextRequest) {
     })
   } catch (error: any) {
     await client.query("ROLLBACK")
+    if (error instanceof BatchValidationError) return NextResponse.json({ error: error.message }, { status: error.status })
     console.error("Error during break-locker operation:", error)
     return NextResponse.json({ error: "Break locker failed: " + error.message }, { status: 500 })
   } finally {

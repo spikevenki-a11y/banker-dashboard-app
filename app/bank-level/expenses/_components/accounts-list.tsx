@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate } from "@/lib/date-format"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
@@ -136,7 +137,7 @@ export default function AccountsList({ onViewAccount, refreshTrigger }: Accounts
                       </span>
                     </TableCell>
                     <TableCell className="text-sm">
-                      {new Date(account.opening_date).toLocaleDateString()}
+                      {formatDate(account.opening_date)}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button

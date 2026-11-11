@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate as formatDisplayDate } from "@/lib/date-format"
 import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -138,7 +139,7 @@ function formatCurrency(val: number | string | null | undefined) {
 
 function formatDate(d: string | null | undefined) {
   if (!d) return "---"
-  return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+  return formatDisplayDate(d)
 }
 
 const depositTypeLabels: Record<string, string> = {

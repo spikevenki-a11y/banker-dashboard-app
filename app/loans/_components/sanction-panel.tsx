@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { formatDate } from "@/lib/date-format"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -46,7 +47,8 @@ import {
   repaymentMethodLabel,
   DEFAULT_FIXED_PRINCIPAL_FREQUENCY,
   DEFAULT_REPAYMENT_METHOD,
-  REPAYMENT_FREQUENCY_OPTIONS,
+  frequencyOptionsFor,
+  isFixedPrincipalFrequency,
   REPAYMENT_METHOD_OPTIONS,
   type RepaymentFrequency,
   type RepaymentMethod,
@@ -78,6 +80,9 @@ export interface SanctionApplication {
   maximum_period_months: number
   loan_tenure_months: number
   loan_gl_account: string
+  /** Gold security cap: Guidelines Value per Gram × Net Weight (null when not gold) */
+  gold_max_sanction_amount?: number | null
+  gold_guideline_value_per_gram?: number | null
 }
 
 interface SecurityDetail {
@@ -111,6 +116,8 @@ interface SanctionPanelProps {
 // arrow keys or mouse wheel — values are typed in only
 const NO_SPINNER_CLASS =
   "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+const EXCEEDS_APPLIED_MSG = "Sanction Amount cannot be greater than Loan Amount Applied."
+
 const noStepProps = {
   onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault()
@@ -179,8 +186,13 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formError, setFormError] = useState("")
 
+  // Sanction Amount above Loan Amount Applied: centred error popup, then back to the field
+  const [showExceedsAppliedPopup, setShowExceedsAppliedPopup] = useState(false)
+  const sanctionedAmountRef = useRef<HTMLInputElement>(null)
+
   // Repayment Type change: On Maturity fixes the frequency to Closing Time;
-  // Fixed Principal starts on Monthly and lets the user pick any frequency
+  // Fixed Principal starts on Monthly and offers Monthly / Quarterly / Half Yearly /
+  // Yearly only, so Closing Time is always dropped
   const handleRepaymentMethodChange = (value: string) => {
     const method = value as RepaymentMethod
     setRepaymentMethod(method)
@@ -267,8 +279,8 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
         </table>`
 
       const generatedOn = identity?.businessDate
-        ? new Date(identity.businessDate).toLocaleDateString("en-IN")
-        : new Date().toLocaleDateString("en-IN")
+        ? formatDate(identity.businessDate)
+        : formatDate(new Date())
       await downloadPdf(
         `Repayment Schedule ${selectedApp?.reference_no ?? ""}`.trim(),
         `Generated on ${generatedOn}`,
@@ -311,8 +323,13 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
     setLoadingDetails(true)
     setFormError("")
 
-    // Pre-fill form with applied values
-    setSanctionedAmount(app.applied_loan_amount.toString())
+    // Pre-fill form with applied values (gold loans: no more than the Maximum Sanction Amount)
+    const goldCap = app.gold_max_sanction_amount != null ? Number(app.gold_max_sanction_amount) : NaN
+    setSanctionedAmount(
+      Number.isFinite(goldCap) && goldCap < Number(app.applied_loan_amount)
+        ? goldCap.toFixed(2)
+        : app.applied_loan_amount.toString()
+    )
     setInterestRate(app.scheme_interest_rate?.toString() || "12")
     setTenureMonths(app.loan_tenure_months.toString())
     setMoratoriumPeriod("0")
@@ -385,12 +402,29 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
     if (isNaN(amount)) return "Please enter a valid sanctioned amount"
     if (amount < 0) return "Sanctioned amount cannot be negative"
     if (amount === 0) return "Sanctioned amount must be greater than zero"
-    if (amount > Number(selectedApp.applied_loan_amount)) {
-      return `Sanctioned amount cannot exceed applied amount (${formatCurrency(selectedApp.applied_loan_amount)})`
+    if (amount > Number(selectedApp.applied_loan_amount)) return EXCEEDS_APPLIED_MSG
+    if (goldMaxSanction !== null && amount > goldMaxSanction) {
+      return `Sanctioned amount cannot exceed the gold Maximum Sanction Amount (${formatCurrency(goldMaxSanction)})`
     }
     return ""
   }
+  // Gold loans: Guidelines Value per Gram × Net Weight caps the sanction
+  const goldMaxSanction =
+    selectedApp?.gold_max_sanction_amount != null && Number.isFinite(Number(selectedApp.gold_max_sanction_amount))
+      ? Number(selectedApp.gold_max_sanction_amount)
+      : null
+  const maxSanctionable = selectedApp
+    ? Math.min(Number(selectedApp.applied_loan_amount), goldMaxSanction ?? Infinity)
+    : 0
   const amountError = getAmountError()
+  const exceedsApplied = amountError === EXCEEDS_APPLIED_MSG
+
+  // Shows the popup when the amount is above the applied amount; returns true if shown
+  const checkExceedsApplied = () => {
+    if (!exceedsApplied) return false
+    setShowExceedsAppliedPopup(true)
+    return true
+  }
 
   // Validate form
   const validateForm = (): boolean => {
@@ -404,6 +438,8 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
       setFormError("Please enter a valid sanctioned amount")
       return false
     }
+
+    if (checkExceedsApplied()) return false
 
     if (amountError) {
       setFormError(amountError)
@@ -430,13 +466,21 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
       return false
     }
 
+    if (repaymentMethod === "FIXED_PRINCIPAL" && !isFixedPrincipalFrequency(repaymentFrequency)) {
+      setFormError("Please select a repayment frequency: Monthly, Quarterly, Half Yearly or Yearly")
+      return false
+    }
+
     return true
   }
 
   // Process approval
   const processApproval = async () => {
     if (!selectedApp) return
-    if (!validateForm()) return
+    if (!validateForm()) {
+      setShowConfirmDialog(false)
+      return
+    }
 
     setIsSubmitting(true)
     setFormError("")
@@ -581,7 +625,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                 <Calendar className="h-3 w-3" />
                 Application Date
               </div>
-              <p className="mt-1 font-medium">{new Date(selectedApp.application_date).toLocaleDateString("en-IN")}</p>
+              <p className="mt-1 font-medium">{formatDate(selectedApp.application_date)}</p>
             </div>
             <div className="rounded-lg border p-3 bg-muted/30">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -676,19 +720,33 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                     type="number"
                     placeholder="Enter amount"
                     min="0"
-                    max={selectedApp.applied_loan_amount}
+                    max={maxSanctionable}
                     value={sanctionedAmount}
+                    ref={sanctionedAmountRef}
                     onChange={(e) => setSanctionedAmount(e.target.value)}
                     aria-invalid={!!amountError}
                     className={`pl-9 ${NO_SPINNER_CLASS} ${amountError ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                     {...noStepProps}
+                    onBlur={() => checkExceedsApplied()}
+                    onKeyDown={(e) => {
+                      noStepProps.onKeyDown(e)
+                      if (e.key === "Enter") checkExceedsApplied()
+                    }}
                   />
                 </div>
                 {amountError ? (
                   <p className="text-xs text-red-500">{amountError}</p>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    Max: {formatCurrency(selectedApp.applied_loan_amount)}
+                    Max: {formatCurrency(maxSanctionable)}
+                    {goldMaxSanction !== null && (
+                      <>
+                        {" "}· Gold Maximum Sanction Amount {formatCurrency(goldMaxSanction)}
+                        {selectedApp.gold_guideline_value_per_gram
+                          ? ` (${formatCurrency(Number(selectedApp.gold_guideline_value_per_gram))}/g × net weight)`
+                          : ""}
+                      </>
+                    )}
                   </p>
                 )}
               </div>
@@ -775,7 +833,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                     <SelectValue placeholder="Select repayment frequency" />
                   </SelectTrigger>
                   <SelectContent>
-                    {REPAYMENT_FREQUENCY_OPTIONS.map((option) => (
+                    {frequencyOptionsFor(repaymentMethod).map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>
@@ -885,7 +943,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                   setShowConfirmDialog(true)
                 }
               }}
-              disabled={!calculatedEMI || !!amountError}
+              disabled={(!calculatedEMI && !exceedsApplied) || (!!amountError && !exceedsApplied)}
             >
               <CheckCircle className="mr-2 h-4 w-4" />
               Approve & Sanction
@@ -895,6 +953,40 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
       </Card>
 
       {/* Repayment Schedule Dialog */}
+      {/* Sanction Amount greater than Loan Amount Applied */}
+      <Dialog open={showExceedsAppliedPopup} onOpenChange={setShowExceedsAppliedPopup}>
+        <DialogContent
+          className="sm:max-w-md"
+          showCloseButton={false}
+          onCloseAutoFocus={(e) => {
+            // Back to the Sanction Amount field so it can be corrected
+            e.preventDefault()
+            sanctionedAmountRef.current?.focus()
+            sanctionedAmountRef.current?.select()
+          }}
+        >
+          <DialogHeader className="items-center text-center sm:text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-100">
+              <XCircle className="h-8 w-8 text-red-600" aria-hidden="true" />
+            </div>
+            <DialogTitle className="text-red-700">Invalid Sanction Amount</DialogTitle>
+            <DialogDescription className="text-base text-foreground">
+              {EXCEEDS_APPLIED_MSG}
+            </DialogDescription>
+            {selectedApp && (
+              <p className="text-sm text-muted-foreground">
+                Loan Amount Applied: {formatCurrency(selectedApp.applied_loan_amount)}
+              </p>
+            )}
+          </DialogHeader>
+          <DialogFooter className="sm:justify-center">
+            <Button variant="destructive" className="min-w-24" onClick={() => setShowExceedsAppliedPopup(false)}>
+              OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
         <DialogContent className="max-w-4xl max-h-[80vh]">
           <DialogHeader>
@@ -919,7 +1011,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                 {emiSchedule.map((item) => (
                   <TableRow key={item.installment_no}>
                     <TableCell>{item.installment_no}</TableCell>
-                    <TableCell>{new Date(item.due_date).toLocaleDateString("en-IN")}</TableCell>
+                    <TableCell>{formatDate(item.due_date)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(item.principal)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(item.interest)}</TableCell>
                     <TableCell className="text-right font-medium">{formatCurrency(item.total)}</TableCell>
@@ -992,7 +1084,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">First Installment Date:</span>
-              <span>{installmentStartDate ? new Date(installmentStartDate).toLocaleDateString("en-IN") : "-"}</span>
+              <span>{installmentStartDate ? formatDate(installmentStartDate) : "-"}</span>
             </div>
             {/* <div className="flex justify-between text-sm border-t pt-2">
               <span className="font-semibold">

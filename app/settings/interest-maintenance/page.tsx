@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate as formatDisplayDate } from "@/lib/date-format"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -217,11 +218,7 @@ export default function InterestMaintenancePage() {
 
   function formatDate(dateStr: string | null) {
     if (!dateStr) return "-"
-    return new Date(dateStr).toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    })
+    return formatDisplayDate(dateStr)
   }
 
   function getProductName(code: string) {

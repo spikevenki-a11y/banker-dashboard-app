@@ -1,5 +1,6 @@
 import AuthGuard from "@/components/AuthGuard"
 import { AuthProvider } from "@/lib/auth-context"
+import { NumberInputGuard } from "@/components/number-input-guard"
 import "./globals.css"
 import { Geist, Geist_Mono } from "next/font/google"
 
@@ -10,6 +11,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className={`font-sans antialiased`}>
+        <NumberInputGuard />
         <AuthProvider>
           {/* <AuthGuard> */}
             {children}

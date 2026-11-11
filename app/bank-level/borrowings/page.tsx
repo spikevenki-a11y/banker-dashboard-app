@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate as formatDisplayDate } from "@/lib/date-format"
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
@@ -129,7 +130,7 @@ function formatCurrency(val: number | string) {
 
 function formatDate(d: string) {
   if (!d) return "---"
-  return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+  return formatDisplayDate(d)
 }
 
 export default function BorrowingsPage() {

@@ -4,7 +4,7 @@ import pool from "@/lib/connection/db"
 import {
   buildRepaymentSchedule,
   effectiveFrequency,
-  isRepaymentFrequency,
+  isFixedPrincipalFrequency,
   isRepaymentMethod,
 } from "@/lib/loan-repayment-schedule"
 
@@ -79,7 +79,26 @@ export async function POST(request: NextRequest) {
       }
       if (requestedAmount > parseFloat(app.applied_loan_amount)) {
         await client.query("ROLLBACK")
-        return NextResponse.json({ error: "Sanctioned amount cannot exceed the applied amount" }, { status: 400 })
+        return NextResponse.json({ error: "Sanction Amount cannot be greater than Loan Amount Applied." }, { status: 400 })
+      }
+
+      // Gold security: cannot exceed the Maximum Sanction Amount stored with the
+      // application (Guidelines Value per Gram × Net Weight)
+      const { rows: goldCap } = await client.query(
+        `SELECT SUM(gd.max_sanction_amount)::float8 AS max_sanction_amount
+           FROM loan_securities sec
+           JOIN security_gold_details gd ON gd.security_id = sec.id
+          WHERE sec.loan_application_id = $1 AND sec.branch_id = $2`,
+        [loan_application_id, branchId]
+      )
+      const goldMaxSanction = goldCap[0]?.max_sanction_amount
+      if (goldMaxSanction != null && requestedAmount > Number(goldMaxSanction)) {
+        await client.query("ROLLBACK")
+        const cap = Number(goldMaxSanction).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        return NextResponse.json(
+          { error: `Sanctioned amount cannot exceed the gold Maximum Sanction Amount (₹${cap})` },
+          { status: 400 }
+        )
       }
 
       // Repayment Type + Frequency (On Maturity always repays at Closing Time)
@@ -87,9 +106,13 @@ export async function POST(request: NextRequest) {
         await client.query("ROLLBACK")
         return NextResponse.json({ error: "Please select a valid repayment type" }, { status: 400 })
       }
-      if (repayment_method === "FIXED_PRINCIPAL" && !isRepaymentFrequency(repayment_type)) {
+      // Fixed Principal: Monthly, Quarterly, Half Yearly or Yearly (never Closing Time)
+      if (repayment_method === "FIXED_PRINCIPAL" && !isFixedPrincipalFrequency(repayment_type)) {
         await client.query("ROLLBACK")
-        return NextResponse.json({ error: "Please select a valid repayment frequency" }, { status: 400 })
+        return NextResponse.json(
+          { error: "Please select a repayment frequency: Monthly, Quarterly, Half Yearly or Yearly" },
+          { status: 400 }
+        )
       }
       const repaymentFrequency = effectiveFrequency(repayment_method, repayment_type)
 

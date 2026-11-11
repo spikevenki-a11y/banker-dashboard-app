@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate } from "@/lib/date-format"
 import { useState, useRef, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,7 +20,7 @@ import { downloadPdf } from "../_components/download-pdf"
 const fmt = (n: number | string | null | undefined) =>
   `₹${Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const fmtDate = (d: string | null) =>
-  d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"
+  d ? formatDate(d) : "—"
 
 const STATUS_MAP: Record<number, { label: string; color: string }> = {
   1:  { label: "Active",            color: "border-teal-300 text-teal-700" },

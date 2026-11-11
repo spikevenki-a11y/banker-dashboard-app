@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate } from "@/lib/date-format"
 import { useState, useEffect, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
@@ -695,7 +696,7 @@ export default function LoanDisbursementPage() {
                     {selectedLoan.sanction_date && (
                       <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
                         <Calendar className="h-4 w-4" />
-                        Sanctioned on: {new Date(selectedLoan.sanction_date).toLocaleDateString("en-IN")}
+                        Sanctioned on: {formatDate(selectedLoan.sanction_date)}
                       </div>
                     )}
                   </CardContent>
@@ -723,7 +724,7 @@ export default function LoanDisbursementPage() {
                         <div className="space-y-2">
                           <Label>Transaction Date</Label>
                           <div className="rounded-md border border-input bg-muted/50 px-3 py-2 text-sm">
-                            {identity?.businessDate || "Loading..."}
+                            {formatDate(identity?.businessDate, "Loading...")}
                           </div>
                         </div>
                       </div>

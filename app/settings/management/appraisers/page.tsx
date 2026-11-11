@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate } from "@/lib/date-format"
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -73,7 +74,7 @@ const accountTypeLabel = (value: string | null) =>
 
 const formatHistoryValue = (field: string, value: string | null) => {
   if (value === null || value === "") return "—"
-  if (field === "license_valid_till") return new Date(value).toLocaleDateString("en-IN")
+  if (field === "license_valid_till") return formatDate(value)
   if (field === "status") return value === "ACTIVE" ? "Active" : "Inactive"
   if (field === "account_type") return accountTypeLabel(value)
   return value
@@ -301,7 +302,7 @@ export default function AppraisersPage() {
                       <TableCell>
                         {a.license_valid_till ? (
                           <span className={isLicenseExpired(a.license_valid_till) ? "text-destructive font-medium" : ""}>
-                            {new Date(a.license_valid_till).toLocaleDateString("en-IN")}
+                            {formatDate(a.license_valid_till)}
                             {isLicenseExpired(a.license_valid_till) && " (Expired)"}
                           </span>
                         ) : (

@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate as formatDisplayDate } from "@/lib/date-format"
 import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -58,6 +59,9 @@ type ClosureAccount = {
   penaltyAmount: number
   payoutAmount: number
   prematureClosureAllowed: boolean
+  /** Interest policy rule that stops premature closure (deposits opened under a policy) */
+  prematureBlockedReason?: string | null
+  interestPolicyName?: string | null
   interestdueforpayment : number
   interestPaidFromTransactions?: number
   interestPayoutCount?: number
@@ -183,7 +187,7 @@ function formatCurrency(val: number | string | null | undefined) {
 
 function formatDate(d: string | null | undefined) {
   if (!d) return "--"
-  return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+  return formatDisplayDate(d)
 }
 
 const depositTypeLabels: Record<string, string> = {
@@ -489,6 +493,7 @@ function DepositClosureContent() {
   const confirmTotalInterestEarned = confirmInterestPaid + confirmInterestDue
 
   const canSubmit = account &&
+    !account.prematureBlockedReason &&
     voucherType &&
     effectivePayout >= 0 &&
     (voucherType !== "DEFAULT_TRANSFER" || (creditEntries.some((e) => e.selected) && creditMatchesPayout)) &&
@@ -883,7 +888,13 @@ function DepositClosureContent() {
                             </div>
                             <p className="text-xs text-orange-700 dark:text-orange-400 mb-3">
                               Penal rate: {account.prematurePenalRate}% on interest earned
+                              {account.interestPolicyName ? ` · Interest policy: ${account.interestPolicyName}` : ""}
                             </p>
+                            {account.prematureBlockedReason && (
+                              <p className="mb-3 rounded border border-red-200 bg-red-50 px-2 py-1.5 text-xs font-medium text-red-700">
+                                {account.prematureBlockedReason}
+                              </p>
+                            )}
                             <div className="flex items-center gap-3">
                               <Label htmlFor="penalty" className="text-xs text-orange-700 dark:text-orange-400 whitespace-nowrap">
                                 Penalty Amount
@@ -1439,7 +1450,7 @@ function DepositClosureContent() {
                           {[
                             { label: "Total Assets",      value: fmt(viewMemberSummary.total_assets),      color: "text-teal-700 bg-teal-50 border-teal-200" },
                             { label: "Total Accounts",    value: String(viewMemberAssets.length),          color: "text-blue-700 bg-blue-50 border-blue-200" },
-                            { label: "Net Worth",         value: fmt(viewMemberSummary.net_worth),         color: "text-green-700 bg-green-50 border-green-200" },
+                            // { label: "Net Worth",         value: fmt(viewMemberSummary.net_worth),         color: "text-green-700 bg-green-50 border-green-200" },
                           ].map(({ label, value, color }) => (
                             <div key={label} className={`rounded-lg border p-3 text-center ${color}`}>
                               <p className="text-xs opacity-70">{label}</p>
@@ -1529,7 +1540,7 @@ function DepositClosureContent() {
                                   <TableRow key={i}>
                                     <TableCell className="text-xs">
                                       <p className="font-medium">{loan.scheme_name}</p>
-                                      {loan.sanction_date && <p className="text-muted-foreground text-xs">{loan.sanction_date}</p>}
+                                      {loan.sanction_date && <p className="text-muted-foreground text-xs">{formatDisplayDate(loan.sanction_date)}</p>}
                                     </TableCell>
                                     <TableCell className="text-xs text-right">{fmt(loan.sanctioned_amount)}</TableCell>
                                     <TableCell className="text-xs text-right font-semibold text-red-600">{fmt(loan.outstanding_balance)}</TableCell>

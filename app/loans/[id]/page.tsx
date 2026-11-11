@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate as formatDisplayDate } from "@/lib/date-format"
 import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
@@ -204,7 +205,7 @@ function formatCurrency(val: number | string | null | undefined) {
 
 function formatDate(d: string | null | undefined) {
   if (!d) return "---"
-  return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+  return formatDisplayDate(d)
 }
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {

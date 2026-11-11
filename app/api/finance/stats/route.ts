@@ -1,16 +1,22 @@
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
+import { getSession } from "@/lib/auth/session"
 
 export async function GET() {
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const branchId = session.branch
+
   try {
     // Get total deposits (savings + fixed deposits)
     const depositsQuery = await pool.query(`
-      SELECT 
+      SELECT
         COALESCE(SUM(sa.clear_balance), 0) as savings_total,
-        COALESCE((SELECT SUM(da.clearbalance) FROM deposit_account da WHERE da.accountstatus = 1), 0) as fd_total
-      FROM savings_accounts sa 
+        COALESCE((SELECT SUM(da.clearbalance) FROM deposit_account da WHERE da.accountstatus = 1 AND da.branch_id = $1), 0) as fd_total
+      FROM savings_accounts sa
       WHERE sa.account_status = 'active'
-    `)
+        AND sa.branch_id = $1
+    `, [branchId])
 
     const savingsTotal = parseFloat(depositsQuery.rows[0]?.savings_total || 0)
     const fdTotal = parseFloat(depositsQuery.rows[0]?.fd_total || 0)
@@ -21,7 +27,8 @@ export async function GET() {
       SELECT COALESCE(SUM(loan_outstanding), 0) as total_loans
       FROM loan_applications
       WHERE application_status IN ('disbursed', 'active')
-    `)
+        AND branch_id = $1
+    `, [branchId])
     const totalLoans = parseFloat(loansQuery.rows[0]?.total_loans || 0)
 
     // Get interest earned (from income accounts - loan interest, etc.)
@@ -29,7 +36,8 @@ export async function GET() {
       SELECT COALESCE(SUM(credit_amount), 0) as interest_earned
       FROM income_transactions
       WHERE description ILIKE '%interest%'
-    `)
+        AND branch_id = $1
+    `, [branchId])
     const interestEarned = parseFloat(interestEarnedQuery.rows[0]?.interest_earned || 0)
 
     // Get interest paid (from expense accounts - FD interest, savings interest, etc.)
@@ -37,34 +45,41 @@ export async function GET() {
       SELECT COALESCE(SUM(debit_amount), 0) as interest_paid
       FROM expense_transactions
       WHERE description ILIKE '%interest%'
-    `)
+        AND branch_id = $1
+    `, [branchId])
     const interestPaid = parseFloat(interestPaidQuery.rows[0]?.interest_paid || 0)
 
     // Get income by category
     const incomeByCategory = await pool.query(`
-      SELECT 
+      SELECT
         ia.account_name,
         ia.current_balance,
         COALESCE(SUM(it.credit_amount), 0) as total_income
       FROM income_accounts ia
-      LEFT JOIN income_transactions it ON ia.account_number = it.account_number
+      LEFT JOIN income_transactions it
+        ON ia.account_number = it.account_number
+        AND it.branch_id = $1
       WHERE ia.account_status = 'active'
+        AND ia.branch_id = $1
       GROUP BY ia.account_number, ia.account_name, ia.current_balance
       ORDER BY total_income DESC
-    `)
+    `, [branchId])
 
     // Get expenses by category
     const expensesByCategory = await pool.query(`
-      SELECT 
+      SELECT
         ea.account_name,
         ea.current_balance,
         COALESCE(SUM(et.debit_amount), 0) as total_expense
       FROM expense_accounts ea
-      LEFT JOIN expense_transactions et ON ea.account_number = et.account_number
+      LEFT JOIN expense_transactions et
+        ON ea.account_number = et.account_number
+        AND et.branch_id = $1
       WHERE ea.account_status = 'active'
+        AND ea.branch_id = $1
       GROUP BY ea.account_number, ea.account_name, ea.current_balance
       ORDER BY total_expense DESC
-    `)
+    `, [branchId])
 
     // Get monthly trends (last 12 months)
     const monthlyTrends = await pool.query(`
@@ -76,30 +91,33 @@ export async function GET() {
         ) as month
       ),
       monthly_deposits AS (
-        SELECT 
+        SELECT
           date_trunc('month', transaction_date) as month,
           SUM(credit_amount) as deposits
         FROM savings_transactions
         WHERE transaction_date >= CURRENT_DATE - interval '12 months'
+          AND branch_id = $1
         GROUP BY date_trunc('month', transaction_date)
       ),
       monthly_income AS (
-        SELECT 
+        SELECT
           date_trunc('month', transaction_date) as month,
           SUM(credit_amount) as income
         FROM income_transactions
         WHERE transaction_date >= CURRENT_DATE - interval '12 months'
+          AND branch_id = $1
         GROUP BY date_trunc('month', transaction_date)
       ),
       monthly_expenses AS (
-        SELECT 
+        SELECT
           date_trunc('month', transaction_date) as month,
           SUM(debit_amount) as expenses
         FROM expense_transactions
         WHERE transaction_date >= CURRENT_DATE - interval '12 months'
+          AND branch_id = $1
         GROUP BY date_trunc('month', transaction_date)
       )
-      SELECT 
+      SELECT
         to_char(m.month, 'Mon') as month_name,
         COALESCE(md.deposits, 0) as deposits,
         COALESCE(mi.income, 0) as income,
@@ -109,7 +127,7 @@ export async function GET() {
       LEFT JOIN monthly_income mi ON m.month = mi.month
       LEFT JOIN monthly_expenses me ON m.month = me.month
       ORDER BY m.month
-    `)
+    `, [branchId])
 
     // Get loan disbursements for monthly trend
     const loanDisbursements = await pool.query(`
@@ -120,46 +138,48 @@ export async function GET() {
           interval '1 month'
         ) as month
       )
-      SELECT 
+      SELECT
         to_char(m.month, 'Mon') as month_name,
         COALESCE(SUM(ltd.debit_amount), 0) as loans_disbursed
       FROM months m
       LEFT JOIN loan_transaction_details ltd ON date_trunc('month', ltd.transaction_date) = m.month
         AND ltd.transaction_type = 'disbursement'
+        AND ltd.branch_id = $1
       GROUP BY m.month
       ORDER BY m.month
-    `)
+    `, [branchId])
 
     // Portfolio distribution
     const portfolioQuery = await pool.query(`
-      SELECT 
-        'Savings Accounts' as name, 
+      SELECT
+        'Savings Accounts' as name,
         COALESCE(SUM(clear_balance), 0)::numeric as value,
         'hsl(var(--chart-1))' as color
-      FROM savings_accounts WHERE account_status = 'active'
+      FROM savings_accounts WHERE account_status = 'active' AND branch_id = $1
       UNION ALL
-      SELECT 
-        'Fixed Deposits' as name, 
+      SELECT
+        'Fixed Deposits' as name,
         COALESCE(SUM(clearbalance), 0)::numeric as value,
         'hsl(var(--chart-2))' as color
-      FROM deposit_account WHERE accountstatus = 1
+      FROM deposit_account WHERE accountstatus = 1 AND branch_id = $1
       UNION ALL
-      SELECT 
-        'Active Loans' as name, 
+      SELECT
+        'Active Loans' as name,
         COALESCE(SUM(loan_outstanding), 0)::numeric as value,
         'hsl(var(--chart-3))' as color
-      FROM loan_applications WHERE application_status IN ('disbursed', 'active')
-    `)
+      FROM loan_applications WHERE application_status IN ('disbursed', 'active') AND branch_id = $1
+    `, [branchId])
 
     // Get today's transactions summary
     const todayTransactions = await pool.query(`
-      SELECT 
+      SELECT
         COUNT(*) as transaction_count,
         COALESCE(SUM(credit_amount), 0) as total_credits,
         COALESCE(SUM(debit_amount), 0) as total_debits
       FROM gl_batch_lines
       WHERE business_date = CURRENT_DATE
-    `)
+        AND branch_id = $1
+    `, [branchId])
 
     // Combine monthly trends
     const monthlyData = monthlyTrends.rows.map((row, index) => ({

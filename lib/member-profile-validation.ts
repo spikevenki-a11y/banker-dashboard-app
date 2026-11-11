@@ -284,6 +284,6 @@ export function validateAadhaar(value: unknown): string | null {
   if (!/^\d+$/.test(a)) return "Aadhaar number must contain digits only"
   if (a.length !== 12) return "Aadhaar number must be exactly 12 digits"
   if (/^[01]/.test(a)) return "Aadhaar number cannot start with 0 or 1"
-  if (!verhoeffValid(a)) return "Invalid Aadhaar number — checksum verification failed. Please check the number and re-enter."
+  if (!verhoeffValid(a)) return "Invalid Aadhaar number . Please check the number and re-enter."
   return null
 }

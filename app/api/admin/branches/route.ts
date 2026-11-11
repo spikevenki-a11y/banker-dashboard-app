@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
+import { getSession } from "@/lib/auth/session"
 
 export async function GET() {
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  if (session.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+
   try {
     const result = await pool.query(
       `SELECT * FROM branchparameters ORDER BY branch_id ASC`
@@ -15,6 +20,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  if (session.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+
   try {
     const { branch_name, branch_code, city, state, phone_number, email, is_head_office } = await request.json()
 

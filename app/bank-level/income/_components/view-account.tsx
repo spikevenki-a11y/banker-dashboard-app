@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate } from "@/lib/date-format"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -196,22 +197,14 @@ export default function ViewAccount({ accountNumber, onBack }: ViewAccountProps)
             <div>
               <p className="text-sm font-medium text-muted-foreground mb-1">Opening Date</p>
               <p className="text-lg">
-                {new Date(account.opening_date).toLocaleDateString('en-IN', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })}
+                {formatDate(account.opening_date)}
               </p>
             </div>
 
             <div>
               <p className="text-sm font-medium text-muted-foreground mb-1">Created Date</p>
               <p className="text-lg">
-                {new Date(account.created_at).toLocaleDateString('en-IN', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })}
+                {formatDate(account.created_at)}
               </p>
             </div>
 
@@ -219,11 +212,7 @@ export default function ViewAccount({ accountNumber, onBack }: ViewAccountProps)
               <div>
                 <p className="text-sm font-medium text-muted-foreground mb-1">Closing Date</p>
                 <p className="text-lg">
-                  {new Date(account.closing_date).toLocaleDateString('en-IN', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
+                  {formatDate(account.closing_date)}
                 </p>
               </div>
             )}
