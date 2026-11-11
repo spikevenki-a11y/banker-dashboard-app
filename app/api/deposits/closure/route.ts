@@ -4,6 +4,25 @@ import pool from "@/lib/connection/db"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
 import { openGlVoucher, lockOpenTransferBatch, insertGlLine, type GlVoucherType } from "@/lib/gl-voucher"
 
+
+// Premature closure rule of the interest policy a deposit was opened under:
+// the reason closure is not allowed yet, or null when it is allowed
+function policyPrematureBlock(policy: any, openDate: any, businessDate: string): string | null {
+  if (!policy) return null
+  if (policy.premature_closure_allowed === false) {
+    return `Premature closure is not allowed for this deposit (interest policy "${policy.policy_name}").`
+  }
+  const lockIn = Number(policy.premature_lock_in_days) || 0
+  if (lockIn > 0 && openDate && businessDate) {
+    const open = new Date(typeof openDate === "string" ? openDate : new Date(openDate).toISOString())
+    const elapsed = Math.floor((new Date(businessDate).getTime() - open.getTime()) / (1000 * 60 * 60 * 24))
+    if (elapsed < lockIn) {
+      return `Premature closure is allowed only after ${lockIn} days from opening (${elapsed} days so far).`
+    }
+  }
+  return null
+}
+
 export async function GET(request: NextRequest) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -25,6 +44,7 @@ export async function GET(request: NextRequest) {
         da.id, da.accountnumber, da.deposittype, da.membership_no,
         da.accountopendate, da.rateofinterest, da.clearbalance, da.unclearbalance,
         da.accountstatus, da.schemeid, da.interestpaidamount, da.interestdueforpayment,
+        da.interest_policy_snapshot,
         ds.scheme_name, ds.deposit_gl_account, ds.interest_expense_gl_account,
         ds.interest_payable_gl_account, ds.premature_closure_allowed, ds.premature_penal_rate,
         c.full_name AS member_name,
@@ -62,7 +82,13 @@ export async function GET(request: NextRequest) {
     // Determine if premature, relative to the bank's current business date (not the server clock)
     const maturityDate = account.td_maturity_date || account.rd_maturity_date || null
     const isPremature = maturityDate ? new Date(maturityDate) > new Date(businessDate) : false
-    const prematurePenalRate = Number(account.premature_penal_rate) || 0
+    // Deposits opened under an interest policy keep that policy's premature rules;
+    // older deposits use the scheme's, as before
+    const policy = account.interest_policy_snapshot
+    const prematurePenalRate = policy
+      ? Number(policy.premature_penal_rate) || 0
+      : Number(account.premature_penal_rate) || 0
+    const prematureBlockedReason = isPremature ? policyPrematureBlock(policy, account.accountopendate, businessDate) : null
 
     // For premature closure, calculate penalty on interest
     let penaltyAmount = 0
@@ -134,7 +160,9 @@ export async function GET(request: NextRequest) {
         prematurePenalRate,
         penaltyAmount,
         payoutAmount,
-        prematureClosureAllowed: account.premature_closure_allowed,
+        prematureClosureAllowed: policy ? !prematureBlockedReason : account.premature_closure_allowed,
+        prematureBlockedReason,
+        interestPolicyName: policy ? `${policy.policy_name} (v${policy.version_no})` : null,
         interestdueforpayment : account.interestdueforpayment,
         interestPaidFromTransactions: Number(payoutTotals?.total_paid) || 0,
         interestPayoutCount: parseInt(payoutTotals?.payout_count || "0"),
@@ -252,6 +280,22 @@ export async function POST(request: NextRequest) {
     if (account.accountstatus !== 1 && account.accountstatus !== 2 && account.accountstatus !== 5) {
       await client.query("ROLLBACK")
       return NextResponse.json({ error: "Account is already closed. Only active or matured accounts can be closed." }, { status: 400 })
+    }
+
+    // Deposit opened under an interest policy: its premature closure rules apply
+    if (account.interest_policy_snapshot) {
+      const { rows: [td] } = await client.query(
+        `SELECT TO_CHAR(maturitydate, 'YYYY-MM-DD') AS maturity_date FROM term_deposit_details WHERE accountnumber = $1`,
+        [account.accountnumber]
+      )
+      const isPrematureNow = td?.maturity_date ? td.maturity_date > String(businessDate) : false
+      const blocked = isPrematureNow
+        ? policyPrematureBlock(account.interest_policy_snapshot, account.accountopendate, businessDate)
+        : null
+      if (blocked) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: blocked }, { status: 400 })
+      }
     }
 
     // A closure already posted and awaiting verification must not be posted again

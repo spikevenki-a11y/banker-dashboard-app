@@ -59,6 +59,9 @@ type ClosureAccount = {
   penaltyAmount: number
   payoutAmount: number
   prematureClosureAllowed: boolean
+  /** Interest policy rule that stops premature closure (deposits opened under a policy) */
+  prematureBlockedReason?: string | null
+  interestPolicyName?: string | null
   interestdueforpayment : number
   interestPaidFromTransactions?: number
   interestPayoutCount?: number
@@ -490,6 +493,7 @@ function DepositClosureContent() {
   const confirmTotalInterestEarned = confirmInterestPaid + confirmInterestDue
 
   const canSubmit = account &&
+    !account.prematureBlockedReason &&
     voucherType &&
     effectivePayout >= 0 &&
     (voucherType !== "DEFAULT_TRANSFER" || (creditEntries.some((e) => e.selected) && creditMatchesPayout)) &&
@@ -884,7 +888,13 @@ function DepositClosureContent() {
                             </div>
                             <p className="text-xs text-orange-700 dark:text-orange-400 mb-3">
                               Penal rate: {account.prematurePenalRate}% on interest earned
+                              {account.interestPolicyName ? ` · Interest policy: ${account.interestPolicyName}` : ""}
                             </p>
+                            {account.prematureBlockedReason && (
+                              <p className="mb-3 rounded border border-red-200 bg-red-50 px-2 py-1.5 text-xs font-medium text-red-700">
+                                {account.prematureBlockedReason}
+                              </p>
+                            )}
                             <div className="flex items-center gap-3">
                               <Label htmlFor="penalty" className="text-xs text-orange-700 dark:text-orange-400 whitespace-nowrap">
                                 Penalty Amount

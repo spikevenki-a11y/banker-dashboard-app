@@ -1163,7 +1163,7 @@ export default function LoanApplicationPage() {
 
                     <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-2">
-                        <Label>Loan Amount *</Label>
+                        <Label>Loan Amount Applied *</Label>
                         <Input type="number" placeholder="Enter amount" value={loanAmount} onChange={(e) => setLoanAmount(e.target.value)} />
                       </div>
                       <div className="space-y-2">

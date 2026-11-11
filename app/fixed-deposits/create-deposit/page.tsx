@@ -27,6 +27,7 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from 
 import { ArrowLeft, Search, Loader2, CheckCircle2, User, Banknote, Calendar, Wallet, TrendingUp, TrendingDown, Shield, ShieldCheck, RefreshCw, Info, Users, X, Eye, MapPin, Camera, PenTool, BarChart3, Printer } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { NomineeEditor, nomineeTotals, type NomineeEntry } from "@/components/nominee-editor"
+import { computeTermMaturity, labelOf, COMPOUNDING_FREQUENCIES, type AppliedPolicy } from "@/lib/fd-interest-policy"
 
 type MemberInfo = {
   membership_no: string
@@ -179,6 +180,11 @@ export default function CreateDepositPage() {
   const [renewalPeriodDays, setRenewalPeriodDays] = useState("")
   const [renewalWithInterest, setRenewalWithInterest] = useState(false)
   const [interestPayoutFrequency, setInterestPayoutFrequency] = useState("ON_MATURITY")
+  // Interest policy for this scheme, tenure and member (Settings → Interest Policy Configuration)
+  const [appliedPolicy, setAppliedPolicy] = useState<AppliedPolicy | null>(null)
+  const [policyStatus, setPolicyStatus] = useState<"idle" | "loading" | "done" | "error">("idle")
+  // Member's date of birth and age on the opening date (decides Regular / Senior Citizen)
+  const [policyMember, setPolicyMember] = useState<{ date_of_birth: string | null; age: number | null } | null>(null)
   const [interestCalcMethod, setInterestCalcMethod] = useState("SIMPLE")
   const [prematureClosureAllowed, setPrematureClosureAllowed] = useState(true)
   const [prematurePenalRate, setPrematurePenalRate] = useState("")
@@ -416,6 +422,55 @@ const getLogindate = async () => {
     }
   }
 
+  // Look up the interest policy whenever the scheme, period or member changes.
+  // No policy: the scheme's rate applies, as before.
+  const policySchemeId = selectedScheme?.scheme_id
+  const policySchemeRate = selectedScheme?.interest_rate
+  const policyMemberNo = memberInfo?.membership_no
+  useEffect(() => {
+    const months = Number(periodMonths) || 0
+    const days = Number(periodDays) || 0
+    if (depositType !== "TERM" || !policySchemeId || (months <= 0 && days <= 0)) {
+      setAppliedPolicy(null)
+      setPolicyMember(null)
+      setPolicyStatus("idle")
+      if (depositType === "TERM" && policySchemeRate != null) setRateOfInterest(String(policySchemeRate))
+      return
+    }
+    let cancelled = false
+    setPolicyStatus("loading")
+    const timer = setTimeout(async () => {
+      try {
+        const qs = new URLSearchParams({
+          scheme_id: String(policySchemeId),
+          period_months: String(months),
+          period_days: String(days),
+          membership_no: policyMemberNo ? String(policyMemberNo) : "",
+        })
+        const res = await fetch(`/api/deposits/interest-policy?${qs}`, { credentials: "include" })
+        const data = await res.json()
+        if (cancelled) return
+        if (!res.ok) throw new Error(data.error)
+        const policy: AppliedPolicy | null = data.policy ?? null
+        setAppliedPolicy(policy)
+        setPolicyMember(data.member ?? null)
+        setRateOfInterest(String(policy ? policy.interest_rate : policySchemeRate ?? ""))
+        if (policy) setPrematurePenalRate(String(policy.premature_penal_rate))
+        setPolicyStatus("done")
+      } catch {
+        if (cancelled) return
+        setAppliedPolicy(null)
+        setPolicyMember(null)
+        setRateOfInterest(String(policySchemeRate ?? ""))
+        setPolicyStatus("error")
+      }
+    }, 300)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [depositType, policySchemeId, policySchemeRate, policyMemberNo, periodMonths, periodDays])
+
   // Resolve the deposit period against the opening date using real calendar month lengths
   // (28/29/30/31 days), rather than assuming every month is 30 days.
   const getPeriodEndInfo = (months: number, days: number) => {
@@ -436,6 +491,21 @@ const getLogindate = async () => {
     const rate = Number(rateOfInterest) || 0
 
     if (amt <= 0 || rate <= 0 || (months <= 0 && days <= 0)) return null
+
+    // Policy deposits: same calculation the server uses (compounding, rounding rule)
+    if (appliedPolicy && openingDate) {
+      const r = computeTermMaturity({
+        principal: amt,
+        annualRate: rate,
+        openDate: openingDate,
+        months,
+        days,
+        compounding: appliedPolicy.compounding_frequency,
+        rounding: appliedPolicy.maturity_rounding,
+        cumulative: interestPayoutFrequency === "ON_MATURITY",
+      })
+      return { interest: r.interest, maturityAmount: r.maturityAmount, maturityDate: r.maturityDate }
+    }
 
     const { endDate: matDate, totalDays } = getPeriodEndInfo(months, days)
     const interest = Math.round((amt * rate * totalDays) / (365 * 100))
@@ -525,7 +595,7 @@ const getLogindate = async () => {
       ["Deposit Amount", inr(Number(depositAmount))],
       ["Rate of Interest", `${Number(rateOfInterest) || selectedScheme?.interest_rate || 0}% p.a.`],
       ["Deposit Period", period],
-      ["Opening Date", openingDate ? formatDate(openingDate) : "---"],
+      ["Opening Date", openingDate ? formatDisplayDate(openingDate) : "---"],
       ["Maturity Date", maturityCalc?.maturityDate ? formatDate(maturityCalc.maturityDate) : "---"],
       ["Payout Frequency", freqLabel],
       ["Maturity Amount", maturityCalc ? inr(maturityCalc.maturityAmount) : "---"],
@@ -955,6 +1025,78 @@ const getLogindate = async () => {
                     {/* ========= TERM DEPOSIT (FD) ========= */}
                     {depositType === "TERM" && (
                       <>
+                        {/* Interest policy that applies (set in Settings → Interest Policy Configuration) */}
+                        {policyStatus !== "idle" && (
+                          <div
+                            className={`rounded-lg border p-3 text-sm ${
+                              appliedPolicy
+                                ? "border-teal-200 bg-teal-50/60 dark:border-teal-800 dark:bg-teal-950/30"
+                                : "border-border bg-muted/40"
+                            }`}
+                          >
+                            {policyStatus === "loading" ? (
+                              <span className="flex items-center gap-2 text-muted-foreground">
+                                <Loader2 className="h-4 w-4 animate-spin" /> Finding interest policy…
+                              </span>
+                            ) : (
+                              <>
+                              {/* Age on the opening date → interest category → rate */}
+                              <div className="mb-2 grid grid-cols-3 gap-2 rounded-md border bg-background/70 p-2 text-xs">
+                                <div>
+                                  <p className="text-muted-foreground">Member Age (on {formatDisplayDate(openingDate)})</p>
+                                  <p className="font-semibold">
+                                    {policyMember?.age != null ? `${policyMember.age} years` : "Date of birth not on record"}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">Interest Category</p>
+                                  <p className={`font-semibold ${appliedPolicy?.interest_category === "SENIOR_CITIZEN" ? "text-teal-700" : ""}`}>
+                                    {appliedPolicy?.interest_category === "SENIOR_CITIZEN" ? "Senior Citizen" : "Regular"}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">Interest Rate</p>
+                                  <p className="font-semibold">
+                                    {Number(rateOfInterest) || 0}% p.a.
+                                    {appliedPolicy?.senior_citizen_applied && appliedPolicy.senior_additional_rate > 0
+                                      ? ` (${appliedPolicy.regular_rate}% + ${appliedPolicy.senior_additional_rate}%)`
+                                      : ""}
+                                  </p>
+                                </div>
+                              </div>
+                              {appliedPolicy ? (
+                              <div className="space-y-1">
+                                <p className="font-medium text-teal-800 dark:text-teal-300">
+                                  Interest policy: {appliedPolicy.policy_name} (v{appliedPolicy.version_no})
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {appliedPolicy.senior_benefit_enabled
+                                    ? appliedPolicy.senior_citizen_applied
+                                      ? `Senior citizen benefit applied (age ${appliedPolicy.senior_min_age}+)`
+                                      : `Senior citizen benefit from age ${appliedPolicy.senior_min_age}${policyMember?.age == null ? " — date of birth needed" : " — not eligible"}`
+                                    : "No senior citizen benefit in this policy"}
+                                  {" · "}Tenure {appliedPolicy.tenure_days} days
+                                  {" · "}Compounding: {labelOf(COMPOUNDING_FREQUENCIES, appliedPolicy.compounding_frequency)}
+                                  {appliedPolicy.compounding_frequency !== "NONE" && interestPayoutFrequency !== "ON_MATURITY"
+                                    ? " (not applied: interest is paid out periodically)"
+                                    : ""}
+                                  {" · "}Premature closure:{" "}
+                                  {appliedPolicy.premature_closure_allowed
+                                    ? `allowed${appliedPolicy.premature_lock_in_days ? ` after ${appliedPolicy.premature_lock_in_days} days` : ""}, penal ${appliedPolicy.premature_penal_rate}% of interest`
+                                    : "not allowed"}
+                                </p>
+                              </div>
+                              ) : (
+                              <p className="text-xs text-muted-foreground">
+                                {policyStatus === "error"
+                                  ? "Could not check the interest policy; the scheme rate is shown."
+                                  : "No interest policy covers this scheme and tenure; the scheme rate applies."}
+                              </p>
+                              )}
+                              </>
+                            )}
+                          </div>
+                        )}
                         {/* Amount */}
                         <div>
                           {/* <h4 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wide">Deposit Amount</h4> */}

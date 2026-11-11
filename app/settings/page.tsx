@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Settings, Users, BookOpen, Percent, FileSpreadsheet, ShieldCheck, Terminal } from "lucide-react"
+import { Settings, Users, BookOpen, Percent, FileSpreadsheet, ShieldCheck, Terminal, Landmark } from "lucide-react"
 import { DashboardWrapper } from "../_components/dashboard-wrapper"
 
 const settingsCards = [
@@ -42,6 +42,15 @@ const settingsCards = [
     color: "text-rose-600",
     bgColor: "bg-rose-50",
     href: "/settings/interest-maintenance",
+  },
+  {
+    id: "fd-interest-policy",
+    title: "Interest Policy Configuration",
+    description: "Fixed deposit interest policies: rates by tenure and age, compounding, premature and maturity rules",
+    icon: Landmark,
+    color: "text-teal-600",
+    bgColor: "bg-teal-50",
+    href: "/settings/fd-interest-policy",
   },
   {
     id: "chart-of-accounts",

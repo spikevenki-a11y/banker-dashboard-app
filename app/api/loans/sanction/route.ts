@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
       }
       if (requestedAmount > parseFloat(app.applied_loan_amount)) {
         await client.query("ROLLBACK")
-        return NextResponse.json({ error: "Sanctioned amount cannot exceed the applied amount" }, { status: 400 })
+        return NextResponse.json({ error: "Sanction Amount cannot be greater than Loan Amount Applied." }, { status: 400 })
       }
 
       // Gold security: cannot exceed the Maximum Sanction Amount stored with the

@@ -1,7 +1,7 @@
 "use client"
 
 import { formatDate } from "@/lib/date-format"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -116,6 +116,8 @@ interface SanctionPanelProps {
 // arrow keys or mouse wheel — values are typed in only
 const NO_SPINNER_CLASS =
   "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+const EXCEEDS_APPLIED_MSG = "Sanction Amount cannot be greater than Loan Amount Applied."
+
 const noStepProps = {
   onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault()
@@ -183,6 +185,10 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
   // Processing state
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formError, setFormError] = useState("")
+
+  // Sanction Amount above Loan Amount Applied: centred error popup, then back to the field
+  const [showExceedsAppliedPopup, setShowExceedsAppliedPopup] = useState(false)
+  const sanctionedAmountRef = useRef<HTMLInputElement>(null)
 
   // Repayment Type change: On Maturity fixes the frequency to Closing Time;
   // Fixed Principal starts on Monthly and offers Monthly / Quarterly / Half Yearly /
@@ -396,9 +402,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
     if (isNaN(amount)) return "Please enter a valid sanctioned amount"
     if (amount < 0) return "Sanctioned amount cannot be negative"
     if (amount === 0) return "Sanctioned amount must be greater than zero"
-    if (amount > Number(selectedApp.applied_loan_amount)) {
-      return `Sanctioned amount cannot exceed applied amount (${formatCurrency(selectedApp.applied_loan_amount)})`
-    }
+    if (amount > Number(selectedApp.applied_loan_amount)) return EXCEEDS_APPLIED_MSG
     if (goldMaxSanction !== null && amount > goldMaxSanction) {
       return `Sanctioned amount cannot exceed the gold Maximum Sanction Amount (${formatCurrency(goldMaxSanction)})`
     }
@@ -413,6 +417,14 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
     ? Math.min(Number(selectedApp.applied_loan_amount), goldMaxSanction ?? Infinity)
     : 0
   const amountError = getAmountError()
+  const exceedsApplied = amountError === EXCEEDS_APPLIED_MSG
+
+  // Shows the popup when the amount is above the applied amount; returns true if shown
+  const checkExceedsApplied = () => {
+    if (!exceedsApplied) return false
+    setShowExceedsAppliedPopup(true)
+    return true
+  }
 
   // Validate form
   const validateForm = (): boolean => {
@@ -426,6 +438,8 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
       setFormError("Please enter a valid sanctioned amount")
       return false
     }
+
+    if (checkExceedsApplied()) return false
 
     if (amountError) {
       setFormError(amountError)
@@ -463,7 +477,10 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
   // Process approval
   const processApproval = async () => {
     if (!selectedApp) return
-    if (!validateForm()) return
+    if (!validateForm()) {
+      setShowConfirmDialog(false)
+      return
+    }
 
     setIsSubmitting(true)
     setFormError("")
@@ -705,10 +722,16 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                     min="0"
                     max={maxSanctionable}
                     value={sanctionedAmount}
+                    ref={sanctionedAmountRef}
                     onChange={(e) => setSanctionedAmount(e.target.value)}
                     aria-invalid={!!amountError}
                     className={`pl-9 ${NO_SPINNER_CLASS} ${amountError ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                     {...noStepProps}
+                    onBlur={() => checkExceedsApplied()}
+                    onKeyDown={(e) => {
+                      noStepProps.onKeyDown(e)
+                      if (e.key === "Enter") checkExceedsApplied()
+                    }}
                   />
                 </div>
                 {amountError ? (
@@ -920,7 +943,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                   setShowConfirmDialog(true)
                 }
               }}
-              disabled={!calculatedEMI || !!amountError}
+              disabled={(!calculatedEMI && !exceedsApplied) || (!!amountError && !exceedsApplied)}
             >
               <CheckCircle className="mr-2 h-4 w-4" />
               Approve & Sanction
@@ -930,6 +953,40 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
       </Card>
 
       {/* Repayment Schedule Dialog */}
+      {/* Sanction Amount greater than Loan Amount Applied */}
+      <Dialog open={showExceedsAppliedPopup} onOpenChange={setShowExceedsAppliedPopup}>
+        <DialogContent
+          className="sm:max-w-md"
+          showCloseButton={false}
+          onCloseAutoFocus={(e) => {
+            // Back to the Sanction Amount field so it can be corrected
+            e.preventDefault()
+            sanctionedAmountRef.current?.focus()
+            sanctionedAmountRef.current?.select()
+          }}
+        >
+          <DialogHeader className="items-center text-center sm:text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-100">
+              <XCircle className="h-8 w-8 text-red-600" aria-hidden="true" />
+            </div>
+            <DialogTitle className="text-red-700">Invalid Sanction Amount</DialogTitle>
+            <DialogDescription className="text-base text-foreground">
+              {EXCEEDS_APPLIED_MSG}
+            </DialogDescription>
+            {selectedApp && (
+              <p className="text-sm text-muted-foreground">
+                Loan Amount Applied: {formatCurrency(selectedApp.applied_loan_amount)}
+              </p>
+            )}
+          </DialogHeader>
+          <DialogFooter className="sm:justify-center">
+            <Button variant="destructive" className="min-w-24" onClick={() => setShowExceedsAppliedPopup(false)}>
+              OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
         <DialogContent className="max-w-4xl max-h-[80vh]">
           <DialogHeader>
