@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import pool from "@/lib/connection/db"
+import { parseSelectedBatch, validateSelectedBatch, BatchValidationError } from "@/lib/validate-batch"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
 import { getSession } from "@/lib/auth/session"
 
@@ -81,8 +82,9 @@ export async function POST(request: NextRequest) {
 
     /* --- BATCH ID --- */
     let batchId = 0
-    if (selected_batch && selected_batch !== 0) {
-      batchId = selected_batch
+    const selectedBatchId = parseSelectedBatch(selected_batch)
+    if (selectedBatchId > 0) {
+      batchId = (await validateSelectedBatch(client, selectedBatchId, session)).batch_id
     } else {
       const { rows: [batch] } = await client.query(
         `UPDATE gl_batch_sequences SET last_batch_id = last_batch_id + 1
@@ -107,7 +109,7 @@ export async function POST(request: NextRequest) {
 
     /* --- VOUCHER NO --- */
     let voucherNo = 0
-    if (!selected_batch || selected_batch === 0) {
+    if (selectedBatchId === 0) {
       const { rows: [voucher] } = await client.query(
         `INSERT INTO voucher_sequences (branch_id, business_date, last_voucher_no)
          VALUES ($1, $2, 1)
@@ -126,7 +128,7 @@ export async function POST(request: NextRequest) {
     }
 
     /* --- GL BATCH HEADER --- */
-    if (!selected_batch || selected_batch === 0) {
+    if (selectedBatchId === 0) {
       await client.query(
         `INSERT INTO gl_batches (business_date, branch_id, batch_id, voucher_id, voucher_type, maker_id, status)
          VALUES ($1,$2,$3,$4,$5,$6,'PENDING')`,
@@ -237,6 +239,7 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
   } catch (error: any) {
     await client.query("ROLLBACK")
+    if (error instanceof BatchValidationError) return NextResponse.json({ error: error.message }, { status: error.status })
     console.error("Reserve & Fund POST Transaction error:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   } finally {

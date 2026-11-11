@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/auth/session"
 import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
+import { parseSelectedBatch, validateSelectedBatch, BatchValidationError } from "@/lib/validate-batch"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
 
 export async function GET(request: NextRequest) {
@@ -120,8 +121,9 @@ export async function POST(request: NextRequest) {
 
       /* ---------------- BATCH ID ---------------- */
       let batchId = 0
-      if (selectedBatch && selectedBatch !== 0) {
-        batchId = selectedBatch
+      const selectedBatchId = parseSelectedBatch(selectedBatch)
+      if (selectedBatchId > 0) {
+        batchId = (await validateSelectedBatch(client, selectedBatchId, session)).batch_id
       } else {
         const { rows: [batch] } = await client.query(`
           UPDATE gl_batch_sequences
@@ -134,7 +136,7 @@ export async function POST(request: NextRequest) {
 
       /* ---------------- VOUCHER NO ---------------- */
       let voucherNo = 0
-      if (!selectedBatch || selectedBatch === 0) {
+      if (selectedBatchId === 0) {
         const { rows: [voucher] } = await client.query(`
           INSERT INTO voucher_sequences (branch_id, business_date, last_voucher_no)
           VALUES ($1, $2, 1)
@@ -152,7 +154,7 @@ export async function POST(request: NextRequest) {
       }
 
       /* ---------------- GL BATCH ---------------- */
-      if (!selectedBatch || selectedBatch === 0) {
+      if (selectedBatchId === 0) {
         await client.query(`
           INSERT INTO gl_batches (
             business_date, branch_id, batch_id, voucher_id,
@@ -292,6 +294,7 @@ export async function POST(request: NextRequest) {
       client.release()
     }
   } catch (error: any) {
+    if (error instanceof BatchValidationError) return NextResponse.json({ error: error.message }, { status: error.status })
     console.error("Failed to process transaction:", error)
     return NextResponse.json({ error: error.message || "Failed to process transaction" }, { status: 500 })
   }

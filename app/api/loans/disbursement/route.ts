@@ -2,6 +2,7 @@ import { getSession } from "@/lib/auth/session"
 import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
+import { lockOpenTransferBatch } from "@/lib/gl-voucher"
 import { creditAppraiserAccount, lockAppraiserAccount, type AppraiserAccount } from "@/lib/appraiser-account"
 import { buildRepaymentSchedule, isRepaymentMethod } from "@/lib/loan-repayment-schedule"
 
@@ -180,27 +181,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Appraiser charge cannot be equal to or exceed the disbursement amount" }, { status: 400 })
     }
 
-    // Transfer into an existing batch: it must be an open transfer batch of this branch and business date
+    // Transfer into an existing batch: it must be an open transfer batch of this branch,
+    // business date and maker
     let existingVoucherNo: number | null = null
     if (existingBatchId) {
-      const { rows: batchRows } = await client.query(
-        `SELECT voucher_id, voucher_type, status, business_date::text AS business_date
-         FROM gl_batches
-         WHERE branch_id = $1 AND batch_id = $2
-         FOR UPDATE`,
-        [branchId, existingBatchId]
-      )
-      const b = batchRows[0]
-      let batchError = ""
-      if (!b) batchError = `GL batch ${existingBatchId} not found`
-      else if (b.status !== 'PENDING') batchError = `GL batch ${existingBatchId} is already ${String(b.status).toLowerCase()}`
-      else if (b.voucher_type !== 'TRANSFER') batchError = `GL batch ${existingBatchId} is not a transfer batch`
-      else if (b.business_date !== String(businessDate).slice(0, 10)) batchError = `GL batch ${existingBatchId} belongs to another business date`
-      if (batchError) {
+      const locked = await lockOpenTransferBatch(client, { branchId, batchId: existingBatchId, businessDate, userId: session.userId })
+      if (locked.error) {
         await client.query("ROLLBACK")
-        return NextResponse.json({ error: batchError }, { status: 400 })
+        return NextResponse.json({ error: locked.error }, { status: 400 })
       }
-      existingVoucherNo = b.voucher_id
+      existingVoucherNo = locked.voucherNo!
     }
 
     // Appraiser charge: resolve and lock the appraiser's designated account before posting anything

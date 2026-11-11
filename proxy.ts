@@ -12,6 +12,11 @@ import { getDayEndLockState, dayEndLockResponse } from "@/lib/dayend-check"
 // never fires on them — that's what keeps this from becoming a redirect loop.
 const PUBLIC_PATHS = new Set(["/", "/login", "/2fa"])
 
+// API paths reachable without a session: only what the login, 2FA and
+// WebAuthn flows need before a session exists. Everything else under /api
+// gets a 401 from the proxy when there's no valid session.
+const PUBLIC_API_PREFIXES = ["/api/auth/"]
+
 // ── Day-End transaction lock ────────────────────────────────────────────────
 // Every write request (POST/PUT/PATCH/DELETE) to /api is blocked while the
 // session branch's business date is under day-end, except the paths below.
@@ -71,15 +76,25 @@ async function readValidSession(request: NextRequest): Promise<SessionRecord | n
   }
 }
 
+function isPublicApiPath(pathname: string): boolean {
+  const path = pathname.replace(/\/+$/, "")
+  return PUBLIC_API_PREFIXES.some((p) => path === p.replace(/\/$/, "") || path.startsWith(p))
+}
+
 async function handleApi(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl
+
+  // Default-deny: every API route needs a valid session unless it is listed
+  // in PUBLIC_API_PREFIXES. Routes still call getSession() themselves; this
+  // is a second layer for any route that forgets to.
+  if (isPublicApiPath(pathname)) return NextResponse.next({ request })
+
+  const session = await readValidSession(request)
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   if (!isDayEndLockedRequest(request.method, pathname)) {
     return NextResponse.next({ request })
   }
-
-  // No valid session: let the route return its own 401 JSON.
-  const session = await readValidSession(request)
-  if (!session) return NextResponse.next({ request })
 
   // A session without a branch/business date can't be checked against
   // day-end, so it can't be allowed to write.
@@ -108,8 +123,8 @@ async function handleApi(request: NextRequest): Promise<NextResponse> {
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl
 
-  // API routes enforce their own auth and return JSON 401s (redirecting would
-  // break fetch() callers), so here they only go through the day-end lock.
+  // API routes get a JSON 401 rather than a redirect (redirecting would break
+  // fetch() callers), then the day-end lock for write requests.
   if (pathname.startsWith("/api/") || pathname === "/api") {
     return handleApi(request)
   }

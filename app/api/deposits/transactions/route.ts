@@ -389,7 +389,7 @@ export async function POST(request: NextRequest) {
     let batchId: number
     let voucherNo: number
     if (existingBatchId) {
-      const locked = await lockOpenTransferBatch(client, { branchId, batchId: existingBatchId, businessDate })
+      const locked = await lockOpenTransferBatch(client, { branchId, batchId: existingBatchId, businessDate, userId: session.userId })
       if (locked.error) {
         await client.query("ROLLBACK")
         return NextResponse.json({ error: locked.error }, { status: 400 })
