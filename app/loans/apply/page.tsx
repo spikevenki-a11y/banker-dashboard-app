@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate } from "@/lib/date-format"
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -32,6 +33,7 @@ import { MemberSearchDialog } from "@/components/member-search-dialog"
 import { LoanSchemeDetailsCard, type LoanSchemeDetails } from "@/components/loan-scheme-details-card"
 import { getEcDateError, getEcYearsError, calculateEcYears } from "@/lib/land-security"
 import { calculateAge, getSchemeAgeError } from "@/lib/member-age"
+import { calculateMaxSanctionAmount } from "@/lib/gold-guideline"
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -579,6 +581,42 @@ export default function LoanApplicationPage() {
 
   // Gold selected: check once appraisers and the business date are loaded
   const isGoldSecurity = Number(selectedSecurityId) === 6
+
+  // Gold Guidelines Value per Gram (Settings → Management → Gold Guidelines Value),
+  // loaded each time Gold is selected so the latest value is used
+  const [goldGuidelineValue, setGoldGuidelineValue] = useState<number | null>(null)
+  const [goldGuidelineStatus, setGoldGuidelineStatus] = useState<"idle" | "loading" | "loaded" | "error">("idle")
+  useEffect(() => {
+    if (!isGoldSecurity) return
+    let cancelled = false
+    setGoldGuidelineStatus("loading")
+    fetch("/api/settings/gold-guideline", { credentials: "include" })
+      .then(async (res) => {
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error)
+        if (cancelled) return
+        setGoldGuidelineValue(data.current ? Number(data.current.value_per_gram) : null)
+        setGoldGuidelineStatus("loaded")
+      })
+      .catch(() => {
+        if (!cancelled) setGoldGuidelineStatus("error")
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isGoldSecurity])
+
+  // Net weight of the gold pledged (sum of the items added), and the cap it gives:
+  // Maximum Sanction Amount = Guidelines Value per Gram × Net Weight
+  const goldNetWeight =
+    goldItems.length > 0
+      ? Math.max(
+          0,
+          goldItems.reduce((s, i) => s + (parseFloat(i.gross_weight_grams) || 0), 0) -
+            goldItems.reduce((s, i) => s + (parseFloat(i.stone_weight_grams) || 0), 0)
+        )
+      : Number(securityForm.net_weight_grams) || 0
+  const goldMaxSanctionAmount = calculateMaxSanctionAmount(goldGuidelineValue, goldNetWeight)
   useEffect(() => {
     if (isGoldSecurity && !loadingAppraisers && applicationDate && availableAppraisers.length === 0) {
       setAppraiserPopup("create")
@@ -770,6 +808,16 @@ export default function LoanApplicationPage() {
       setAppraiserPopup(availableAppraisers.length === 0 ? "create" : "select")
       return
     }
+    if (isGoldSecurity && goldGuidelineStatus !== "loaded") {
+      alert(goldGuidelineStatus === "loading"
+        ? "The gold guidelines value is still loading. Please try again in a moment."
+        : "Could not load the gold guidelines value. Please reload the page and try again.")
+      return
+    }
+    if (isGoldSecurity && !goldGuidelineValue) {
+      alert("The Gold Guidelines Value per Gram is not set. Please set it in Settings → Management → Gold Guidelines Value.")
+      return
+    }
     if (Number(selectedSecurityId) === 13) {
       const income = Number(securityForm.surety_annual_income)
       const eligible = Number(securityForm.surety_eligible_security_amount)
@@ -827,6 +875,9 @@ export default function LoanApplicationPage() {
           gold_rate_date: securityForm.gold_rate_date || null,
           market_value: securityForm.market_value ? Number(securityForm.market_value) : null,
           storage_location: securityForm.storage_location || null,
+          // Shown to the user; the server recalculates both from its own guidelines value
+          guideline_value_per_gram: goldGuidelineValue,
+          max_sanction_amount: goldMaxSanctionAmount,
           gold_items: goldItems.map((item, idx) => ({
             item_seq: idx + 1,
             ornament_name: item.ornament_name,
@@ -1330,6 +1381,38 @@ export default function LoanApplicationPage() {
                           </div>
                         </div>
 
+                        {/* Guidelines value (from Settings) and the maximum sanction it allows — not editable */}
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Guidelines Value per Gram (₹)</Label>
+                            <Input className="h-8 text-xs bg-muted" readOnly tabIndex={-1}
+                              value={goldGuidelineValue ? goldGuidelineValue.toFixed(2) : ""}
+                              placeholder={goldGuidelineStatus === "loading" ? "Loading…" : "Not configured"} />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Net Weight (g)</Label>
+                            <Input className="h-8 text-xs bg-muted" readOnly tabIndex={-1}
+                              value={goldNetWeight > 0 ? goldNetWeight.toFixed(3) : ""} placeholder="Add items" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Maximum Sanction Amount (₹)</Label>
+                            <Input className="h-8 text-xs bg-muted font-semibold" readOnly tabIndex={-1}
+                              value={goldMaxSanctionAmount > 0 ? goldMaxSanctionAmount.toFixed(2) : ""}
+                              placeholder="Auto-calculated" />
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          Maximum Sanction Amount = Guidelines Value per Gram × Net Weight. The sanctioned loan cannot exceed it.
+                        </p>
+                        {goldGuidelineStatus === "loaded" && !goldGuidelineValue && (
+                          <p className="text-xs text-red-500">
+                            Gold Guidelines Value per Gram is not set. Set it in Settings → Management → Gold Guidelines Value before submitting.
+                          </p>
+                        )}
+                        {goldGuidelineStatus === "error" && (
+                          <p className="text-xs text-red-500">Could not load the gold guidelines value. Please reload the page.</p>
+                        )}
+
                         <div className="grid grid-cols-3 gap-3">
                           <div className="space-y-1">
                             <Label className="text-xs">Packet No</Label>
@@ -1792,7 +1875,7 @@ export default function LoanApplicationPage() {
                                         <span className="font-mono">{acc.accountNumber}</span>
                                         <span className="ml-2 text-muted-foreground">
                                           {acc.depositTypeLabel} · {acc.schemeName} · ₹{acc.depositAmount.toLocaleString("en-IN")}
-                                          {acc.maturityDate ? ` · Matures ${acc.maturityDate}` : ""}
+                                          {acc.maturityDate ? ` · Matures ${formatDate(acc.maturityDate)}` : ""}
                                         </span>
                                       </SelectItem>
                                     ))}
@@ -2182,7 +2265,7 @@ export default function LoanApplicationPage() {
                             {emiSchedule.slice(0, 6).map((item) => (
                               <TableRow key={item.installment_no}>
                                 <TableCell className="text-xs">{item.installment_no}</TableCell>
-                                <TableCell className="text-xs">{item.due_date}</TableCell>
+                                <TableCell className="text-xs">{formatDate(item.due_date)}</TableCell>
                                 <TableCell className="text-xs text-right">{formatCurrency(item.emi_amount)}</TableCell>
                               </TableRow>
                             ))}

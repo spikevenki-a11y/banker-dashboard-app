@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate as formatDisplayDate } from "@/lib/date-format"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -447,12 +448,8 @@ const getLogindate = async () => {
       maturityDate: matDate.toISOString().split("T")[0],
     }
   }
-  const formatDate = (date) => {
-    const d = new Date(date);
-    return `${String(d.getDate()).padStart(2, "0")}-${String(
-      d.getMonth() + 1
-    ).padStart(2, "0")}-${d.getFullYear()}`;
-  };
+  // DD-MM-YYYY (shared helper: plain dates are not shifted by the timezone)
+  const formatDate = (date) => formatDisplayDate(date, "");
 
   // Breaks the deposit term into payout intervals (per the selected Payout Frequency)
   // and computes the simple-interest amount payable at each interval, using real
@@ -819,7 +816,7 @@ const getLogindate = async () => {
                           </div>
                           <div>
                             <span className="text-muted-foreground">DOB:</span>
-                            <p className="font-medium">{memberInfo.date_of_birth || "---"}</p>
+                            <p className="font-medium">{formatDisplayDate(memberInfo.date_of_birth, "---")}</p>
                           </div>
                           <div>
                             <span className="text-muted-foreground">Status:</span>
@@ -1282,7 +1279,7 @@ const getLogindate = async () => {
                             <div className="mt-2 flex items-center gap-2 rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-sm dark:border-teal-800 dark:bg-teal-950">
                               <Info className="h-4 w-4 text-teal-600" />
                               <span className="text-teal-700 dark:text-teal-300">
-                                Maturity Date: <span className="font-semibold">{rdMaturityDate}</span>
+                                Maturity Date: <span className="font-semibold">{formatDisplayDate(rdMaturityDate)}</span>
                               </span>
                             </div>
                           )}
@@ -1678,7 +1675,7 @@ const getLogindate = async () => {
                               </div>
                               <div className="flex justify-between text-sm">
                                 <span className="text-muted-foreground">Maturity Date:</span>
-                                <span className="font-medium">{maturityCalc.maturityDate}</span>
+                                <span className="font-medium">{formatDisplayDate(maturityCalc.maturityDate)}</span>
                               </div>
                               <div className="flex justify-between border-t border-border pt-3">
                                 <span className="font-semibold">Maturity Amount:</span>
@@ -1724,7 +1721,7 @@ const getLogindate = async () => {
                           {rdMaturityDate && (
                             <div className="flex justify-between border-t border-border pt-3 text-sm">
                               <span className="text-muted-foreground">Maturity Date:</span>
-                              <span className="font-semibold text-teal-600">{rdMaturityDate}</span>
+                              <span className="font-semibold text-teal-600">{formatDisplayDate(rdMaturityDate)}</span>
                             </div>
                           )}
                         </>
@@ -2045,7 +2042,7 @@ const getLogindate = async () => {
                           {[
                             { label: "Total Assets",      value: fmt(viewMemberSummary.total_assets),      color: "text-teal-700 bg-teal-50 border-teal-200" },
                             { label: "Total Accounts",    value: String(viewMemberAssets.length),          color: "text-blue-700 bg-blue-50 border-blue-200" },
-                            { label: "Net Worth",         value: fmt(viewMemberSummary.net_worth),         color: "text-green-700 bg-green-50 border-green-200" },
+                            // { label: "Net Worth",         value: fmt(viewMemberSummary.net_worth),         color: "text-green-700 bg-green-50 border-green-200" },
                           ].map(({ label, value, color }) => (
                             <div key={label} className={`rounded-lg border p-3 text-center ${color}`}>
                               <p className="text-xs opacity-70">{label}</p>
@@ -2135,7 +2132,7 @@ const getLogindate = async () => {
                                   <TableRow key={i}>
                                     <TableCell className="text-xs">
                                       <p className="font-medium">{loan.scheme_name}</p>
-                                      {loan.sanction_date && <p className="text-muted-foreground text-xs">{loan.sanction_date}</p>}
+                                      {loan.sanction_date && <p className="text-muted-foreground text-xs">{formatDisplayDate(loan.sanction_date)}</p>}
                                     </TableCell>
                                     <TableCell className="text-xs text-right">{fmt(loan.sanctioned_amount)}</TableCell>
                                     <TableCell className="text-xs text-right font-semibold text-red-600">{fmt(loan.outstanding_balance)}</TableCell>
@@ -2318,7 +2315,7 @@ const getLogindate = async () => {
                         {successInfo?.maturity_date && (
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Maturity Date:</span>
-                            <span className="font-medium text-foreground">{successInfo.maturity_date}</span>
+                            <span className="font-medium text-foreground">{formatDisplayDate(successInfo.maturity_date)}</span>
                           </div>
                         )}
                         {successInfo?.maturity_amount && (

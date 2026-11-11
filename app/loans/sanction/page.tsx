@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate } from "@/lib/date-format"
 import { useState, useEffect, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {DashboardWrapper } from "@/app/_components/dashboard-wrapper"
@@ -183,7 +184,7 @@ export default function LoanSanctionPage() {
                           </Badge>
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Applied: {new Date(app.application_date).toLocaleDateString("en-IN")}
+                          Applied: {formatDate(app.application_date)}
                         </p>
                       </button>
                     ))}

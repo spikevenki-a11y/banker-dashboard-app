@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate } from "@/lib/date-format"
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -527,7 +528,7 @@ export function MemberSummaryCard({ memberInfo }: { memberInfo: MemberSummaryInf
                             <TableRow key={i}>
                               <TableCell className="text-xs">
                                 <p className="font-medium">{loan.scheme_name}</p>
-                                {loan.sanction_date && <p className="text-muted-foreground text-xs">{loan.sanction_date}</p>}
+                                {loan.sanction_date && <p className="text-muted-foreground text-xs">{formatDate(loan.sanction_date)}</p>}
                               </TableCell>
                               <TableCell className="text-xs text-right">{fmt(loan.sanctioned_amount)}</TableCell>
                               <TableCell className="text-xs text-right font-semibold text-red-600">{fmt(loan.outstanding_balance)}</TableCell>

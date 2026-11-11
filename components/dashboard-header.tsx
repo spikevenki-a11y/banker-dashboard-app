@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate } from "@/lib/date-format"
 import { Bell, Search, User, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -48,7 +49,7 @@ export function DashboardHeader() {
         )}
 
         <div className="ml-4 flex items-center gap-2 rounded-md bg-red-100 px-3 py-1">
-          <span className="text-xs font-medium text-red-500 underline">{identity?.businessDate || "No Date"}</span>
+          <span className="text-xs font-medium text-red-500 underline">{formatDate(identity?.businessDate, "No Date")}</span>
         </div>
 
       </div>

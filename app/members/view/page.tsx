@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate, formatDateTime } from "@/lib/date-format"
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
@@ -832,10 +833,10 @@ export default function ViewMemberPage() {
                       <DetailField icon={Building2} label="Membership Class" value={selectedMember.membership_class} />
                       <DetailField icon={User} label="Member Type" value={selectedMember.member_type} capitalize />
                       <DetailField icon={CheckCircle2} label="Status" value={selectedMember.status} />
-                      <DetailField icon={Calendar} label="Join Date" value={selectedMember.join_date} />
+                      <DetailField icon={Calendar} label="Join Date" value={formatDate(selectedMember.join_date, "")} />
                       <DetailField icon={Book} label="Ledger Folio No." value={selectedMember.ledger_folio_number} mono />
                       <DetailField icon={FileText} label="Board Resolution No." value={selectedMember.board_resolution_number} />
-                      <DetailField icon={Calendar} label="Board Resolution Date" value={selectedMember.board_resolution_date} />
+                      <DetailField icon={Calendar} label="Board Resolution Date" value={formatDate(selectedMember.board_resolution_date, "")} />
                     </DetailSection>
                   </div>
                 )}
@@ -929,7 +930,7 @@ export default function ViewMemberPage() {
                                 </TableCell>
                                 <TableCell className="text-xs font-medium">{n.nominee_name || "---"}</TableCell>
                                 <TableCell className="text-xs capitalize">{n.nominee_relation || "---"}</TableCell>
-                                <TableCell className="text-xs">{n.nominee_dob || "---"}</TableCell>
+                                <TableCell className="text-xs">{formatDate(n.nominee_dob, "---")}</TableCell>
                                 <TableCell className="text-xs">{n.nominee_age ?? "---"}</TableCell>
                                 <TableCell className="text-xs capitalize">{n.nominee_gender || "---"}</TableCell>
                                 <TableCell className="text-xs">
@@ -1064,7 +1065,7 @@ export default function ViewMemberPage() {
                                       </TableCell>
                                       <TableCell className="text-sm">
                                         {acc.opening_date
-                                          ? new Date(acc.opening_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                                          ? formatDate(acc.opening_date)
                                           : "---"}
                                       </TableCell>
                                       <TableCell className="text-right font-mono text-sm font-semibold text-emerald-700">
@@ -1155,7 +1156,7 @@ export default function ViewMemberPage() {
                                       </TableCell>
                                       <TableCell className="text-sm">
                                         {acc.opening_date
-                                          ? new Date(acc.opening_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                                          ? formatDate(acc.opening_date)
                                           : "---"}
                                       </TableCell>
                                       <TableCell className="text-right font-mono text-sm font-semibold text-red-700">
@@ -1611,7 +1612,7 @@ export default function ViewMemberPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">Join Date</Label>
-                  <Input value={selectedMember?.join_date || ""} disabled className="bg-muted/50" />
+                  <Input value={formatDate(selectedMember?.join_date, "")} disabled className="bg-muted/50" />
                 </div>
                 <EditInput label="Ledger Folio No" k="ledger_folio_number" form={editForm} onChange={ef} />
                 <EditInput label="Board Resolution No" k="board_resolution_number" form={editForm} onChange={ef} />
@@ -1737,7 +1738,7 @@ export default function ViewMemberPage() {
                     {historyRows.map((r) => (
                       <TableRow key={r.id}>
                         <TableCell className="whitespace-nowrap text-xs">
-                          {new Date(r.changed_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                          {formatDateTime(r.changed_at)}
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-xs">{r.changed_by_name || "Unknown user"}</TableCell>
                         <TableCell className="whitespace-nowrap text-xs">
@@ -1911,7 +1912,7 @@ const fmtInr = (n: number | null | undefined) =>
   Number(n || 0).toLocaleString("en-IN", { style: "currency", currency: "INR" })
 
 const fmtDay = (d: string | null | undefined) =>
-  d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "---"
+  d ? formatDate(d) : "---"
 
 // Status badge colours shared by both tables
 function statusBadgeClass(status: string, side: "asset" | "liability") {

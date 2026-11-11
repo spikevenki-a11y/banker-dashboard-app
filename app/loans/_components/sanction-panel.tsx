@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate } from "@/lib/date-format"
 import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -46,7 +47,8 @@ import {
   repaymentMethodLabel,
   DEFAULT_FIXED_PRINCIPAL_FREQUENCY,
   DEFAULT_REPAYMENT_METHOD,
-  REPAYMENT_FREQUENCY_OPTIONS,
+  frequencyOptionsFor,
+  isFixedPrincipalFrequency,
   REPAYMENT_METHOD_OPTIONS,
   type RepaymentFrequency,
   type RepaymentMethod,
@@ -78,6 +80,9 @@ export interface SanctionApplication {
   maximum_period_months: number
   loan_tenure_months: number
   loan_gl_account: string
+  /** Gold security cap: Guidelines Value per Gram × Net Weight (null when not gold) */
+  gold_max_sanction_amount?: number | null
+  gold_guideline_value_per_gram?: number | null
 }
 
 interface SecurityDetail {
@@ -180,7 +185,8 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
   const [formError, setFormError] = useState("")
 
   // Repayment Type change: On Maturity fixes the frequency to Closing Time;
-  // Fixed Principal starts on Monthly and lets the user pick any frequency
+  // Fixed Principal starts on Monthly and offers Monthly / Quarterly / Half Yearly /
+  // Yearly only, so Closing Time is always dropped
   const handleRepaymentMethodChange = (value: string) => {
     const method = value as RepaymentMethod
     setRepaymentMethod(method)
@@ -267,8 +273,8 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
         </table>`
 
       const generatedOn = identity?.businessDate
-        ? new Date(identity.businessDate).toLocaleDateString("en-IN")
-        : new Date().toLocaleDateString("en-IN")
+        ? formatDate(identity.businessDate)
+        : formatDate(new Date())
       await downloadPdf(
         `Repayment Schedule ${selectedApp?.reference_no ?? ""}`.trim(),
         `Generated on ${generatedOn}`,
@@ -311,8 +317,13 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
     setLoadingDetails(true)
     setFormError("")
 
-    // Pre-fill form with applied values
-    setSanctionedAmount(app.applied_loan_amount.toString())
+    // Pre-fill form with applied values (gold loans: no more than the Maximum Sanction Amount)
+    const goldCap = app.gold_max_sanction_amount != null ? Number(app.gold_max_sanction_amount) : NaN
+    setSanctionedAmount(
+      Number.isFinite(goldCap) && goldCap < Number(app.applied_loan_amount)
+        ? goldCap.toFixed(2)
+        : app.applied_loan_amount.toString()
+    )
     setInterestRate(app.scheme_interest_rate?.toString() || "12")
     setTenureMonths(app.loan_tenure_months.toString())
     setMoratoriumPeriod("0")
@@ -388,8 +399,19 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
     if (amount > Number(selectedApp.applied_loan_amount)) {
       return `Sanctioned amount cannot exceed applied amount (${formatCurrency(selectedApp.applied_loan_amount)})`
     }
+    if (goldMaxSanction !== null && amount > goldMaxSanction) {
+      return `Sanctioned amount cannot exceed the gold Maximum Sanction Amount (${formatCurrency(goldMaxSanction)})`
+    }
     return ""
   }
+  // Gold loans: Guidelines Value per Gram × Net Weight caps the sanction
+  const goldMaxSanction =
+    selectedApp?.gold_max_sanction_amount != null && Number.isFinite(Number(selectedApp.gold_max_sanction_amount))
+      ? Number(selectedApp.gold_max_sanction_amount)
+      : null
+  const maxSanctionable = selectedApp
+    ? Math.min(Number(selectedApp.applied_loan_amount), goldMaxSanction ?? Infinity)
+    : 0
   const amountError = getAmountError()
 
   // Validate form
@@ -427,6 +449,11 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
 
     if (selectedApp && tenure > (selectedApp.maximum_period_months || 360)) {
       setFormError(`Tenure cannot exceed ${selectedApp.maximum_period_months} months`)
+      return false
+    }
+
+    if (repaymentMethod === "FIXED_PRINCIPAL" && !isFixedPrincipalFrequency(repaymentFrequency)) {
+      setFormError("Please select a repayment frequency: Monthly, Quarterly, Half Yearly or Yearly")
       return false
     }
 
@@ -581,7 +608,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                 <Calendar className="h-3 w-3" />
                 Application Date
               </div>
-              <p className="mt-1 font-medium">{new Date(selectedApp.application_date).toLocaleDateString("en-IN")}</p>
+              <p className="mt-1 font-medium">{formatDate(selectedApp.application_date)}</p>
             </div>
             <div className="rounded-lg border p-3 bg-muted/30">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -676,7 +703,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                     type="number"
                     placeholder="Enter amount"
                     min="0"
-                    max={selectedApp.applied_loan_amount}
+                    max={maxSanctionable}
                     value={sanctionedAmount}
                     onChange={(e) => setSanctionedAmount(e.target.value)}
                     aria-invalid={!!amountError}
@@ -688,7 +715,15 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                   <p className="text-xs text-red-500">{amountError}</p>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    Max: {formatCurrency(selectedApp.applied_loan_amount)}
+                    Max: {formatCurrency(maxSanctionable)}
+                    {goldMaxSanction !== null && (
+                      <>
+                        {" "}· Gold Maximum Sanction Amount {formatCurrency(goldMaxSanction)}
+                        {selectedApp.gold_guideline_value_per_gram
+                          ? ` (${formatCurrency(Number(selectedApp.gold_guideline_value_per_gram))}/g × net weight)`
+                          : ""}
+                      </>
+                    )}
                   </p>
                 )}
               </div>
@@ -775,7 +810,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                     <SelectValue placeholder="Select repayment frequency" />
                   </SelectTrigger>
                   <SelectContent>
-                    {REPAYMENT_FREQUENCY_OPTIONS.map((option) => (
+                    {frequencyOptionsFor(repaymentMethod).map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>
@@ -919,7 +954,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                 {emiSchedule.map((item) => (
                   <TableRow key={item.installment_no}>
                     <TableCell>{item.installment_no}</TableCell>
-                    <TableCell>{new Date(item.due_date).toLocaleDateString("en-IN")}</TableCell>
+                    <TableCell>{formatDate(item.due_date)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(item.principal)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(item.interest)}</TableCell>
                     <TableCell className="text-right font-medium">{formatCurrency(item.total)}</TableCell>
@@ -992,7 +1027,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">First Installment Date:</span>
-              <span>{installmentStartDate ? new Date(installmentStartDate).toLocaleDateString("en-IN") : "-"}</span>
+              <span>{installmentStartDate ? formatDate(installmentStartDate) : "-"}</span>
             </div>
             {/* <div className="flex justify-between text-sm border-t pt-2">
               <span className="font-semibold">

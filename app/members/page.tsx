@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate } from "@/lib/date-format"
 import { Badge } from "@/components/ui/badge"
 
 import { TableCell } from "@/components/ui/table"
@@ -908,7 +909,7 @@ export default function MembersPage() {
                                 {member.membership_class === "A" ? "Class A" : member.membership_class === "B" ? "Class B" : member.membership_class || "---"}
                               </Badge>
                             </TableCell>
-                            <TableCell className="whitespace-nowrap text-sm">{member.join_date || "---"}</TableCell>
+                            <TableCell className="whitespace-nowrap text-sm">{formatDate(member.join_date, "---")}</TableCell>
                             <TableCell>
                               <Badge
                                 variant={member.status?.toUpperCase() === "ACTIVE" ? "default" : "secondary"}
@@ -1013,7 +1014,7 @@ export default function MembersPage() {
                           </div>
                           <div>
                             <Label className="text-muted-foreground">Member Since</Label>
-                            <p className="font-medium">{selectedMember.joined_date}</p>
+                            <p className="font-medium">{formatDate(selectedMember.joined_date)}</p>
                           </div>
                         </div>
                         <div>

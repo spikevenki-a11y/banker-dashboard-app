@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate } from "@/lib/date-format"
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -794,7 +795,7 @@ const getLogindate = async () => {
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">Date of Birth</p>
-                            <p className="text-sm font-medium">{memberInfo.date_of_birth || "---"}</p>
+                            <p className="text-sm font-medium">{formatDate(memberInfo.date_of_birth, "---")}</p>
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">Gender</p>
@@ -937,7 +938,7 @@ const getLogindate = async () => {
                               <div><span className="text-muted-foreground">Father's Name: </span>{secondaryInfo.father_name || "---"}</div>
                               <div><span className="text-muted-foreground">Mobile: </span>{secondaryInfo.mobile_no || "---"}</div>
                               <div><span className="text-muted-foreground">Date of Birth: </span>{secondaryInfo.date_of_birth
-                                ? new Date(secondaryInfo.date_of_birth).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                                ? formatDate(secondaryInfo.date_of_birth)
                                 : "---"}</div>
                               <div><span className="text-muted-foreground">Gender: </span>{secondaryInfo.gender || "---"}</div>
                               <div><span className="text-muted-foreground">Aadhaar: </span><span className="font-mono">{secondaryInfo.aadhaar_no?.trim() || "---"}</span></div>
@@ -1025,7 +1026,7 @@ const getLogindate = async () => {
                                     n.relation,
                                     n.gender,
                                     n.age !== null && n.age !== undefined ? `${n.age} yrs` : null,
-                                    n.dob,
+                                    n.dob ? formatDate(n.dob) : null,
                                     n.phone ? `Ph ${n.phone}` : null,
                       n.percentage ? `${n.percentage}%` : null,
                                   ].filter(Boolean).join(" · ")}
@@ -1422,7 +1423,7 @@ const getLogindate = async () => {
                     <div className="space-y-3">
                       <div>
                         <p className="text-xs text-muted-foreground">Opening Date</p>
-                        <p className="text-sm font-semibold">{openingDate || "---"}</p>
+                        <p className="text-sm font-semibold">{formatDate(openingDate, "---")}</p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">Initial Deposit</p>
@@ -1736,7 +1737,7 @@ const getLogindate = async () => {
                                   <TableRow key={i}>
                                     <TableCell className="text-xs">
                                       <p className="font-medium">{loan.scheme_name}</p>
-                                      {loan.sanction_date && <p className="text-muted-foreground text-xs">{loan.sanction_date}</p>}
+                                      {loan.sanction_date && <p className="text-muted-foreground text-xs">{formatDate(loan.sanction_date)}</p>}
                                     </TableCell>
                                     <TableCell className="text-xs text-right">{fmt(loan.sanctioned_amount)}</TableCell>
                                     <TableCell className="text-xs text-right font-semibold text-red-600">{fmt(loan.outstanding_balance)}</TableCell>

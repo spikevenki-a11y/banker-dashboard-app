@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Users, Gem, ClipboardList, ShieldCheck, FilePlus2, Target } from "lucide-react"
+import { ArrowLeft, Users, Gem, ClipboardList, ShieldCheck, FilePlus2, Target, Coins } from "lucide-react"
 import { DashboardWrapper } from "../../_components/dashboard-wrapper"
 
 const managementCards = [
@@ -24,6 +24,15 @@ const managementCards = [
     color: "text-blue-600",
     bgColor: "bg-blue-50",
     href: "/settings/management/appraisal-master",
+  },
+  {
+    id: "gold-guideline",
+    title: "Gold Guidelines Value",
+    description: "Set the guidelines value per gram that caps the maximum sanction amount for gold loans",
+    icon: Coins,
+    color: "text-yellow-600",
+    bgColor: "bg-yellow-50",
+    href: "/settings/management/gold-guideline",
   },
   {
     id: "loan-scheme-security",

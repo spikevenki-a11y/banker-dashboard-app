@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate } from "@/lib/date-format"
 import { useEffect, useState } from "react"
 import {
   Dialog,
@@ -422,10 +423,10 @@ export function ViewMemberPopup({ open, onOpenChange, member: memberProp, member
                         <DetailField icon={Building2} label="Membership Class" value={member.membership_class} />
                         <DetailField icon={User} label="Member Type" value={member.member_type} capitalize />
                         <DetailField icon={CheckCircle2} label="Status" value={member.status} />
-                        <DetailField icon={Calendar} label="Join Date" value={member.join_date} />
+                        <DetailField icon={Calendar} label="Join Date" value={formatDate(member.join_date, "")} />
                         <DetailField icon={Book} label="Ledger Folio No." value={member.ledger_folio_number} mono />
                         <DetailField icon={FileText} label="Board Resolution No." value={member.board_resolution_number} />
-                        <DetailField icon={Calendar} label="Board Resolution Date" value={member.board_resolution_date} />
+                        <DetailField icon={Calendar} label="Board Resolution Date" value={formatDate(member.board_resolution_date, "")} />
                       </DetailSection>
                     </div>
                   )}
@@ -519,7 +520,7 @@ export function ViewMemberPopup({ open, onOpenChange, member: memberProp, member
                                   <TableCell className="text-xs font-medium">{n.nominee_name || "---"}</TableCell>
                                   <TableCell className="text-xs capitalize">{n.nominee_relation || "---"}</TableCell>
                                   <TableCell className="whitespace-nowrap text-xs">
-                                    {n.nominee_dob || "---"}
+                                    {formatDate(n.nominee_dob, "---")}
                                     {n.nominee_age != null && <span className="text-muted-foreground"> · {n.nominee_age} yrs</span>}
                                   </TableCell>
                                   <TableCell className="text-xs capitalize">{n.nominee_gender || "---"}</TableCell>
@@ -754,7 +755,7 @@ function AccountsTable({
                   <TableCell className="text-sm text-muted-foreground">{acc.scheme_name}</TableCell>
                   <TableCell className="text-sm">
                     {acc.opening_date
-                      ? new Date(acc.opening_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                      ? formatDate(acc.opening_date)
                       : "---"}
                   </TableCell>
                   <TableCell className={`text-right font-mono text-sm font-semibold ${balanceColor}`}>

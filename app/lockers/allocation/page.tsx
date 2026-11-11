@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate } from "@/lib/date-format"
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -96,7 +97,7 @@ const LEGEND = [
 const fmt     = (n: number | string | null | undefined) =>
   `₹${Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`
 const fmtDate = (d: string | null) =>
-  d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"
+  d ? formatDate(d) : "—"
 
 // ─── Locker Card ──────────────────────────────────────────────────────────────
 
@@ -120,7 +121,7 @@ function LockerCard({
         locker.row_no    != null ? `Row ${locker.row_no}`     : "",
         locker.cabinet_no != null ? `Cabinet ${locker.cabinet_no}` : "",
         locker.member_name ?? "",
-        locker.expiry_date ? `Exp: ${locker.expiry_date}` : "",
+        locker.expiry_date ? `Exp: ${formatDate(locker.expiry_date)}` : "",
       ].filter(Boolean).join(" · ")}
       className={[
         "relative flex flex-col items-center justify-center gap-0.5",

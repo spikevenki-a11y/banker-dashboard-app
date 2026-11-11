@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate as formatDisplayDate } from "@/lib/date-format"
 import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -183,7 +184,7 @@ function formatCurrency(val: number | string | null | undefined) {
 
 function formatDate(d: string | null | undefined) {
   if (!d) return "--"
-  return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+  return formatDisplayDate(d)
 }
 
 const depositTypeLabels: Record<string, string> = {
@@ -1439,7 +1440,7 @@ function DepositClosureContent() {
                           {[
                             { label: "Total Assets",      value: fmt(viewMemberSummary.total_assets),      color: "text-teal-700 bg-teal-50 border-teal-200" },
                             { label: "Total Accounts",    value: String(viewMemberAssets.length),          color: "text-blue-700 bg-blue-50 border-blue-200" },
-                            { label: "Net Worth",         value: fmt(viewMemberSummary.net_worth),         color: "text-green-700 bg-green-50 border-green-200" },
+                            // { label: "Net Worth",         value: fmt(viewMemberSummary.net_worth),         color: "text-green-700 bg-green-50 border-green-200" },
                           ].map(({ label, value, color }) => (
                             <div key={label} className={`rounded-lg border p-3 text-center ${color}`}>
                               <p className="text-xs opacity-70">{label}</p>
@@ -1529,7 +1530,7 @@ function DepositClosureContent() {
                                   <TableRow key={i}>
                                     <TableCell className="text-xs">
                                       <p className="font-medium">{loan.scheme_name}</p>
-                                      {loan.sanction_date && <p className="text-muted-foreground text-xs">{loan.sanction_date}</p>}
+                                      {loan.sanction_date && <p className="text-muted-foreground text-xs">{formatDisplayDate(loan.sanction_date)}</p>}
                                     </TableCell>
                                     <TableCell className="text-xs text-right">{fmt(loan.sanctioned_amount)}</TableCell>
                                     <TableCell className="text-xs text-right font-semibold text-red-600">{fmt(loan.outstanding_balance)}</TableCell>

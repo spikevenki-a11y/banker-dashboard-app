@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate as formatDisplayDate } from "@/lib/date-format"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
@@ -287,7 +288,7 @@ export default function TransactionsList() {
 
   const formatDate = (d: string) => {
     if (!d) return "---"
-    return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+    return formatDisplayDate(d)
   }
 
   if (loading) {

@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate } from "@/lib/date-format"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -421,7 +422,7 @@ export default function CreateLockerDepositPage() {
                         Annual interest (= locker rent):{" "}
                         <span className="font-semibold">{fmt(annualInterest)}</span>
                         {expiryDate && (
-                          <> · Expiry: <span className="font-semibold">{expiryDate}</span></>
+                          <> · Expiry: <span className="font-semibold">{formatDate(expiryDate)}</span></>
                         )}
                       </span>
                     </div>
@@ -932,7 +933,7 @@ export default function CreateLockerDepositPage() {
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Expiry Date</span>
-                      <span className="font-medium">{successInfo?.expiry_date}</span>
+                      <span className="font-medium">{formatDate(successInfo?.expiry_date)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Locker Assigned</span>

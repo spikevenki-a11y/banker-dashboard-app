@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate } from "@/lib/date-format"
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -588,8 +589,8 @@ export default function LockersPage() {
                               <p className="text-xs text-muted-foreground">Rent: {fmt(dep.annual_rent)}/yr</p>
                             )}
                           </TableCell>
-                          <TableCell className="text-sm">{dep.opening_date || "—"}</TableCell>
-                          <TableCell className="text-sm">{dep.expiry_date || "—"}</TableCell>
+                          <TableCell className="text-sm">{formatDate(dep.opening_date, "—")}</TableCell>
+                          <TableCell className="text-sm">{formatDate(dep.expiry_date, "—")}</TableCell>
                           <TableCell>
                             <StatusBadge status={dep.status} />
                           </TableCell>
@@ -763,7 +764,7 @@ export default function LockersPage() {
                               <span className="text-sm text-muted-foreground">—</span>
                             )}
                           </TableCell>
-                          <TableCell className="text-sm">{locker.expiry_date || "—"}</TableCell>
+                          <TableCell className="text-sm">{formatDate(locker.expiry_date, "—")}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -1159,7 +1160,7 @@ export default function LockersPage() {
                             ? new Date(renewDeposit.expiry_date)
                             : new Date()
                           base.setFullYear(base.getFullYear() + Number(renewYears))
-                          return base.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                          return formatDate(base)
                         })()}
                       </span>
                     </div>

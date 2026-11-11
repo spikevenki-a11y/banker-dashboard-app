@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDate } from "@/lib/date-format"
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -201,7 +202,7 @@ export default function ViewAccount({
 
           <div className="space-y-2 border-t pt-4">
             <p className="text-xs text-muted-foreground">
-              Created on {new Date(account.created_at).toLocaleDateString()}
+              Created on {formatDate(account.created_at)}
             </p>
             <p className="text-xs text-muted-foreground">
               Branch ID: {account.branch_id}

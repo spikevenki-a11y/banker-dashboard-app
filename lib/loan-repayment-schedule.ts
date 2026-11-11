@@ -38,6 +38,18 @@ export const isRepaymentMethod = (v: unknown): v is RepaymentMethod =>
 export const isRepaymentFrequency = (v: unknown): v is RepaymentFrequency =>
   REPAYMENT_FREQUENCY_OPTIONS.some((o) => o.value === v)
 
+// Fixed Principal is repaid in instalments, so Closing Time is not offered for it
+export const FIXED_PRINCIPAL_FREQUENCY_OPTIONS = REPAYMENT_FREQUENCY_OPTIONS.filter((o) => o.value !== "CLOSING_TIME")
+
+export const isFixedPrincipalFrequency = (v: unknown): v is RepaymentFrequency =>
+  FIXED_PRINCIPAL_FREQUENCY_OPTIONS.some((o) => o.value === v)
+
+/** Frequencies offered for a repayment type: On Maturity is Closing Time only. */
+export const frequencyOptionsFor = (method: RepaymentMethod) =>
+  method === "ON_MATURITY"
+    ? REPAYMENT_FREQUENCY_OPTIONS.filter((o) => o.value === "CLOSING_TIME")
+    : FIXED_PRINCIPAL_FREQUENCY_OPTIONS
+
 export const repaymentMethodLabel = (v: string | null | undefined) =>
   REPAYMENT_METHOD_OPTIONS.find((o) => o.value === v)?.label || String(v || "").replace(/_/g, " ")
 

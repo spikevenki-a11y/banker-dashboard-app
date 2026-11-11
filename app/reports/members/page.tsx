@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate } from "@/lib/date-format"
 import { useState, useRef, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -18,7 +19,7 @@ import { downloadPdf } from "../_components/download-pdf"
 const fmt = (n: number | string | null | undefined) =>
   new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n || 0))
 const fmtDate = (d: string | null) =>
-  d ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"
+  d ? formatDate(d) : "—"
 
 const TABS = [
   { value: "all",      label: "All Members" },
@@ -187,7 +188,7 @@ function MembersReportContent() {
                               <TableCell className="text-xs">{r.mobile_no || "—"}</TableCell>
                               <TableCell className="text-xs">{r.member_type}</TableCell>
                               <TableCell className="text-xs">{r.membership_class}</TableCell>
-                              <TableCell className="text-xs">{r.share_balance}</TableCell>
+                              <TableCell className="text-xs">{fmt(r.share_balance)}</TableCell>
                               <TableCell>
                                 <Badge variant="outline" className={`text-[10px] ${r.status === "ACTIVE" ? "border-teal-300 text-teal-700" : "border-red-300 text-red-700"}`}>
                                   {r.status}

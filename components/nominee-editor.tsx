@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2, Plus, Search, Trash2, UserPlus } from "lucide-react"
+import { formatDate } from "@/lib/date-format"
 import { MemberSearchDialog } from "@/components/member-search-dialog"
 import { calculateAge } from "@/lib/member-age"
 import { isValidNomineePhone, normaliseNomineePhone } from "@/lib/savings-nominees"
@@ -289,7 +290,7 @@ export function NomineeEditor({
                       n.relation,
                       n.gender,
                       n.age !== null && n.age !== undefined ? `${n.age} yrs` : null,
-                      n.dob,
+                      n.dob ? formatDate(n.dob) : null,
                       n.phone ? `Ph ${n.phone}` : null,
                       n.percentage ? `${n.percentage}%` : null,
                     ].filter(Boolean).join(" · ")}

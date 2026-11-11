@@ -1,5 +1,6 @@
 "use client"
 
+import { formatDate, formatDateTime } from "@/lib/date-format"
 import { useState, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import {
@@ -167,15 +168,12 @@ const fmt = (n: number) =>
 
 const fmtDate = (d: string | null) =>
   d
-    ? new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+    ? formatDate(d)
     : "—"
 
 const fmtDateTime = (d: string | null) =>
   d
-    ? new Date(d).toLocaleString("en-IN", {
-        day: "2-digit", month: "short", year: "numeric",
-        hour: "2-digit", minute: "2-digit",
-      })
+    ? formatDateTime(d)
     : "—"
 
 function StatusBadge({ status }: { status: string }) {
@@ -958,9 +956,7 @@ export default function DayEndPage() {
                                     <TableCell className="font-mono text-xs font-semibold">{v.batchId}</TableCell>
                                     <TableCell className="font-mono text-xs">{v.voucherId}</TableCell>
                                     <TableCell className="text-xs">
-                                      {new Date(v.businessDate).toLocaleDateString("en-IN", {
-                                        day: "2-digit", month: "short", year: "numeric",
-                                      })}
+                                      {formatDate(v.businessDate)}
                                     </TableCell>
                                     <TableCell>
                                       <Badge variant="outline" className="text-[10px]">{v.voucherType}</Badge>
