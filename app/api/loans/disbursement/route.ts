@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
 import { lockOpenTransferBatch } from "@/lib/gl-voucher"
-import { creditAppraiserAccount, lockAppraiserAccount, type AppraiserAccount } from "@/lib/appraiser-account"
+import { lockAppraiserAccount, postAppraiserChargeCredits, splitAppraiserCharge, type AppraiserAccount } from "@/lib/appraiser-account"
 import { buildRepaymentSchedule, isRepaymentMethod } from "@/lib/loan-repayment-schedule"
 
 // CASH          — DR Loan, CR Cash; balanced voucher.
@@ -111,7 +111,8 @@ export async function POST(request: NextRequest) {
        JOIN loan_sanction_details ls ON la.loan_application_id = ls.loan_application_id
        JOIN loan_schemes lscheme ON la.scheme_id = lscheme.scheme_id
        JOIN memberships m ON la.membership_no = CAST(m.membership_no AS VARCHAR)
-       WHERE la.loan_application_id = $1 AND la.branch_id = $2`,
+       WHERE la.loan_application_id = $1 AND la.branch_id = $2
+       FOR UPDATE OF la`,
       [loan_application_id, branchId]
     )
 
@@ -132,8 +133,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Disbursement amount cannot exceed sanctioned amount" }, { status: 400 })
     }
 
-    // Appraiser charge is only allowed when the loan scheme permits it
-    if (appraiser_charge && parseFloat(appraiser_charge.charge_amount) > 0 && !app.scheme_appraiser_charge_allowed) {
+    // Appraiser charge (rounded to paise) is only allowed when the loan scheme permits it
+    const chargeAmt = appraiser_charge ? splitAppraiserCharge(Number(appraiser_charge.charge_amount) || 0).total : 0
+    if (appraiser_charge && !(Number.isFinite(Number(appraiser_charge.charge_amount)) && Number(appraiser_charge.charge_amount) >= 0)) {
+      await client.query("ROLLBACK")
+      return NextResponse.json({ error: "Invalid appraiser charge amount" }, { status: 400 })
+    }
+    if (chargeAmt > 0 && !app.scheme_appraiser_charge_allowed) {
       await client.query("ROLLBACK")
       return NextResponse.json({ error: "Appraiser charge is not allowed for this loan scheme" }, { status: 400 })
     }
@@ -170,10 +176,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Appraiser charge adjusted with loan reduces the amount credited to savings
-    const adjustedChargeAmt =
-      appraiser_charge && appraiser_charge.charge_amount > 0 && appraiser_charge.payment_mode !== 'CASH'
-        ? parseFloat(appraiser_charge.charge_amount)
-        : 0
+    const adjustedChargeAmt = chargeAmt > 0 && appraiser_charge.payment_mode !== 'CASH' ? chargeAmt : 0
     const savingsCreditAmt = disbursementAmt - adjustedChargeAmt
 
     if ((isDefaultTransfer || isTransfer) && savingsCreditAmt <= 0) {
@@ -194,7 +197,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Appraiser charge: resolve and lock the appraiser's designated account before posting anything
-    const hasAppraiserCharge = !!appraiser_charge && parseFloat(appraiser_charge.charge_amount) > 0
+    const hasAppraiserCharge = chargeAmt > 0
     let appraiserAccount: AppraiserAccount | null = null
     if (hasAppraiserCharge) {
       if (!appraiser_charge.appraiser_id) {
@@ -332,9 +335,10 @@ export async function POST(request: NextRequest) {
     }
     // TRANSFER: no contra line here — the batch stays open for the credit side to be posted
 
-    // Appraiser charge: transfer to the appraiser's designated account
+    // Appraiser charge: 80% to the appraiser's account, 20% to the configured income account.
+    // Both credits go into the same batch as the charge's debit, inside this DB transaction.
+    let chargeSplit: ReturnType<typeof splitAppraiserCharge> | null = null
     if (hasAppraiserCharge && appraiserAccount) {
-      const chargeAmt = parseFloat(appraiser_charge.charge_amount)
 
       if (appraiser_charge.payment_mode === 'CASH') {
         // Separate cash voucher: DR Cash, CR Appraiser Account
@@ -364,16 +368,17 @@ export async function POST(request: NextRequest) {
           VALUES ($1, $2, $3, $4, '0', $5, 0, $6, $7, $8)
         `, [branchId, chargeBatchId, businessDate, CASH_GL_ACCOUNT, chargeAmt, chargeVoucherNo, `Appraiser charge - ${app.reference_no}`, session.userId])
 
-        // CR Appraiser Account
-        await creditAppraiserAccount(client, {
+        // CR Appraiser Account (80%) + CR Income Account (20%)
+        chargeSplit = await postAppraiserChargeCredits(client, {
           account: appraiserAccount, branchId, batchId: chargeBatchId, voucherNo: chargeVoucherNo, businessDate,
           voucherType: 'CASH', amount: chargeAmt,
           narration: `Appraiser charge - ${app.reference_no}`, userId: session.userId,
         })
 
       } else {
-        // ADJUST_WITH_LOAN: add CR Appraiser Account to existing batch (reduces cash paid to member)
-        await creditAppraiserAccount(client, {
+        // ADJUST_WITH_LOAN: add CR Appraiser Account (80%) + CR Income Account (20%) to the
+        // disbursement batch (reduces the amount paid to the member)
+        chargeSplit = await postAppraiserChargeCredits(client, {
           account: appraiserAccount, branchId, batchId, voucherNo, businessDate,
           voucherType: 'TRANSFER', amount: chargeAmt,
           narration: `Appraiser charge adjusted - ${app.reference_no}`, userId: session.userId,
@@ -499,6 +504,13 @@ export async function POST(request: NextRequest) {
       batch_open: isTransfer, // Transfer batch still needs its contra entry
       savings_account_no: isDefaultTransfer ? savings_account_no : null,
       appraiser_account_no: appraiserAccount?.account_number ?? null,
+      appraiser_charge_split: chargeSplit && appraiserAccount ? {
+        total: chargeSplit.total,
+        appraiser_share: chargeSplit.appraiserShare,
+        income_share: chargeSplit.incomeShare,
+        income_account_code: appraiserAccount.income_account_code,
+        income_account_name: appraiserAccount.income_account_name,
+      } : null,
       emi_amount: emi,
       total_installments: N
     })

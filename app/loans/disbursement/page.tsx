@@ -46,6 +46,7 @@ import {
 import { ArrowLeft, Loader2, CheckCircle2, Wallet, CreditCard, Search, User, Calendar, IndianRupee, Banknote, Building2, RefreshCw, ChevronRight, AlertCircle, Receipt, FileText, Home } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { APPRAISER_ACCOUNT_TYPES } from "@/lib/appraiser-history"
+import { APPRAISER_SHARE_PERCENT, INCOME_SHARE_PERCENT, splitAppraiserCharge } from "@/lib/appraiser-account"
 import { MemberSummaryCard, useMemberSummary } from "@/components/member-summary-card"
 
 type LoanAppraiser = {
@@ -54,6 +55,8 @@ type LoanAppraiser = {
   appraiser_name: string
   account_number: string | null
   account_type: string | null
+  income_account_code: string | null
+  income_account_name: string | null
 }
 
 // Returns the reason the appraiser cannot receive the charge, or "" when the account is usable
@@ -64,6 +67,9 @@ function getAppraiserAccountError(appraiser: LoanAppraiser | undefined) {
   }
   if (!APPRAISER_ACCOUNT_TYPES.some((t) => t.value === appraiser.account_type)) {
     return `Account type ${appraiser.account_type} is not supported for appraiser ${appraiser.appraiser_name}. Update it in Settings > Management > Manage Appraiser Details.`
+  }
+  if (!appraiser.income_account_code) {
+    return `No income account is configured for appraiser ${appraiser.appraiser_name}. Update it in Settings > Management > Manage Appraiser Details.`
   }
   return ""
 }
@@ -183,6 +189,7 @@ export default function LoanDisbursementPage() {
   const selectedAppraiser = appraisers.find((a) => String(a.appraiser_id) === appraiserCharge.appraiser_id)
   const hasAppraiserCharge = !!selectedLoan?.appraiser_charge_allowed && Number(appraiserCharge.charge_amount) > 0
   const appraiserAccountError = hasAppraiserCharge ? getAppraiserAccountError(selectedAppraiser) : ""
+  const chargeSplit = hasAppraiserCharge ? splitAppraiserCharge(Number(appraiserCharge.charge_amount)) : null
 
   // Fetch sanctioned loans
   const fetchSanctionedLoans = useCallback(async () => {
@@ -433,8 +440,10 @@ export default function LoanDisbursementPage() {
         (data.batch_open
           ? `Posted to GL Batch ${data.batch_id}. Post the credit entry to complete this batch.\n`
           : "") +
-        (data.appraiser_account_no
-          ? `Appraiser charge credited to A/c: ${data.appraiser_account_no}\n`
+        (data.appraiser_charge_split
+          ? `Appraiser charge ${formatCurrency(data.appraiser_charge_split.total)}:\n` +
+            `  ${APPRAISER_SHARE_PERCENT}% ${formatCurrency(data.appraiser_charge_split.appraiser_share)} → Appraiser A/c ${data.appraiser_account_no}\n` +
+            `  ${INCOME_SHARE_PERCENT}% ${formatCurrency(data.appraiser_charge_split.income_share)} → Income A/c ${data.appraiser_charge_split.income_account_code}\n`
           : "") +
         // `Monthly EMI: ${formatCurrency(data.emi_amount)}\n` +
         // `Total EMIs: ${data.total_installments}\n` +
@@ -860,6 +869,39 @@ export default function LoanDisbursementPage() {
                             {selectedAppraiser.account_number}
                           </span>{" "}
                           ({APPRAISER_ACCOUNT_TYPES.find((t) => t.value === selectedAppraiser.account_type)?.label})
+                          {selectedAppraiser.income_account_code && (
+                            <>
+                              {" · "}Income account:{" "}
+                              <span className="font-semibold text-foreground">
+                                {selectedAppraiser.income_account_code}
+                              </span>
+                              {selectedAppraiser.income_account_name && ` (${selectedAppraiser.income_account_name})`}
+                            </>
+                          )}
+                        </div>
+                      )}
+                      {chargeSplit && !appraiserAccountError && chargeSplit.total > 0 && (
+                        <div className="rounded-md border text-sm">
+                          <div className="grid grid-cols-3 gap-2 border-b bg-muted/50 px-3 py-1.5 text-xs font-medium text-muted-foreground">
+                            <span>Account</span>
+                            <span className="text-right">Share</span>
+                            <span className="text-right">Amount</span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 px-3 py-1.5">
+                            <span>Appraiser Account</span>
+                            <span className="text-right">{APPRAISER_SHARE_PERCENT}%</span>
+                            <span className="text-right font-mono">{formatCurrency(chargeSplit.appraiserShare)}</span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 px-3 py-1.5">
+                            <span>Income Account</span>
+                            <span className="text-right">{INCOME_SHARE_PERCENT}%</span>
+                            <span className="text-right font-mono">{formatCurrency(chargeSplit.incomeShare)}</span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 border-t px-3 py-1.5 font-medium">
+                            <span>Total Charge</span>
+                            <span className="text-right">100%</span>
+                            <span className="text-right font-mono">{formatCurrency(chargeSplit.total)}</span>
+                          </div>
                         </div>
                       )}
                       {appraiserAccountError && (
