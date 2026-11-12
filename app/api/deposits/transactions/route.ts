@@ -550,7 +550,7 @@ export async function POST(request: NextRequest) {
       batch_open: isTransfer, // Bank Transfer batch still needs its contra entry
       savings_account_nos: isDefaultTransfer ? savingsSources.map((s) => s.accountNumber) : [],
       newBalance,
-      message: `Credit of ${fmt.format(amt)} successful. Batch: ${batchId}, Voucher: ${voucherNo}.${modeText} New balance: ${fmt.format(newBalance)}`,
+      message: `Credit of ${fmt.format(amt)} successful. ${voucherType === "CASH" ? "" : `Batch: ${batchId}, `}Voucher: ${voucherNo}.${modeText} New balance: ${fmt.format(newBalance)}`,
     })
   } catch (err: any) {
     await client.query("ROLLBACK")

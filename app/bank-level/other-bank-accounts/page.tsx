@@ -1514,7 +1514,10 @@ export default function OtherBankAccountsPage() {
                     {voucherDetails.voucherNo && (
                       <div className="flex items-center justify-between rounded-md bg-muted px-4 py-2 text-sm">
                         <span className="font-semibold">Voucher #{voucherDetails.voucherNo}</span>
-                        <span className="text-muted-foreground">Batch #{voucherDetails.batchId}</span>
+                        {/* Batch is not shown for Cash transactions */}
+                        {voucherDetails.voucherType !== "CASH" && (
+                          <span className="text-muted-foreground">Batch #{voucherDetails.batchId}</span>
+                        )}
                       </div>
                     )}
 

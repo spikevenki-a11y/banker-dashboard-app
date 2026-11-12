@@ -1483,9 +1483,12 @@ export default function BorrowingsPage() {
                         <span className="font-semibold text-foreground">
                           Voucher&nbsp;#{voucherDetails.voucherNo}
                         </span>
-                        <span className="text-muted-foreground">
-                          Batch&nbsp;#{voucherDetails.batchId}
-                        </span>
+                        {/* Batch is not shown for Cash transactions */}
+                        {voucherDetails.voucherType !== "CASH" && (
+                          <span className="text-muted-foreground">
+                            Batch&nbsp;#{voucherDetails.batchId}
+                          </span>
+                        )}
                       </div>
                     )}
 

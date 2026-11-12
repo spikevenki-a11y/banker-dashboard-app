@@ -285,7 +285,7 @@ export async function POST(request: NextRequest) {
         batch_id: batchId,
         newBalance,
         status: "PENDING_APPROVAL",
-        message: `${transactionType === "DEPOSIT" ? "Deposit" : "Withdrawal"} of ₹${Number(amount).toLocaleString("en-IN")} successful. Batch: ${batchId}, Voucher: ${voucherNo}. New balance: ₹${newBalance.toLocaleString("en-IN")}`,
+        message: `${transactionType === "DEPOSIT" ? "Deposit" : "Withdrawal"} of ₹${Number(amount).toLocaleString("en-IN")} successful. ${voucherType === "CASH" ? "" : `Batch: ${batchId}, `}Voucher: ${voucherNo}. New balance: ₹${newBalance.toLocaleString("en-IN")}`,
       })
     } catch (err) {
       await client.query("ROLLBACK")

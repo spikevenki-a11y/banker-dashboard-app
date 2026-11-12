@@ -1325,7 +1325,7 @@ const BREAK_REASONS = [
 ]
 
 type BreakStep = 1 | 2 | 3 | 4
-type BreakResult = { break_event_id: string; locker_no: string; voucher_no: number | null; batch_id: number | null }
+type BreakResult = { break_event_id: string; locker_no: string; voucher_no: number | null; batch_id: number | null; voucher_type: string | null }
 
 function BreakLockerWizard({
   open, locker, onClose, onSuccess,
@@ -1387,7 +1387,7 @@ function BreakLockerWizard({
       })
       const data = await res.json()
       if (res.ok && data.success) {
-        setResult({ break_event_id: data.break_event_id, locker_no: data.locker_no, voucher_no: data.voucher_no, batch_id: data.batch_id })
+        setResult({ break_event_id: data.break_event_id, locker_no: data.locker_no, voucher_no: data.voucher_no, batch_id: data.batch_id, voucher_type: charge > 0 ? voucherType : null })
         setStep(4)
       } else {
         setSubmitError(data.error || "Break locker failed.")
@@ -1697,7 +1697,8 @@ function BreakLockerWizard({
                   ["Break Event ID", result.break_event_id.slice(0, 8) + "…"],
                   ["Locker", result.locker_no],
                   ...(result.voucher_no ? [["Voucher No", String(result.voucher_no)]] : []),
-                  ...(result.batch_id   ? [["Batch ID",   String(result.batch_id)]]   : []),
+                  // Batch ID is not shown for Cash transactions
+                  ...(result.batch_id && result.voucher_type !== "CASH" ? [["Batch ID", String(result.batch_id)]] : []),
                   ["New Status", "MAINTENANCE"],
                 ].map(([label, value]) => (
                   <div key={label} className="flex justify-between px-4 py-2.5">

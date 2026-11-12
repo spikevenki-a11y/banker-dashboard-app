@@ -146,6 +146,7 @@ type VoucherDetails = {
   title: string
   voucherNo: string | number | null
   batchId: string | number | null
+  voucherType?: string
   date: string
   description: string
   amount: number
@@ -368,6 +369,7 @@ export default function FixedAssetsPage() {
         title: "Purchase Confirmed",
         voucherNo: data.voucher_no,
         batchId: data.batch_id,
+        voucherType: vType,
         date: new Date().toISOString().split("T")[0],
         description: `${data.assets_created} individual asset record(s) created`,
         amount: 0,
@@ -497,6 +499,7 @@ export default function FixedAssetsPage() {
         title: saleDisposalType === "SALE" ? "Asset Sale Recorded" : "Asset Scrapped",
         voucherNo: data.voucher_no,
         batchId: data.batch_id,
+        voucherType: saleVoucherType,
         date: saleDate,
         description: `${asset?.asset_name} (${asset?.serial_number})`,
         amount: parseFloat(saleAmount || "0"),
@@ -1323,7 +1326,8 @@ export default function FixedAssetsPage() {
                       <span className="font-mono font-semibold">{voucherDetails.voucherNo}</span>
                     </div>
                   )}
-                  {voucherDetails?.batchId && (
+                  {/* Batch ID is not shown for Cash transactions */}
+                  {voucherDetails?.batchId && voucherDetails.voucherType !== "CASH" && (
                     <div className="flex justify-between px-3 py-2">
                       <span className="text-muted-foreground">Batch ID</span>
                       <span className="font-mono">{voucherDetails.batchId}</span>

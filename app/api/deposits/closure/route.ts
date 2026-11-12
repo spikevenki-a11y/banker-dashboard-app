@@ -512,7 +512,7 @@ export async function POST(request: NextRequest) {
       voucher_type: voucherType,
       batch_open: isTransfer, // Bank Transfer batch still needs its contra entry
       savings_account_nos: isDefaultTransfer ? savingsTargets.map((t) => t.accountNumber) : [],
-      message: `Account ${accountNumber} closed successfully.\nPayout: ${fmt.format(payout)}\n${modeLine}\nBatch: ${batchId} | Voucher: ${voucherNo}`,
+      message: `Account ${accountNumber} closed successfully.\nPayout: ${fmt.format(payout)}\n${modeLine}\n${voucherType === "CASH" ? "" : `Batch: ${batchId} | `}Voucher: ${voucherNo}`,
     })
   } catch (err: any) {
     await client.query("ROLLBACK")

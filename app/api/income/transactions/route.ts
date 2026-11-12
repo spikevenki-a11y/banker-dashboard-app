@@ -338,7 +338,7 @@ export async function POST(request: NextRequest) {
       entries_count: processedEntries.length,
       total_amount: totalAmount,
       status: "PENDING_APPROVAL",
-      message: `${processedEntries.length} income transaction(s) recorded. Batch: ${batchId}, Voucher: ${voucherNo}. Total: ₹${totalAmount.toLocaleString("en-IN")}`,
+      message: `${processedEntries.length} income transaction(s) recorded. ${voucher_type === "CASH" ? "" : `Batch: ${batchId}, `}Voucher: ${voucherNo}. Total: ₹${totalAmount.toLocaleString("en-IN")}`,
     }, { status: 201 })
   } catch (error: any) {
     await client.query("ROLLBACK")

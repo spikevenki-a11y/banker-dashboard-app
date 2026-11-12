@@ -43,32 +43,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  ArrowLeft,
-  Loader2,
-  CheckCircle2,
-  Wallet,
-  CreditCard,
-  Search,
-  User,
-  Phone,
-  Calendar,
-  IndianRupee,
-  Percent,
-  Clock,
-  Banknote,
-  Building2,
-  RefreshCw,
-  ChevronRight,
-  AlertCircle,
-  Receipt,
-  FileText,
-  Home,
-  Eye,
-} from "lucide-react"
+import { ArrowLeft, Loader2, CheckCircle2, Wallet, CreditCard, Search, User, Calendar, IndianRupee, Banknote, Building2, RefreshCw, ChevronRight, AlertCircle, Receipt, FileText, Home } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { APPRAISER_ACCOUNT_TYPES } from "@/lib/appraiser-history"
-import { ViewMemberPopup } from "@/components/view-member-popup"
+import { MemberSummaryCard, useMemberSummary } from "@/components/member-summary-card"
 
 type LoanAppraiser = {
   appraiser_id: number
@@ -150,6 +128,12 @@ export default function LoanDisbursementPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedLoan, setSelectedLoan] = useState<SanctionedLoan | null>(null)
+  // Member Summary card (shared with other modules); the loan's member details show until loaded
+  const summaryMember = useMemberSummary(selectedLoan?.membership_no, selectedLoan ? {
+    full_name: selectedLoan.member_name,
+    mobile_no: selectedLoan.mobile_no,
+    aadhaar_no: selectedLoan.aadhaar_no,
+  } : undefined)
 
   // Disbursement form
   const [disbursementAmount, setDisbursementAmount] = useState("")
@@ -177,7 +161,6 @@ export default function LoanDisbursementPage() {
   // Submit state
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
-  const [viewMemberOpen, setViewMemberOpen] = useState(false)
   const [successOpen, setSuccessOpen] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
   const [formError, setFormError] = useState("")
@@ -599,6 +582,9 @@ export default function LoanDisbursementPage() {
               </Card>
             ) : (
               <div className="space-y-4">
+                {/* Member Summary — shared card and View Member Details popup */}
+                <MemberSummaryCard memberInfo={summaryMember} />
+
                 {/* Loan Details Card */}
                 <Card>
                   <CardHeader className="pb-3">
@@ -613,16 +599,6 @@ export default function LoanDisbursementPage() {
                         </CardDescription>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setViewMemberOpen(true)}
-                          className="gap-2 bg-transparent"
-                        >
-                          <Eye className="h-4 w-4" />
-                          {/* View Member Details */}
-                        </Button>
                         {/* <Badge className="bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400">
                           <CheckCircle2 className="mr-1 h-3 w-3" />
                           Sanctioned
@@ -631,22 +607,8 @@ export default function LoanDisbursementPage() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    {/* Member Info */}
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                      <div className="rounded-lg border p-3 bg-muted/30">
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Phone className="h-3 w-3" />
-                          Mobile
-                        </div>
-                        <p className="mt-1 font-medium">{selectedLoan.mobile_no || "N/A"}</p>
-                      </div>
-                      <div className="rounded-lg border p-3 bg-muted/30">
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <CreditCard className="h-3 w-3" />
-                          Aadhaar
-                        </div>
-                        <p className="mt-1 font-medium">{selectedLoan.aadhaar_no ? `XXXX-XXXX-${selectedLoan.aadhaar_no.slice(-4)}` : "N/A"}</p>
-                      </div>
+                    {/* Loan scheme (member details are in the Member Summary card) */}
+                    <div className="grid gap-4 sm:grid-cols-2">
                       <div className="rounded-lg border p-3 bg-muted/30">
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <Building2 className="h-3 w-3" />
@@ -1178,11 +1140,6 @@ export default function LoanDisbursementPage() {
           </AlertDialogContent>
         </AlertDialog>
       </div>
-      <ViewMemberPopup
-        open={viewMemberOpen}
-        onOpenChange={setViewMemberOpen}
-        membershipNo={selectedLoan?.membership_no}
-      />
     </DashboardWrapper>
   )
 }

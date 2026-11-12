@@ -387,7 +387,7 @@ export async function POST(request: NextRequest) {
       voucher_no: voucherNo,
       batch_id: batchId,
       newInterestDue,
-      message: `Interest payment of ${fmt.format(amt)} processed successfully. Batch: ${batchId}, Voucher: ${voucherNo}. Remaining interest due: ${fmt.format(newInterestDue)}`,
+      message: `Interest payment of ${fmt.format(amt)} processed successfully. ${voucherType === "CASH" ? "" : `Batch: ${batchId}, `}Voucher: ${voucherNo}. Remaining interest due: ${fmt.format(newInterestDue)}`,
     })
   } catch (err: any) {
     await client.query("ROLLBACK")

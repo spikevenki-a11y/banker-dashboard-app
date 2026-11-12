@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import {
   Camera, PenTool, ArrowLeft, ArrowUpCircle, Search, User, MapPin,
-  ShieldCheck, Building2, CheckCircle2, AlertCircle, Pencil, Phone, Users,
+  ShieldCheck, Building2, CheckCircle2, AlertCircle, AlertTriangle, Pencil, Phone, Users,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { customerDocumentUrl, useCustomerDocuments } from "@/components/customer-photo-signature"
@@ -207,6 +207,8 @@ export default function EnrollMemberPage() {
   const [memberFieldsReadOnly, setMemberFieldsReadOnly] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isCustomerNotFoundOpen, setIsCustomerNotFoundOpen] = useState(false)
+  // Customer already holds an active membership in this branch (server returns 409)
+  const [isAlreadyEnrolledOpen, setIsAlreadyEnrolledOpen] = useState(false)
   const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false)
   const [createdMemberNo, setCreatedMemberNo] = useState<string>("")
   const [photo, setPhoto] = useState<File | null>(null)
@@ -384,6 +386,10 @@ export default function EnrollMemberPage() {
       })
 
       const data = await res.json()
+      if (res.status === 409) {
+        setIsAlreadyEnrolledOpen(true)
+        return
+      }
       if (!res.ok) throw new Error(data.error)
 
       setCreatedMemberNo(data.membership_no)
@@ -900,6 +906,30 @@ export default function EnrollMemberPage() {
               className="bg-amber-600 hover:bg-amber-700 text-white"
             >
               Continue Registration
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Already Enrolled Dialog */}
+      <AlertDialog open={isAlreadyEnrolledOpen} onOpenChange={setIsAlreadyEnrolledOpen}>
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100">
+                <AlertTriangle className="h-6 w-6 text-amber-600" aria-hidden="true" />
+              </div>
+              <div className="pt-0.5 text-left">
+                <AlertDialogTitle className="text-lg">Member Already Enrolled</AlertDialogTitle>
+                <AlertDialogDescription className="mt-0.5">
+                  This member is already enrolled in this bank.
+                </AlertDialogDescription>
+              </div>
+            </div>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-2">
+            <AlertDialogAction onClick={() => setIsAlreadyEnrolledOpen(false)} className="min-w-24">
+              OK
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -227,7 +227,7 @@ export default function TransactionsList() {
 
       setMessage({
         type: "success",
-        text: data.message || `Transaction recorded successfully! Batch: ${data.batch_id}, Voucher: ${data.voucher_no}`,
+        text: data.message || `Transaction recorded successfully! ${voucherType === "CASH" ? "" : `Batch: ${data.batch_id}, `}Voucher: ${data.voucher_no}`,
       })
 
       // Reset form
