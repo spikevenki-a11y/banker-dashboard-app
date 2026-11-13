@@ -733,10 +733,10 @@ function LoanCollectionContent() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 text-sm">
-                    {/* <div>
-                      <span className="text-muted-foreground">EMI Amount</span>
+                    <div>
+                      <span className="text-muted-foreground">Due Amount</span>
                       <p className="text-lg font-bold text-blue-600">{formatCurrency(accountInfo.emi_amount)}</p>
-                    </div> */}
+                    </div>
                     <div>
                       <span className="text-muted-foreground">Outstanding</span>
                       <p className="text-lg font-bold text-orange-600">{formatCurrency(accountInfo.outstanding_balance)}</p>
@@ -835,7 +835,7 @@ function LoanCollectionContent() {
                       <Banknote className="h-5 w-5" />
                       Record Collection
                     </CardTitle>
-                    <CardDescription>Enter payment details for loan collection</CardDescription>
+                    <CardDescription>Enter loan collection details</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
