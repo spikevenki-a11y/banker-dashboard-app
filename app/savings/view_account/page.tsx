@@ -26,6 +26,7 @@ import { ArrowLeft, Search, Loader2, CreditCard, Banknote, Calendar, ArrowDownRi
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { MemberSummaryCard, useMemberSummary } from "@/components/member-summary-card"
 import { isValidNomineePhone, normaliseNomineePhone } from "@/lib/savings-nominees"
+import { formatCurrency as formatINR, type Numeric } from "@/lib/number-format"
 
 type AccountDetails = {
   id: string
@@ -534,10 +535,7 @@ export default function ViewModifyAccountPage() {
     return formatDisplayDate(d)
   }
 
-  const formatCurrency = (amount: number | null) => {
-    if (amount === null || amount === undefined) return "---"
-    return `₹${Number(amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
-  }
+  const formatCurrency = (v: Numeric) => formatINR(v, { empty: "---" })
 
   return (
     <DashboardWrapper>
@@ -896,7 +894,7 @@ export default function ViewModifyAccountPage() {
                                   <Label htmlFor="txn-amount">Amount (INR)</Label>
                                   <Input
                                     id="txn-amount"
-                                    type="number"
+                                    type="amount"
                                     min="0"
                                     step="0.01"
                                     placeholder="Enter amount"

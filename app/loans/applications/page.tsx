@@ -35,6 +35,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Progress } from "@/components/ui/progress"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { SanctionPanel, type SanctionApplication } from "../_components/sanction-panel"
+import { formatCurrency } from "@/lib/number-format"
 
 type LoanScheme = {
   scheme_id: number
@@ -104,10 +105,6 @@ type MemberSearchResult = {
   customer_code: string
   aadhaar_no: string
   status: string
-}
-
-function formatCurrency(val: number | string) {
-  return `₹${Number(val).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 function formatDate(d: string) {
@@ -802,7 +799,7 @@ export default function LoansPage() {
                       <Label htmlFor="loan-amount">Loan Amount *</Label>
                       <Input 
                         id="loan-amount" 
-                        type="number" 
+                        type="amount" 
                         placeholder="Enter amount" 
                         value={newLoanAmount}
                         onChange={(e) => setNewLoanAmount(e.target.value)}
@@ -984,7 +981,7 @@ export default function LoansPage() {
                       <div className="space-y-2">
                         <Label>Sanctioned Amount *</Label>
                         <Input 
-                          type="number" 
+                          type="amount" 
                           value={sanctionAmount}
                           onChange={(e) => setSanctionAmount(e.target.value)}
                         />
@@ -1062,7 +1059,7 @@ export default function LoansPage() {
                   <div className="space-y-2">
                     <Label>Disbursement Amount *</Label>
                     <Input 
-                      type="number" 
+                      type="amount" 
                       value={disbursementAmount}
                       onChange={(e) => setDisbursementAmount(e.target.value)}
                     />
@@ -1124,7 +1121,7 @@ export default function LoansPage() {
                   <div className="space-y-2">
                     <Label>Collection Amount *</Label>
                     <Input 
-                      type="number" 
+                      type="amount" 
                       value={collectionAmount}
                       onChange={(e) => setCollectionAmount(e.target.value)}
                     />

@@ -45,6 +45,7 @@ import {
   ChevronRight,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
+import { formatAmount as fmt } from "@/lib/number-format"
 
 interface PendingVoucher {
   id: string
@@ -253,9 +254,6 @@ export default function VerifyVouchersPage() {
   }
 
   const noneSelected = selectedIds.size === 0
-
-  const fmt = (n: number) =>
-    new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 }).format(n)
 
   const fmtDate = (d: string) =>
     formatDate(d)

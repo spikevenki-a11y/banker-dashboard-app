@@ -7,6 +7,7 @@ import {
   isFixedPrincipalFrequency,
   isRepaymentMethod,
 } from "@/lib/loan-repayment-schedule"
+import { formatAmount } from "@/lib/number-format"
 
 // POST: Approve or Reject a loan application
 export async function POST(request: NextRequest) {
@@ -94,7 +95,7 @@ export async function POST(request: NextRequest) {
       const goldMaxSanction = goldCap[0]?.max_sanction_amount
       if (goldMaxSanction != null && requestedAmount > Number(goldMaxSanction)) {
         await client.query("ROLLBACK")
-        const cap = Number(goldMaxSanction).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        const cap = formatAmount(goldMaxSanction)
         return NextResponse.json(
           { error: `Sanctioned amount cannot exceed the gold Maximum Sanction Amount (₹${cap})` },
           { status: 400 }

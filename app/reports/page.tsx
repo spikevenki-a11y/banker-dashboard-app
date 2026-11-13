@@ -28,6 +28,7 @@ import {
   XCircle,
 } from "lucide-react"
 import { DashboardWrapper } from "../_components/dashboard-wrapper"
+import { formatAmount } from "@/lib/number-format"
 
 const reportCategories = [
   {
@@ -538,12 +539,12 @@ export default function ReportsPage() {
                         </TableCell>
                         <TableCell className="text-right text-xs font-mono">
                           {line.debitAmount > 0
-                            ? new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(line.debitAmount)
+                            ? formatAmount(line.debitAmount)
                             : "-"}
                         </TableCell>
                         <TableCell className="text-right text-xs font-mono">
                           {line.creditAmount > 0
-                            ? new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(line.creditAmount)
+                            ? formatAmount(line.creditAmount)
                             : "-"}
                         </TableCell>
                       </TableRow>
@@ -553,10 +554,10 @@ export default function ReportsPage() {
                     <TableRow>
                       <TableCell colSpan={3} className="text-xs font-bold">Total</TableCell>
                       <TableCell className="text-right text-xs font-bold font-mono">
-                        {new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(pvData.totals.totalDebit)}
+                        {formatAmount(pvData.totals.totalDebit)}
                       </TableCell>
                       <TableCell className="text-right text-xs font-bold font-mono">
-                        {new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(pvData.totals.totalCredit)}
+                        {formatAmount(pvData.totals.totalCredit)}
                       </TableCell>
                     </TableRow>
                   </TableFooter>

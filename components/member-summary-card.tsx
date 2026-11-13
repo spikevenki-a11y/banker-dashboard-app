@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Loader2, User, TrendingUp, TrendingDown, ShieldCheck, Eye, MapPin, Camera, PenTool, Users } from "lucide-react"
+import { formatCurrency as fmt } from "@/lib/number-format"
 
 // Member Summary card + "View Member Details" profile modal.
 // Same layout, fields and behaviour as Fixed Deposits → Create Deposit.
@@ -159,9 +160,6 @@ type LoanAccount = {
   application_status: string
   loan_account_no: string
 }
-
-const fmt = (n: number) =>
-  `₹${Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 // Bank's perspective: the member's savings, deposits and shares are money the bank
 // holds (liabilities); the member's loans are money owed to the bank (assets).

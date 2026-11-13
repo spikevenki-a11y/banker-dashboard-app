@@ -16,6 +16,7 @@ import {
   ArrowLeft, CreditCard, Loader2, ShieldCheck, Scale,
   Building2, Car, Landmark, FileText, ImageIcon, ExternalLink,
 } from "lucide-react"
+import { formatCurrency as formatINR, type Numeric } from "@/lib/number-format"
 
 type LoanApplication = {
   id: string
@@ -198,10 +199,7 @@ type LoanSecurity = {
   gold_documents: GoldDocument[]
 }
 
-function formatCurrency(val: number | string | null | undefined) {
-  if (val === null || val === undefined || val === "") return "---"
-  return `₹${Number(val).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-}
+const formatCurrency = (v: Numeric) => formatINR(v, { empty: "---" })
 
 function formatDate(d: string | null | undefined) {
   if (!d) return "---"

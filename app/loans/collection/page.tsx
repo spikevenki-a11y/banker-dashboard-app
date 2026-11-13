@@ -55,6 +55,7 @@ import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { Progress } from "@/components/ui/progress"
 import { MemberSearchDialog } from "@/components/member-search-dialog"
 import { MemberSummaryCard, type MemberSummaryInfo } from "@/components/member-summary-card"
+import { formatCurrency } from "@/lib/number-format"
 
 type LoanAccountInfo = {
   loan_account_no: string
@@ -115,10 +116,6 @@ const noStepProps = {
     if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault()
   },
   onWheel: (e: React.WheelEvent<HTMLInputElement>) => e.currentTarget.blur(),
-}
-
-function formatCurrency(val: number | string) {
-  return `₹${Number(val).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 function formatDate(d: string) {
@@ -549,7 +546,7 @@ function LoanCollectionContent() {
       ? pNum < 0 || iNum < 0
         ? "Principal and Interest cannot be negative"
         : Math.abs(aNum - (pNum + iNum)) > 0.01
-        ? `Total mismatch: ₹${(pNum + iNum).toFixed(2)} ≠ Collection Amount ₹${aNum.toFixed(2)}`
+        ? `Total mismatch: ${formatCurrency(pNum + iNum)} ≠ Collection Amount ${formatCurrency(aNum)}`
         : ""
       : ""
 
@@ -845,7 +842,7 @@ function LoanCollectionContent() {
                       <div className="space-y-2">
                         <Label>Collection Amount *</Label>
                         <Input
-                          type="number"
+                          type="amount"
                           min="0"
                           step="1"
                           placeholder="Enter amount"
@@ -880,7 +877,7 @@ function LoanCollectionContent() {
                             <Label htmlFor="principal-amt" className="text-xs">Principal</Label>
                             <Input
                               id="principal-amt"
-                              type="number"
+                              type="amount"
                               min="0"
                               step="0.01"
                               placeholder="0.00"
@@ -894,7 +891,7 @@ function LoanCollectionContent() {
                             <Label htmlFor="interest-amt" className="text-xs">Interest</Label>
                             <Input
                               id="interest-amt"
-                              type="number"
+                              type="amount"
                               min="0"
                               step="0.01"
                               placeholder="0.00"

@@ -35,6 +35,7 @@ import {
   Calendar,
   FileText,
 } from "lucide-react"
+import { formatCurrency } from "@/lib/number-format"
 
 interface Transaction {
   id: string
@@ -282,10 +283,6 @@ export default function TransactionsList() {
     account.account_name.toLowerCase().includes(accountSearchTerm.toLowerCase())
   )
 
-  const formatCurrency = (val: number | string) => {
-    return `₹${Number(val).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-  }
-
   const formatDate = (d: string) => {
     if (!d) return "---"
     return formatDisplayDate(d)
@@ -483,7 +480,7 @@ export default function TransactionsList() {
                           <div>
                             <Label className="text-xs text-muted-foreground">Amount (INR) *</Label>
                             <Input
-                              type="number"
+                              type="amount"
                               min="0"
                               step="0.01"
                               placeholder="0.00"

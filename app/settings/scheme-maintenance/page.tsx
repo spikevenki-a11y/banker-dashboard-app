@@ -41,6 +41,7 @@ import {
   HandCoins,
 } from "lucide-react"
 import { DashboardWrapper } from "../../_components/dashboard-wrapper"
+import { formatAmount } from "@/lib/number-format"
 
 /* ── field definitions per module ────────────────────────────────── */
 
@@ -385,7 +386,7 @@ export default function SchemeMaintenancePage() {
                             ) : col === "loan_type" ? (
                               scheme[col] ? String(scheme[col]).replace(/_/g, " ") : "-"
                             ) : amountColumns.includes(col) ? (
-                              scheme[col] != null ? Number(scheme[col]).toLocaleString("en-IN") : "-"
+                              formatAmount(scheme[col], { empty: "-" })
                             ) : (
                               scheme[col] ?? "-"
                             )}

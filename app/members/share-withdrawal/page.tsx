@@ -43,6 +43,7 @@ import {
 import { ArrowLeft, Search, Loader2, CheckCircle2, CreditCard, Banknote, ArrowUpRight, AlertTriangle, Users, X, History } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { MemberSummaryCard, useMemberSummary } from "@/components/member-summary-card"
+import { formatCurrency } from "@/lib/number-format"
 
 type MemberInfo = {
   membership_id: string
@@ -75,10 +76,6 @@ type ShareTransaction = {
   gl_batch_id: number
   status: string
   narration: string
-}
-
-function formatCurrency(val: number | string) {
-  return `₹${Number(val).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 function formatDate(d: string) {
@@ -435,7 +432,7 @@ export default function ShareWithdrawalPage() {
                         <Label htmlFor="withdrawal-amount">Withdrawal Amount (INR) *</Label>
                         <Input
                           id="withdrawal-amount"
-                          type="number"
+                          type="amount"
                           min="0"
                           step="0.01"
                           placeholder="Enter withdrawal amount"

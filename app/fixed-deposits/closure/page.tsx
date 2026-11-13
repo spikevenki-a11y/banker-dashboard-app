@@ -24,6 +24,7 @@ import { ArrowLeft, Loader2, CheckCircle2, AlertTriangle, IndianRupee, Calendar,
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { DepositAccountSearchDialog } from "../_components/deposit-account-search-dialog"
 import { MemberSummaryCard } from "@/components/member-summary-card"
+import { formatCurrency as formatINR, type Numeric } from "@/lib/number-format"
 
 type ClosureAccount = {
   accountNumber: string
@@ -118,10 +119,7 @@ type MemberInfo = {
 
 
 
-function formatCurrency(val: number | string | null | undefined) {
-  if (val == null) return "--"
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(Number(val))
-}
+const formatCurrency = (v: Numeric) => formatINR(v, { empty: "--" })
 
 function formatDate(d: string | null | undefined) {
   if (!d) return "--"
@@ -791,7 +789,7 @@ function DepositClosureContent() {
                               </Label>
                               <Input
                                 id="penalty"
-                                type="number"
+                                type="amount"
                                 min="0"
                                 step="0.01"
                                 value={penaltyOverride}
@@ -1030,7 +1028,7 @@ function DepositClosureContent() {
                                       <div className="mt-2">
                                         <Label className="text-[10px] text-muted-foreground">Credit Amount</Label>
                                         <Input
-                                          type="number"
+                                          type="amount"
                                           min="0"
                                           step="0.01"
                                           placeholder="0.00"

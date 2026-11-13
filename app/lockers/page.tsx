@@ -44,6 +44,7 @@ import {
   CreditCard, Calendar,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
+import { formatCurrency as fmt } from "@/lib/number-format"
 
 type LockerDeposit = {
   id: string
@@ -103,9 +104,6 @@ type InventoryStats = {
   allocated: string
   maintenance: string
 }
-
-const fmt = (n: number | string | null | undefined) =>
-  `₹${Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`
 
 function StatusBadge({ status }: { status: string }) {
   const s = status?.toUpperCase()
@@ -891,7 +889,7 @@ export default function LockersPage() {
                 <Label htmlFor="new-type-rent">Annual Rent (₹)</Label>
                 <Input
                   id="new-type-rent"
-                  type="number"
+                  type="amount"
                   min="0"
                   placeholder="0"
                   value={newTypeRent}

@@ -50,6 +50,7 @@ import {
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { SearchableSelect } from "@/components/ui/searchable-select"
+import { formatCurrency } from "@/lib/number-format"
 
 type BorrowingAccount = {
   id: string
@@ -122,10 +123,6 @@ type VoucherDetails = {
   otherCharges?: number
   accountStatus?: string
   newBalance?: number
-}
-
-function formatCurrency(val: number | string) {
-  return `₹${Number(val || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 function formatDate(d: string) {
@@ -803,7 +800,7 @@ export default function BorrowingsPage() {
                             <div className="relative">
                               <IndianRupee className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                               <Input
-                                type="number"
+                                type="amount"
                                 className="pl-10"
                                 placeholder="0.00"
                                 value={amountSanctioned}
@@ -912,7 +909,7 @@ export default function BorrowingsPage() {
                             <div className="relative">
                               <IndianRupee className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                               <Input
-                                type="number"
+                                type="amount"
                                 className="pl-10"
                                 placeholder="0.00"
                                 value={installmentAmount}
@@ -1085,7 +1082,7 @@ export default function BorrowingsPage() {
                             <div className="relative">
                               <IndianRupee className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                               <Input
-                                type="number"
+                                type="amount"
                                 className="pl-10"
                                 placeholder="0.00"
                                 value={drawalAmount}
@@ -1239,7 +1236,7 @@ export default function BorrowingsPage() {
                             <div className="relative">
                               <IndianRupee className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                               <Input
-                                type="number"
+                                type="amount"
                                 className="pl-10"
                                 placeholder="0.00"
                                 value={repaymentAmount}
@@ -1266,7 +1263,7 @@ export default function BorrowingsPage() {
                             <div className="relative">
                               <IndianRupee className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                               <Input
-                                type="number"
+                                type="amount"
                                 className="pl-10"
                                 placeholder="0.00"
                                 value={interestAmountPaid}
@@ -1280,7 +1277,7 @@ export default function BorrowingsPage() {
                             <div className="relative">
                               <IndianRupee className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                               <Input
-                                type="number"
+                                type="amount"
                                 className="pl-10 bg-muted"
                                 placeholder="0.00"
                                 value={principalAmount}
@@ -1294,7 +1291,7 @@ export default function BorrowingsPage() {
                             <div className="relative">
                               <IndianRupee className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                               <Input
-                                type="number"
+                                type="amount"
                                 className="pl-10"
                                 placeholder="0.00"
                                 value={penalInterestAmount}
@@ -1308,7 +1305,7 @@ export default function BorrowingsPage() {
                             <div className="relative">
                               <IndianRupee className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                               <Input
-                                type="number"
+                                type="amount"
                                 className="pl-10"
                                 placeholder="0.00"
                                 value={chargeAmount}

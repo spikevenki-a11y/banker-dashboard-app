@@ -28,6 +28,7 @@ import Link from "next/link"
 import { useBranchInfo } from "../_components/use-branch-info"
 import { openPrintWindow } from "../_components/open-print-window"
 import { downloadPdf } from "../_components/download-pdf"
+import { formatCount, formatAmount, formatCurrency } from "@/lib/number-format"
 
 interface Transaction {
   id: string
@@ -147,15 +148,6 @@ export default function DailyTransactionsReportPage() {
     } finally { setPdfLoading(false) }
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount)
-  }
-
   const formatDate = (dateString: string) => {
     return formatDisplayDate(dateString)
   }
@@ -233,15 +225,16 @@ export default function DailyTransactionsReportPage() {
         t.module,
         t.transactionType,
         t.paymentMethod,
-        t.debitAmount.toFixed(2),
-        t.creditAmount.toFixed(2),
+        // Indian format (1,00,000.00), quoted because the value contains commas
+        `"${formatAmount(t.debitAmount)}"`,
+        `"${formatAmount(t.creditAmount)}"`,
         t.status,
         `"${(t.narration || "").replace(/"/g, '""')}"`,
       ])
 
       // Add totals row
       rows.push([])
-      rows.push(["TOTALS", "", "", "", "", "", "", data.totals.totalDebit.toFixed(2), data.totals.totalCredit.toFixed(2), "", ""])
+      rows.push(["TOTALS", "", "", "", "", "", "", `"${formatAmount(data.totals.totalDebit)}"`, `"${formatAmount(data.totals.totalCredit)}"`, "", ""])
 
       const csvContent = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n")
 
@@ -294,7 +287,7 @@ export default function DailyTransactionsReportPage() {
    <Interior ss:Color="#E0E0E0" ss:Pattern="Solid"/>
   </Style>
   <Style ss:ID="Currency">
-   <NumberFormat ss:Format="₹#,##0.00"/>
+   <NumberFormat ss:Format="[&gt;=10000000]&quot;₹&quot;##\\,##\\,##\\,##0.00;[&gt;=100000]&quot;₹&quot;##\\,##\\,##0.00;&quot;₹&quot;##,##0.00"/>
   </Style>
   <Style ss:ID="Total">
    <Font ss:Bold="1"/>
@@ -488,7 +481,7 @@ export default function DailyTransactionsReportPage() {
             <CardContent className="pt-6">
               <div className="text-center">
                 <p className="text-sm font-medium text-muted-foreground">Total Transactions</p>
-                <p className="text-2xl font-bold text-foreground">{totals.totalTransactions.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-foreground">{formatCount(totals.totalTransactions)}</p>
               </div>
             </CardContent>
           </Card>

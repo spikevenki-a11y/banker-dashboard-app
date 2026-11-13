@@ -59,6 +59,7 @@ import {
   PlayCircle,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
+import { formatAmount, formatAmount as fmt } from "@/lib/number-format"
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -162,9 +163,6 @@ const STEPS: { key: string; label: string; description: string }[] = [
 ]
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-
-const fmt = (n: number) =>
-  new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
 
 const fmtDate = (d: string | null) =>
   d
@@ -968,10 +966,10 @@ export default function DayEndPage() {
                                       )}
                                     </TableCell>
                                     <TableCell className="text-right font-mono text-xs text-red-600">
-                                      {new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 }).format(v.totalDebit)}
+                                      {formatAmount(v.totalDebit)}
                                     </TableCell>
                                     <TableCell className="text-right font-mono text-xs text-green-600">
-                                      {new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 }).format(v.totalCredit)}
+                                      {formatAmount(v.totalCredit)}
                                     </TableCell>
                                     <TableCell className="pr-6">
                                       {isBalanced ? (

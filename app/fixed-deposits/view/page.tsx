@@ -41,6 +41,7 @@ import {
   Info,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
+import { formatCurrency as formatINR, type Numeric } from "@/lib/number-format"
 
 type DepositAccount = {
   accountNumber: string
@@ -102,10 +103,7 @@ const typeMap: Record<string, string> = {
   PIGMY: "Pigmy Deposit",
 }
 
-function formatCurrency(val: number | null | undefined) {
-  if (val == null) return "--"
-  return val.toLocaleString("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 })
-}
+const formatCurrency = (v: Numeric) => formatINR(v, { empty: "--" })
 
 function formatDate(val: string | null | undefined) {
   if (!val) return "--"

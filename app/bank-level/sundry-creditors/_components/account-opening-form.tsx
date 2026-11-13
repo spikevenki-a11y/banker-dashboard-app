@@ -187,7 +187,7 @@ export default function AccountOpeningForm({
               <Label htmlFor="opening_balance">Opening Balance</Label>
               <Input
                 id="opening_balance"
-                type="number"
+                type="amount"
                 placeholder="0.00"
                 value={formData.opening_balance}
                 onChange={(e) =>

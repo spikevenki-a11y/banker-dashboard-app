@@ -5,6 +5,8 @@ import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
 import { calculateMaxSanctionAmount, getCurrentGoldGuideline } from "@/lib/gold-guideline"
+import { getLoanSecurityError } from "@/lib/loan-security-value"
+import { formatCurrency } from "@/lib/number-format"
 
 // GET: Fetch all loan applications
 export async function GET(request: NextRequest) {
@@ -231,8 +233,15 @@ export async function POST(request: NextRequest) {
         loan_amount > parseFloat(scheme.maximum_loan_amount)) {
       await client.query("ROLLBACK")
       return NextResponse.json({ 
-        error: `Loan amount must be between ₹${scheme.minimum_loan_amount} and ₹${scheme.maximum_loan_amount}` 
+        error: `Loan amount must be between ${formatCurrency(scheme.minimum_loan_amount)} and ${formatCurrency(scheme.maximum_loan_amount)}`
       }, { status: 400 })
+    }
+
+    // Loan amount applied must be less than the security amount
+    const securityError = getLoanSecurityError(loan_amount, security)
+    if (securityError) {
+      await client.query("ROLLBACK")
+      return NextResponse.json({ error: securityError }, { status: 400 })
     }
 
     // Generate loan application ID

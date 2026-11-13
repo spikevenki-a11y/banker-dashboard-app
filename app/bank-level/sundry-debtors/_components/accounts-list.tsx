@@ -15,6 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Eye, Search, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { formatCurrency } from "@/lib/number-format"
 
 interface SundryDebtorsAccount {
   id: string;
@@ -150,7 +151,7 @@ export default function AccountsList({
                       {account.parent_account_number}
                     </TableCell>
                     <TableCell className="text-right font-semibold">
-                      ₹{Number(account.ledger_balance || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      {formatCurrency(account.ledger_balance)}
                     </TableCell>
                     <TableCell>
                       <Badge className={getStatusBadgeClass(account.account_status)}>

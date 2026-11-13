@@ -31,6 +31,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { DepositAccountSearchDialog } from "../_components/deposit-account-search-dialog"
+import { formatAmount, formatCurrency as formatINR, type Numeric } from "@/lib/number-format"
 
 type SavingsAccount = {
   account_number: string
@@ -116,10 +117,7 @@ type MemberDepositAccount = {
   periodMonths: number | null
 }
 
-function formatCurrency(val: number | string | null | undefined) {
-  if (val == null) return "--"
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(Number(val))
-}
+const formatCurrency = (v: Numeric) => formatINR(v, { empty: "--" })
 
 function formatDate(d: string | null | undefined) {
   if (!d) return "--"
@@ -722,7 +720,7 @@ function DepositAccountPanel({ accountNumber }: { accountNumber: string | null }
                             ) : isSelected && isOverdue ? (
                               <div className="flex items-center gap-1">
                                 <Input
-                                  type="number"
+                                  type="amount"
                                   min="0"
                                   step="0.01"
                                   value={penaltyOverrides[inst.id] !== undefined ? penaltyOverrides[inst.id] : String(autoPenalty)}
@@ -848,14 +846,14 @@ function DepositAccountPanel({ accountNumber }: { accountNumber: string | null }
                   <Label htmlFor="credit-amount">Credit Amount (INR) *</Label>
                   <Input
                     id="credit-amount"
-                    type="number"
+                    type="amount"
                     min="0"
                     step="0.01"
                     placeholder={
                       isRd && account.installmentAmount
-                        ? String(account.installmentAmount)
+                        ? formatAmount(account.installmentAmount)
                         : account.depositType === "PIGMY" && account.dailyAmount
-                          ? String(account.dailyAmount)
+                          ? formatAmount(account.dailyAmount)
                           : "Enter amount"
                     }
                     value={isRd && selectedInstallmentsList.length > 0 ? totalPayable : (account.depositAmount || "")}
@@ -1134,7 +1132,7 @@ function DepositAccountPanel({ accountNumber }: { accountNumber: string | null }
                                 <div className="mt-2">
                                   <Label className="text-[10px] text-muted-foreground">Debit Amount</Label>
                                   <Input
-                                    type="number"
+                                    type="amount"
                                     min="0"
                                     step="0.01"
                                     max={entry.availableBalance}

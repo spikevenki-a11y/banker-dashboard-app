@@ -4,6 +4,7 @@ import pool from "@/lib/connection/db"
 import { DEPOSIT_CREDIT_STATUSES } from "@/lib/deposit-account-status"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
 import { openGlVoucher, lockOpenTransferBatch, insertGlLine, type GlVoucherType } from "@/lib/gl-voucher"
+import { formatCurrency } from "@/lib/number-format"
 
 export async function GET(request: NextRequest) {
   const session = await getSession()
@@ -535,11 +536,10 @@ export async function POST(request: NextRequest) {
 
     await client.query("COMMIT")
 
-    const fmt = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" })
     const modeText = isDefaultTransfer
       ? ` Debited from Savings A/c: ${savingsSources.map((s) => s.accountNumber).join(", ")}.`
       : isTransfer
-        ? ` Bank Transfer batch is open — post the contra (debit) entry for ${fmt.format(amt)}.`
+        ? ` Bank Transfer batch is open — post the contra (debit) entry for ${formatCurrency(amt)}.`
         : ""
 
     return NextResponse.json({
@@ -550,7 +550,7 @@ export async function POST(request: NextRequest) {
       batch_open: isTransfer, // Bank Transfer batch still needs its contra entry
       savings_account_nos: isDefaultTransfer ? savingsSources.map((s) => s.accountNumber) : [],
       newBalance,
-      message: `Credit of ${fmt.format(amt)} successful. ${voucherType === "CASH" ? "" : `Batch: ${batchId}, `}Voucher: ${voucherNo}.${modeText} New balance: ${fmt.format(newBalance)}`,
+      message: `Credit of ${formatCurrency(amt)} successful. ${voucherType === "CASH" ? "" : `Batch: ${batchId}, `}Voucher: ${voucherNo}.${modeText} New balance: ${formatCurrency(newBalance)}`,
     })
   } catch (err: any) {
     await client.query("ROLLBACK")

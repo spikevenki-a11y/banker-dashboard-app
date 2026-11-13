@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { parseSelectedBatch, validateSelectedBatch, BatchValidationError } from "@/lib/validate-batch"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
+import { formatCurrency } from "@/lib/number-format"
 
 export async function GET(request: NextRequest) {
   const session = await getSession()
@@ -380,14 +381,12 @@ export async function POST(request: NextRequest) {
 
     await client.query("COMMIT")
 
-    const fmt = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" })
-
     return NextResponse.json({
       success: true,
       voucher_no: voucherNo,
       batch_id: batchId,
       newInterestDue,
-      message: `Interest payment of ${fmt.format(amt)} processed successfully. ${voucherType === "CASH" ? "" : `Batch: ${batchId}, `}Voucher: ${voucherNo}. Remaining interest due: ${fmt.format(newInterestDue)}`,
+      message: `Interest payment of ${formatCurrency(amt)} processed successfully. ${voucherType === "CASH" ? "" : `Batch: ${batchId}, `}Voucher: ${voucherNo}. Remaining interest due: ${formatCurrency(newInterestDue)}`,
     })
   } catch (err: any) {
     await client.query("ROLLBACK")

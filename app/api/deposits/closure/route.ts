@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
 import { openGlVoucher, lockOpenTransferBatch, insertGlLine, type GlVoucherType } from "@/lib/gl-voucher"
+import { formatCurrency } from "@/lib/number-format"
 
 
 // Premature closure rule of the interest policy a deposit was opened under:
@@ -498,11 +499,10 @@ export async function POST(request: NextRequest) {
 
     await client.query("COMMIT")
 
-    const fmt = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" })
     const modeLine = isDefaultTransfer
       ? `Credited to Savings A/c: ${savingsTargets.map((t) => t.accountNumber).join(", ")}`
       : isTransfer
-        ? `Bank Transfer batch is open — post the contra entry for ${fmt.format(payout)}`
+        ? `Bank Transfer batch is open — post the contra entry for ${formatCurrency(payout)}`
         : "Paid in Cash"
 
     return NextResponse.json({
@@ -512,7 +512,7 @@ export async function POST(request: NextRequest) {
       voucher_type: voucherType,
       batch_open: isTransfer, // Bank Transfer batch still needs its contra entry
       savings_account_nos: isDefaultTransfer ? savingsTargets.map((t) => t.accountNumber) : [],
-      message: `Account ${accountNumber} closed successfully.\nPayout: ${fmt.format(payout)}\n${modeLine}\n${voucherType === "CASH" ? "" : `Batch: ${batchId} | `}Voucher: ${voucherNo}`,
+      message: `Account ${accountNumber} closed successfully.\nPayout: ${formatCurrency(payout)}\n${modeLine}\n${voucherType === "CASH" ? "" : `Batch: ${batchId} | `}Voucher: ${voucherNo}`,
     })
   } catch (err: any) {
     await client.query("ROLLBACK")

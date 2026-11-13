@@ -61,6 +61,7 @@ import {
   validateMemberSection,
   type MemberEditSection,
 } from "@/lib/member-profile-validation"
+import { formatCurrency } from "@/lib/number-format"
 
 type MemberData = {
   caste_category: string
@@ -126,7 +127,7 @@ type MemberData = {
 function formatAnnualIncome(v?: string | number | null) {
   if (v === null || v === undefined || String(v).trim() === "") return "N/A"
   const n = Number(v)
-  return Number.isFinite(n) ? `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}` : String(v)
+  return Number.isFinite(n) ? `${formatCurrency(n)}` : String(v)
 }
 
 type EditHistoryRow = {
@@ -968,7 +969,7 @@ export default function ViewMemberPage() {
                                 <p className="text-xs font-medium text-emerald-700">Assets</p>
                               </div>
                               <p className="mt-2 text-lg font-bold text-emerald-800">
-                                {accountSummary.total_assets.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                                {formatCurrency(accountSummary.total_assets)}
                               </p>
                             </div>
                             <div className="rounded-lg border bg-red-50 p-4">
@@ -977,7 +978,7 @@ export default function ViewMemberPage() {
                                 <p className="text-xs font-medium text-red-700">Liabilities</p>
                               </div>
                               <p className="mt-2 text-lg font-bold text-red-800">
-                                {accountSummary.total_liabilities.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                                {formatCurrency(accountSummary.total_liabilities)}
                               </p>
                             </div>
                             {/* <div className="rounded-lg border bg-blue-50 p-4">
@@ -986,7 +987,7 @@ export default function ViewMemberPage() {
                                 <p className="text-xs font-medium text-blue-700">Net Position</p>
                               </div>
                               <p className="mt-2 text-lg font-bold text-blue-800">
-                                {accountSummary.net_worth.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                                {formatCurrency(accountSummary.net_worth)}
                               </p>
                             </div> */}
                             <div className="rounded-lg border bg-muted/50 p-4">
@@ -1069,7 +1070,7 @@ export default function ViewMemberPage() {
                                           : "---"}
                                       </TableCell>
                                       <TableCell className="text-right font-mono text-sm font-semibold text-emerald-700">
-                                        {acc.balance.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                                        {formatCurrency(acc.balance)}
                                       </TableCell>
                                       <TableCell>
                                         <Badge
@@ -1160,7 +1161,7 @@ export default function ViewMemberPage() {
                                           : "---"}
                                       </TableCell>
                                       <TableCell className="text-right font-mono text-sm font-semibold text-red-700">
-                                        {acc.balance.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                                        {formatCurrency(acc.balance)}
                                       </TableCell>
                                       <TableCell>
                                         <Badge
@@ -1909,7 +1910,7 @@ function accountViewHref(acc: { account_type: string; account_number: string }):
 }
 
 const fmtInr = (n: number | null | undefined) =>
-  Number(n || 0).toLocaleString("en-IN", { style: "currency", currency: "INR" })
+  formatCurrency(n)
 
 const fmtDay = (d: string | null | undefined) =>
   d ? formatDate(d) : "---"

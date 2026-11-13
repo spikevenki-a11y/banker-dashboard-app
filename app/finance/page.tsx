@@ -37,6 +37,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DashboardWrapper } from "../_components/dashboard-wrapper"
 import { Skeleton } from "@/components/ui/skeleton"
+import { formatCurrency } from "@/lib/number-format"
 
 interface FinanceStats {
   stats: {
@@ -110,21 +111,8 @@ interface InterestAnalysis {
   netRevenue: number
 }
 
-// Format currency in Indian Rupees
-const formatCurrency = (amount: number): string => {
-  if (amount >= 10000000) {
-    return `₹${(amount / 10000000).toFixed(2)}Cr`
-  } else if (amount >= 100000) {
-    return `₹${(amount / 100000).toFixed(2)}L`
-  } else if (amount >= 1000) {
-    return `₹${(amount / 1000).toFixed(1)}K`
-  }
-  return `₹${amount.toLocaleString("en-IN")}`
-}
-
-const formatFullCurrency = (amount: number): string => {
-  return `₹${amount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`
-}
+// Amounts in Indian Rupees: ₹1,25,00,000.00
+const formatFullCurrency = formatCurrency
 
 export default function FinancePage() {
   const [stats, setStats] = useState<FinanceStats | null>(null)

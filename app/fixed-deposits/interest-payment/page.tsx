@@ -59,6 +59,7 @@ import {
   ChevronRight,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
+import { formatCurrency as formatINR, type Numeric } from "@/lib/number-format"
 
 type DepositAccountInfo = {
   accountNumber: string
@@ -132,10 +133,7 @@ type SearchResult = {
   aadhaar_no: string
 }
 
-function formatCurrency(val: number | string | null | undefined) {
-  if (val == null) return "--"
-  return `₹${Number(val).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-}
+const formatCurrency = (v: Numeric) => formatINR(v, { empty: "--" })
 
 function formatDate(d: string | null | undefined) {
   if (!d) return "---"
@@ -656,7 +654,7 @@ function InterestPaymentContent() {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="payment-amount">Interest Payment Amount (INR) *</Label>
-                        <Input id="payment-amount" type="number" value={interestDue || ""} placeholder="0.00" disabled />
+                        <Input id="payment-amount" type="amount" value={interestDue || ""} placeholder="0.00" disabled />
                         <p className="text-xs text-muted-foreground">Equal to the interest currently due for payment</p>
                       </div>
                     </div>
@@ -727,7 +725,7 @@ function InterestPaymentContent() {
                                       <div className="mt-2">
                                         <Label className="text-[10px] text-muted-foreground">Credit Amount</Label>
                                         <Input
-                                          type="number"
+                                          type="amount"
                                           min="0"
                                           step="0.01"
                                           placeholder="0.00"

@@ -30,6 +30,7 @@ import {
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { formatCurrency } from "@/lib/number-format"
 
 type LoanScheme = {
   scheme_id: number
@@ -57,10 +58,6 @@ type EMIResult = {
   total_principal: number
   tenure_months: number
   schedule: EMIScheduleItem[]
-}
-
-function formatCurrency(val: number | string) {
-  return `₹${Number(val).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 function formatDate(d: string) {
@@ -212,7 +209,7 @@ export default function EMICalculatorPage() {
                 <div className="space-y-2">
                   <Label>Loan Amount *</Label>
                   <Input
-                    type="number"
+                    type="amount"
                     placeholder="Enter loan amount"
                     value={loanAmount}
                     onChange={(e) => setLoanAmount(e.target.value)}

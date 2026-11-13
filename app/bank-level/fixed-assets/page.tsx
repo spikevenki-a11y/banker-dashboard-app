@@ -53,6 +53,7 @@ import {
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { SearchableSelect } from "@/components/ui/searchable-select"
+import { formatCurrency as fmt } from "@/lib/number-format"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -154,10 +155,6 @@ type VoucherDetails = {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function fmt(val: number | string) {
-  return `₹${Number(val || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-}
 
 function fmtDate(d: string) {
   if (!d) return "—"
@@ -976,7 +973,7 @@ export default function FixedAssetsPage() {
                           </td>
                           <td className="py-2 pr-2">
                             <Input
-                              type="number" placeholder="0.00" value={line.unit_cost}
+                              type="amount" placeholder="0.00" value={line.unit_cost}
                               onChange={e => updateLine(idx, "unit_cost", e.target.value)}
                               className="w-28"
                             />
@@ -1165,7 +1162,7 @@ export default function FixedAssetsPage() {
                     <div className="space-y-1.5">
                       <Label>Sale Amount *</Label>
                       <Input
-                        type="number" placeholder="0.00" value={saleAmount}
+                        type="amount" placeholder="0.00" value={saleAmount}
                         onChange={e => setSaleAmount(e.target.value)}
                       />
                     </div>

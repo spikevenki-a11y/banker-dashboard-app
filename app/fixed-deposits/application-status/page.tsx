@@ -20,6 +20,7 @@ import {
   RefreshCw,
   Search,
 } from "lucide-react"
+import { formatCurrency as formatINR, type Numeric } from "@/lib/number-format"
 
 type DepositAccount = {
   accountNumber: string
@@ -62,8 +63,7 @@ const statusClass = (statusId: number) => {
   }
 }
 
-const formatCurrency = (v: number | null) =>
-  v == null ? "--" : `₹${Number(v).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const formatCurrency = (v: Numeric) => formatINR(v, { empty: "--" })
 
 // "YYYY-MM-DD" → "DD-MM-YYYY"
 const formatDate = (v: string | null) => {

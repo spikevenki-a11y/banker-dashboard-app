@@ -24,6 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { ArrowLeft, Plus, Search, Eye, FileText, TrendingUp, Calendar, RefreshCw, Loader2, AlertCircle, Banknote, Info } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { DashboardWrapper } from "../../_components/dashboard-wrapper"
+import { formatAmount, formatCurrency as formatINR, type Numeric } from "@/lib/number-format"
 
 type Deposit = {
   id: string
@@ -63,10 +64,7 @@ type Stats = {
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
-function formatCurrency(val: number | null | undefined) {
-  if (val == null) return "--"
-  return val.toLocaleString("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 })
-}
+const formatCurrency = (v: Numeric) => formatINR(v, { empty: "--" })
 
 function formatDate(val: string | null | undefined) {
   if (!val) return "--"
@@ -537,8 +535,8 @@ function FixedDepositsAccountsContent() {
                           <Label htmlFor="renew-amount">Renewal Amount</Label>
                           <Input
                             id="renew-amount"
-                            type="number"
-                            placeholder={String(selectedDeposit.maturityAmount || selectedDeposit.balance)}
+                            type="amount"
+                            placeholder={formatAmount(selectedDeposit.maturityAmount || selectedDeposit.balance)}
                           />
                         </div>
                       </>

@@ -8,6 +8,7 @@ import { QuickActionsCard } from "./_components/quick-actions-card"
 import { DepositMixCard, type DepositSegment } from "./_components/deposit-mix-card"
 import { NotificationsCard, type NotificationItem } from "./_components/notifications-card"
 import { PendingTasksCard, type PendingTask } from "./_components/pending-tasks-card"
+import { formatCurrency, formatCount } from "@/lib/number-format"
 
 interface DashboardStats {
   totalMembers: number
@@ -47,14 +48,8 @@ const NOTIFICATIONS_SAMPLE: NotificationItem[] = [
   { title: "RCS review meeting", detail: "Monday, 09 Nov 2026", status: "info" },
 ]
 
-// ₹18.76 Cr / ₹4.82 L / ₹12,500
-function formatAmount(amount: number) {
-  if (amount >= 1_00_00_000) return `₹${(amount / 1_00_00_000).toFixed(2)} Cr`
-  if (amount >= 1_00_000) return `₹${(amount / 1_00_000).toFixed(2)} L`
-  return `₹${amount.toLocaleString("en-IN")}`
-}
-
-const formatCount = (n: number | undefined) => (n ?? 0).toLocaleString("en-IN")
+// ₹18,76,00,000.00 — full Indian format with 2 decimals for all dashboard amounts
+const formatAmount = (amount: number) => formatCurrency(amount)
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null)

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { formatCurrency } from "@/lib/number-format"
 
 interface SundryCreditorsAccount {
   id: string;
@@ -142,7 +143,7 @@ export default function ViewAccount({
                 Opening Balance
               </p>
               <p className="text-lg font-semibold">
-                ₹{account.opening_balance.toFixed(2)}
+                {formatCurrency(account.opening_balance)}
               </p>
             </div>
 
@@ -151,7 +152,7 @@ export default function ViewAccount({
                 Current Balance
               </p>
               <p className="text-2xl font-bold">
-                ₹{account.current_balance.toFixed(2)}
+                {formatCurrency(account.current_balance)}
               </p>
             </div>
           </div>
@@ -169,7 +170,7 @@ export default function ViewAccount({
                     }`}
                   >
                     {balanceChange >= 0 ? "+" : ""}
-                    ₹{balanceChange.toFixed(2)}
+                    {formatCurrency(balanceChange)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">

@@ -28,6 +28,7 @@ import {
   CheckCircle2,
 } from "lucide-react"
 import { SanctionPanel, type SanctionApplication } from "../_components/sanction-panel"
+import { formatCurrency } from "@/lib/number-format"
 
 type LoanApplication = SanctionApplication
 
@@ -52,14 +53,6 @@ export default function LoanSanctionPage() {
   const [successMessage, setSuccessMessage] = useState("")
   const [sanctionedLoanAppId, setSanctionedLoanAppId] = useState<number | null>(null)
 
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 0,
-    }).format(amount)
-  }
 
   // Fetch pending applications
   const fetchApplications = useCallback(async () => {

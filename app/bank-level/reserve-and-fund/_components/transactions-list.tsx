@@ -17,6 +17,7 @@ import {
   AlertCircle, CheckCircle2, Loader2, Plus, Search, Trash2,
   Banknote, ArrowUpRight, History, IndianRupee, Calendar, FileText,
 } from "lucide-react"
+import { formatCurrency } from "@/lib/number-format"
 
 interface Transaction {
   id: string
@@ -204,9 +205,6 @@ export default function TransactionsList() {
     a.account_name.toLowerCase().includes(accountSearchTerm.toLowerCase())
   )
 
-  const formatCurrency = (val: number | string) =>
-    `₹${Number(val).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-
   const formatDate = (d: string) => {
     if (!d) return "---"
     return formatDisplayDate(d)
@@ -357,7 +355,7 @@ export default function TransactionsList() {
                           </div>
                           <div>
                             <Label className="text-xs text-muted-foreground">Amount (INR) *</Label>
-                            <Input type="number" min="0" step="0.01" placeholder="0.00"
+                            <Input type="amount" min="0" step="0.01" placeholder="0.00"
                               value={entry.amount}
                               onChange={(e) => handleEntryChange(entry.id, "amount", e.target.value)}
                               disabled={submitting} className="mt-1" />

@@ -28,6 +28,7 @@ import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { NomineeEditor, nomineeTotals, type NomineeEntry } from "@/components/nominee-editor"
 import { MemberSummaryCard } from "@/components/member-summary-card"
 import { computeTermMaturity, labelOf, COMPOUNDING_FREQUENCIES, type AppliedPolicy } from "@/lib/fd-interest-policy"
+import { formatCurrency } from "@/lib/number-format"
 
 type MemberInfo = {
   membership_no: string
@@ -470,7 +471,7 @@ const getLogindate = async () => {
     if (interestPayableSeries.length === 0) return
     const esc = (v: unknown) =>
       String(v ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!)
-    const inr = (n: number) => Number(n || 0).toLocaleString("en-IN", { style: "currency", currency: "INR" })
+    const inr = (n: number) => formatCurrency(n)
     const total = interestPayableSeries.reduce((sum, p) => sum + p.interestPayable, 0)
     const freqLabel = interestPayoutFrequency.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
     const period = [
@@ -844,14 +845,14 @@ const getLogindate = async () => {
                           <div>
                             <span className="text-muted-foreground">Min Deposit:</span>
                             <span className="ml-1 font-medium">
-                              {Number(selectedScheme.minimum_deposit).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                              {formatCurrency(selectedScheme.minimum_deposit)}
                             </span>
                           </div>
                           {selectedScheme.maximum_deposit > 0 && (
                             <div>
                               <span className="text-muted-foreground">Max Deposit:</span>
                               <span className="ml-1 font-medium">
-                                {Number(selectedScheme.maximum_deposit).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                                {formatCurrency(selectedScheme.maximum_deposit)}
                               </span>
                             </div>
                           )}
@@ -995,14 +996,14 @@ const getLogindate = async () => {
                             <Label htmlFor="deposit-amount">Amount</Label>
                             <Input
                               id="deposit-amount"
-                              type="number"
-                              placeholder={`Min: ${Number(selectedScheme?.minimum_deposit || 0).toLocaleString("en-IN")} | Max: ${Number(selectedScheme?.maximum_deposit || 0).toLocaleString("en-IN")}`}
+                              type="amount"
+                              placeholder={`Min: ${formatCurrency(selectedScheme?.minimum_deposit)} | Max: ${formatCurrency(selectedScheme?.maximum_deposit)}`}
                               value={depositAmount}
                               onChange={(e) => setDepositAmount(e.target.value)}
                             />
                             {selectedScheme && (Number(depositAmount) < Number(selectedScheme.minimum_deposit) || (Number(selectedScheme.maximum_deposit) > 0 && Number(depositAmount) > Number(selectedScheme.maximum_deposit))) && depositAmount && (
                               <p className="text-xs text-destructive">
-                                Amount must be between {Number(selectedScheme.minimum_deposit).toLocaleString("en-IN")} and {Number(selectedScheme.maximum_deposit).toLocaleString("en-IN")}
+                                Amount must be between {formatCurrency(selectedScheme.minimum_deposit)} and {formatCurrency(selectedScheme.maximum_deposit)}
                               </p>
                             )}
                           </div>
@@ -1233,14 +1234,14 @@ const getLogindate = async () => {
                               <Label htmlFor="installment-amount">Installment Amount</Label>
                               <Input
                                 id="installment-amount"
-                                type="number"
-                                placeholder={`Min: ${Number(selectedScheme?.minimum_installment_amount || 0).toLocaleString("en-IN")}`}
+                                type="amount"
+                                placeholder={`Min: ${formatCurrency(selectedScheme?.minimum_installment_amount)}`}
                                 value={installmentAmount}
                                 onChange={(e) => setInstallmentAmount(e.target.value)}
                               />
                               {selectedScheme && installmentAmount && (Number(installmentAmount) < Number(selectedScheme.minimum_installment_amount) || (Number(selectedScheme.maximum_installment_amount) > 0 && Number(installmentAmount) > Number(selectedScheme.maximum_installment_amount))) && (
                                 <p className="text-xs text-destructive">
-                                  Amount must be between {Number(selectedScheme.minimum_installment_amount).toLocaleString("en-IN")} and {Number(selectedScheme.maximum_installment_amount).toLocaleString("en-IN")}
+                                  Amount must be between {formatCurrency(selectedScheme.minimum_installment_amount)} and {formatCurrency(selectedScheme.maximum_installment_amount)}
                                 </p>
                               )}
                             </div>
@@ -1374,7 +1375,7 @@ const getLogindate = async () => {
                             <Label htmlFor="daily-amount">Minimum Daily Collection Amount</Label>
                             <Input
                               id="daily-amount"
-                              type="number"
+                              type="amount"
                               placeholder="Enter minimum daily amount"
                               value={depositAmount}
                               onChange={(e) => setDepositAmount(e.target.value)}
@@ -1470,14 +1471,14 @@ const getLogindate = async () => {
                           <div>
                             <span className="text-muted-foreground">Min Deposit:</span>
                             <span className="ml-1 font-medium">
-                              {Number(selectedScheme.minimum_deposit).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                              {formatCurrency(selectedScheme.minimum_deposit)}
                             </span>
                           </div>
                           {selectedScheme.maximum_deposit > 0 && (
                             <div>
                               <span className="text-muted-foreground">Max Deposit:</span>
                               <span className="ml-1 font-medium">
-                                {Number(selectedScheme.maximum_deposit).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                                {formatCurrency(selectedScheme.maximum_deposit)}
                               </span>
                             </div>
                           )}
@@ -1526,10 +1527,11 @@ const getLogindate = async () => {
                             <div className="flex items-center justify-between">
                               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Balance</span>
                               <span className="text-sm font-semibold text-teal-600">
-                                {savingsAccounts
-                                  .filter((a) => a.account_status === "ACTIVE")
-                                  .reduce((sum, a) => sum + (Number(a.available_balance) || 0), 0)
-                                  .toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                                {formatCurrency(
+                                  savingsAccounts
+                                    .filter((a) => a.account_status === "ACTIVE")
+                                    .reduce((sum, a) => sum + (Number(a.available_balance) || 0), 0)
+                                )}
                               </span>
                             </div>
                             <p className="mt-1 text-xs text-muted-foreground">
@@ -1556,7 +1558,7 @@ const getLogindate = async () => {
                               <div className="flex items-baseline justify-between">
                                 <span className="text-xs text-muted-foreground">Balance</span>
                                 <span className="text-sm font-semibold text-foreground">
-                                  {Number(acc.available_balance || 0).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                                  {formatCurrency(acc.available_balance)}
                                 </span>
                               </div>
                             </div>
@@ -1596,7 +1598,7 @@ const getLogindate = async () => {
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Deposit Amount:</span>
                             <span className="font-medium">
-                              {Number(depositAmount || 0).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                              {formatCurrency(depositAmount)}
                             </span>
                           </div>
                           <div className="flex justify-between text-sm">
@@ -1629,7 +1631,7 @@ const getLogindate = async () => {
                                 <div className="flex justify-between text-sm">
                                   <span className="text-muted-foreground">Interest Earned:</span>
                                   <span className="font-semibold text-teal-600">
-                                    {maturityCalc.interest.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                                    {formatCurrency(maturityCalc.interest)}
                                   </span>
                                 </div>
                               </div>
@@ -1640,7 +1642,7 @@ const getLogindate = async () => {
                               <div className="flex justify-between border-t border-border pt-3">
                                 <span className="font-semibold">Maturity Amount:</span>
                                 <span className="text-lg font-bold text-teal-600">
-                                  {maturityCalc.maturityAmount.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                                  {formatCurrency(maturityCalc.maturityAmount)}
                                 </span>
                               </div>
                             </>
@@ -1657,7 +1659,7 @@ const getLogindate = async () => {
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Installment:</span>
                             <span className="font-medium">
-                              {Number(installmentAmount || 0).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                              {formatCurrency(installmentAmount)}
                             </span>
                           </div>
                           <div className="flex justify-between text-sm">
@@ -1733,14 +1735,14 @@ const getLogindate = async () => {
                               tickLine={false}
                               axisLine={false}
                               width={64}
-                              tickFormatter={(v) => `₹${Number(v).toLocaleString("en-IN")}`}
+                              tickFormatter={(v) => `${formatCurrency(v)}`}
                             />
                             <ChartTooltip
                               content={
                                 <ChartTooltipContent
                                   labelFormatter={(label) => `Payout on ${label}`}
                                   formatter={(value) => [
-                                    Number(value).toLocaleString("en-IN", { style: "currency", currency: "INR" }),
+                                    formatCurrency(value),
                                     "Interest Payable",
                                   ]}
                                 />
@@ -1768,7 +1770,7 @@ const getLogindate = async () => {
                                 <TableCell className="text-xs">{p.dateLabel}</TableCell>
                                 <TableCell className="text-xs text-right">{p.days}</TableCell>
                                 <TableCell className="text-xs text-right font-semibold text-teal-600">
-                                  {p.interestPayable.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                                  {formatCurrency(p.interestPayable)}
                                 </TableCell>
                               </TableRow>
                             ))}
@@ -1777,9 +1779,7 @@ const getLogindate = async () => {
                             <TableRow>
                               <TableCell colSpan={3} className="text-xs font-semibold">Total Interest Payable</TableCell>
                               <TableCell className="text-xs text-right font-bold text-teal-600">
-                                {interestPayableSeries
-                                  .reduce((sum, p) => sum + p.interestPayable, 0)
-                                  .toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                                {formatCurrency(interestPayableSeries.reduce((sum, p) => sum + p.interestPayable, 0))}
                               </TableCell>
                             </TableRow>
                           </TableFooter>
@@ -1792,7 +1792,7 @@ const getLogindate = async () => {
                         Interest Payable at Maturity
                       </p>
                       <p className="mt-2 text-3xl font-bold text-teal-600">
-                        {interestPayableSeries[0].interestPayable.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                        {formatCurrency(interestPayableSeries[0].interestPayable)}
                       </p>
                       <p className="mt-1 text-sm text-muted-foreground">
                         Payable on {interestPayableSeries[0].dateLabel}
@@ -1950,14 +1950,14 @@ const getLogindate = async () => {
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Installment Amount:</span>
                             <span className="font-semibold text-foreground">
-                              {Number(successInfo.installment_amount).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                              {formatCurrency(successInfo.installment_amount)}
                             </span>
                           </div>
                         ) : successInfo?.deposit_amount != null && (
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Deposit Amount:</span>
                             <span className="font-semibold text-foreground">
-                              {Number(successInfo.deposit_amount).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                              {formatCurrency(successInfo.deposit_amount)}
                             </span>
                           </div>
                         )}
@@ -1971,7 +1971,7 @@ const getLogindate = async () => {
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Maturity Amount:</span>
                             <span className="font-semibold text-teal-600">
-                              {Number(successInfo.maturity_amount).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                              {formatCurrency(successInfo.maturity_amount)}
                             </span>
                           </div>
                         )}

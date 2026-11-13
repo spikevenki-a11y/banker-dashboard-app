@@ -48,6 +48,7 @@ import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { APPRAISER_ACCOUNT_TYPES } from "@/lib/appraiser-history"
 import { APPRAISER_SHARE_PERCENT, INCOME_SHARE_PERCENT, splitAppraiserCharge } from "@/lib/appraiser-account"
 import { MemberSummaryCard, useMemberSummary } from "@/components/member-summary-card"
+import { formatCurrency } from "@/lib/number-format"
 
 type LoanAppraiser = {
   appraiser_id: number
@@ -111,10 +112,6 @@ const PAYMENT_MODE_LABELS: Record<PaymentMode, string> = {
   CASH: "CASH",
   TRANSFER: "TRANSFER",
   DEFAULT_TRANSFER: "DEFAULT TRANSFER",
-}
-
-function formatCurrency(val: number | string) {
-  return `₹${Number(val).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 export default function LoanDisbursementPage() {
@@ -708,7 +705,7 @@ export default function LoanDisbursementPage() {
                             <IndianRupee className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
                               id="disbursement-amount"
-                              type="number"
+                              type="amount"
                               placeholder="Enter amount"
                               min="0"
                               max={selectedLoan.sanctioned_amount}
@@ -958,7 +955,7 @@ export default function LoanDisbursementPage() {
                             )}
                           </Label>
                           <Input
-                            type="number"
+                            type="amount"
                             placeholder="0.00"
                             value={appraiserCharge.charge_amount}
                             onChange={(e) => ac("charge_amount", e.target.value)}

@@ -22,6 +22,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
+import { formatCurrency as fmt } from "@/lib/number-format"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -94,8 +95,6 @@ const LEGEND = [
   { dot: "border-2 border-dashed border-muted-foreground/30 bg-muted/20", label: "Empty slot" },
 ]
 
-const fmt     = (n: number | string | null | undefined) =>
-  `₹${Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`
 const fmtDate = (d: string | null) =>
   d ? formatDate(d) : "—"
 
@@ -763,7 +762,7 @@ function LockerDepositWindow({
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Deposit Amount (₹) *</Label>
-                  <Input type="number" min="0" placeholder="Enter amount"
+                  <Input type="amount" min="0" placeholder="Enter amount"
                     value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
@@ -1180,7 +1179,7 @@ function AssignmentWizard({
 
               <div className="space-y-1.5">
                 <Label htmlFor="deposit">Security Deposit (₹)</Label>
-                <Input id="deposit" type="number" min="0" placeholder="0"
+                <Input id="deposit" type="amount" min="0" placeholder="0"
                   value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} />
                 <p className="text-xs text-muted-foreground">Optional. Leave blank if no deposit collected.</p>
               </div>
@@ -1561,7 +1560,7 @@ function BreakLockerWizard({
               <div className="space-y-1.5">
                 <Label>Breaking Charge (₹)</Label>
                 <Input
-                  type="number"
+                  type="amount"
                   min="0"
                   placeholder="0 — leave blank to waive"
                   value={breakingCharge}

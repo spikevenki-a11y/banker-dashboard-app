@@ -14,6 +14,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
+import { formatCurrency } from "@/lib/number-format"
 
 /* ── Module config ─────────────────────────────────────────────────── */
 
@@ -99,7 +100,7 @@ export default function AddSchemePage() {
     if (selectedModule === "savings") return [
       m.interest_rate != null ? `${m.interest_rate}%` : "—",
       m.interest_frequency?.replace(/_/g, " ") ?? "—",
-      m.min_balance != null ? `₹${Number(m.min_balance).toLocaleString("en-IN")}` : "—",
+      m.min_balance != null ? `${formatCurrency(m.min_balance)}` : "—",
     ]
     if (selectedModule === "deposits") return [
       m.deposit_type ?? "—",

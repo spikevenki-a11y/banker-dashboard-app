@@ -27,6 +27,7 @@ import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { calculateAge } from "@/lib/member-age"
 import { isValidNomineePhone, normaliseNomineePhone } from "@/lib/savings-nominees"
 import { MemberSummaryCard } from "@/components/member-summary-card"
+import { formatCurrency } from "@/lib/number-format"
 
 type MemberInfo = {
   membership_no: string
@@ -862,7 +863,7 @@ const getLogindate = async () => {
                         <Label htmlFor="initial-deposit">Initial Deposit Amount</Label>
                         <Input
                           id="initial-deposit"
-                          type="number"
+                          type="amount"
                           placeholder="0.00"
                           value={initialDeposit}
                           // onChange={(e) => setInitialDeposit(e.target.value)}
@@ -1212,7 +1213,7 @@ const getLogindate = async () => {
                         <div>
                           <p className="text-xs text-muted-foreground">Min Balance</p>
                           <p className="text-sm font-semibold">
-                            {selectedScheme.min_balance ? `₹${Number(selectedScheme.min_balance).toLocaleString()}` : "---"}
+                            {selectedScheme.min_balance ? `${formatCurrency(selectedScheme.min_balance)}` : "---"}
                           </p>
                         </div>
                         <div>
@@ -1249,7 +1250,7 @@ const getLogindate = async () => {
                       <div>
                         <p className="text-xs text-muted-foreground">Initial Deposit</p>
                         <p className="text-sm font-semibold">
-                          {initialDeposit ? `₹${Number(initialDeposit).toLocaleString()}` : "₹0"}
+                          {initialDeposit ? `${formatCurrency(initialDeposit)}` : "₹0"}
                         </p>
                       </div>
                       <div>
