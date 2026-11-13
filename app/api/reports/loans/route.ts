@@ -42,7 +42,8 @@ export async function GET(req: NextRequest) {
         `SELECT la.loan_application_id, la.membership_no, la.application_status,
                 la.applied_loan_amount, COALESCE(la.loan_outstanding, 0) AS loan_outstanding,
                 TO_CHAR(la.application_date, 'YYYY-MM-DD') AS application_date,
-                lsd.sanctioned_amount, lsd.interest_rate, la.loan_tenure_months,
+                lsd.sanctioned_amount, lsd.interest_rate,
+                COALESCE(lsd.loan_tenure_months, la.loan_tenure_months) AS loan_tenure_months,
                 lsd.payment_amount AS emi_amount,
                 ls.scheme_name, c.full_name, c.mobile_no
          ${baseFrom}${outWhere}
@@ -63,7 +64,8 @@ export async function GET(req: NextRequest) {
       if (toDate)   { params.push(toDate);   dateWhere += ` AND lsd.sanction_date <= $${params.length}` }
       const result = await pool.query(
         `SELECT la.loan_application_id, la.membership_no, la.application_status,
-                lsd.sanctioned_amount, lsd.interest_rate, la.loan_tenure_months,
+                lsd.sanctioned_amount, lsd.interest_rate,
+                COALESCE(lsd.loan_tenure_months, la.loan_tenure_months) AS loan_tenure_months,
                 TO_CHAR(lsd.sanction_date, 'YYYY-MM-DD') AS sanction_date,
                 lsd.repayment_type,
                 ls.scheme_name, c.full_name, c.mobile_no
@@ -108,7 +110,8 @@ export async function GET(req: NextRequest) {
         `SELECT la.loan_application_id, la.membership_no, la.application_status,
                 la.applied_loan_amount,
                 TO_CHAR(la.application_date, 'YYYY-MM-DD') AS application_date,
-                lsd.sanctioned_amount, lsd.interest_rate, la.loan_tenure_months,
+                lsd.sanctioned_amount, lsd.interest_rate,
+                COALESCE(lsd.loan_tenure_months, la.loan_tenure_months) AS loan_tenure_months,
                 ls.scheme_name, c.full_name, c.mobile_no
          ${baseFrom} AND la.application_status = 'CLOSED'${dateWhere}
          ORDER BY la.application_date DESC`,

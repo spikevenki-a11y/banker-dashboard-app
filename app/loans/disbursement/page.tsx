@@ -47,7 +47,8 @@ import { ArrowLeft, Loader2, CheckCircle2, Wallet, CreditCard, Search, User, Cal
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { APPRAISER_ACCOUNT_TYPES } from "@/lib/appraiser-history"
 import { APPRAISER_SHARE_PERCENT, INCOME_SHARE_PERCENT, splitAppraiserCharge } from "@/lib/appraiser-account"
-import { MemberSummaryCard, useMemberSummary } from "@/components/member-summary-card"
+import { MemberSummaryCard, useMemberSummary, ViewMemberDetailsButton } from "@/components/member-summary-card"
+import { CustomerPhotoSignature } from "@/components/customer-photo-signature"
 import { formatCurrency } from "@/lib/number-format"
 
 type LoanAppraiser = {
@@ -589,27 +590,27 @@ export default function LoanDisbursementPage() {
             ) : (
               <div className="space-y-4">
                 {/* Member Summary — shared card and View Member Details popup */}
-                <MemberSummaryCard memberInfo={summaryMember} />
+                {/* <MemberSummaryCard memberInfo={summaryMember} /> */}
 
                 {/* Loan Details Card */}
                 <Card>
                   <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="flex items-center gap-2 text-xl">
-                          <User className="h-5 w-5 text-primary" />
-                          {selectedLoan.member_name}
-                        </CardTitle>
-                        <CardDescription className="mt-1">
-                          Reference: {selectedLoan.reference_no} | Membership: {selectedLoan.membership_no}
-                        </CardDescription>
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="space-y-3">
+                        <div>
+                          <CardTitle className="flex items-center gap-2 text-xl">
+                            <User className="h-5 w-5 text-primary" />
+                            {selectedLoan.member_name}
+                          </CardTitle>
+                          <CardDescription className="mt-1">
+                            Reference: {selectedLoan.reference_no} | Membership: {selectedLoan.membership_no}
+                          </CardDescription>
+                        </div>
+                        {/* Same member profile popup as the Member Summary card */}
+                        <ViewMemberDetailsButton memberInfo={summaryMember} />
                       </div>
-                      <div className="flex items-center gap-2">
-                        {/* <Badge className="bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400">
-                          <CheckCircle2 className="mr-1 h-3 w-3" />
-                          Sanctioned
-                        </Badge> */}
-                      </div>
+                      {/* Member photo & signature, for verification before disbursing */}
+                      <CustomerPhotoSignature customerCode={summaryMember?.customer_code} className="shrink-0" />
                     </div>
                   </CardHeader>
                   <CardContent>

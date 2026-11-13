@@ -24,6 +24,8 @@ export type MemberSummaryInfo = {
   mobile_no: string
   aadhaar_no: string
   ledger_folio_number?: string
+  // Returned by the member lookup; used to load the photo & signature
+  customer_code?: string
 }
 
 // Loads the Member Summary card's details for a membership number, from the
@@ -184,6 +186,82 @@ const sumOpen = (items: AccountAsset[]) =>
   Math.round(items.filter((a) => isOpenAccount(a.status)).reduce((t, a) => t + Number(a.balance || 0), 0) * 100) / 100
 
 export function MemberSummaryCard({ memberInfo }: { memberInfo: MemberSummaryInfo | null }) {
+  return (
+    <Card>
+      <CardHeader className="">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <User className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Member Summary</CardTitle>
+          </div>
+          <ViewMemberDetailsButton memberInfo={memberInfo} />
+        </div>
+      </CardHeader>
+      <CardContent>
+        {memberInfo ? (
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex-1 space-y-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Name</p>
+                <p className="text-sm font-semibold">{memberInfo.full_name}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Membership No</p>
+                <p className="text-sm font-mono font-semibold">{memberInfo.membership_no}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Type</p>
+                <Badge variant="outline">{memberInfo.member_type}</Badge>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Father's Name</p>
+                <p className="text-sm font-semibold">{memberInfo.father_name || "---"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Aadhaar Number</p>
+                <p className="text-sm font-mono font-semibold">{memberInfo.aadhaar_no || "---"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Phone Number</p>
+                <p className="text-sm font-semibold">{memberInfo.mobile_no || "---"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Ledger Number</p>
+                <p className="text-sm font-mono font-semibold">{memberInfo.ledger_folio_number || "---"}</p>
+              </div>
+            </div>
+            <div className="flex shrink-0 gap-4 sm:flex-col sm:items-end">
+              <div className="flex flex-col items-center gap-1.5">
+                <div className="flex h-20 w-20 items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/25 bg-muted/30">
+                  <Camera className="h-6 w-6 text-muted-foreground/50" />
+                </div>
+                <span className="text-[11px] font-medium text-muted-foreground">Photo</span>
+              </div>
+              <div className="flex flex-col items-center gap-1.5">
+                <div className="flex h-20 w-20 items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/25 bg-muted/30">
+                  <PenTool className="h-6 w-6 text-muted-foreground/50" />
+                </div>
+                <span className="text-[11px] font-medium text-muted-foreground">Signature</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Search a member to see details</p>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// "View Member Details" button and the member profile popup it opens. Used by the
+// Member Summary card and by pages that show member details in their own card.
+export function ViewMemberDetailsButton({
+  memberInfo,
+  className = "",
+}: {
+  memberInfo: MemberSummaryInfo | null
+  className?: string
+}) {
   const [viewMemberOpen, setViewMemberOpen] = useState(false)
   const [viewMemberTab, setViewMemberTab] = useState("personal")
   const [viewMemberProfile, setViewMemberProfile] = useState<MemberProfile | null>(null)
@@ -260,79 +338,17 @@ export function MemberSummaryCard({ memberInfo }: { memberInfo: MemberSummaryInf
 
   return (
     <>
-      <Card>
-        <CardHeader className="">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-sm font-medium">Member Summary</CardTitle>
-            </div>
-            {memberInfo && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleViewMember}
-                className="h-7 gap-1.5 text-xs bg-transparent"
-              >
-                <Eye className="h-3.5 w-3.5" />
-                View Member Details
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {memberInfo ? (
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex-1 space-y-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">Name</p>
-                  <p className="text-sm font-semibold">{memberInfo.full_name}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Membership No</p>
-                  <p className="text-sm font-mono font-semibold">{memberInfo.membership_no}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Type</p>
-                  <Badge variant="outline">{memberInfo.member_type}</Badge>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Father's Name</p>
-                  <p className="text-sm font-semibold">{memberInfo.father_name || "---"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Aadhaar Number</p>
-                  <p className="text-sm font-mono font-semibold">{memberInfo.aadhaar_no || "---"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Phone Number</p>
-                  <p className="text-sm font-semibold">{memberInfo.mobile_no || "---"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Ledger Number</p>
-                  <p className="text-sm font-mono font-semibold">{memberInfo.ledger_folio_number || "---"}</p>
-                </div>
-              </div>
-              <div className="flex shrink-0 gap-4 sm:flex-col sm:items-end">
-                <div className="flex flex-col items-center gap-1.5">
-                  <div className="flex h-20 w-20 items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/25 bg-muted/30">
-                    <Camera className="h-6 w-6 text-muted-foreground/50" />
-                  </div>
-                  <span className="text-[11px] font-medium text-muted-foreground">Photo</span>
-                </div>
-                <div className="flex flex-col items-center gap-1.5">
-                  <div className="flex h-20 w-20 items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/25 bg-muted/30">
-                    <PenTool className="h-6 w-6 text-muted-foreground/50" />
-                  </div>
-                  <span className="text-[11px] font-medium text-muted-foreground">Signature</span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Search a member to see details</p>
-          )}
-        </CardContent>
-      </Card>
+      {memberInfo && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleViewMember}
+          className={`h-7 gap-1.5 text-xs bg-transparent ${className}`}
+        >
+          <Eye className="h-3.5 w-3.5" />
+          View Member Details
+        </Button>
+      )}
 
       {/* Member Profile Modal */}
       <Dialog open={viewMemberOpen} onOpenChange={setViewMemberOpen}>

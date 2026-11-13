@@ -4,10 +4,13 @@ import pool from "@/lib/connection/db"
 import {
   buildRepaymentSchedule,
   effectiveFrequency,
+  getScheduleFitError,
   isFixedPrincipalFrequency,
   isRepaymentMethod,
+  maturityDate,
 } from "@/lib/loan-repayment-schedule"
 import { formatAmount } from "@/lib/number-format"
+import { getMoratoriumError, getTenureError, getTenureLimits } from "@/lib/loan-tenure"
 
 // POST: Approve or Reject a loan application
 export async function POST(request: NextRequest) {
@@ -45,7 +48,8 @@ export async function POST(request: NextRequest) {
 
     // Verify application exists and is pending
     const { rows: apps } = await client.query(
-      `SELECT la.*, ls.scheme_name, ls.interest_rate as scheme_rate, ls.loan_gl_account
+      `SELECT la.*, ls.scheme_name, ls.interest_rate as scheme_rate, ls.loan_gl_account,
+              ls.minimum_period_months AS scheme_min_tenure, ls.maximum_period_months AS scheme_max_tenure
        FROM loan_applications la
        JOIN loan_schemes ls ON la.scheme_id = ls.scheme_id
        WHERE la.loan_application_id = $1 AND la.branch_id = $2`,
@@ -71,6 +75,25 @@ export async function POST(request: NextRequest) {
           { error: "Sanctioned amount, interest rate, and tenure are required for approval" },
           { status: 400 }
         )
+      }
+
+      // Sanctioned tenure (entered at sanction) must be within the scheme's tenure limits.
+      // It is what the repayment schedule, instalments and interest are calculated on.
+      const tenureError = getTenureError(
+        loan_tenure_months,
+        getTenureLimits(app.scheme_min_tenure, app.scheme_max_tenure)
+      )
+      if (tenureError) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: tenureError }, { status: 400 })
+      }
+      const sanctionedTenure = Number(loan_tenure_months)
+
+      // Gestation (moratorium) period must be less than the sanctioned tenure
+      const moratoriumError = getMoratoriumError(moratorium_period, sanctionedTenure)
+      if (moratoriumError) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: moratoriumError }, { status: 400 })
       }
 
       const requestedAmount = parseFloat(sanctioned_amount)
@@ -116,14 +139,27 @@ export async function POST(request: NextRequest) {
         )
       }
       const repaymentFrequency = effectiveFrequency(repayment_method, repayment_type)
+      const moratoriumMonths = parseInt(moratorium_period) || 0
+
+      // Repayment Period = Tenure − Moratorium; the schedule must fit inside the tenure
+      const fitError = getScheduleFitError({
+        tenureMonths: sanctionedTenure,
+        moratoriumMonths,
+        method: repayment_method,
+        frequency: repaymentFrequency,
+      })
+      if (fitError) {
+        await client.query("ROLLBACK")
+        return NextResponse.json({ error: fitError }, { status: 400 })
+      }
 
       // Same schedule the disbursement will save; its first instalment is stored as
       // payment_amount (On Maturity: the maturity amount)
       const schedule = buildRepaymentSchedule({
         principal: parseFloat(sanctioned_amount),
         annualRate: parseFloat(interest_rate),
-        tenureMonths: parseInt(loan_tenure_months),
-        moratoriumMonths: parseInt(moratorium_period) || 0,
+        tenureMonths: sanctionedTenure,
+        moratoriumMonths,
         method: repayment_method,
         frequency: repaymentFrequency,
         startDate: businessDate,
@@ -131,6 +167,28 @@ export async function POST(request: NextRequest) {
       if (schedule.length === 0) {
         await client.query("ROLLBACK")
         return NextResponse.json({ error: "Could not build the repayment schedule — check amount, rate and tenure" }, { status: 400 })
+      }
+      // No repayment date may fall after the maturity date (sanction date + tenure)
+      const maturity = maturityDate(businessDate, sanctionedTenure)
+      if (schedule[schedule.length - 1].due_date > maturity) {
+        await client.query("ROLLBACK")
+        return NextResponse.json(
+          { error: "The repayment schedule does not fit within the sanctioned tenure" },
+          { status: 400 }
+        )
+      }
+      // A First Installment Date entered by the officer must be after the gestation
+      // period and on or before maturity
+      if (installment_start_date) {
+        const firstDate = String(installment_start_date).slice(0, 10)
+        const moratoriumEnd = maturityDate(businessDate, moratoriumMonths)
+        if (firstDate <= moratoriumEnd || firstDate > maturity) {
+          await client.query("ROLLBACK")
+          return NextResponse.json(
+            { error: `First installment date must be after the gestation period end (${moratoriumEnd}) and on or before the maturity date (${maturity})` },
+            { status: 400 }
+          )
+        }
       }
       const emiAmount = schedule[0].total
       const number_of_installments = schedule.length
@@ -151,7 +209,7 @@ export async function POST(request: NextRequest) {
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'SANCTIONED', $9, $10, NOW(), $11, $12, $13, $14, $15)`,
         [
           sanctionId, loan_application_id, sanctioned_amount, businessDate,
-          interest_rate, loan_tenure_months, emiAmount, moratorium_period || 0, session.userId, remarks || '', repaymentFrequency, number_of_installments,
+          interest_rate, sanctionedTenure, emiAmount, moratorium_period || 0, session.userId, remarks || '', repaymentFrequency, number_of_installments,
           installment_start_date || schedule[0].due_date, session.branch,
           repayment_method
         ]

@@ -2,6 +2,7 @@ import { getSession } from "@/lib/auth/session"
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { cleanNominees, saveSavingsNominees } from "@/lib/savings-nominees"
+import { getMemberTypeError, loadBranchEnrollmentRules } from "@/lib/membership-enrollment-rules"
 
 export async function POST(req: Request) {
   const u = await getSession()
@@ -32,6 +33,14 @@ export async function POST(req: Request) {
 
   if (!perm) {
     return NextResponse.json({ error: "No permission" }, { status: 403 })
+  }
+
+  /* -------------------- BRANCH MEMBERSHIP TYPE RULE -------------------- */
+  // Hierarchy level 2 branches may enroll Nominal Members only
+  const rules = await loadBranchEnrollmentRules(pool, u.branch)
+  const memberTypeError = getMemberTypeError(rules, member_type)
+  if (memberTypeError) {
+    return NextResponse.json({ error: memberTypeError }, { status: 400 })
   }
 
   /* -------------------- CUSTOMER CHECK -------------------- */

@@ -14,8 +14,9 @@ import { Progress } from "@/components/ui/progress"
 import { DashboardWrapper } from "../../_components/dashboard-wrapper"
 import {
   ArrowLeft, CreditCard, Loader2, ShieldCheck, Scale,
-  Building2, Car, Landmark, FileText, ImageIcon, ExternalLink,
+  Building2, Car, Landmark, FileText, ImageIcon, ExternalLink, Printer,
 } from "lucide-react"
+import { printLtLoanApplication } from "@/lib/print/print-lt-loan-application"
 import { formatCurrency as formatINR, type Numeric } from "@/lib/number-format"
 
 type LoanApplication = {
@@ -553,6 +554,22 @@ export default function LoanDetailsPage() {
   const [loanSummary, setLoanSummary] = useState<any>(null)
   const [loanSecurity, setLoanSecurity] = useState<LoanSecurity | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isPrinting, setIsPrinting] = useState(false)
+
+  const handlePrintApplicationForm = async () => {
+    if (!selectedLoan) return
+    setIsPrinting(true)
+    try {
+      const isLand = loanSecurity?.security_code === "LAND"
+      await printLtLoanApplication({
+        loan: selectedLoan,
+        land: isLand ? (loanSecurity?.detail as PropertyDetail | null) : null,
+        branchName: (user as any)?.branch_name,
+      })
+    } finally {
+      setIsPrinting(false)
+    }
+  }
 
   useEffect(() => {
     const fetchLoanDetails = async () => {
@@ -641,9 +658,15 @@ export default function LoanDetailsPage() {
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back
               </Button>
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight text-foreground">Loan Details</h1>
-                <p className="text-muted-foreground">Reference: {selectedLoan.reference_no}</p>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h1 className="text-3xl font-bold tracking-tight text-foreground">Loan Details</h1>
+                  <p className="text-muted-foreground">Reference: {selectedLoan.reference_no}</p>
+                </div>
+                <Button variant="outline" onClick={handlePrintApplicationForm} disabled={isPrinting}>
+                  {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
+                  Print Application Form
+                </Button>
               </div>
             </div>
 

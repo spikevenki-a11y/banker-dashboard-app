@@ -919,7 +919,7 @@ export default function BorrowingsPage() {
                           </div>
 
                           <div className="space-y-2">
-                            <Label>Moratorium Period (Months)</Label>
+                            <Label>Gestation Period (Months)</Label>
                             <Input
                               type="number"
                               placeholder="0"
@@ -947,7 +947,7 @@ export default function BorrowingsPage() {
                               checked={moratoriumInterest}
                               onCheckedChange={setMoratoriumInterest}
                             />
-                            <Label htmlFor="moratorium-interest">Interest during moratorium</Label>
+                            <Label htmlFor="moratorium-interest">Interest during gestation period</Label>
                           </div>
                         </div>
 
