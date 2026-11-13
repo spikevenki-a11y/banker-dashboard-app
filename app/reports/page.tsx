@@ -76,6 +76,7 @@ const reportCategories = [
       { name: "Loan Outstanding Report",  description: "Current outstanding loan balances",        href: "/reports/loans?type=outstanding" },
       { name: "Overdue Loans Report",     description: "Loans with overdue payments",              href: "/reports/loans?type=overdue" },
       { name: "Loan Closure Report",      description: "Fully repaid and closed loans",            href: "/reports/loans?type=closure" },
+      { name: "Loan Application",         description: "Print or download a member's loan application form", href: "/reports/loans/application" },
     ],
   },
   {

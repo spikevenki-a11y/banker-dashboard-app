@@ -15,6 +15,7 @@ import { useBranchInfo } from "../_components/use-branch-info"
 import { openPrintWindow } from "../_components/open-print-window"
 import { downloadPdf } from "../_components/download-pdf"
 import { formatCurrency, type Numeric } from "@/lib/number-format"
+import { printDayBook } from "@/lib/print/print-day-book"
 
 // Zero amounts are shown as "—" in the statement columns
 const fmt = (n: Numeric) => (Number(n || 0) === 0 ? "—" : formatCurrency(n))
@@ -76,6 +77,11 @@ function AccountingReportContent() {
   }
 
   function handlePrint() {
+    // Day Book prints in the bank's Receipt / Payment format
+    if (type === "day-book") {
+      printDayBook(fromDate).catch((e) => setError(e.message || "Failed to print day book"))
+      return
+    }
     if (!printRef.current) return
     openPrintWindow(meta.label, dateLabel, branchInfo, printRef.current.innerHTML)
   }
@@ -101,6 +107,10 @@ function AccountingReportContent() {
   useEffect(() => {
     if (!openTabRef.current || !fetched || !printRef.current || rows.length === 0) return
     openTabRef.current = false
+    if (type === "day-book") {
+      printDayBook(fromDate, "preview").catch((e) => setError(e.message || "Failed to open day book"))
+      return
+    }
     openPrintWindow(meta.label, dateLabel, branchInfo, printRef.current.innerHTML, false)
   }, [fetched, rows]) // eslint-disable-line react-hooks/exhaustive-deps
 

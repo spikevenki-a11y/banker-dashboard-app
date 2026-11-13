@@ -17,6 +17,8 @@ import {
   Building2, Car, Landmark, FileText, ImageIcon, ExternalLink, Printer,
 } from "lucide-react"
 import { printLtLoanApplication } from "@/lib/print/print-lt-loan-application"
+import { printLoanApplication } from "@/lib/print/print-loan-application"
+import { popup } from "@/lib/popup"
 import { formatCurrency as formatINR, type Numeric } from "@/lib/number-format"
 
 type LoanApplication = {
@@ -562,11 +564,18 @@ export default function LoanDetailsPage() {
     setIsPrinting(true)
     try {
       const isLand = loanSecurity?.security_code === "LAND"
-      await printLtLoanApplication({
-        loan: selectedLoan,
-        land: isLand ? (loanSecurity?.detail as PropertyDetail | null) : null,
-        branchName: (user as any)?.branch_name,
-      })
+      if (isLand) {
+        await printLtLoanApplication({
+          loan: selectedLoan,
+          land: isLand ? (loanSecurity?.detail as PropertyDetail | null) : null,
+          branchName: (user as any)?.branch_name,
+        })
+      } else {
+        // Other security types have their own application form
+        await printLoanApplication({ loanApplicationId: selectedLoan.loan_application_id, branchName: (user as any)?.branch_name })
+      }
+    } catch (e: any) {
+      popup.error(e?.message || "Failed to print the application form")
     } finally {
       setIsPrinting(false)
     }
