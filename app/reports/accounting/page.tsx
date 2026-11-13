@@ -16,6 +16,7 @@ import { openPrintWindow } from "../_components/open-print-window"
 import { downloadPdf } from "../_components/download-pdf"
 import { formatCurrency, type Numeric } from "@/lib/number-format"
 import { printDayBook } from "@/lib/print/print-day-book"
+import { printCashBook } from "@/lib/print/print-cash-book"
 
 // Zero amounts are shown as "—" in the statement columns
 const fmt = (n: Numeric) => (Number(n || 0) === 0 ? "—" : formatCurrency(n))
@@ -82,6 +83,11 @@ function AccountingReportContent() {
       printDayBook(fromDate).catch((e) => setError(e.message || "Failed to print day book"))
       return
     }
+    // Cash Book prints in the bank's format, one page per business date
+    if (type === "cash-book") {
+      printCashBook(fromDate, toDate || fromDate).catch((e) => setError(e.message || "Failed to print cash book"))
+      return
+    }
     if (!printRef.current) return
     openPrintWindow(meta.label, dateLabel, branchInfo, printRef.current.innerHTML)
   }
@@ -97,6 +103,15 @@ function AccountingReportContent() {
     : ""
 
   async function handleDownloadPdf() {
+    if (type === "cash-book") {
+      setPdfLoading(true)
+      try {
+        await printCashBook(fromDate, toDate || fromDate, "pdf")
+      } catch (e: any) {
+        setError(e.message || "Failed to download cash book")
+      } finally { setPdfLoading(false) }
+      return
+    }
     if (!printRef.current) return
     setPdfLoading(true)
     try {
@@ -109,6 +124,10 @@ function AccountingReportContent() {
     openTabRef.current = false
     if (type === "day-book") {
       printDayBook(fromDate, "preview").catch((e) => setError(e.message || "Failed to open day book"))
+      return
+    }
+    if (type === "cash-book") {
+      printCashBook(fromDate, toDate || fromDate, "preview").catch((e) => setError(e.message || "Failed to open cash book"))
       return
     }
     openPrintWindow(meta.label, dateLabel, branchInfo, printRef.current.innerHTML, false)
