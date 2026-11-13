@@ -11,6 +11,10 @@
 // Repayment Frequency (stored in loan_sanction_details.repayment_type, which already
 // held the frequency before Repayment Type existed): MONTHLY, QUARTERLY, HALF_YEARLY,
 // YEARLY or CLOSING_TIME (a single instalment at the end of the tenure).
+//
+// Moratorium (gestation) period: counted inside the sanctioned tenure. No principal is
+// scheduled during it; Fixed Principal instalments start after it and the last one falls
+// on the maturity date (start + tenure). Repayment Period = Tenure − Moratorium.
 
 export type RepaymentMethod = "ON_MATURITY" | "FIXED_PRINCIPAL"
 export type RepaymentFrequency = "MONTHLY" | "QUARTERLY" | "HALF_YEARLY" | "YEARLY" | "CLOSING_TIME"
@@ -97,6 +101,56 @@ function addMonths(ymd: string, months: number): string {
   return `${ty}-${pad(tm + 1)}-${pad(Math.min(d, lastDay))}`
 }
 
+/** Months in one repayment period for a frequency; 0 = the whole repayment period (Closing Time). */
+export const frequencyMonths = (frequency: string | null | undefined): number =>
+  REPAYMENT_FREQUENCY_OPTIONS.find((o) => o.value === frequency)?.months ?? 0
+
+/**
+ * Moratorium (gestation) period is part of the sanctioned tenure, not added to it:
+ *   Repayment Period = Sanctioned Loan Tenure − Moratorium Period
+ * Principal is repaid only in the repayment period, which ends on the maturity date.
+ */
+export function repaymentPeriodMonths(tenureMonths: unknown, moratoriumMonths: unknown): number {
+  const T = Math.floor(Number(tenureMonths)) || 0
+  const M = Math.max(0, Math.floor(Number(moratoriumMonths) || 0))
+  return T - M
+}
+
+/** Maturity date = start date + sanctioned tenure (YYYY-MM-DD). No instalment falls after it. */
+export function maturityDate(startDate: string | Date, tenureMonths: number): string {
+  return addMonths(toYmd(startDate), Math.floor(Number(tenureMonths)) || 0)
+}
+
+/**
+ * Error message when the repayment schedule cannot fit within the sanctioned tenure,
+ * otherwise "". Used by the Loan Sanction screen and POST /api/loans/sanction.
+ * - The moratorium must leave at least one month to repay in.
+ * - Fixed Principal needs at least one full period of the chosen frequency after the
+ *   moratorium (e.g. Yearly needs 12 months left).
+ */
+export function getScheduleFitError(params: {
+  tenureMonths: unknown
+  moratoriumMonths: unknown
+  method: RepaymentMethod
+  frequency: string | null | undefined
+}): string {
+  const T = Math.floor(Number(params.tenureMonths)) || 0
+  if (!(T > 0)) return ""
+  const M = Math.max(0, Math.floor(Number(params.moratoriumMonths) || 0))
+  const R = repaymentPeriodMonths(T, M)
+  if (R <= 0) {
+    return `Gestation period (${M} months) must be less than the loan tenure (${T} months)`
+  }
+  const frequency = effectiveFrequency(params.method, params.frequency)
+  const period = frequencyMonths(frequency)
+  if (params.method === "FIXED_PRINCIPAL" && period > R) {
+    return `Only ${R} month(s) remain for repayment after the ${M}-month gestation period — ` +
+      `not enough for a ${repaymentFrequencyLabel(frequency)} instalment (${period} months). ` +
+      `Reduce the gestation period or choose a shorter frequency.`
+  }
+  return ""
+}
+
 export function buildRepaymentSchedule(params: {
   principal: number
   annualRate: number // % per annum
@@ -111,24 +165,46 @@ export function buildRepaymentSchedule(params: {
   const T = Math.floor(Number(params.tenureMonths))
   const moratorium = Math.max(0, Math.floor(Number(params.moratoriumMonths) || 0))
   if (!(P > 0) || !(T > 0) || rate < 0) return []
+  if (getScheduleFitError({ tenureMonths: T, moratoriumMonths: moratorium, method: params.method, frequency: params.frequency })) {
+    return []
+  }
 
   const frequency = effectiveFrequency(params.method, params.frequency)
-  const periodMonths = REPAYMENT_FREQUENCY_OPTIONS.find((o) => o.value === frequency)!.months || T
-  const n = Math.ceil(T / periodMonths)
-  const principalPer = round2(P / n)
   const start = toYmd(params.startDate)
+
+  // On Maturity (Closing Time): one instalment on the maturity date — full principal plus
+  // simple interest for the whole tenure (unchanged; the moratorium doesn't move maturity)
+  if (frequency === "CLOSING_TIME") {
+    const interest = round2((P * rate * T) / 1200)
+    return [{
+      installment_no: 1,
+      due_date: maturityDate(start, T),
+      principal: P,
+      interest,
+      total: round2(P + interest),
+      balance: 0,
+    }]
+  }
+
+  // Fixed Principal: no instalments during the moratorium; the remaining repayment
+  // period is split into instalments of the chosen frequency, the last ending at maturity
+  const R = repaymentPeriodMonths(T, moratorium)
+  const periodMonths = frequencyMonths(frequency)
+  const n = Math.ceil(R / periodMonths)
+  const principalPer = round2(P / n)
 
   const rows: RepaymentScheduleRow[] = []
   let balance = P
   for (let i = 1; i <= n; i++) {
-    // The last period may be shorter when the tenure isn't a whole number of periods
-    const endMonth = Math.min(i * periodMonths, T)
+    // The last period may be shorter when the repayment period isn't a whole number of periods
+    const endMonth = Math.min(i * periodMonths, R)
     const monthsInPeriod = endMonth - (i - 1) * periodMonths
     const interest = round2((balance * rate * monthsInPeriod) / 1200)
     const principal = i === n ? balance : principalPer // last instalment clears any rounding
     balance = round2(balance - principal)
     rows.push({
       installment_no: i,
+      // moratorium + endMonth ≤ T, so the final instalment is on the maturity date
       due_date: addMonths(start, moratorium + endMonth),
       principal: round2(principal),
       interest,

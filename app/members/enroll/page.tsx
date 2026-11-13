@@ -26,6 +26,13 @@ import {
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { customerDocumentUrl, useCustomerDocuments } from "@/components/customer-photo-signature"
 import { NomineeEditor, nomineeTotals, type NomineeEntry } from "@/components/nominee-editor"
+import {
+  MEMBER_TYPE_MEMBER,
+  MEMBER_TYPE_NOMINAL,
+  getEnrollmentRules,
+  getMemberTypeError,
+  type EnrollmentRules,
+} from "@/lib/membership-enrollment-rules"
 
 type OtherBranchMembership = {
   membership_no: string
@@ -227,6 +234,21 @@ export default function EnrollMemberPage() {
   // Nominees for the new membership (saved with it in nominee_details)
   const [nominees, setNominees] = useState<NomineeEntry[]>([])
   const [businessDate, setBusinessDate] = useState<string>("")
+  // Membership types this branch may enroll (hierarchy level 2 → Nominal Member only).
+  // Until loaded the existing options are shown; the API enforces the rule regardless.
+  const [enrollmentRules, setEnrollmentRules] = useState<EnrollmentRules>(() => getEnrollmentRules(null))
+  const defaultMemberType = enrollmentRules.nominal_only ? MEMBER_TYPE_NOMINAL : MEMBER_TYPE_MEMBER
+  useEffect(() => {
+    fetch("/api/memberships/enrollment-rules", { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d?.success) return
+        const rules = getEnrollmentRules(d.hierarchy_level ?? null)
+        setEnrollmentRules(rules)
+        if (rules.nominal_only) setNewMember((prev) => ({ ...prev, member_type: MEMBER_TYPE_NOMINAL }))
+      })
+      .catch(() => {})
+  }, [])
   useEffect(() => {
     fetch("/api/fas/get-login-date", { credentials: "include" })
       .then((r) => r.json())
@@ -371,6 +393,11 @@ export default function EnrollMemberPage() {
   }
 
   const handleEnrollMember = async () => {
+    const memberTypeError = getMemberTypeError(enrollmentRules, newMember.member_type)
+    if (memberTypeError) {
+      alert(memberTypeError)
+      return
+    }
     const totals = nomineeTotals(nominees)
     if (!totals.ok) {
       alert(`Nominee percentages must add up to exactly 100% (currently ${totals.total}%).`)
@@ -405,7 +432,7 @@ export default function EnrollMemberPage() {
         email: "",
         phone: "",
         address: "",
-        member_type: "member",
+        member_type: defaultMemberType,
         date_of_birth: "",
         dob: "",
         id_type: "",
@@ -538,11 +565,16 @@ export default function EnrollMemberPage() {
                       <SelectValue placeholder="Select account type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="0" >Select Account Type</SelectItem>
-                      <SelectItem value="member">Member</SelectItem>
-                      <SelectItem value="associate">Nominal Member</SelectItem>
+                      {!enrollmentRules.nominal_only && <SelectItem value="0" >Select Account Type</SelectItem>}
+                      {!enrollmentRules.nominal_only && <SelectItem value={MEMBER_TYPE_MEMBER}>Member</SelectItem>}
+                      <SelectItem value={MEMBER_TYPE_NOMINAL}>Nominal Member</SelectItem>
                     </SelectContent>
                   </Select>
+                  {enrollmentRules.nominal_only && (
+                    <p className="text-xs text-muted-foreground">
+                      Only Nominal Member enrollment is allowed for this branch (hierarchy level 2).
+                    </p>
+                  )}
                 </Field>
 
 

@@ -274,17 +274,11 @@ export default function LoanApplicationPage() {
   // Form fields
   const [applicationDate, setApplicationDate] = useState("")
   const [loanAmount, setLoanAmount] = useState("")
-  const [tenureMonths, setTenureMonths] = useState("")
   const [interestRate, setInterestRate] = useState("")
   const [remarks, setRemarks] = useState("")
 
 
   // EMI calculation
-  const [emiSchedule, setEmiSchedule] = useState<EMISchedule[]>([])
-  const [isCalculating, setIsCalculating] = useState(false)
-  const [emiAmount, setEmiAmount] = useState<number | null>(null)
-  const [totalInterest, setTotalInterest] = useState<number | null>(null)
-  const [totalPayment, setTotalPayment] = useState<number | null>(null)
 
   // Submit
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -506,10 +500,6 @@ export default function LoanApplicationPage() {
     if (selectedScheme) setInterestRate(String(selectedScheme.interest_rate))
   }, [selectedScheme])
 
-  useEffect(() => {
-    if (loanAmount && tenureMonths && interestRate) calculateEMI()
-    else { setEmiAmount(null); setTotalInterest(null); setTotalPayment(null); setEmiSchedule([]) }
-  }, [loanAmount, tenureMonths, interestRate])
 
   // Gold item totals → propagate to securityForm summary fields
   useEffect(() => {
@@ -641,28 +631,6 @@ export default function LoanApplicationPage() {
     } catch { /* silent */ }
   }
 
-  async function calculateEMI() {
-    const principal = Number(loanAmount)
-    const months = Number(tenureMonths)
-    const rate = Number(interestRate)
-    if (!principal || !months || !rate) return
-    setIsCalculating(true)
-    try {
-      const res = await fetch("/api/loans/calculate-emi", {
-        method: "POST", credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ principal, tenure_months: months, interest_rate: rate, start_date: applicationDate }),
-      })
-      const data = await res.json()
-      if (res.ok && data.success) {
-        setEmiAmount(data.emi_amount)
-        setTotalInterest(data.total_interest)
-        setTotalPayment(data.total_payment)
-        setEmiSchedule(data.schedule || [])
-      }
-    } catch { /* silent */ }
-    finally { setIsCalculating(false) }
-  }
 
   const handleDepositAccountSelect = (accountNumber: string) => {
     const acc = memberDepositAccounts.find((a) => a.accountNumber === accountNumber)
@@ -790,7 +758,7 @@ export default function LoanApplicationPage() {
   // ── Submit ─────────────────────────────────────────────────────────────────
 
   const handleSubmit = async () => {
-    if (!memberInfo || !selectedSchemeId || !applicationDate || !loanAmount || !tenureMonths) return
+    if (!memberInfo || !selectedSchemeId || !applicationDate || !loanAmount) return
     if (schemeAgeError) {
       alert(schemeAgeError)
       return
@@ -990,7 +958,6 @@ export default function LoanApplicationPage() {
           scheme_id: Number(selectedSchemeId),
           application_date: applicationDate,
           loan_amount: Number(loanAmount),
-          tenure_months: Number(tenureMonths),
           interest_rate: Number(interestRate),
           loan_purpose: selectedPurposeId,
           remarks,
@@ -1024,11 +991,10 @@ export default function LoanApplicationPage() {
 
   const handleReset = () => {
     setMembershipNo(""); setMemberInfo(null); setMemberError("")
-    setSelectedLoanType(""); setSelectedSchemeId(""); setLoanAmount(""); setTenureMonths(""); setInterestRate("")
+    setSelectedLoanType(""); setSelectedSchemeId(""); setLoanAmount(""); setInterestRate("")
     setSelectedPurposeId(""); setSelectedSecurityId(""); setSecurityTypeError(""); setSecurityForm(emptySecurityForm)
     setGoldItems([]); setGoldItemDraft(emptyGoldItem); setSuretyError("")
     setRemarks("")
-    setEmiAmount(null); setTotalInterest(null); setTotalPayment(null); setEmiSchedule([])
   }
 
   // ── Security type classification ───────────────────────────────────────────
@@ -1182,7 +1148,8 @@ export default function LoanApplicationPage() {
                       </div>
                     )} */}
 
-                    <div className="grid grid-cols-3 gap-4">
+                    {/* Loan tenure is entered by the sanctioning officer at Loan Sanction */}
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Loan Amount Applied *</Label>
                         <Input
@@ -1199,10 +1166,6 @@ export default function LoanApplicationPage() {
                             Must be less than the security amount ({formatCurrency(securityValue.amount)})
                           </p>
                         ) : null}
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Tenure (Months) *</Label>
-                        <Input type="number" placeholder="Enter months" value={tenureMonths} onChange={(e) => setTenureMonths(e.target.value)} />
                       </div>
                       <div className="space-y-2">
                         <Label>Interest Rate (% p.a.)</Label>
@@ -2197,7 +2160,7 @@ export default function LoanApplicationPage() {
                   <Button variant="outline" onClick={() => router.push("/loans")} className="bg-transparent">Cancel</Button>
                   <Button
                     onClick={handleSubmit}
-                    disabled={!memberInfo || !selectedSchemeId || !applicationDate || !loanAmount || !tenureMonths || !!schemeAgeError || isSubmitting}
+                    disabled={!memberInfo || !selectedSchemeId || !applicationDate || !loanAmount || !!schemeAgeError || isSubmitting}
                     className="bg-blue-600 hover:bg-blue-700 text-white"
                   >
                     {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Submitting...</> : "Submit Application"}
@@ -2265,7 +2228,6 @@ export default function LoanApplicationPage() {
                       ["Member", memberInfo?.full_name || "---"],
                       ["Scheme", selectedScheme?.scheme_name || "---"],
                       ["Loan Amount", loanAmount ? formatCurrency(Number(loanAmount)) : "---"],
-                      ["Tenure", tenureMonths ? `${tenureMonths} months` : "---"],
                       ["Interest Rate", interestRate ? `${interestRate}% p.a.` : "---"],
                       ["Security", selectedSecurityId ? securities.find((s: any) => String(s.security_id) === selectedSecurityId)?.security_name || "---" : "None"],
                     ].map(([label, value], i, arr) => (
@@ -2277,41 +2239,6 @@ export default function LoanApplicationPage() {
                   </CardContent>
                 </Card> */}
 
-                {/* EMI Schedule Preview */}
-                {emiSchedule.length > 0 && (
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="flex items-center gap-2 text-lg">
-                        <Clock className="h-5 w-5 text-blue-600" />EMI Schedule (First 6)
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="max-h-60 overflow-y-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="text-xs">#</TableHead>
-                              <TableHead className="text-xs">Due Date</TableHead>
-                              <TableHead className="text-xs text-right">EMI</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {emiSchedule.slice(0, 6).map((item) => (
-                              <TableRow key={item.installment_no}>
-                                <TableCell className="text-xs">{item.installment_no}</TableCell>
-                                <TableCell className="text-xs">{formatDate(item.due_date)}</TableCell>
-                                <TableCell className="text-xs text-right">{formatCurrency(item.emi_amount)}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                        {emiSchedule.length > 6 && (
-                          <p className="mt-2 text-center text-xs text-muted-foreground">+ {emiSchedule.length - 6} more installments</p>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
               </div>
             </div>
           </main>

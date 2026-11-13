@@ -48,12 +48,16 @@ import {
   DEFAULT_FIXED_PRINCIPAL_FREQUENCY,
   DEFAULT_REPAYMENT_METHOD,
   frequencyOptionsFor,
+  getScheduleFitError,
   isFixedPrincipalFrequency,
+  maturityDate,
+  repaymentPeriodMonths,
   REPAYMENT_METHOD_OPTIONS,
   type RepaymentFrequency,
   type RepaymentMethod,
 } from "@/lib/loan-repayment-schedule"
 import { formatCurrency } from "@/lib/number-format"
+import { getMoratoriumError, getTenureError, getTenureLimits } from "@/lib/loan-tenure"
 
 // Sanction form for one pending loan application: application details, sanction terms,
 // EMI calculation, repayment schedule (with PDF), approve/reject. Shared by
@@ -79,7 +83,8 @@ export interface SanctionApplication {
   scheme_interest_rate: number
   minimum_period_months: number
   maximum_period_months: number
-  loan_tenure_months: number
+  /** Tenure entered on older applications (new applications leave it empty) */
+  loan_tenure_months: number | null
   loan_gl_account: string
   /** Gold security cap: Guidelines Value per Gram × Net Weight (null when not gold) */
   gold_max_sanction_amount?: number | null
@@ -112,6 +117,7 @@ interface SanctionPanelProps {
   onCancel: () => void
 }
 
+// Format currency
 // Number inputs in the sanction form: no spinner buttons, and no stepping with the
 // arrow keys or mouse wheel — values are typed in only
 const NO_SPINNER_CLASS =
@@ -146,7 +152,13 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
   const [sanctionedAmount, setSanctionedAmount] = useState("")
   const [interestRate, setInterestRate] = useState("")
   const [tenureMonths, setTenureMonths] = useState("")
+  // Loan period is entered here (not at application), within the scheme's limits
+  const tenureLimits = getTenureLimits(selectedApp?.minimum_period_months, selectedApp?.maximum_period_months)
+  // Shown under the field once something is typed; an empty field is reported on submit
+  const tenureFieldError = tenureMonths.trim() ? getTenureError(tenureMonths, tenureLimits) : ""
   const [moratoriumPeriod, setMoratoriumPeriod] = useState("0")
+  // Gestation (moratorium) period must be less than the tenure
+  const moratoriumFieldError = getMoratoriumError(moratoriumPeriod, tenureMonths)
   const [remarks, setRemarks] = useState("")
 
   // Repayment details
@@ -168,6 +180,30 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
   const [downloadingSchedule, setDownloadingSchedule] = useState(false)
   const [scheduleDownloadError, setScheduleDownloadError] = useState("")
   const branchInfo = useBranchInfo()
+
+  // Moratorium is inside the tenure: Repayment Period = Tenure − Moratorium, and the
+  // schedule must end by the maturity date (same rules as POST /api/loans/sanction)
+  const tenureNum = parseInt(tenureMonths) || 0
+  const moratoriumNum = parseInt(moratoriumPeriod) || 0
+  const repaymentPeriod = repaymentPeriodMonths(tenureNum, moratoriumNum)
+  const scheduleStart = identity?.businessDate || new Date()
+  const maturityYmd = tenureNum > 0 ? maturityDate(scheduleStart, tenureNum) : ""
+  const moratoriumEndYmd = maturityDate(scheduleStart, moratoriumNum)
+  const scheduleFitError =
+    tenureNum > 0 && !moratoriumFieldError
+      ? getScheduleFitError({
+          tenureMonths: tenureNum,
+          moratoriumMonths: moratoriumNum,
+          method: repaymentMethod,
+          frequency: repaymentFrequency,
+        })
+      : ""
+  // An officer-edited First Installment Date must be after the gestation period and by maturity
+  const installmentDateError =
+    installmentStartDate && maturityYmd &&
+    (installmentStartDate <= moratoriumEndYmd || installmentStartDate > maturityYmd)
+      ? `First installment date must be after ${formatDate(moratoriumEndYmd)} (end of gestation period) and on or before ${formatDate(maturityYmd)} (maturity date)`
+      : ""
 
   // Dialog states
   const [showRejectDialog, setShowRejectDialog] = useState(false)
@@ -209,7 +245,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
         ["Tenure", `${tenureMonths} months`],
         ["Repayment Type", repaymentMethodLabel(repaymentMethod)],
         ["Repayment Frequency", repaymentFrequencyLabel(repaymentFrequency)],
-        ["Moratorium", `${parseInt(moratoriumPeriod) || 0} months`],
+        ["Gestation Period", `${parseInt(moratoriumPeriod) || 0} months`],
         // ["EMI", formatCurrency(calculatedEMI || 0)],
         ["Total Installments", String(emiSchedule.length)],
         ["Total Interest", formatCurrency(totalInterest || 0)],
@@ -323,7 +359,8 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
         : app.applied_loan_amount.toString()
     )
     setInterestRate(app.scheme_interest_rate?.toString() || "12")
-    setTenureMonths(app.loan_tenure_months.toString())
+    // The sanctioning officer enters the loan period; an older application's tenure is a starting value
+    setTenureMonths(Number(app.loan_tenure_months) > 0 ? String(app.loan_tenure_months) : "")
     setMoratoriumPeriod("0")
     setRemarks("")
     setCalculatedEMI(null)
@@ -424,8 +461,6 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
 
     const amount = parseFloat(sanctionedAmount)
     const rate = parseFloat(interestRate)
-    const tenure = parseInt(tenureMonths)
-
     if (isNaN(amount) || amount <= 0) {
       setFormError("Please enter a valid sanctioned amount")
       return false
@@ -443,23 +478,35 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
       return false
     }
 
-    if (isNaN(tenure) || tenure <= 0) {
-      setFormError("Please enter a valid tenure in months")
+    const tenureError = getTenureError(tenureMonths, tenureLimits)
+    if (tenureError) {
+      setFormError(tenureError)
       return false
     }
 
-    if (selectedApp && tenure < (selectedApp.minimum_period_months || 1)) {
-      setFormError(`Tenure must be at least ${selectedApp.minimum_period_months} months`)
-      return false
-    }
-
-    if (selectedApp && tenure > (selectedApp.maximum_period_months || 360)) {
-      setFormError(`Tenure cannot exceed ${selectedApp.maximum_period_months} months`)
+    const moratoriumError = getMoratoriumError(moratoriumPeriod, tenureMonths)
+    if (moratoriumError) {
+      setFormError(moratoriumError)
       return false
     }
 
     if (repaymentMethod === "FIXED_PRINCIPAL" && !isFixedPrincipalFrequency(repaymentFrequency)) {
       setFormError("Please select a repayment frequency: Monthly, Quarterly, Half Yearly or Yearly")
+      return false
+    }
+
+    if (scheduleFitError) {
+      setFormError(scheduleFitError)
+      return false
+    }
+
+    if (emiSchedule.length === 0) {
+      setFormError("Could not build the repayment schedule — check amount, rate, tenure and gestation period")
+      return false
+    }
+
+    if (installmentDateError) {
+      setFormError(installmentDateError)
       return false
     }
 
@@ -644,7 +691,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
             </div>
             <div className="rounded-lg border p-3 bg-muted/30">
               <p className="text-xs text-muted-foreground">Tenure Range</p>
-              <p className="mt-1 font-medium">{selectedApp.minimum_period_months || 1} - {selectedApp.maximum_period_months || 60} months</p>
+              <p className="mt-1 font-medium">{tenureLimits.min} - {tenureLimits.max} months</p>
             </div>
           </div>
 
@@ -760,35 +807,51 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
               </div>
             </div>
 
-            {/* Row 2: Tenure and Moratorium */}
+            {/* Row 2: Tenure and Gestation Period (stored as moratorium_period) */}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="tenure">Tenure (Months) *</Label>
+                <Label htmlFor="tenure">Loan Period / Tenure (Months) *</Label>
                 <Input
                   id="tenure"
                   type="number"
-                  placeholder="Enter tenure"
+                  inputMode="numeric"
+                  min={tenureLimits.min}
+                  max={tenureLimits.max}
+                  placeholder="Enter tenure in months"
                   value={tenureMonths}
+                  onChange={(e) => setTenureMonths(e.target.value.replace(/[^\d]/g, ""))}
                   className={NO_SPINNER_CLASS}
+                  aria-invalid={!!tenureFieldError || undefined}
                   {...noStepProps}
-                  disabled
                 />
-                <p className="text-xs text-muted-foreground">
-                  Min: {selectedApp.minimum_period_months || 1} | Max: {selectedApp.maximum_period_months || 60} months
-                </p>
+                {tenureFieldError ? (
+                  <p className="text-xs text-destructive">{tenureFieldError}</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Min: {tenureLimits.min} | Max: {tenureLimits.max} months
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="moratorium">Moratorium Period (Months)</Label>
+                <Label htmlFor="moratorium">Gestation Period (Months)</Label>
                 <Input
                   id="moratorium"
                   type="number"
                   placeholder="0"
                   value={moratoriumPeriod}
-                  onChange={(e) => setMoratoriumPeriod(e.target.value)}
+                  onChange={(e) => setMoratoriumPeriod(e.target.value.replace(/[^\d]/g, ""))}
                   className={NO_SPINNER_CLASS}
                   {...noStepProps}
+                  aria-invalid={!!(moratoriumFieldError || scheduleFitError) || undefined}
                 />
-                <p className="text-xs text-muted-foreground">Grace period before EMI starts</p>
+                {moratoriumFieldError || scheduleFitError ? (
+                  <p className="text-xs text-destructive">{moratoriumFieldError || scheduleFitError}</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    No principal due in this period; counted within the tenure
+                    {tenureNum > 0 ? ` (repayment period: ${repaymentPeriod} months)` : ""}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -855,8 +918,13 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                   type="date"
                   value={installmentStartDate}
                   onChange={(e) => setInstallmentStartDate(e.target.value)}
+                  aria-invalid={!!installmentDateError || undefined}
                 />
-                <p className="text-xs text-muted-foreground">When first payment is due</p>
+                {installmentDateError ? (
+                  <p className="text-xs text-destructive">{installmentDateError}</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">When first payment is due</p>
+                )}
               </div>
             </div>
 
@@ -887,6 +955,20 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                   <div>
                     <p className="text-xs text-muted-foreground">No. of Installments</p>
                     <p className="text-lg font-semibold">{numberOfInstallments}</p>
+                  </div>
+                </div>
+                <div className="mt-3 grid gap-4 sm:grid-cols-4 text-sm">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Gestation Period</p>
+                    <p className="font-medium">{moratoriumNum} months</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Repayment Period</p>
+                    <p className="font-medium">{repaymentPeriod} months</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Maturity Date</p>
+                    <p className="font-medium">{maturityYmd ? formatDate(maturityYmd) : "-"}</p>
                   </div>
                 </div>
                 {emiSchedule.length > 1 && (

@@ -151,3 +151,20 @@ export function CustomerImageFrame({
     </div>
   )
 }
+
+/** A customer's photo and signature side by side, loaded by customer code. */
+export function CustomerPhotoSignature({
+  customerCode,
+  className = "",
+}: {
+  customerCode: string | null | undefined
+  className?: string
+}) {
+  const { docs, loading } = useCustomerDocuments(customerCode)
+  return (
+    <div className={`flex items-start gap-3 ${className}`}>
+      <CustomerImageFrame kind="photo" doc={docs.photo} loading={loading} />
+      <CustomerImageFrame kind="signature" doc={docs.signature} loading={loading} />
+    </div>
+  )
+}

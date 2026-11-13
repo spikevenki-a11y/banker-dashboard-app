@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
             AND sec.branch_id = la.branch_id) AS gold_guideline_value_per_gram
       FROM loan_applications la
       LEFT JOIN loan_sanction_details ls ON la.loan_application_id = ls.loan_application_id and la.branch_id = ls.branch_id
-      LEFT JOIN loan_schemes lscheme ON la.scheme_id = lscheme.scheme_id
+      LEFT JOIN loan_schemes lscheme ON la.scheme_id = lscheme.scheme_id  and lscheme.branch_id = la.branch_id
       LEFT JOIN memberships m ON la.membership_no = CAST(m.membership_no AS VARCHAR)
       LEFT JOIN customers c ON m.customer_code = c.customer_code
       WHERE la.branch_id = $1
@@ -270,7 +270,9 @@ export async function POST(request: NextRequest) {
         loanApplicationId, branchId,
         application_date || new Date().toISOString().split('T')[0],
         membership_no, scheme_id, loan_purpose || '', loan_amount,
-        referenceNo, session.userId, tenure_months,
+        // Loan tenure is set at Loan Sanction (loan_sanction_details.loan_tenure_months);
+        // new applications leave it empty
+        referenceNo, session.userId, Number(tenure_months) > 0 ? Number(tenure_months) : null,
       ]
     )
 
