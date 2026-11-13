@@ -15,6 +15,9 @@
 // Moratorium (gestation) period: counted inside the sanctioned tenure. No principal is
 // scheduled during it; Fixed Principal instalments start after it and the last one falls
 // on the maturity date (start + tenure). Repayment Period = Tenure − Moratorium.
+// Interest Payable During Moratorium (loan_sanction_details.moratorium_interest_payable,
+// Fixed Principal only): Yes adds interest-only instalments at the Repayment Frequency
+// during the moratorium (installment_type MORATORIUM_INTEREST); No adds none.
 
 export type RepaymentMethod = "ON_MATURITY" | "FIXED_PRINCIPAL"
 export type RepaymentFrequency = "MONTHLY" | "QUARTERLY" | "HALF_YEARLY" | "YEARLY" | "CLOSING_TIME"
@@ -66,6 +69,13 @@ export function effectiveFrequency(method: RepaymentMethod, frequency: string | 
   return isRepaymentFrequency(frequency) ? frequency : DEFAULT_FIXED_PRINCIPAL_FREQUENCY
 }
 
+// REGULAR: principal (+ interest) instalment; MORATORIUM_INTEREST: interest-only
+// instalment due during the moratorium (stored in loan_repayment_schedule_details.installment_type)
+export type InstallmentType = "REGULAR" | "MORATORIUM_INTEREST"
+
+export const installmentTypeLabel = (t: string | null | undefined) =>
+  t === "MORATORIUM_INTEREST" ? "Moratorium Interest" : "Regular"
+
 export type RepaymentScheduleRow = {
   installment_no: number
   due_date: string // YYYY-MM-DD
@@ -73,7 +83,20 @@ export type RepaymentScheduleRow = {
   interest: number
   total: number
   balance: number // principal still outstanding after this instalment
+  installment_type: InstallmentType
 }
+
+/**
+ * "Interest Payable During Moratorium" applies only to Fixed Principal loans with a
+ * moratorium: interest is then paid at the Repayment Frequency during the moratorium.
+ * On Maturity already charges interest for the whole tenure at maturity, so it never applies.
+ */
+export const isMoratoriumInterestApplicable = (method: RepaymentMethod, moratoriumMonths: unknown) =>
+  method === "FIXED_PRINCIPAL" && (Math.floor(Number(moratoriumMonths) || 0) > 0)
+
+/** First principal (regular) instalment — the EMI / installment start date shown and stored at sanction. */
+export const firstRegularInstallment = (rows: RepaymentScheduleRow[]) =>
+  rows.find((r) => r.installment_type === "REGULAR") ?? rows[0]
 
 const round2 = (n: number) => Math.round(n * 100) / 100
 const pad = (n: number) => String(n).padStart(2, "0")
@@ -156,6 +179,8 @@ export function buildRepaymentSchedule(params: {
   annualRate: number // % per annum
   tenureMonths: number
   moratoriumMonths?: number
+  /** Interest Payable During Moratorium (Fixed Principal only; ignored otherwise) */
+  moratoriumInterestPayable?: boolean
   method: RepaymentMethod
   frequency: string | null | undefined
   startDate: string | Date // sanction date (preview) or disbursement date (saved schedule)
@@ -183,17 +208,41 @@ export function buildRepaymentSchedule(params: {
       interest,
       total: round2(P + interest),
       balance: 0,
+      installment_type: "REGULAR",
     }]
   }
 
-  // Fixed Principal: no instalments during the moratorium; the remaining repayment
-  // period is split into instalments of the chosen frequency, the last ending at maturity
   const R = repaymentPeriodMonths(T, moratorium)
   const periodMonths = frequencyMonths(frequency)
+  const rows: RepaymentScheduleRow[] = []
+
+  // Interest Payable During Moratorium = Yes: interest-only instalments at the Repayment
+  // Frequency on the full principal (nothing is repaid yet), the last one ending with the
+  // moratorium. No = no instalments in the moratorium (unchanged behaviour).
+  if (params.moratoriumInterestPayable && isMoratoriumInterestApplicable(params.method, moratorium)) {
+    const k = Math.ceil(moratorium / periodMonths)
+    for (let j = 1; j <= k; j++) {
+      // The last moratorium period may be shorter when it isn't a whole number of periods
+      const endMonth = Math.min(j * periodMonths, moratorium)
+      const monthsInPeriod = endMonth - (j - 1) * periodMonths
+      const interest = round2((P * rate * monthsInPeriod) / 1200)
+      rows.push({
+        installment_no: rows.length + 1,
+        due_date: addMonths(start, endMonth),
+        principal: 0,
+        interest,
+        total: interest,
+        balance: P,
+        installment_type: "MORATORIUM_INTEREST",
+      })
+    }
+  }
+
+  // Fixed Principal: principal repaid after the moratorium; the remaining repayment
+  // period is split into instalments of the chosen frequency, the last ending at maturity
   const n = Math.ceil(R / periodMonths)
   const principalPer = round2(P / n)
 
-  const rows: RepaymentScheduleRow[] = []
   let balance = P
   for (let i = 1; i <= n; i++) {
     // The last period may be shorter when the repayment period isn't a whole number of periods
@@ -203,13 +252,14 @@ export function buildRepaymentSchedule(params: {
     const principal = i === n ? balance : principalPer // last instalment clears any rounding
     balance = round2(balance - principal)
     rows.push({
-      installment_no: i,
+      installment_no: rows.length + 1, // numbered after any moratorium-interest instalments
       // moratorium + endMonth ≤ T, so the final instalment is on the maturity date
       due_date: addMonths(start, moratorium + endMonth),
       principal: round2(principal),
       interest,
       total: round2(principal + interest),
       balance,
+      installment_type: "REGULAR",
     })
   }
   return rows

@@ -1,5 +1,6 @@
 "use client"
 
+import { popup } from "@/lib/popup"
 import { formatDate } from "@/lib/date-format"
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
@@ -25,8 +26,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import {
   ArrowLeft, Search, Loader2, CheckCircle2, Calculator,
   FileText, Users, IndianRupee, Clock, ChevronRight, AlertCircle,
-  Upload, ImageIcon, X, Camera, RefreshCw,
+  Upload, ImageIcon, X, Camera, RefreshCw, Printer,
 } from "lucide-react"
+import { useAuth } from "@/lib/auth-context"
+import { printLtLoanApplication } from "@/lib/print/print-lt-loan-application"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { MemberSummaryCard } from "@/components/member-summary-card"
 import { MemberSearchDialog } from "@/components/member-search-dialog"
@@ -249,6 +252,7 @@ const emptySecurityForm: SecurityForm = {
 
 export default function LoanApplicationPage() {
   const router = useRouter()
+  const { user } = useAuth()
 
   // Member lookup
   const [membershipNo, setMembershipNo] = useState("")
@@ -284,6 +288,19 @@ export default function LoanApplicationPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [successOpen, setSuccessOpen] = useState(false)
   const [createdApplicationNo, setCreatedApplicationNo] = useState("")
+  // Snapshot of the submitted application for "Print Application Form" in the success popup
+  const [printOpts, setPrintOpts] = useState<Parameters<typeof printLtLoanApplication>[0] | null>(null)
+  const [isPrinting, setIsPrinting] = useState(false)
+
+  const handlePrintApplicationForm = async () => {
+    if (!printOpts) return
+    setIsPrinting(true)
+    try {
+      await printLtLoanApplication(printOpts)
+    } finally {
+      setIsPrinting(false)
+    }
+  }
 
   // Loan purposes
   const [purposes, setPurposes] = useState<any[]>([])
@@ -760,18 +777,18 @@ export default function LoanApplicationPage() {
   const handleSubmit = async () => {
     if (!memberInfo || !selectedSchemeId || !applicationDate || !loanAmount) return
     if (schemeAgeError) {
-      alert(schemeAgeError)
+      popup.warning(schemeAgeError)
       return
     }
     // Several security types offered for the scheme → user must pick one (a single type is auto-selected)
     if (securities.length > 0 && !selectedSecurityId) {
       setSecurityTypeError("Please select a security type.")
-      alert("Please select a security type.")
+      popup.warning("Please select a security type.")
       return
     }
     if (Number(selectedSecurityId) === 6 && goldItems.some(hasNegativeGoldValue)) return
     if (Number(selectedSecurityId) === 6 && goldItems.some(isDisallowedWeightInvalid)) {
-      alert(DISALLOWED_WEIGHT_MSG)
+      popup.warning(DISALLOWED_WEIGHT_MSG)
       return
     }
     if (isGoldSecurity && !selectedAppraiser) {
@@ -779,13 +796,13 @@ export default function LoanApplicationPage() {
       return
     }
     if (isGoldSecurity && goldGuidelineStatus !== "loaded") {
-      alert(goldGuidelineStatus === "loading"
+      popup.warning(goldGuidelineStatus === "loading"
         ? "The gold guidelines value is still loading. Please try again in a moment."
         : "Could not load the gold guidelines value. Please reload the page and try again.")
       return
     }
     if (isGoldSecurity && !goldGuidelineValue) {
-      alert("The Gold Guidelines Value per Gram is not set. Please set it in Settings → Management → Gold Guidelines Value.")
+      popup.warning("The Gold Guidelines Value per Gram is not set. Please set it in Settings → Management → Gold Guidelines Value.")
       return
     }
     if (Number(selectedSecurityId) === 13) {
@@ -798,7 +815,7 @@ export default function LoanApplicationPage() {
       else if (!securityForm.surety_eligible_security_amount || !(eligible > 0)) suretyMsg = "Please enter the surety's eligible security amount."
       if (suretyMsg) {
         setSuretyError(suretyMsg)
-        alert(suretyMsg)
+        popup.warning(suretyMsg)
         return
       }
     }
@@ -807,12 +824,12 @@ export default function LoanApplicationPage() {
         || getEcYearsError(securityForm.ec_years_obtained)
       if (landMsg) {
         setShowLandErrors(true)
-        alert(landMsg)
+        popup.warning(landMsg)
         return
       }
     }
     if (loanSecurityError) {
-      alert(loanSecurityError)
+      popup.warning(loanSecurityError)
       return
     }
     setIsSubmitting(true)
@@ -967,6 +984,30 @@ export default function LoanApplicationPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setCreatedApplicationNo(data.loan_application_id || data.reference_no)
+      // Land security (type 1) fills the security section of the printed form
+      const isLand = Number(selectedSecurityId) === 1
+      setPrintOpts({
+        loan: {
+          reference_no: data.reference_no,
+          membership_no: memberInfo.membership_no,
+          application_date: applicationDate,
+          applied_loan_amount: Number(loanAmount),
+          loan_purpose: purposes.find((p: any) => String(p.purpose_id) === selectedPurposeId)?.purpose_name,
+          member_name: memberInfo.full_name,
+          mobile_no: memberInfo.mobile_no,
+        },
+        land: isLand
+          ? {
+              survey_no: securityForm.survey_no,
+              revenue_village: securityForm.revenue_village.trim() || null,
+              city: securityForm.city,
+              land_area_acres: securityForm.land_area_acres,
+              guideline_value: securityForm.guideline_value,
+              market_value: securityForm.market_value,
+            }
+          : null,
+        branchName: (user as any)?.branch_name,
+      })
 
       // Upload gold documents if any files were staged
       if (isGold && goldFiles.length > 0 && data.loan_application_id) {
@@ -983,7 +1024,7 @@ export default function LoanApplicationPage() {
 
       setSuccessOpen(true)
     } catch (e: any) {
-      alert("Error: " + e.message)
+      popup.error("Error: " + e.message)
     } finally {
       setIsSubmitting(false)
     }
@@ -1374,7 +1415,7 @@ export default function LoanApplicationPage() {
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs">Market Value (₹)</Label>
-                            <Input className="h-8 text-xs bg-muted" readOnly value={securityForm.market_value} placeholder="Auto-calculated" />
+                            <Input className="h-8 text-xs bg-muted" type="amount" readOnly value={securityForm.market_value} placeholder="Auto-calculated" />
                           </div>
                         </div>
 
@@ -1383,6 +1424,7 @@ export default function LoanApplicationPage() {
                           <div className="space-y-1">
                             <Label className="text-xs">Guidelines Value per Gram (₹)</Label>
                             <Input className="h-8 text-xs bg-muted" readOnly tabIndex={-1}
+                              type="amount"
                               value={goldGuidelineValue ? goldGuidelineValue.toFixed(2) : ""}
                               placeholder={goldGuidelineStatus === "loading" ? "Loading…" : "Not configured"} />
                           </div>
@@ -1394,6 +1436,7 @@ export default function LoanApplicationPage() {
                           <div className="space-y-1">
                             <Label className="text-xs">Maximum Sanction Amount (₹)</Label>
                             <Input className="h-8 text-xs bg-muted font-semibold" readOnly tabIndex={-1}
+                              type="amount"
                               value={goldMaxSanctionAmount > 0 ? goldMaxSanctionAmount.toFixed(2) : ""}
                               placeholder="Auto-calculated" />
                           </div>
@@ -2279,6 +2322,11 @@ export default function LoanApplicationPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
+            {/* Plain Button (not AlertDialogAction) so the popup stays open while printing */}
+            <Button variant="outline" onClick={handlePrintApplicationForm} disabled={isPrinting || !printOpts}>
+              {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
+              Print Application Form
+            </Button>
             <AlertDialogAction onClick={() => { setSuccessOpen(false); router.push("/loans") }} className="bg-muted text-foreground hover:bg-muted/80">
               Go to Loans
             </AlertDialogAction>

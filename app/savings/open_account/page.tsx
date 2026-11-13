@@ -1,5 +1,6 @@
 "use client"
 
+import { popup } from "@/lib/popup"
 import { formatDate } from "@/lib/date-format"
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
@@ -504,16 +505,16 @@ export default function OpenSavingsAccountPage() {
   const handleSubmit = async () => {
     if (!memberInfo || !selectedSchemeId || !openingDate) return
     if (!nomineeTotalOk) {
-      alert(`Nominee percentages must add up to exactly 100% (currently ${nomineeTotal}%).`)
+      popup.warning(`Nominee percentages must add up to exactly 100% (currently ${nomineeTotal}%).`)
       return
     }
     if (needsSecondaryHolder) {
       if (!secondaryInfo) {
-        alert("Please select the secondary holder for this operation type.")
+        popup.warning("Please select the secondary holder for this operation type.")
         return
       }
       if (String(secondaryInfo.membership_no) === String(memberInfo.membership_no)) {
-        alert("Secondary holder must be a different member from the account holder.")
+        popup.warning("Secondary holder must be a different member from the account holder.")
         return
       }
     }
@@ -543,7 +544,7 @@ export default function OpenSavingsAccountPage() {
       setCreatedAccountNo(data.account_number)
       setSuccessOpen(true)
     } catch (e: any) {
-      alert("Error: " + e.message)
+      popup.error("Error: " + e.message)
     } finally {
       setIsSubmitting(false)
     }

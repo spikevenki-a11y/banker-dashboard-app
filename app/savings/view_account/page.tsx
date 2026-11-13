@@ -1,5 +1,6 @@
 "use client"
 
+import { popup } from "@/lib/popup"
 import { formatDate as formatDisplayDate } from "@/lib/date-format"
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -274,7 +275,7 @@ export default function ViewModifyAccountPage() {
       setSuccessMessage(`The account ${account.account_number} has been updated successfully.`)
       setSuccessOpen(true)
     } catch (e: any) {
-      alert("Error: " + e.message)
+      popup.error("Error: " + e.message)
     } finally {
       setIsSaving(false)
     }

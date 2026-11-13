@@ -1,5 +1,6 @@
 "use client"
 
+import { popup } from "@/lib/popup"
 import { formatDate as formatDisplayDate } from "@/lib/date-format"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
@@ -612,7 +613,7 @@ const getLogindate = async () => {
     if (!memberInfo || !selectedScheme) return
     const totals = nomineeTotals(nominees)
     if (!totals.ok) {
-      alert(`Nominee percentages must add up to exactly 100% (currently ${totals.total}%).`)
+      popup.warning(`Nominee percentages must add up to exactly 100% (currently ${totals.total}%).`)
       return
     }
     setIsSubmitting(true)
@@ -661,10 +662,10 @@ const getLogindate = async () => {
           installment_amount: data.installment_amount,
         })
       } else {
-        alert(data.error || "Failed to create deposit account")
+        popup.error(data.error || "Failed to create deposit account")
       }
     } catch {
-      alert("Network error. Please try again.")
+      popup.error("Network error. Please try again.")
     } finally {
       setIsSubmitting(false)
     }

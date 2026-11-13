@@ -48,10 +48,14 @@ import {
   DEFAULT_FIXED_PRINCIPAL_FREQUENCY,
   DEFAULT_REPAYMENT_METHOD,
   frequencyOptionsFor,
+  firstRegularInstallment,
   getScheduleFitError,
+  installmentTypeLabel,
   isFixedPrincipalFrequency,
+  isMoratoriumInterestApplicable,
   maturityDate,
   repaymentPeriodMonths,
+  type InstallmentType,
   REPAYMENT_METHOD_OPTIONS,
   type RepaymentFrequency,
   type RepaymentMethod,
@@ -106,6 +110,7 @@ interface EMIScheduleItem {
   interest: number
   total: number
   balance: number
+  installment_type: InstallmentType
 }
 
 interface SanctionPanelProps {
@@ -159,6 +164,8 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
   const [moratoriumPeriod, setMoratoriumPeriod] = useState("0")
   // Gestation (moratorium) period must be less than the tenure
   const moratoriumFieldError = getMoratoriumError(moratoriumPeriod, tenureMonths)
+  // Interest Payable During Moratorium (saved as loan_sanction_details.moratorium_interest_payable)
+  const [moratoriumInterestPayable, setMoratoriumInterestPayable] = useState<"YES" | "NO">("NO")
   const [remarks, setRemarks] = useState("")
 
   // Repayment details
@@ -189,6 +196,10 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
   const scheduleStart = identity?.businessDate || new Date()
   const maturityYmd = tenureNum > 0 ? maturityDate(scheduleStart, tenureNum) : ""
   const moratoriumEndYmd = maturityDate(scheduleStart, moratoriumNum)
+  // Only Fixed Principal loans with a moratorium can pay interest during it (at the
+  // Repayment Frequency); otherwise the option is fixed to No
+  const moratoriumInterestApplies = isMoratoriumInterestApplicable(repaymentMethod, moratoriumNum)
+  const effectiveMoratoriumInterest = moratoriumInterestApplies && moratoriumInterestPayable === "YES"
   const scheduleFitError =
     tenureNum > 0 && !moratoriumFieldError
       ? getScheduleFitError({
@@ -246,6 +257,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
         ["Repayment Type", repaymentMethodLabel(repaymentMethod)],
         ["Repayment Frequency", repaymentFrequencyLabel(repaymentFrequency)],
         ["Gestation Period", `${parseInt(moratoriumPeriod) || 0} months`],
+        ["Interest Payable During Moratorium", effectiveMoratoriumInterest ? "Yes" : "No"],
         // ["EMI", formatCurrency(calculatedEMI || 0)],
         ["Total Installments", String(emiSchedule.length)],
         ["Total Interest", formatCurrency(totalInterest || 0)],
@@ -270,13 +282,13 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
         <table>${detailRows.join("")}</table>
         <table class="rs-schedule">
           <colgroup>
-            <col style="width:8%" /><col style="width:16%" />
-            <col style="width:19%" /><col style="width:19%" />
-            <col style="width:19%" /><col style="width:19%" />
+            <col style="width:6%" /><col style="width:13%" /><col style="width:17%" />
+            <col style="width:16%" /><col style="width:16%" />
+            <col style="width:16%" /><col style="width:16%" />
           </colgroup>
           <thead>
             <tr>
-              <th class="tc">No.</th><th>Due Date</th>
+              <th class="tc">No.</th><th>Due Date</th><th>Type</th>
               <th class="tr">Principal</th><th class="tr">Interest</th>
               <th class="tr">Total</th><th class="tr">Balance</th>
             </tr>
@@ -287,6 +299,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                 (item) => `<tr>
                   <td class="tc">${item.installment_no}</td>
                   <td>${formatDueDatePdf(item.due_date)}</td>
+                  <td>${escapeHtml(installmentTypeLabel(item.installment_type))}</td>
                   <td class="tr">${formatCurrency(item.principal)}</td>
                   <td class="tr">${formatCurrency(item.interest)}</td>
                   <td class="tr">${formatCurrency(item.total)}</td>
@@ -297,7 +310,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
           </tbody>
           <tfoot>
             <tr>
-              <td colspan="2">Total</td>
+              <td colspan="3">Total</td>
               <td class="tr">${formatCurrency(sum("principal"))}</td>
               <td class="tr">${formatCurrency(sum("interest"))}</td>
               <td class="tr">${formatCurrency(sum("total"))}</td>
@@ -362,6 +375,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
     // The sanctioning officer enters the loan period; an older application's tenure is a starting value
     setTenureMonths(Number(app.loan_tenure_months) > 0 ? String(app.loan_tenure_months) : "")
     setMoratoriumPeriod("0")
+    setMoratoriumInterestPayable("NO")
     setRemarks("")
     setCalculatedEMI(null)
     setTotalInterest(null)
@@ -393,6 +407,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
             annualRate,
             tenureMonths: tenureInMonths,
             moratoriumMonths: parseInt(moratoriumPeriod) || 0,
+            moratoriumInterestPayable: moratoriumInterestPayable === "YES",
             method: repaymentMethod,
             frequency: repaymentFrequency,
             startDate: identity?.businessDate || new Date(),
@@ -408,21 +423,24 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
 
     const totalInt = schedule.reduce((s, r) => s + r.interest, 0)
     const totalPay = schedule.reduce((s, r) => s + r.total, 0)
+    // First principal instalment (On Maturity: the maturity amount; Fixed Principal: the
+    // largest instalment). Moratorium-interest instalments, if any, come before it.
+    const firstRegular = firstRegularInstallment(schedule)
     setNumberOfInstallments(schedule.length)
-    setInstallmentStartDate(schedule[0].due_date)
-    // First instalment (On Maturity: the maturity amount; Fixed Principal: the largest instalment)
-    setCalculatedEMI(schedule[0].total)
+    setInstallmentStartDate(firstRegular.due_date)
+    setCalculatedEMI(firstRegular.total)
     setTotalInterest(Math.round(totalInt * 100) / 100)
     setTotalPayment(Math.round(totalPay * 100) / 100)
     setEmiSchedule(schedule)
-  }, [sanctionedAmount, interestRate, tenureMonths, moratoriumPeriod, repaymentMethod, repaymentFrequency, identity])
+  }, [sanctionedAmount, interestRate, tenureMonths, moratoriumPeriod, moratoriumInterestPayable, repaymentMethod, repaymentFrequency, identity])
 
-  // Auto-calculate when values change
+  // Auto-calculate when values change (incl. moratorium period, frequency and the
+  // Interest Payable During Moratorium option)
   useEffect(() => {
     if (sanctionedAmount && interestRate && tenureMonths) {
       calculateEMI()
     }
-  }, [sanctionedAmount, interestRate, tenureMonths, moratoriumPeriod, repaymentMethod, repaymentFrequency, calculateEMI])
+  }, [sanctionedAmount, interestRate, tenureMonths, moratoriumPeriod, moratoriumInterestPayable, repaymentMethod, repaymentFrequency, calculateEMI])
 
   // Inline validation for the Sanctioned Amount field
   const getAmountError = (): string => {
@@ -535,6 +553,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
           interest_rate: parseFloat(interestRate),
           loan_tenure_months: parseInt(tenureMonths),
           moratorium_period: parseInt(moratoriumPeriod) || 0,
+          moratorium_interest_payable: effectiveMoratoriumInterest,
           repayment_method: repaymentMethod,
           repayment_type: repaymentFrequency,
           installment_start_date: installmentStartDate,
@@ -807,8 +826,9 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
               </div>
             </div>
 
-            {/* Row 2: Tenure and Gestation Period (stored as moratorium_period) */}
-            <div className="grid gap-4 sm:grid-cols-2">
+            {/* Row 2: Tenure, Gestation Period (stored as moratorium_period) and
+                Interest Payable During Moratorium */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="tenure">Loan Period / Tenure (Months) *</Label>
                 <Input
@@ -852,6 +872,31 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                     {tenureNum > 0 ? ` (repayment period: ${repaymentPeriod} months)` : ""}
                   </p>
                 )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="moratorium-interest">Interest Payable During Moratorium</Label>
+                <Select
+                  value={moratoriumInterestApplies ? moratoriumInterestPayable : "NO"}
+                  onValueChange={(v) => setMoratoriumInterestPayable(v as "YES" | "NO")}
+                  disabled={!moratoriumInterestApplies}
+                >
+                  <SelectTrigger id="moratorium-interest">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="YES">Yes</SelectItem>
+                    <SelectItem value="NO">No</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {repaymentMethod !== "FIXED_PRINCIPAL"
+                    ? "Not applicable to On Maturity (interest is paid at maturity)"
+                    : moratoriumNum <= 0
+                      ? "Enter a gestation period to enable"
+                      : effectiveMoratoriumInterest
+                        ? `Interest-only instalments ${repaymentFrequencyLabel(repaymentFrequency).toLowerCase()} during the gestation period`
+                        : "No instalments during the gestation period"}
+                </p>
               </div>
             </div>
 
@@ -970,6 +1015,19 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                     <p className="text-xs text-muted-foreground">Maturity Date</p>
                     <p className="font-medium">{maturityYmd ? formatDate(maturityYmd) : "-"}</p>
                   </div>
+                  {effectiveMoratoriumInterest && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Moratorium Interest</p>
+                      <p className="font-medium">
+                        {formatCurrency(
+                          emiSchedule.filter((r) => r.installment_type === "MORATORIUM_INTEREST").reduce((s, r) => s + r.interest, 0)
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                          {" "}({emiSchedule.filter((r) => r.installment_type === "MORATORIUM_INTEREST").length} instalments)
+                        </span>
+                      </p>
+                    </div>
+                  )}
                 </div>
                 {emiSchedule.length > 1 && (
                   <Button
@@ -1075,6 +1133,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                 <TableRow className="bg-muted/50">
                   <TableHead className="text-xs">No.</TableHead>
                   <TableHead className="text-xs">Due Date</TableHead>
+                  <TableHead className="text-xs">Type</TableHead>
                   <TableHead className="text-xs text-right">Principal</TableHead>
                   <TableHead className="text-xs text-right">Interest</TableHead>
                   <TableHead className="text-xs text-right">Total EMI</TableHead>
@@ -1083,9 +1142,21 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
               </TableHeader>
               <TableBody>
                 {emiSchedule.map((item) => (
-                  <TableRow key={item.installment_no}>
+                  <TableRow
+                    key={item.installment_no}
+                    className={item.installment_type === "MORATORIUM_INTEREST" ? "bg-amber-50/60 dark:bg-amber-950/20" : undefined}
+                  >
                     <TableCell>{item.installment_no}</TableCell>
                     <TableCell>{formatDate(item.due_date)}</TableCell>
+                    <TableCell>
+                      {item.installment_type === "MORATORIUM_INTEREST" ? (
+                        <Badge variant="outline" className="border-amber-300 text-amber-700 dark:text-amber-400 text-[10px]">
+                          {installmentTypeLabel(item.installment_type)}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">{installmentTypeLabel(item.installment_type)}</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">{formatCurrency(item.principal)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(item.interest)}</TableCell>
                     <TableCell className="text-right font-medium">{formatCurrency(item.total)}</TableCell>
@@ -1151,6 +1222,14 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Repayment Frequency:</span>
               <span>{repaymentFrequencyLabel(repaymentFrequency)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Gestation Period:</span>
+              <span>{moratoriumNum} months</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Interest Payable During Moratorium:</span>
+              <span>{effectiveMoratoriumInterest ? "Yes" : "No"}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">No. of Installments:</span>

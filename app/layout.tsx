@@ -1,6 +1,7 @@
 import AuthGuard from "@/components/AuthGuard"
 import { AuthProvider } from "@/lib/auth-context"
 import { NumberInputGuard } from "@/components/number-input-guard"
+import { GlobalPopup } from "@/components/global-popup"
 import "./globals.css"
 import { Geist, Geist_Mono } from "next/font/google"
 
@@ -17,6 +18,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {children}
           {/* </AuthGuard> */}
         </AuthProvider>
+        {/* App-wide replacement for alert()/confirm()/prompt() — see lib/popup.ts */}
+        <GlobalPopup />
       </body>
     </html>
   )

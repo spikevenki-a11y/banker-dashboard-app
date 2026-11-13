@@ -1,5 +1,6 @@
 "use client"
 
+import { popup } from "@/lib/popup"
 import { formatDate } from "@/lib/date-format"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
@@ -231,7 +232,7 @@ export default function CreateLockerDepositPage() {
   const handleSubmit = async () => {
     if (!memberInfo || !depositAmount || !openingDate) return
     if (!voucherType) {
-      alert("Please select a voucher type.")
+      popup.warning("Please select a voucher type.")
       return
     }
     setIsSubmitting(true)
@@ -262,10 +263,10 @@ export default function CreateLockerDepositPage() {
           locker_assigned: data.locker_assigned,
         })
       } else {
-        alert(data.error || "Failed to create locker deposit")
+        popup.error(data.error || "Failed to create locker deposit")
       }
     } catch {
-      alert("Network error. Please try again.")
+      popup.error("Network error. Please try again.")
     } finally {
       setIsSubmitting(false)
     }

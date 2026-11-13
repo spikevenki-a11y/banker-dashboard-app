@@ -1006,7 +1006,7 @@ export default function ViewMemberPage() {
                         <div className="space-y-3">
                           <div className="flex items-center gap-2">
                             <Banknote className="h-5 w-5 text-emerald-600" />
-                            <h3 className="text-base font-semibold text-foreground">Bank Assets</h3>
+                            <h3 className="text-base font-semibold text-foreground">Assets</h3>
                             <Badge variant="outline" className="text-xs">
                               {assets.length} account{assets.length !== 1 ? "s" : ""}
                             </Badge>
@@ -1105,7 +1105,7 @@ export default function ViewMemberPage() {
                         <div className="space-y-3">
                           <div className="flex items-center gap-2">
                             <PiggyBank className="h-5 w-5 text-red-600" />
-                            <h3 className="text-base font-semibold text-foreground">Bank Liabilities</h3>
+                            <h3 className="text-base font-semibold text-foreground">Liabilities</h3>
                             <Badge variant="outline" className="text-xs">
                               {liabilities.length} account{liabilities.length !== 1 ? "s" : ""}
                             </Badge>

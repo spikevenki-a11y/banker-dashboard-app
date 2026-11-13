@@ -1,5 +1,6 @@
 "use client"
 
+import { popup } from "@/lib/popup"
 import { formatDate } from "@/lib/date-format"
 import { Badge } from "@/components/ui/badge"
 
@@ -386,14 +387,14 @@ export default function MembersPage() {
       setMemberFieldsReadOnly(true)
     } catch (e: any) {
       console.log(e.message)
-      alert("Failed to create member: " + e.message)
+      popup.error("Failed to create member: " + e.message)
     } finally {
       setIsSubmitting(false)
     }
   }
   const handleAadhaarSearch = async () => {
     if (!newMember.aadhaar_no || newMember.aadhaar_no.length < 12) {
-      alert("Please enter a valid 12-digit Aadhaar number")
+      popup.warning("Please enter a valid 12-digit Aadhaar number")
       return
     }
 
@@ -441,7 +442,7 @@ export default function MembersPage() {
       console.log("Aadhaar lookup completed.",newMember)
     } catch (error) {
       console.error("[v0] Aadhaar lookup error:", error)
-      alert("Failed to lookup customer. Please try again.")
+      popup.error("Failed to lookup customer. Please try again.")
     } finally {
       setIsSearching(false)
     }
@@ -495,7 +496,7 @@ export default function MembersPage() {
     console.log("Submitting share deposit...")
     if(!shareDepositMemberNo || !voucherType || !shareAmount) {
       setFormError("Please fill in all required fields")
-      alert("Please fill in all required fields")
+      popup.warning("Please fill in all required fields")
     }
     if (!shareDepositMemberNo) {
       setFormError("Membership number is required")
@@ -548,7 +549,7 @@ export default function MembersPage() {
         }
 
         /* ---------- SUCCESS ---------- */
-        alert(
+        popup.success(
           `Share deposit saved successfully.\nVoucher No: ${data.voucher_no}\nStatus: ${data.status}`
         )
       }else if(transactionType=="Share Withdrawal"){
@@ -576,7 +577,7 @@ export default function MembersPage() {
         }
 
         /* ---------- SUCCESS ---------- */
-        alert(
+        popup.success(
           `Share deposit saved successfully.\nVoucher No: ${data.voucher_no}\nStatus: ${data.status}`
         )
 
