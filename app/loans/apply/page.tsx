@@ -30,6 +30,7 @@ import {
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { printLtLoanApplication } from "@/lib/print/print-lt-loan-application"
+import { printLoanApplication } from "@/lib/print/print-loan-application"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { MemberSummaryCard } from "@/components/member-summary-card"
 import { MemberSearchDialog } from "@/components/member-search-dialog"
@@ -290,13 +291,25 @@ export default function LoanApplicationPage() {
   const [createdApplicationNo, setCreatedApplicationNo] = useState("")
   // Snapshot of the submitted application for "Print Application Form" in the success popup
   const [printOpts, setPrintOpts] = useState<Parameters<typeof printLtLoanApplication>[0] | null>(null)
+  // Land security prints the LT/MT form from printOpts (unchanged); every other security
+  // type prints its own form, loaded from the saved application
+  const [printIsLand, setPrintIsLand] = useState(false)
+  const [printApplicationId, setPrintApplicationId] = useState<number | string | null>(null)
   const [isPrinting, setIsPrinting] = useState(false)
 
   const handlePrintApplicationForm = async () => {
     if (!printOpts) return
     setIsPrinting(true)
     try {
-      await printLtLoanApplication(printOpts)
+      if (printIsLand) {
+        await printLtLoanApplication(printOpts)
+      } else if (printApplicationId == null) {
+        popup.error("The application number is not available for printing.")
+      } else {
+        await printLoanApplication({ loanApplicationId: printApplicationId, branchName: printOpts.branchName })
+      }
+    } catch (e: any) {
+      popup.error(e?.message || "Failed to print the application form")
     } finally {
       setIsPrinting(false)
     }
@@ -986,6 +999,8 @@ export default function LoanApplicationPage() {
       setCreatedApplicationNo(data.loan_application_id || data.reference_no)
       // Land security (type 1) fills the security section of the printed form
       const isLand = Number(selectedSecurityId) === 1
+      setPrintIsLand(isLand)
+      setPrintApplicationId(data.loan_application_id ?? null)
       setPrintOpts({
         loan: {
           reference_no: data.reference_no,
@@ -2305,32 +2320,35 @@ export default function LoanApplicationPage() {
 
       {/* Success Dialog */}
       <AlertDialog open={successOpen} onOpenChange={setSuccessOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-green-700">
-              <CheckCircle2 className="h-6 w-6" />Application Submitted Successfully!
+        <AlertDialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+          <AlertDialogHeader className="items-center text-center sm:text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
+              <CheckCircle2 className="h-7 w-7 text-green-600" />
+            </div>
+            <AlertDialogTitle className="text-xl text-green-700">
+              Application Submitted Successfully!
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
-              <div className="space-y-2">
+              <div className="w-full space-y-3 text-center">
                 <p>Loan application has been created successfully.</p>
-                <div className="mt-4 rounded-lg bg-green-50 p-4 text-center">
+                <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3">
                   <p className="text-sm text-muted-foreground">Application Number</p>
-                  <p className="text-2xl font-bold text-green-700">{createdApplicationNo}</p>
+                  <p className="break-all text-2xl font-bold text-green-700">{createdApplicationNo}</p>
                 </div>
-                <p className="mt-4 text-sm">The application is now pending for sanction approval.</p>
+                <p className="text-sm">The application is now pending for sanction approval.</p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
+          <AlertDialogFooter className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:justify-stretch">
             {/* Plain Button (not AlertDialogAction) so the popup stays open while printing */}
-            <Button variant="outline" onClick={handlePrintApplicationForm} disabled={isPrinting || !printOpts}>
+            <Button variant="outline" className="w-full sm:col-span-2" onClick={handlePrintApplicationForm} disabled={isPrinting || !printOpts}>
               {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
               Print Application Form
             </Button>
-            <AlertDialogAction onClick={() => { setSuccessOpen(false); router.push("/loans") }} className="bg-muted text-foreground hover:bg-muted/80">
+            <AlertDialogAction onClick={() => { setSuccessOpen(false); router.push("/loans") }} className="w-full bg-muted text-foreground hover:bg-muted/80">
               Go to Loans
             </AlertDialogAction>
-            <AlertDialogAction onClick={() => { setSuccessOpen(false); router.push(`/loans/sanction?appId=${createdApplicationNo}`) }} className="bg-blue-600 hover:bg-blue-700 text-white">
+            <AlertDialogAction onClick={() => { setSuccessOpen(false); router.push(`/loans/sanction?appId=${createdApplicationNo}`) }} className="w-full bg-blue-600 text-white hover:bg-blue-700">
               Proceed to Sanction <ChevronRight className="ml-1 h-4 w-4" />
             </AlertDialogAction>
           </AlertDialogFooter>

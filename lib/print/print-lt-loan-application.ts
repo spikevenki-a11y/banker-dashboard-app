@@ -23,10 +23,10 @@ type LandDetailLike = {
   market_value?: string
 } | null
 
-const joinAddr = (...parts: (string | null | undefined)[]) =>
+export const joinAddr = (...parts: (string | null | undefined)[]) =>
   parts.map((p) => (p ?? "").trim()).filter(Boolean).join(", ")
 
-function ageFrom(dob?: string | null): number | undefined {
+export function ageFrom(dob?: string | null): number | undefined {
   if (!dob) return undefined
   const b = new Date(dob)
   if (Number.isNaN(b.getTime())) return undefined
@@ -37,7 +37,7 @@ function ageFrom(dob?: string | null): number | undefined {
 }
 
 /** Fetches the member's full profile (KYC, address, community) for the form. */
-async function fetchMember(membershipNo?: string) {
+export async function fetchMember(membershipNo?: string) {
   if (!membershipNo) return null
   try {
     const res = await fetch("/api/memberships/view_member", {
@@ -60,11 +60,18 @@ async function fetchMember(membershipNo?: string) {
  * - Pass a loan (and optionally its land security) → pre-filled form.
  * - Pass nothing → blank form for hand-filling.
  */
-export async function printLtLoanApplication(opts: {
+export type LtLoanPrintOptions = {
   loan?: LoanLike | null
   land?: LandDetailLike
   branchName?: string
-} = {}): Promise<void> {
+}
+
+export async function printLtLoanApplication(opts: LtLoanPrintOptions = {}): Promise<void> {
+  printHtml(await buildLtLoanApplicationDocument(opts))
+}
+
+/** The LT/MT form as a complete HTML document (used for printing and PDF download). */
+export async function buildLtLoanApplicationDocument(opts: LtLoanPrintOptions = {}): Promise<string> {
   const { loan, land, branchName } = opts
   const m = loan ? await fetchMember(loan.membership_no) : null
 
@@ -125,5 +132,5 @@ export async function printLtLoanApplication(opts: {
       : undefined,
   }
 
-  printHtml(buildLtLoanApplicationHtml(data))
+  return buildLtLoanApplicationHtml(data)
 }
