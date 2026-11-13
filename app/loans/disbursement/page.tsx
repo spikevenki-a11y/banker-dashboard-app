@@ -610,7 +610,7 @@ export default function LoanDisbursementPage() {
                         <ViewMemberDetailsButton memberInfo={summaryMember} />
                       </div>
                       {/* Member photo & signature, for verification before disbursing */}
-                      <CustomerPhotoSignature customerCode={summaryMember?.customer_code} className="shrink-0" />
+                      <CustomerPhotoSignature customerCode={summaryMember?.customer_code} enlargeable className="shrink-0" />
                     </div>
                   </CardHeader>
                   <CardContent>

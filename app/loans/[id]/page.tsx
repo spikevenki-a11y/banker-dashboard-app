@@ -851,7 +851,7 @@ export default function LoanDetailsPage() {
                                   {formatDate(emi.due_date)}
                                   {emi.installment_type === "MORATORIUM_INTEREST" && (
                                     <Badge variant="outline" className="ml-2 border-amber-300 text-amber-700 text-[10px]">
-                                      Moratorium Interest
+                                      Gestation period Interest
                                     </Badge>
                                   )}
                                 </TableCell>

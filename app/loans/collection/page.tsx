@@ -977,9 +977,9 @@ function LoanCollectionContent() {
                           <TableHeader>
                             <TableRow>
                               <TableHead className="w-10"></TableHead>
-                              <TableHead>EMI #</TableHead>
+                              <TableHead>S.no #</TableHead>
                               <TableHead>Due Date</TableHead>
-                              <TableHead>EMI</TableHead>
+                              <TableHead>Due Amount</TableHead>
                               <TableHead>Principal</TableHead>
                               <TableHead>Interest</TableHead>
                               <TableHead>Status</TableHead>

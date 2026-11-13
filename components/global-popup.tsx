@@ -99,7 +99,7 @@ function PopupDialog({ req }: { req: PopupRequest }) {
   return (
     <AlertDialog open onOpenChange={(open) => !open && cancel()}>
       <AlertDialogContent
-        className="sm:max-w-md"
+        className={req.size === "wide" ? "max-h-[90vh] overflow-y-auto sm:max-w-3xl" : "sm:max-w-md"}
         onEscapeKeyDown={(e) => {
           if (busy.current) e.preventDefault()
         }}
@@ -119,6 +119,7 @@ function PopupDialog({ req }: { req: PopupRequest }) {
           <AlertDialogDescription className="whitespace-pre-line break-words text-foreground/80">
             {req.message}
           </AlertDialogDescription>
+          {req.content && <div className="w-full text-left">{req.content}</div>}
           {actionError && (
             <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
               {actionError}

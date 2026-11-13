@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
       if (wantsMoratoriumInterest && repayment_method !== "FIXED_PRINCIPAL") {
         await client.query("ROLLBACK")
         return NextResponse.json(
-          { error: "Interest Payable During Moratorium is available only for the Fixed Principal repayment type" },
+          { error: "Interest Payable During Gestation period is available only for the Fixed Principal repayment type" },
           { status: 400 }
         )
       }

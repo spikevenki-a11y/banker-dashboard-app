@@ -192,7 +192,8 @@ export async function POST(request: NextRequest) {
       `SELECT m.*, c.full_name, c.date_of_birth::text AS dob_text
        FROM memberships m 
        JOIN customers c ON m.customer_code = c.customer_code
-       WHERE m.membership_no = $1 AND m.branch_id = $2 AND m.status = 'ACTIVE'`,
+       WHERE m.membership_no = $1 AND m.branch_id = $2 AND m.status = 'ACTIVE'
+       FOR SHARE OF m`, // blocks a concurrent Member Closure until this application is saved
       [membership_no, branchId]
     )
 

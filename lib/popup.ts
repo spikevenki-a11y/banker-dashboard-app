@@ -18,6 +18,8 @@
 // they don't block the code that opened them; await the returned promise when the
 // next step must wait for the user.
 
+import type { ReactNode } from "react"
+
 export type PopupVariant = "success" | "error" | "warning" | "info" | "confirm"
 
 export type PopupRequest = {
@@ -25,6 +27,9 @@ export type PopupRequest = {
   variant: PopupVariant
   title?: string
   message: string
+  /** Extra content under the message (e.g. a table); use "wide" for tables */
+  content?: ReactNode
+  size?: "default" | "wide"
   confirmText?: string
   cancelText?: string
   /** Confirmation only: red confirm button for destructive actions */
@@ -33,11 +38,13 @@ export type PopupRequest = {
   resolve: (confirmed: boolean) => void
 }
 
-export type PopupOptions = { title?: string; okText?: string }
+export type PopupOptions = { title?: string; okText?: string; content?: ReactNode; size?: "default" | "wide" }
 
 export type ConfirmOptions = {
   message: string
   title?: string
+  content?: ReactNode
+  size?: "default" | "wide"
   confirmText?: string
   cancelText?: string
   destructive?: boolean
@@ -89,7 +96,10 @@ const toText = (message: unknown) =>
 
 const notify = (variant: Exclude<PopupVariant, "confirm">) =>
   (message: unknown, opts: PopupOptions = {}): Promise<void> =>
-    open({ variant, message: toText(message), title: opts.title, confirmText: opts.okText }).then(() => undefined)
+    open({
+      variant, message: toText(message), title: opts.title, confirmText: opts.okText,
+      content: opts.content, size: opts.size,
+    }).then(() => undefined)
 
 export const popup = {
   success: notify("success"),
@@ -102,6 +112,8 @@ export const popup = {
       variant: "confirm",
       message: opts.message,
       title: opts.title,
+      content: opts.content,
+      size: opts.size,
       confirmText: opts.confirmText,
       cancelText: opts.cancelText,
       destructive: opts.destructive,

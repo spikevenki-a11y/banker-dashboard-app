@@ -2,6 +2,7 @@ import { getSession } from "@/lib/auth/session"
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
+import { getMemberNotActiveError } from "@/lib/member-closure"
 import { cleanNominees, saveSavingsNominees } from "@/lib/savings-nominees"
 
 const OPERATION_TYPES = ["SINGLE", "EITHER_SURVIVOR", "JOINT_MINOR", "FORMER_SURVIVOR", "LATTER_SURVIVOR"]
@@ -43,6 +44,14 @@ export async function POST(req: Request) {
     if (dayendErr) return dayendErr
 
     await client.query("BEGIN")
+
+    // A closed (or otherwise inactive) member can't open new accounts; the share lock
+    // keeps a Member Closure from running at the same time
+    const memberErr = await getMemberNotActiveError(client, membership_no, { lock: true })
+    if (memberErr) {
+      await client.query("ROLLBACK")
+      return NextResponse.json({ error: memberErr }, { status: 400 })
+    }
 
     // Get scheme details
     const schemeResult = await client.query(
