@@ -1,5 +1,6 @@
 "use client"
 
+import { popup } from "@/lib/popup"
 import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
@@ -398,13 +399,13 @@ export default function CustomerPage() {
     const aadhaarError = validateAadhaar(c.aadhar_id)
     if (aadhaarError) {
       setActiveTab("kycdetails")
-      alert(aadhaarError)
+      popup.warning(aadhaarError)
       return
     }
     const panError = validatePan(c.pan_card_number, c.full_name)
     if (panError) {
       setActiveTab("kycdetails")
-      alert(panError)
+      popup.warning(panError)
       return
     }
     const kycError = validateAdditionalKycDocs({
@@ -415,7 +416,7 @@ export default function CustomerPage() {
     })
     if (kycError) {
       setActiveTab("kycdetails")
-      alert(kycError)
+      popup.warning(kycError)
       return
     }
     setIsSubmitting(true)
@@ -453,7 +454,7 @@ export default function CustomerPage() {
       setPhotoPreview("")
       setSignaturePreview("")
     } catch (e: any) {
-      alert("Failed to create customer: " + e.message)
+      popup.error("Failed to create customer: " + e.message)
     } finally {
       setIsSubmitting(false)
     }
@@ -615,7 +616,7 @@ export default function CustomerPage() {
                   sublabel="Upload"
                   onChange={(f) => {
                     const err = checkCustomerImage(f, "Photo")
-                    if (err) { alert(err); return }
+                    if (err) { popup.warning(err); return }
                     setPhoto(f)
                   }}
                 />
@@ -626,7 +627,7 @@ export default function CustomerPage() {
                   sublabel="Upload"
                   onChange={(f) => {
                     const err = checkCustomerImage(f, "Signature")
-                    if (err) { alert(err); return }
+                    if (err) { popup.warning(err); return }
                     setSignature(f)
                   }}
                 />

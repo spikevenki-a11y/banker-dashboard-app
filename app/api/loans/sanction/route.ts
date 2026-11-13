@@ -4,7 +4,9 @@ import pool from "@/lib/connection/db"
 import {
   buildRepaymentSchedule,
   effectiveFrequency,
+  firstRegularInstallment,
   getScheduleFitError,
+  isMoratoriumInterestApplicable,
   isFixedPrincipalFrequency,
   isRepaymentMethod,
   maturityDate,
@@ -34,7 +36,8 @@ export async function POST(request: NextRequest) {
       remarks,
       repayment_method,   // Repayment Type: ON_MATURITY | FIXED_PRINCIPAL
       repayment_type,     // Repayment Frequency: MONTHLY ... CLOSING_TIME
-      installment_start_date
+      installment_start_date,
+      moratorium_interest_payable, // Interest Payable During Moratorium: true / false
     } = body
 
     if (!loan_application_id || !action) {
@@ -153,13 +156,28 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: fitError }, { status: 400 })
       }
 
-      // Same schedule the disbursement will save; its first instalment is stored as
-      // payment_amount (On Maturity: the maturity amount)
+      // Interest Payable During Moratorium: Fixed Principal only, paid at the Repayment
+      // Frequency (there is no separate interest frequency). Meaningless without a moratorium.
+      const wantsMoratoriumInterest =
+        moratorium_interest_payable === true || moratorium_interest_payable === "true" || moratorium_interest_payable === "YES"
+      if (wantsMoratoriumInterest && repayment_method !== "FIXED_PRINCIPAL") {
+        await client.query("ROLLBACK")
+        return NextResponse.json(
+          { error: "Interest Payable During Moratorium is available only for the Fixed Principal repayment type" },
+          { status: 400 }
+        )
+      }
+      const moratoriumInterestPayable =
+        wantsMoratoriumInterest && isMoratoriumInterestApplicable(repayment_method, moratoriumMonths)
+
+      // Same schedule the disbursement will save; its first regular instalment is stored
+      // as payment_amount (On Maturity: the maturity amount)
       const schedule = buildRepaymentSchedule({
         principal: parseFloat(sanctioned_amount),
         annualRate: parseFloat(interest_rate),
         tenureMonths: sanctionedTenure,
         moratoriumMonths,
+        moratoriumInterestPayable,
         method: repayment_method,
         frequency: repaymentFrequency,
         startDate: businessDate,
@@ -190,7 +208,9 @@ export async function POST(request: NextRequest) {
           )
         }
       }
-      const emiAmount = schedule[0].total
+      // EMI / start date = first principal instalment (moratorium-interest rows come before it)
+      const firstRegular = firstRegularInstallment(schedule)
+      const emiAmount = firstRegular.total
       const number_of_installments = schedule.length
       // Generate sanction ID
       const { rows: seqResult } = await client.query(
@@ -205,13 +225,13 @@ export async function POST(request: NextRequest) {
           sanction_id, loan_application_id, sanctioned_amount, sanction_date,
           interest_rate, loan_tenure_months, payment_amount, moratorium_period,
           sanction_status, approved_by, remarks, created_at,repayment_type,number_of_installments,installment_start_date,branch_id,
-          repayment_method
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'SANCTIONED', $9, $10, NOW(), $11, $12, $13, $14, $15)`,
+          repayment_method, moratorium_interest_payable
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'SANCTIONED', $9, $10, NOW(), $11, $12, $13, $14, $15, $16)`,
         [
           sanctionId, loan_application_id, sanctioned_amount, businessDate,
           interest_rate, sanctionedTenure, emiAmount, moratorium_period || 0, session.userId, remarks || '', repaymentFrequency, number_of_installments,
-          installment_start_date || schedule[0].due_date, session.branch,
-          repayment_method
+          installment_start_date || firstRegular.due_date, session.branch,
+          repayment_method, moratoriumInterestPayable
         ]
       )
 

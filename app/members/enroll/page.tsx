@@ -1,5 +1,6 @@
 "use client"
 
+import { popup } from "@/lib/popup"
 import { formatDate } from "@/lib/date-format"
 import { useState, useEffect, useCallback } from "react"
 import { useAuth } from "@/lib/auth-context"
@@ -367,7 +368,7 @@ export default function EnrollMemberPage() {
       }
     } catch (error) {
       console.error("Aadhaar lookup error:", error)
-      alert("Failed to lookup customer. Please try again.")
+      popup.error("Failed to lookup customer. Please try again.")
       return false
     } finally {
       setIsSearching(false)
@@ -386,7 +387,7 @@ export default function EnrollMemberPage() {
 
   const handleAadhaarSearch = async () => {
     if (!newMember.aadhaar_no || newMember.aadhaar_no.length < 12) {
-      alert("Please enter a valid 12-digit Aadhaar number")
+      popup.warning("Please enter a valid 12-digit Aadhaar number")
       return
     }
     await searchByAadhaar(newMember.aadhaar_no)
@@ -395,12 +396,12 @@ export default function EnrollMemberPage() {
   const handleEnrollMember = async () => {
     const memberTypeError = getMemberTypeError(enrollmentRules, newMember.member_type)
     if (memberTypeError) {
-      alert(memberTypeError)
+      popup.warning(memberTypeError)
       return
     }
     const totals = nomineeTotals(nominees)
     if (!totals.ok) {
-      alert(`Nominee percentages must add up to exactly 100% (currently ${totals.total}%).`)
+      popup.warning(`Nominee percentages must add up to exactly 100% (currently ${totals.total}%).`)
       return
     }
     setIsSubmitting(true)
@@ -447,7 +448,7 @@ export default function EnrollMemberPage() {
       setCustomerDetails(null)
       setNominees([])
     } catch (e: any) {
-      alert("Failed to create member: " + e.message)
+      popup.error("Failed to create member: " + e.message)
     } finally {
       setIsSubmitting(false)
     }

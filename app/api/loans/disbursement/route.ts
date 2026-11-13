@@ -104,6 +104,7 @@ export async function POST(request: NextRequest) {
               ls.sanctioned_amount, ls.interest_rate, ls.loan_tenure_months, ls.payment_amount,
               ls.repayment_method, ls.repayment_type AS sanction_repayment_frequency,
               ls.moratorium_period AS sanction_moratorium_period,
+              ls.moratorium_interest_payable AS sanction_moratorium_interest_payable,
               lscheme.loan_gl_account, lscheme.interest_receivable_gl_account,
               COALESCE(lscheme.appraiser_charge_allowed, false) AS scheme_appraiser_charge_allowed,
               m.membership_no as mem_no
@@ -429,6 +430,7 @@ export async function POST(request: NextRequest) {
         annualRate: parseFloat(app.interest_rate),
         tenureMonths: parseInt(app.loan_tenure_months),
         moratoriumMonths: parseInt(app.sanction_moratorium_period) || 0,
+        moratoriumInterestPayable: app.sanction_moratorium_interest_payable === true,
         method: app.repayment_method,
         frequency: app.sanction_repayment_frequency,
         startDate: businessDate,
@@ -441,11 +443,11 @@ export async function POST(request: NextRequest) {
           INSERT INTO loan_repayment_schedule_details (
             schedule_id, loan_account_no, installment_no, due_date,
             principal_amount, interest_amount, total_installment,
-            balance_principal, payment_status, created_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING', NOW())
+            balance_principal, payment_status, created_at, installment_type
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING', NOW(), $9)
         `, [
           nextScheduleId, loanAccountNo, row.installment_no, row.due_date,
-          row.principal, row.interest, row.total, row.balance,
+          row.principal, row.interest, row.total, row.balance, row.installment_type,
         ])
       }
       N = schedule.length

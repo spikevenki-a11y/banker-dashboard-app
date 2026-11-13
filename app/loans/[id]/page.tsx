@@ -53,6 +53,7 @@ type EMISchedule = {
   total_installment: number
   balance_principal: number
   payment_status: string
+  installment_type?: string // REGULAR | MORATORIUM_INTEREST
 }
 
 type LoanTransaction = {
@@ -846,7 +847,14 @@ export default function LoanDetailsPage() {
                             {emiSchedule.map((emi) => (
                               <TableRow key={emi.schedule_id}>
                                 <TableCell className="font-medium">{emi.installment_no}</TableCell>
-                                <TableCell>{formatDate(emi.due_date)}</TableCell>
+                                <TableCell>
+                                  {formatDate(emi.due_date)}
+                                  {emi.installment_type === "MORATORIUM_INTEREST" && (
+                                    <Badge variant="outline" className="ml-2 border-amber-300 text-amber-700 text-[10px]">
+                                      Moratorium Interest
+                                    </Badge>
+                                  )}
+                                </TableCell>
                                 <TableCell className="font-semibold">{formatCurrency(emi.total_installment)}</TableCell>
                                 <TableCell>{formatCurrency(emi.principal_amount)}</TableCell>
                                 <TableCell>{formatCurrency(emi.interest_amount)}</TableCell>
