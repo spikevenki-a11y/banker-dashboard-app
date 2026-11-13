@@ -1,0 +1,176 @@
+/**
+ * Cash Book — printed format (A4 portrait)
+ * S. No. | Voucher No. | Type | Account Number | Particulars | Receipt | Payment
+ * + totals, opening / closing cash, closing cash in words, signatures and the
+ * denomination-wise closing cash table (left blank for the cashier to fill).
+ *
+ * One <section class="sheet"> per business date, so a date range prints each
+ * day on its own page(s) and works with downloadHtmlAsPdf().
+ */
+import { escapeHtml as esc } from "./print-html"
+import { rupeesInWords } from "./day-book"
+
+export type CashBookLine = {
+  voucherNo: number | string
+  type: string
+  accountNo?: string
+  particulars: string
+  receipt: number
+  payment: number
+}
+
+export type CashBookDay = {
+  date: string // YYYY-MM-DD
+  openingBalance: number
+  closingBalance?: number // defaults to opening + receipts − payments
+  lines: CashBookLine[]
+}
+
+export type CashBookData = {
+  bankName: string
+  regionOffice?: string
+  generatedBy?: string
+  generatedOn?: Date
+  logoUrl?: string
+  days: CashBookDay[]
+}
+
+export const DENOMINATIONS = ["2000", "500", "200", "100", "50", "20", "10", "5", "2", "1", "Others"]
+
+const amt = (n: number) =>
+  Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+const dmy = (iso: string) => {
+  const [y, m, d] = iso.split("-")
+  return d && m && y ? `${d}-${m}-${y}` : iso
+}
+
+const dateTime = (dt: Date) => {
+  const p = (n: number) => String(n).padStart(2, "0")
+  return `${p(dt.getDate())}-${p(dt.getMonth() + 1)}-${dt.getFullYear()} ${p(dt.getHours())}:${p(dt.getMinutes())}:${p(dt.getSeconds())}`
+}
+
+function daySheet(d: CashBookData, day: CashBookDay): string {
+  const receipts = day.lines.reduce((s, l) => s + l.receipt, 0)
+  const payments = day.lines.reduce((s, l) => s + l.payment, 0)
+  const closing = day.closingBalance ?? day.openingBalance + receipts - payments
+  const grand = day.openingBalance + receipts // = closing + payments
+
+  const rows = day.lines.length
+    ? day.lines
+        .map(
+          (l, i) => `<tr>
+  <td class="c">${i + 1}</td><td class="c">${esc(l.voucherNo)}</td><td class="c">${esc(l.type)}</td>
+  <td class="r">${esc(l.accountNo ?? "")}</td><td class="p">${esc(l.particulars)}</td>
+  <td class="r">${amt(l.receipt)}</td><td class="r">${amt(l.payment)}</td></tr>`
+        )
+        .join("")
+    : `<tr><td colspan="7" class="c" style="padding:5mm">No cash vouchers for this date</td></tr>`
+
+  const denoms = DENOMINATIONS.map(
+    (n) => `<tr><td class="r">${n} X</td><td class="fill"></td><td class="fill"></td></tr>`
+  ).join("")
+
+  return `<section class="sheet">
+<div class="band">
+  ${d.logoUrl ? `<img class="logo" src="${esc(d.logoUrl)}" alt="" onerror="this.style.visibility='hidden'">` : "<div></div>"}
+  <div class="titles"><div class="bank">${esc(d.bankName)}</div><div class="rep">CASH BOOK</div></div>
+  <div></div>
+  <div class="meta"><div>${d.regionOffice ? `R.O : ${esc(d.regionOffice)}` : ""}</div><div class="dt">DATE <span>${esc(dmy(day.date))}</span></div></div>
+</div>
+
+<table class="book">
+  <colgroup><col style="width:6.5%"><col style="width:11%"><col style="width:7%"><col style="width:14%">
+            <col style="width:30.5%"><col style="width:15.5%"><col style="width:15.5%"></colgroup>
+  <thead><tr><th>S. No.</th><th>Voucher No.</th><th>Type</th><th>Account Number</th><th>Particulars</th><th>Receipt</th><th>Payment</th></tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+
+<div class="keep">
+<table class="totals">
+  <colgroup><col style="width:6.5%"><col style="width:11%"><col style="width:7%"><col style="width:14%">
+            <col style="width:30.5%"><col style="width:15.5%"><col style="width:15.5%"></colgroup>
+  <tr><td colspan="4"></td><td>Total</td><td class="r">${amt(receipts)}</td><td class="r">${amt(payments)}</td></tr>
+  <tr><td colspan="4"></td><td>Opening Balance</td><td class="r">${amt(day.openingBalance)}</td><td></td></tr>
+  <tr><td colspan="4"></td><td>Closing Balance</td><td></td><td class="r">${amt(closing)}</td></tr>
+  <tr><td colspan="4"></td><td>Grand Total</td><td class="r">${amt(grand)}</td><td class="r">${amt(closing + payments)}</td></tr>
+</table>
+
+<div class="words"><span>Closing Cash In Words :</span> ${esc(rupeesInWords(closing))}</div>
+<div class="sigs"><div>CASHIER</div><div>C.E.O.</div><div>PRESIDENT</div></div>
+</div>
+
+<div class="keep denom">
+  <h3>Denomination-wise Closing Cash Balance</h3>
+  <table>
+    <colgroup><col style="width:42%"><col style="width:29%"><col style="width:29%"></colgroup>
+    <thead><tr><th>Notes</th><th>No. of Pieces</th><th>Total Amount (₹)</th></tr></thead>
+    <tbody>${denoms}<tr class="dt-total"><td class="r b">Total</td><td></td><td></td></tr></tbody>
+  </table>
+</div>
+</section>`
+}
+
+export function buildCashBookHtml(d: CashBookData): string {
+  const generatedOn = dateTime(d.generatedOn ?? new Date())
+  const footerRight = `Generated On : ${generatedOn}\\A Generated By : ${String(d.generatedBy ?? "").replace(/["\\]/g, "")}`
+  const first = d.days[0]?.date ?? ""
+  const last = d.days[d.days.length - 1]?.date ?? first
+
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<title>Cash Book ${esc(dmy(first))}${last !== first ? " to " + esc(dmy(last)) : ""}</title>
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 12mm 12mm 18mm;
+    @bottom-left   { content: "Page :  " counter(page) " of " counter(pages); font: 700 9pt Arial, sans-serif;
+                     background: #dbe7f5; vertical-align: middle; padding-left: 3mm; margin-bottom: 4mm; }
+    @bottom-center { content: ""; background: #dbe7f5; margin-bottom: 4mm; }
+    @bottom-right  { content: "${footerRight}"; white-space: pre; font: 8pt Arial, sans-serif; text-align: left;
+                     background: #dbe7f5; vertical-align: middle; margin-bottom: 4mm; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 9pt; color: #000;
+         -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .sheet { break-after: page; page-break-after: always; }
+  .sheet:last-child { break-after: auto; page-break-after: auto; }
+
+  .band { background: #daf0d3; display: grid; grid-template-columns: 20mm 1fr 8mm; align-items: center; padding-top: 1mm; }
+  .logo { width: 19mm; height: 19mm; object-fit: contain; }
+  .titles { text-align: center; }
+  .bank { font-size: 9.5pt; font-weight: 700; white-space: nowrap; }
+  .rep  { font-size: 11pt; font-weight: 700; margin-top: 5mm; }
+  .meta { grid-column: 1 / -1; display: flex; justify-content: space-between; padding: 1mm 1mm 0.5mm 14mm; }
+  .meta .dt span { display: inline-block; min-width: 28mm; text-align: right; }
+
+  table { width: 100%; border-collapse: collapse; }
+  thead { display: table-header-group; }
+  tr { break-inside: avoid; }
+  .book { border: 1.5px solid #000; margin-top: 7mm; }
+  .book th { border: 1px solid #000; border-bottom: 1.5px solid #000; padding: 1.8mm 1mm; font-weight: 700; white-space: nowrap; }
+  .book td { border-left: 1px solid #000; border-right: 1px solid #000; padding: 0.3mm 1mm; white-space: nowrap; }
+  .book td.p { white-space: normal; }
+  .totals td { padding: 0.4mm 1mm; font-weight: 700; font-size: 9.5pt; }
+  .c { text-align: center; }
+  .r { text-align: right; }
+  .b { font-weight: 700; }
+
+  .keep { break-inside: avoid; page-break-inside: avoid; }
+  .words { margin-top: 7mm; }
+  .words span { margin-right: 2mm; }
+  .sigs { display: grid; grid-template-columns: 1fr 1fr 1fr; margin-top: 10mm; }
+  .sigs div:nth-child(1) { padding-left: 14mm; }
+  .sigs div:nth-child(2) { padding-left: 14mm; }
+  .sigs div:nth-child(3) { text-align: right; padding-right: 12mm; }
+
+  .denom { width: 58%; margin: 16mm 0 0 auto; }
+  .denom h3 { text-align: center; font-size: 11pt; margin: 0 0 3mm; }
+  .denom table { border: 1.5px solid #000; }
+  .denom th { background: #1f4e79; color: #fff; font-weight: 700; padding: 0.6mm 1mm; border: 1px solid #000; }
+  .denom td { border: 1px solid #000; padding: 0.2mm 1mm; height: 4.8mm; }
+  .denom td.fill { background: #fbe1d5; }
+  .denom .dt-total td { background: #dbe7f5; }
+</style></head><body>
+${d.days.map((day) => daySheet(d, day)).join("\n")}
+</body></html>`
+}
