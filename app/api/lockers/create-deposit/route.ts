@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { parseSelectedBatch, validateSelectedBatch, BatchValidationError } from "@/lib/validate-batch"
 import { getSession } from "@/lib/auth/session"
+import { getMemberNotActiveError } from "@/lib/member-closure"
 
 export async function POST(req: Request) {
   const session = await getSession()
@@ -38,6 +39,14 @@ export async function POST(req: Request) {
     }
 
     await client.query("BEGIN")
+
+    // A closed (or otherwise inactive) member can't open new accounts; the share lock
+    // keeps a Member Closure from running at the same time
+    const memberErr = await getMemberNotActiveError(client, membership_no, { lock: true })
+    if (memberErr) {
+      await client.query("ROLLBACK")
+      return NextResponse.json({ error: memberErr }, { status: 400 })
+    }
 
     // Generate account number: branch(3) + "06" + seq(6) = 11 chars
     const seqResult = await client.query(

@@ -1,7 +1,9 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import { Camera, ImageOff, Loader2, PenTool } from "lucide-react"
+import { useCallback, useEffect, useState, type KeyboardEvent } from "react"
+import { Camera, ImageOff, Loader2, Maximize2, PenTool } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 // Customer photo & signature: loading, display frames with placeholders,
 // and upload. Images are served by /api/customers/documents/file (auth-checked).
@@ -106,6 +108,7 @@ export function CustomerImageFrame({
   kind,
   loading = false,
   previewUrl,
+  onEnlarge,
   className = "",
 }: {
   doc: CustomerDocument | null
@@ -113,6 +116,8 @@ export function CustomerImageFrame({
   loading?: boolean
   /** Local preview (e.g. a file just picked), shown instead of the stored image */
   previewUrl?: string
+  /** When set, a loaded image becomes clickable and calls this with its URL */
+  onEnlarge?: (src: string) => void
   className?: string
 }) {
   const [failed, setFailed] = useState(false)
@@ -122,24 +127,47 @@ export function CustomerImageFrame({
   const src = previewUrl || (doc && !failed ? customerDocumentUrl(doc) : "")
   const size = kind === "photo" ? "h-24 w-[4.5rem]" : "h-16 w-48"
   const Icon = kind === "photo" ? Camera : PenTool
+  const clickable = !!onEnlarge && !!src
 
   return (
     <div className={`flex flex-col items-center gap-1.5 ${className}`}>
       <div
-        className={`flex ${size} items-center justify-center overflow-hidden rounded-lg border bg-muted/30 ${
+        className={`group relative flex ${size} items-center justify-center overflow-hidden rounded-lg border bg-muted/30 ${
           src ? "border-border bg-white" : "border-dashed border-muted-foreground/25"
-        }`}
+        } ${clickable ? "cursor-zoom-in transition hover:border-primary hover:ring-2 hover:ring-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" : ""}`}
+        {...(clickable
+          ? {
+              role: "button",
+              tabIndex: 0,
+              title: `Click to enlarge ${label.toLowerCase()}`,
+              "aria-label": `Enlarge member ${label.toLowerCase()}`,
+              onClick: () => onEnlarge!(src),
+              onKeyDown: (e: KeyboardEvent) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault()
+                  onEnlarge!(src)
+                }
+              },
+            }
+          : {})}
       >
         {loading && !src ? (
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/60" />
         ) : src ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={src}
-            alt={`Member ${label.toLowerCase()}`}
-            className="h-full w-full object-contain"
-            onError={() => setFailed(true)}
-          />
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={src}
+              alt={`Member ${label.toLowerCase()}`}
+              className="h-full w-full object-contain"
+              onError={() => setFailed(true)}
+            />
+            {clickable && (
+              <span className="pointer-events-none absolute right-1 bottom-1 rounded bg-black/55 p-0.5 text-white opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">
+                <Maximize2 className="h-3 w-3" />
+              </span>
+            )}
+          </>
         ) : (
           <div className="flex flex-col items-center gap-1 text-muted-foreground/50">
             {failed ? <ImageOff className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
@@ -152,19 +180,87 @@ export function CustomerImageFrame({
   )
 }
 
+/** Large, centered view of a member photo or signature (aspect ratio preserved). */
+export function CustomerImageViewer({
+  image,
+  onClose,
+}: {
+  image: { src: string; kind: "photo" | "signature" } | null
+  onClose: () => void
+}) {
+  const [failed, setFailed] = useState(false)
+  useEffect(() => setFailed(false), [image?.src])
+  const label = image?.kind === "signature" ? "Signature" : "Photo"
+
+  return (
+    <Dialog open={!!image} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="w-auto max-w-[95vw] gap-3 p-4 sm:max-w-[95vw] sm:p-5">
+        <DialogHeader className="pr-8">
+          <DialogTitle>Member {label}</DialogTitle>
+          <DialogDescription className="sr-only">Enlarged view of the member {label.toLowerCase()}</DialogDescription>
+        </DialogHeader>
+        {image && (
+          <div
+            className={`flex items-center justify-center rounded-md border bg-white ${
+              image.kind === "signature"
+                ? "h-[min(70vh,40vw)] w-[min(90vw,1100px)]"
+                : "h-[75vh] w-[min(90vw,calc(75vh*0.75))]"
+            }`}
+          >
+            {failed ? (
+              <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                <ImageOff className="h-8 w-8" />
+                <span className="text-sm">The {label.toLowerCase()} could not be loaded.</span>
+              </div>
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={image.src}
+                alt={`Member ${label.toLowerCase()} (enlarged)`}
+                className="h-full w-full object-contain"
+                onError={() => setFailed(true)}
+              />
+            )}
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 /** A customer's photo and signature side by side, loaded by customer code. */
 export function CustomerPhotoSignature({
   customerCode,
+  enlargeable = false,
   className = "",
 }: {
   customerCode: string | null | undefined
+  /** Click a loaded photo/signature to view it enlarged in a popup */
+  enlargeable?: boolean
   className?: string
 }) {
   const { docs, loading } = useCustomerDocuments(customerCode)
+  const [viewing, setViewing] = useState<{ src: string; kind: "photo" | "signature" } | null>(null)
   return (
     <div className={`flex items-start gap-3 ${className}`}>
-      <CustomerImageFrame kind="photo" doc={docs.photo} loading={loading} />
-      <CustomerImageFrame kind="signature" doc={docs.signature} loading={loading} />
+      <CustomerImageFrame
+        kind="photo"
+        doc={docs.photo}
+        loading={loading}
+        onEnlarge={enlargeable ? (src) => setViewing({ src, kind: "photo" }) : undefined}
+      />
+      <CustomerImageFrame
+        kind="signature"
+        doc={docs.signature}
+        loading={loading}
+        onEnlarge={enlargeable ? (src) => setViewing({ src, kind: "signature" }) : undefined}
+      />
+      {enlargeable && <CustomerImageViewer image={viewing} onClose={() => setViewing(null)} />}
     </div>
   )
 }

@@ -257,7 +257,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
         ["Repayment Type", repaymentMethodLabel(repaymentMethod)],
         ["Repayment Frequency", repaymentFrequencyLabel(repaymentFrequency)],
         ["Gestation Period", `${parseInt(moratoriumPeriod) || 0} months`],
-        ["Interest Payable During Moratorium", effectiveMoratoriumInterest ? "Yes" : "No"],
+        ["Interest Payable During Gestation period", effectiveMoratoriumInterest ? "Yes" : "No"],
         // ["EMI", formatCurrency(calculatedEMI || 0)],
         ["Total Installments", String(emiSchedule.length)],
         ["Total Interest", formatCurrency(totalInterest || 0)],
@@ -874,7 +874,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="moratorium-interest">Interest Payable During Moratorium</Label>
+                <Label htmlFor="moratorium-interest">Interest Payable During Gestation period</Label>
                 <Select
                   value={moratoriumInterestApplies ? moratoriumInterestPayable : "NO"}
                   onValueChange={(v) => setMoratoriumInterestPayable(v as "YES" | "NO")}
