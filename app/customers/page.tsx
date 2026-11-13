@@ -797,7 +797,7 @@ export default function CustomerPage() {
                     </Field>
                     <Field id="anual_income" label="Annual Income (₹)">
                       <Input
-                        id="anual_income" type="number" min="0" placeholder="e.g. 120000"
+                        id="anual_income" type="amount" min="0" placeholder="e.g. 120000"
                         value={c.anual_income}
                         onChange={(e) => up({ anual_income: e.target.value })}
                       />

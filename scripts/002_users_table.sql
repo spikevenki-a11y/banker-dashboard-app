@@ -12,6 +12,13 @@ CREATE TABLE users (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+ALTER TABLE public.users
+RENAME COLUMN branch TO branch_id;
+
+ALTER TABLE public.users
+ALTER COLUMN branch_id TYPE BIGINT
+USING NULLIF(branch_id, '')::BIGINT;
+
 
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 -- RLS Policies for users table
@@ -57,3 +64,20 @@ ON CONFLICT (empid) DO UPDATE
   SET password = EXCLUDED.password,
       full_name = EXCLUDED.full_name,
       updated_at = NOW();
+
+-- the current user table structure is as follows:
+-- create table public.users (
+--   id uuid not null default gen_random_uuid (),
+--   username character varying(255) not null,
+--   password text not null,
+--   full_name character varying(255) null,
+--   role character varying(50) null default 'admin'::character varying,
+--   is_active boolean null default true,
+--   created_at timestamp with time zone null default now(),
+--   updated_at timestamp with time zone null default now(),
+--   branch_id bigint null,
+--   two_factor_enabled boolean null default false,
+--   two_factor_secret text null,
+--   constraint users_pkey primary key (id),
+--   constraint users_email_key unique (username)
+-- ) TABLESPACE pg_default;

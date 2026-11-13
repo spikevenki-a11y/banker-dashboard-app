@@ -38,6 +38,21 @@
   --sidebar-accent-foreground: oklch(0.3 0.01 240);
   --sidebar-border: oklch(0.92 0.005 240);
   --sidebar-ring: oklch(0.48 0.15 250);
+
+  /* ARDB homepage tokens (Figma: ARDB Homepage – Dev Handoff) */
+  --ardb-page: #f0f7fd;
+  --ardb-surface: #ffffff;
+  --ardb-subtle: #f6fbff;
+  --ardb-border: #e3ecf4;
+  --ardb-ink: #172c57;
+  --ardb-muted: #71849c;
+  --ardb-brand: #305d9c;
+  --ardb-icon-surface: #e8f1fc;
+  --ardb-danger: #ff383c;
+  --ardb-chart-deposits: #519cf4;
+  --ardb-chart-loans: #69ce73;
+  --ardb-chart-recurring: #f1ad28;
+  --ardb-chart-mfd: #6155f5;
 }
 
 .dark {
@@ -73,6 +88,15 @@
   --sidebar-accent-foreground: oklch(0.95 0.005 240);
   --sidebar-border: oklch(0.25 0.01 240);
   --sidebar-ring: oklch(0.6 0.18 250);
+
+  --ardb-page: oklch(0.15 0.01 240);
+  --ardb-surface: oklch(0.18 0.01 240);
+  --ardb-subtle: oklch(0.21 0.01 240);
+  --ardb-border: oklch(0.27 0.01 240);
+  --ardb-ink: oklch(0.95 0.005 240);
+  --ardb-muted: oklch(0.68 0.02 240);
+  --ardb-brand: oklch(0.65 0.13 255);
+  --ardb-icon-surface: oklch(0.9 0.03 250);
 }
 
 @theme inline {
@@ -114,6 +138,19 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-ardb-page: var(--ardb-page);
+  --color-ardb-surface: var(--ardb-surface);
+  --color-ardb-subtle: var(--ardb-subtle);
+  --color-ardb-border: var(--ardb-border);
+  --color-ardb-ink: var(--ardb-ink);
+  --color-ardb-muted: var(--ardb-muted);
+  --color-ardb-brand: var(--ardb-brand);
+  --color-ardb-icon-surface: var(--ardb-icon-surface);
+  --color-ardb-danger: var(--ardb-danger);
+  --color-ardb-chart-deposits: var(--ardb-chart-deposits);
+  --color-ardb-chart-loans: var(--ardb-chart-loans);
+  --color-ardb-chart-recurring: var(--ardb-chart-recurring);
+  --color-ardb-chart-mfd: var(--ardb-chart-mfd);
 }
 
 @layer base {

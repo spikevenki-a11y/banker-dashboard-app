@@ -46,6 +46,7 @@ import {
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { SearchableSelect } from "@/components/ui/searchable-select"
+import { formatCurrency } from "@/lib/number-format"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -105,13 +106,6 @@ type VoucherDetails = {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatCurrency(val: number | string) {
-  return `₹${Number(val || 0).toLocaleString("en-IN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`
-}
 
 function formatDate(d: string) {
   if (!d) return "—"
@@ -692,7 +686,7 @@ export default function InvestmentsPage() {
                             <div className="relative">
                               <IndianRupee className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                               <Input
-                                type="number"
+                                type="amount"
                                 className="pl-10"
                                 placeholder="0.00"
                                 value={openAmount}
@@ -875,7 +869,7 @@ export default function InvestmentsPage() {
                             <div className="relative">
                               <IndianRupee className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                               <Input
-                                type="number"
+                                type="amount"
                                 className="pl-10"
                                 placeholder="0.00"
                                 value={creditAmount}
@@ -1017,7 +1011,7 @@ export default function InvestmentsPage() {
                             <div className="relative">
                               <IndianRupee className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                               <Input
-                                type="number"
+                                type="amount"
                                 className="pl-10"
                                 placeholder="0.00"
                                 value={closureAmount}
@@ -1031,7 +1025,7 @@ export default function InvestmentsPage() {
                             <div className="relative">
                               <IndianRupee className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                               <Input
-                                type="number"
+                                type="amount"
                                 className="pl-10"
                                 placeholder="0.00"
                                 value={closureInterest}
@@ -1215,7 +1209,10 @@ export default function InvestmentsPage() {
                     {/* Voucher header band */}
                     <div className="flex items-center justify-between rounded-md bg-muted px-4 py-2 text-sm">
                       <span className="font-semibold">Voucher #{voucherDetails.voucherNo}</span>
-                      <span className="text-muted-foreground">Batch #{voucherDetails.batchId}</span>
+                      {/* Batch is not shown for Cash transactions */}
+                      {voucherDetails.voucherType !== "CASH" && (
+                        <span className="text-muted-foreground">Batch #{voucherDetails.batchId}</span>
+                      )}
                     </div>
 
                     {/* Detail rows */}

@@ -4,6 +4,7 @@ import pool from "@/lib/connection/db"
 import { parseSelectedBatch, validateSelectedBatch, BatchValidationError } from "@/lib/validate-batch"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
 import { getSession } from "@/lib/auth/session"
+import { formatCurrency } from "@/lib/number-format"
 
 export async function GET(request: NextRequest) {
   try {
@@ -270,7 +271,7 @@ export async function POST(request: NextRequest) {
       batch_id: batchId,
       entries_count: processedEntries.length,
       total_amount: totalAmount,
-      message: `${processedEntries.length} grants & subsidies transaction(s) recorded. Batch: ${batchId}, Voucher: ${voucherNo}. Total: ₹${totalAmount.toLocaleString("en-IN")}`,
+      message: `${processedEntries.length} grants & subsidies transaction(s) recorded. ${voucher_type === "CASH" ? "" : `Batch: ${batchId}, `}Voucher: ${voucherNo}. Total: ${formatCurrency(totalAmount)}`,
     }, { status: 201 })
   } catch (error: any) {
     await client.query("ROLLBACK")

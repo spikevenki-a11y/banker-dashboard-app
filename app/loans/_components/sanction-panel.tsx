@@ -53,6 +53,7 @@ import {
   type RepaymentFrequency,
   type RepaymentMethod,
 } from "@/lib/loan-repayment-schedule"
+import { formatCurrency } from "@/lib/number-format"
 
 // Sanction form for one pending loan application: application details, sanction terms,
 // EMI calculation, repayment schedule (with PDF), approve/reject. Shared by
@@ -111,7 +112,6 @@ interface SanctionPanelProps {
   onCancel: () => void
 }
 
-// Format currency
 // Number inputs in the sanction form: no spinner buttons, and no stepping with the
 // arrow keys or mouse wheel — values are typed in only
 const NO_SPINNER_CLASS =
@@ -133,14 +133,6 @@ const formatDueDatePdf = (value: string) => {
   if (isNaN(d.getTime())) return String(value || "")
   const pad = (n: number) => String(n).padStart(2, "0")
   return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}`
-}
-
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(amount)
 }
 
 export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCancel }: SanctionPanelProps) {
@@ -717,7 +709,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                   <IndianRupee className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="sanctioned-amount"
-                    type="number"
+                    type="amount"
                     placeholder="Enter amount"
                     min="0"
                     max={maxSanctionable}

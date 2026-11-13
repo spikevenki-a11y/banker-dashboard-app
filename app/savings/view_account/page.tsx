@@ -22,35 +22,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  ArrowLeft,
-  Search,
-  Loader2,
-  User,
-  CreditCard,
-  Banknote,
-  Calendar,
-  Percent,
-  ArrowDownRight,
-  ArrowUpRight,
-  Edit3,
-  Save,
-  X,
-  CheckCircle2,
-  History,
-  Plus,
-  Minus,
-  Eye,
-  UserPlus,
-  Trash2,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-} from "lucide-react"
+import { ArrowLeft, Search, Loader2, CreditCard, Banknote, Calendar, ArrowDownRight, ArrowUpRight, Edit3, Save, X, CheckCircle2, History, Plus, Minus, UserPlus, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
-import { ViewMemberPopup } from "@/components/view-member-popup"
+import { MemberSummaryCard, useMemberSummary } from "@/components/member-summary-card"
 import { isValidNomineePhone, normaliseNomineePhone } from "@/lib/savings-nominees"
+import { formatCurrency as formatINR, type Numeric } from "@/lib/number-format"
 
 type AccountDetails = {
   id: string
@@ -146,6 +122,14 @@ export default function ViewModifyAccountPage() {
   const [activeTab, setActiveTab] = useState(tabFromParams || "overview")
   const [isSearching, setIsSearching] = useState(false)
   const [account, setAccount] = useState<AccountDetails | null>(null)
+  // Member Summary card (shared with other modules); the account's own details show until loaded
+  const summaryMember = useMemberSummary(account ? String(account.membership_no) : null, account ? {
+    full_name: account.full_name,
+    father_name: account.father_name,
+    mobile_no: account.mobile_no,
+    aadhaar_no: account.aadhaar_no,
+    member_type: account.member_type || "---",
+  } : undefined)
   const [searchError, setSearchError] = useState("")
   const [isEditing, setIsEditing] = useState(false)
   const [editStatus, setEditStatus] = useState("")
@@ -155,7 +139,6 @@ export default function ViewModifyAccountPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [successOpen, setSuccessOpen] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
-  const [viewMemberOpen, setViewMemberOpen] = useState(false)
 
   // Transaction state
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -552,10 +535,7 @@ export default function ViewModifyAccountPage() {
     return formatDisplayDate(d)
   }
 
-  const formatCurrency = (amount: number | null) => {
-    if (amount === null || amount === undefined) return "---"
-    return `₹${Number(amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
-  }
+  const formatCurrency = (v: Numeric) => formatINR(v, { empty: "---" })
 
   return (
     <DashboardWrapper>
@@ -914,7 +894,7 @@ export default function ViewModifyAccountPage() {
                                   <Label htmlFor="txn-amount">Amount (INR)</Label>
                                   <Input
                                     id="txn-amount"
-                                    type="number"
+                                    type="amount"
                                     min="0"
                                     step="0.01"
                                     placeholder="Enter amount"
@@ -1371,42 +1351,8 @@ export default function ViewModifyAccountPage() {
                     </CardContent>
                   </Card> */}
 
-                  {/* Member Quick Info */}
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                        <CardTitle className="text-sm font-medium">Member Info</CardTitle>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setViewMemberOpen(true)}
-                          className="ml-auto h-7 gap-1.5 text-xs text-teal-600 hover:text-teal-700 hover:bg-teal-50"
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          View
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Name</p>
-                        <p className="text-sm font-semibold">{account.full_name}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Membership No</p>
-                        <p className="font-mono text-sm font-semibold">{account.membership_no}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Type</p>
-                        <Badge variant="outline">{account.member_type}</Badge>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Mobile</p>
-                        <p className="text-sm font-medium">{account.mobile_no || "---"}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  {/* Member Summary — shared card and View Member Details popup */}
+                  <MemberSummaryCard memberInfo={summaryMember} />
 
                   {/* Scheme Quick Info */}
                   {/* <Card>
@@ -1559,13 +1505,6 @@ export default function ViewModifyAccountPage() {
                 </CardContent>
               </Card>
             )}
-
-            {/* View Member Popup */}
-            <ViewMemberPopup
-              open={viewMemberOpen}
-              onOpenChange={setViewMemberOpen}
-              membershipNo={account ? String(account.membership_no) : undefined}
-            />
 
             {/* Success Dialog */}
             <AlertDialog open={successOpen} onOpenChange={setSuccessOpen}>

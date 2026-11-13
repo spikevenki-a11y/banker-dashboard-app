@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ChevronLeft, ChevronRight, CreditCard, Loader2, Search, Users, X } from "lucide-react"
+import { formatCurrency as formatINR, type Numeric } from "@/lib/number-format"
 
 export type DepositSearchResult = {
   account_number: string
@@ -25,10 +26,7 @@ export type DepositSearchResult = {
   aadhaar_no: string
 }
 
-function formatCurrency(val: number | string | null | undefined) {
-  if (val == null) return "--"
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(Number(val))
-}
+const formatCurrency = (v: Numeric) => formatINR(v, { empty: "--" })
 
 /**
  * Advanced deposit account search popup (same criteria and API as the Deposit Interest Payment screen).

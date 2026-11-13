@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { parseSelectedBatch, validateSelectedBatch, BatchValidationError } from "@/lib/validate-batch"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
+import { formatCurrency } from "@/lib/number-format"
 
 export async function GET(request: NextRequest) {
   const session = await getSession()
@@ -285,7 +286,7 @@ export async function POST(request: NextRequest) {
         batch_id: batchId,
         newBalance,
         status: "PENDING_APPROVAL",
-        message: `${transactionType === "DEPOSIT" ? "Deposit" : "Withdrawal"} of ₹${Number(amount).toLocaleString("en-IN")} successful. Batch: ${batchId}, Voucher: ${voucherNo}. New balance: ₹${newBalance.toLocaleString("en-IN")}`,
+        message: `${transactionType === "DEPOSIT" ? "Deposit" : "Withdrawal"} of ${formatCurrency(amount)} successful. ${voucherType === "CASH" ? "" : `Batch: ${batchId}, `}Voucher: ${voucherNo}. New balance: ${formatCurrency(newBalance)}`,
       })
     } catch (err) {
       await client.query("ROLLBACK")

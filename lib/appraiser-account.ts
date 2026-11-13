@@ -8,9 +8,55 @@ export type AppraiserAccount = {
   account_number: string
   account_type: "SAVINGS" | "SUNDRY_CREDITOR"
   gl_account: string
+  // GL income ledger that receives the society's share of the charge
+  income_account_code: string
+  income_account_name: string
 }
 
 const MANAGE_HINT = "Update it in Settings > Management > Manage Appraiser Details."
+
+// Appraiser charge distribution: 80% to the appraiser's account, 20% to the income account.
+export const APPRAISER_SHARE_PERCENT = 80
+export const INCOME_SHARE_PERCENT = 100 - APPRAISER_SHARE_PERCENT
+
+// Splits a charge into the appraiser and income shares, in whole paise, so the two
+// amounts always add up exactly to the (2-decimal) charge. The income share takes the
+// rounding remainder.
+export function splitAppraiserCharge(totalCharge: number) {
+  const totalPaise = Math.round(totalCharge * 100)
+  const appraiserPaise = Math.round((totalPaise * APPRAISER_SHARE_PERCENT) / 100)
+  const incomePaise = totalPaise - appraiserPaise
+  return {
+    total: totalPaise / 100,
+    appraiserShare: appraiserPaise / 100,
+    incomeShare: incomePaise / 100,
+  }
+}
+
+// Validates that the code is an active income ledger in the branch's chart of accounts.
+// Returns the account name, or { error }.
+export async function findIncomeAccount(
+  client: Pick<PoolClient, "query">,
+  branchId: number | string,
+  accountCode: number | string
+): Promise<{ accountName: string; error?: undefined } | { accountName?: undefined; error: string }> {
+  const code = String(accountCode ?? "").trim()
+  if (!/^\d+$/.test(code)) return { error: "Invalid income account" }
+
+  const { rows } = await client.query(
+    `SELECT accountname, accounttypecode,
+            (isledger = B'1') AS is_ledger, (isactive = B'1') AS is_active
+     FROM chart_of_accounts
+     WHERE branch_id = $1 AND accountcode = $2`,
+    [branchId, code]
+  )
+  const acc = rows[0]
+  if (!acc) return { error: `Income account ${code} was not found in the chart of accounts` }
+  if (Number(acc.accounttypecode) !== 3) return { error: `Account ${code} (${acc.accountname}) is not an income account` }
+  if (!acc.is_ledger) return { error: `Income account ${code} (${acc.accountname}) is not a ledger account` }
+  if (!acc.is_active) return { error: `Income account ${code} (${acc.accountname}) is not active` }
+  return { accountName: acc.accountname }
+}
 
 // Loads the appraiser and locks their designated account.
 // Returns { error } when the appraiser or account cannot receive the charge.
@@ -21,7 +67,8 @@ export async function lockAppraiserAccount(
 ): Promise<{ account: AppraiserAccount; error?: undefined } | { account?: undefined; error: string }> {
   const { rows } = await client.query(
     `SELECT appraiser_id, appraiser_code, appraiser_name, status,
-            account_number::text AS account_number, account_type
+            account_number::text AS account_number, account_type,
+            income_account_code::text AS income_account_code
      FROM appraiser_master
      WHERE appraiser_id = $1 AND branch_id = $2`,
     [appraiserId, branchId]
@@ -71,6 +118,13 @@ export async function lockAppraiserAccount(
   }
   if (!glAccount) return { error: `GL account is not configured for appraiser account ${accountNo}` }
 
+  // Income account for the society's share of the charge
+  if (!appraiser.income_account_code) {
+    return { error: `No income account is configured for appraiser ${label}. ${MANAGE_HINT}` }
+  }
+  const income = await findIncomeAccount(client, branchId, appraiser.income_account_code)
+  if (income.error) return { error: `${income.error}. ${MANAGE_HINT}` }
+
   return {
     account: {
       appraiser_id: appraiser.appraiser_id,
@@ -79,6 +133,8 @@ export async function lockAppraiserAccount(
       account_number: accountNo,
       account_type: appraiser.account_type,
       gl_account: String(glAccount),
+      income_account_code: appraiser.income_account_code,
+      income_account_name: income.accountName!,
     },
   }
 }
@@ -157,4 +213,48 @@ export async function creditAppraiserAccount(
        batchId, voucherNo, userId]
     )
   }
+}
+
+// Posts an appraiser charge into the given batch as two credits that together equal the
+// charge: the appraiser's share to their account and the society's share to the income
+// account. The caller posts the matching debit(s) in the same batch, inside the same DB
+// transaction, so either every line is posted or none is.
+export async function postAppraiserChargeCredits(
+  client: PoolClient,
+  p: {
+    account: AppraiserAccount
+    branchId: number | string
+    batchId: number
+    voucherNo: number
+    businessDate: string
+    voucherType: "CASH" | "TRANSFER"
+    amount: number
+    narration: string
+    userId: string
+  }
+) {
+  const split = splitAppraiserCharge(p.amount)
+  if (split.appraiserShare <= 0) throw new Error("Appraiser charge is too small to distribute")
+
+  await creditAppraiserAccount(client, {
+    ...p,
+    amount: split.appraiserShare,
+    narration: `${p.narration} (${APPRAISER_SHARE_PERCENT}% appraiser share)`,
+  })
+
+  if (split.incomeShare > 0) {
+    await client.query(
+      `INSERT INTO gl_batch_lines (
+         branch_id, batch_id, business_date,
+         accountcode, ref_account_id,
+         debit_amount, credit_amount,
+         voucher_id, narration, created_by
+       ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9)`,
+      // GL-only line (no sub-ledger), so ref_account_id is '0' as for Cash
+      [p.branchId, p.batchId, p.businessDate, p.account.income_account_code, '0',
+       split.incomeShare, p.voucherNo, `${p.narration} (${INCOME_SHARE_PERCENT}% income share)`, p.userId]
+    )
+  }
+
+  return split
 }

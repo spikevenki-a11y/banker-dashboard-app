@@ -46,6 +46,7 @@ import {
   IndianRupee,
 } from "lucide-react"
 import { DashboardWrapper } from "../../_components/dashboard-wrapper"
+import { formatAmount, formatCurrency } from "@/lib/number-format"
 
 /* ── Types ── */
 
@@ -75,14 +76,6 @@ const ACCOUNT_TYPES = [
   { code: 4, label: "Expenses", color: "text-rose-700", bg: "bg-rose-50" },
   { code: 5, label: "Profit & Loss", color: "text-amber-700", bg: "bg-amber-50" },
 ]
-
-function formatCurrency(val: number): string {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    minimumFractionDigits: 2,
-  }).format(val)
-}
 
 /* ── Build tree from flat array ── */
 
@@ -510,7 +503,7 @@ export default function ChartOfAccountsPage() {
                           <TableCell className="text-right">
                             <span className="flex items-center justify-end gap-0.5 text-sm font-mono">
                               <IndianRupee className="h-3 w-3 text-muted-foreground" />
-                              {Number(node.accountBalance).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                              {formatAmount(node.accountBalance)}
                             </span>
                           </TableCell>
                           <TableCell>

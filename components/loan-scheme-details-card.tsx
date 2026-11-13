@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { FileText } from "lucide-react"
+import { formatCurrency } from "@/lib/number-format"
 
 // Scheme Details card for Loans → New Loan Application.
 // Shows the selected loan_schemes row; styled like the Member Summary card.
@@ -36,7 +37,7 @@ const label = (value?: string | null) => (value ? value.replace(/_/g, " ") : "--
 const amount = (value?: number | string | null) =>
   value === null || value === undefined || value === ""
     ? "---"
-    : new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(Number(value))
+    : formatCurrency(value)
 const percent = (value?: number | string | null) =>
   value === null || value === undefined || value === "" ? "---" : `${Number(value)}%`
 const range = (min?: number | string | null, max?: number | string | null, fmt: (v: any) => string = String) =>

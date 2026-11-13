@@ -12,9 +12,7 @@ import { ArrowLeft, Coins, Loader2 } from "lucide-react"
 import { DashboardWrapper } from "../../../_components/dashboard-wrapper"
 import { formatDate, formatDateTime } from "@/lib/date-format"
 import type { GoldGuideline } from "@/lib/gold-guideline"
-
-const formatAmount = (n: number) =>
-  `₹${Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+import { formatCurrency as formatAmount } from "@/lib/number-format"
 
 export default function GoldGuidelinePage() {
   const router = useRouter()
@@ -149,7 +147,7 @@ export default function GoldGuidelinePage() {
                     <Label htmlFor="gold-guideline-value">Guidelines Value per Gram (₹) *</Label>
                     <Input
                       id="gold-guideline-value"
-                      type="number"
+                      type="amount"
                       min="0.01"
                       step="0.01"
                       inputMode="decimal"

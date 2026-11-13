@@ -15,9 +15,8 @@ import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { useBranchInfo } from "../_components/use-branch-info"
 import { openPrintWindow } from "../_components/open-print-window"
 import { downloadPdf } from "../_components/download-pdf"
+import { formatCurrency as fmt } from "@/lib/number-format"
 
-const fmt = (n: number | string | null | undefined) =>
-  `₹${Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const fmtDate = (d: string | null) =>
   d ? formatDate(d) : "—"
 

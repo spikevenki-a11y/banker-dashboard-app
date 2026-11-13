@@ -259,11 +259,23 @@ export async function GET(req: NextRequest) {
         ca.state,
         ca.pincode,
         ca.phone_no                                   AS address_phone,
+        ca.permanent_house_no,
+        ca.permanent_street,
+        ca.permanent_village,
+        ca.permanent_thaluk,
+        ca.permanent_district,
+        ca.permanent_state,
+        ca.permanent_pincode,
 
         ck.aadhaar_no,
         ck.pan_no,
         ck.ration_no,
-        ck.driving_license_no
+        ck.ration_card_type,
+        ck.driving_license_no,
+        ck.passport_no,
+        ck.eb_bill_no,
+        ck.other_document_name,
+        ck.other_document_no
 
       FROM memberships m
       JOIN customers c        ON c.customer_code  = m.customer_code

@@ -21,13 +21,14 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts"
-import { ArrowLeft, Search, Loader2, CheckCircle2, User, Banknote, Calendar, Wallet, TrendingUp, TrendingDown, Shield, ShieldCheck, RefreshCw, Info, Users, X, Eye, MapPin, Camera, PenTool, BarChart3, Printer } from "lucide-react"
+import { ArrowLeft, Search, Loader2, CheckCircle2, User, Banknote, Calendar, Wallet, TrendingUp, Shield, ShieldCheck, RefreshCw, Info, Users, X, MapPin, BarChart3, Printer } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { NomineeEditor, nomineeTotals, type NomineeEntry } from "@/components/nominee-editor"
+import { MemberSummaryCard } from "@/components/member-summary-card"
 import { computeTermMaturity, labelOf, COMPOUNDING_FREQUENCIES, type AppliedPolicy } from "@/lib/fd-interest-policy"
+import { formatCurrency } from "@/lib/number-format"
 
 type MemberInfo = {
   membership_no: string
@@ -42,68 +43,6 @@ type MemberInfo = {
   customer_code: string
   gender: string
   ledger_folio_number: string
-}
-
-type MemberProfile = {
-  membership_no: string
-  membership_class: string
-  member_type: string
-  status: string
-  join_date: string
-  ledger_folio_number: string
-  board_resolution_number: string
-  customer_code: string
-  full_name: string
-  father_name: string
-  gender: string
-  date_of_birth: string
-  customer_type: string
-  spouse_name: string
-  marital_status: string
-  occupation: string
-  mobile_no: string
-  customer_email: string
-  house_no: string
-  street: string
-  village: string
-  thaluk: string
-  district: string
-  state: string
-  pincode: string
-  address_phone: string
-  aadhaar_no: string
-  pan_no: string
-  ration_no: string
-  driving_license_no: string
-}
-
-type AccountAsset = {
-  account_type: string
-  account_number: string
-  scheme_name: string
-  balance: number
-  status: string
-  opening_date: string
-  interest_rate: number
-  close_date?: string
-  extra: any
-}
-
-type LoanAccount = {
-  loan_application_id: number
-  scheme_name: string
-  loan_type: string
-  sanctioned_amount: number
-  interest_rate: number
-  loan_tenure_months: number
-  emi_amount: number
-  sanction_date: string
-  outstanding_balance: number
-  paid_installments: number
-  total_installments: number
-  overdue_installments: number
-  application_status: string
-  loan_account_no: string
 }
 
 type Scheme = {
@@ -156,15 +95,6 @@ export default function CreateDepositPage() {
   const [savingsAccounts, setSavingsAccounts] = useState<SavingsAccount[]>([])
   const [isFetchingSavings, setIsFetchingSavings] = useState(false)
 
-  // View member profile modal
-  const [viewMemberOpen, setViewMemberOpen] = useState(false)
-  const [viewMemberTab, setViewMemberTab] = useState("personal")
-  const [viewMemberProfile, setViewMemberProfile] = useState<MemberProfile | null>(null)
-  const [viewMemberAssets, setViewMemberAssets] = useState<AccountAsset[]>([])
-  const [viewMemberSummary, setViewMemberSummary] = useState<any>(null)
-  const [viewMemberLoans, setViewMemberLoans] = useState<LoanAccount[]>([])
-  const [viewMemberLoading, setViewMemberLoading] = useState(false)
-  const [viewMemberError, setViewMemberError] = useState("")
 
   const [schemes, setSchemes] = useState<Scheme[]>([])
   const [selectedScheme, setSelectedScheme] = useState<Scheme | null>(null)
@@ -306,45 +236,6 @@ const getLogindate = async () => {
   const handleMemberBlur = () => {
     if (memberSearch.trim() && !memberInfo && !isSearching) {
       searchMember()
-    }
-  }
-
-  const fmt = (n: number) =>
-    `₹${Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`
-
-  const handleViewMember = async () => {
-    if (!memberInfo) return
-    setViewMemberOpen(true)
-    setViewMemberTab("personal")
-    setViewMemberLoading(true)
-    setViewMemberError("")
-    setViewMemberProfile(null)
-    setViewMemberAssets([])
-    setViewMemberSummary(null)
-    setViewMemberLoans([])
-
-    try {
-      const no = memberInfo.membership_no
-      const [profileRes, accountsRes, loansRes] = await Promise.all([
-        fetch(`/api/members/profile?membership_no=${no}`, { credentials: "include" }),
-        fetch(`/api/members/accounts?membership_no=${no}`, { credentials: "include" }),
-        fetch(`/api/loans/accounts?membershipNo=${no}`, { credentials: "include" }),
-      ])
-      const [profileData, accountsData, loansData] = await Promise.all([
-        profileRes.json(),
-        accountsRes.json(),
-        loansRes.json(),
-      ])
-      if (profileData.found) setViewMemberProfile(profileData.profile)
-      if (accountsData.success) {
-        setViewMemberAssets(accountsData.assets || [])
-        setViewMemberSummary(accountsData.summary)
-      }
-      if (loansData.accounts) setViewMemberLoans(loansData.accounts)
-    } catch {
-      setViewMemberError("Failed to load member details. Please try again.")
-    } finally {
-      setViewMemberLoading(false)
     }
   }
 
@@ -580,7 +471,7 @@ const getLogindate = async () => {
     if (interestPayableSeries.length === 0) return
     const esc = (v: unknown) =>
       String(v ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!)
-    const inr = (n: number) => Number(n || 0).toLocaleString("en-IN", { style: "currency", currency: "INR" })
+    const inr = (n: number) => formatCurrency(n)
     const total = interestPayableSeries.reduce((sum, p) => sum + p.interestPayable, 0)
     const freqLabel = interestPayoutFrequency.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
     const period = [
@@ -954,14 +845,14 @@ const getLogindate = async () => {
                           <div>
                             <span className="text-muted-foreground">Min Deposit:</span>
                             <span className="ml-1 font-medium">
-                              {Number(selectedScheme.minimum_deposit).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                              {formatCurrency(selectedScheme.minimum_deposit)}
                             </span>
                           </div>
                           {selectedScheme.maximum_deposit > 0 && (
                             <div>
                               <span className="text-muted-foreground">Max Deposit:</span>
                               <span className="ml-1 font-medium">
-                                {Number(selectedScheme.maximum_deposit).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                                {formatCurrency(selectedScheme.maximum_deposit)}
                               </span>
                             </div>
                           )}
@@ -1105,14 +996,14 @@ const getLogindate = async () => {
                             <Label htmlFor="deposit-amount">Amount</Label>
                             <Input
                               id="deposit-amount"
-                              type="number"
-                              placeholder={`Min: ${Number(selectedScheme?.minimum_deposit || 0).toLocaleString("en-IN")} | Max: ${Number(selectedScheme?.maximum_deposit || 0).toLocaleString("en-IN")}`}
+                              type="amount"
+                              placeholder={`Min: ${formatCurrency(selectedScheme?.minimum_deposit)} | Max: ${formatCurrency(selectedScheme?.maximum_deposit)}`}
                               value={depositAmount}
                               onChange={(e) => setDepositAmount(e.target.value)}
                             />
                             {selectedScheme && (Number(depositAmount) < Number(selectedScheme.minimum_deposit) || (Number(selectedScheme.maximum_deposit) > 0 && Number(depositAmount) > Number(selectedScheme.maximum_deposit))) && depositAmount && (
                               <p className="text-xs text-destructive">
-                                Amount must be between {Number(selectedScheme.minimum_deposit).toLocaleString("en-IN")} and {Number(selectedScheme.maximum_deposit).toLocaleString("en-IN")}
+                                Amount must be between {formatCurrency(selectedScheme.minimum_deposit)} and {formatCurrency(selectedScheme.maximum_deposit)}
                               </p>
                             )}
                           </div>
@@ -1343,14 +1234,14 @@ const getLogindate = async () => {
                               <Label htmlFor="installment-amount">Installment Amount</Label>
                               <Input
                                 id="installment-amount"
-                                type="number"
-                                placeholder={`Min: ${Number(selectedScheme?.minimum_installment_amount || 0).toLocaleString("en-IN")}`}
+                                type="amount"
+                                placeholder={`Min: ${formatCurrency(selectedScheme?.minimum_installment_amount)}`}
                                 value={installmentAmount}
                                 onChange={(e) => setInstallmentAmount(e.target.value)}
                               />
                               {selectedScheme && installmentAmount && (Number(installmentAmount) < Number(selectedScheme.minimum_installment_amount) || (Number(selectedScheme.maximum_installment_amount) > 0 && Number(installmentAmount) > Number(selectedScheme.maximum_installment_amount))) && (
                                 <p className="text-xs text-destructive">
-                                  Amount must be between {Number(selectedScheme.minimum_installment_amount).toLocaleString("en-IN")} and {Number(selectedScheme.maximum_installment_amount).toLocaleString("en-IN")}
+                                  Amount must be between {formatCurrency(selectedScheme.minimum_installment_amount)} and {formatCurrency(selectedScheme.maximum_installment_amount)}
                                 </p>
                               )}
                             </div>
@@ -1484,7 +1375,7 @@ const getLogindate = async () => {
                             <Label htmlFor="daily-amount">Minimum Daily Collection Amount</Label>
                             <Input
                               id="daily-amount"
-                              type="number"
+                              type="amount"
                               placeholder="Enter minimum daily amount"
                               value={depositAmount}
                               onChange={(e) => setDepositAmount(e.target.value)}
@@ -1529,80 +1420,8 @@ const getLogindate = async () => {
               {/* Right Column - Summary */}
               <div className="space-y-6">
 
-                {/* Member Summary */}
-                <Card>
-                  <CardHeader className="">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                        <CardTitle className="text-sm font-medium">Member Summary</CardTitle>
-                      </div>
-                      {memberInfo && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleViewMember}
-                          className="h-7 gap-1.5 text-xs bg-transparent"
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          View Member Details
-                        </Button>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {memberInfo ? (
-                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="flex-1 space-y-3">
-                          <div>
-                            <p className="text-xs text-muted-foreground">Name</p>
-                            <p className="text-sm font-semibold">{memberInfo.full_name}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Membership No</p>
-                            <p className="text-sm font-mono font-semibold">{memberInfo.membership_no}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Type</p>
-                            <Badge variant="outline">{memberInfo.member_type}</Badge>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Father's Name</p>
-                            <p className="text-sm font-semibold">{memberInfo.father_name || "---"}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Aadhaar Number</p>
-                            <p className="text-sm font-mono font-semibold">{memberInfo.aadhaar_no || "---"}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Phone Number</p>
-                            <p className="text-sm font-semibold">{memberInfo.mobile_no || "---"}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Ledger Number</p>
-                            <p className="text-sm font-mono font-semibold">{memberInfo.ledger_folio_number || "---"}</p>
-                          </div>
-                        </div>
-                        <div className="flex shrink-0 gap-4 sm:flex-col sm:items-end">
-                          <div className="flex flex-col items-center gap-1.5">
-                            <div className="flex h-20 w-20 items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/25 bg-muted/30">
-                              <Camera className="h-6 w-6 text-muted-foreground/50" />
-                            </div>
-                            <span className="text-[11px] font-medium text-muted-foreground">Photo</span>
-                          </div>
-                          <div className="flex flex-col items-center gap-1.5">
-                            <div className="flex h-20 w-20 items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/25 bg-muted/30">
-                              <PenTool className="h-6 w-6 text-muted-foreground/50" />
-                            </div>
-                            <span className="text-[11px] font-medium text-muted-foreground">Signature</span>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">Search a member to see details</p>
-                    )}
-                  </CardContent>
-                </Card>
+                {/* Member Summary — shared card and View Member Details popup (bank's perspective) */}
+                <MemberSummaryCard memberInfo={memberInfo} />
 
                 {/* Quick Info */}
                 {/* <Card>
@@ -1652,14 +1471,14 @@ const getLogindate = async () => {
                           <div>
                             <span className="text-muted-foreground">Min Deposit:</span>
                             <span className="ml-1 font-medium">
-                              {Number(selectedScheme.minimum_deposit).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                              {formatCurrency(selectedScheme.minimum_deposit)}
                             </span>
                           </div>
                           {selectedScheme.maximum_deposit > 0 && (
                             <div>
                               <span className="text-muted-foreground">Max Deposit:</span>
                               <span className="ml-1 font-medium">
-                                {Number(selectedScheme.maximum_deposit).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                                {formatCurrency(selectedScheme.maximum_deposit)}
                               </span>
                             </div>
                           )}
@@ -1708,10 +1527,11 @@ const getLogindate = async () => {
                             <div className="flex items-center justify-between">
                               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Balance</span>
                               <span className="text-sm font-semibold text-teal-600">
-                                {savingsAccounts
-                                  .filter((a) => a.account_status === "ACTIVE")
-                                  .reduce((sum, a) => sum + (Number(a.available_balance) || 0), 0)
-                                  .toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                                {formatCurrency(
+                                  savingsAccounts
+                                    .filter((a) => a.account_status === "ACTIVE")
+                                    .reduce((sum, a) => sum + (Number(a.available_balance) || 0), 0)
+                                )}
                               </span>
                             </div>
                             <p className="mt-1 text-xs text-muted-foreground">
@@ -1738,7 +1558,7 @@ const getLogindate = async () => {
                               <div className="flex items-baseline justify-between">
                                 <span className="text-xs text-muted-foreground">Balance</span>
                                 <span className="text-sm font-semibold text-foreground">
-                                  {Number(acc.available_balance || 0).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                                  {formatCurrency(acc.available_balance)}
                                 </span>
                               </div>
                             </div>
@@ -1778,7 +1598,7 @@ const getLogindate = async () => {
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Deposit Amount:</span>
                             <span className="font-medium">
-                              {Number(depositAmount || 0).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                              {formatCurrency(depositAmount)}
                             </span>
                           </div>
                           <div className="flex justify-between text-sm">
@@ -1811,7 +1631,7 @@ const getLogindate = async () => {
                                 <div className="flex justify-between text-sm">
                                   <span className="text-muted-foreground">Interest Earned:</span>
                                   <span className="font-semibold text-teal-600">
-                                    {maturityCalc.interest.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                                    {formatCurrency(maturityCalc.interest)}
                                   </span>
                                 </div>
                               </div>
@@ -1822,7 +1642,7 @@ const getLogindate = async () => {
                               <div className="flex justify-between border-t border-border pt-3">
                                 <span className="font-semibold">Maturity Amount:</span>
                                 <span className="text-lg font-bold text-teal-600">
-                                  {maturityCalc.maturityAmount.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                                  {formatCurrency(maturityCalc.maturityAmount)}
                                 </span>
                               </div>
                             </>
@@ -1839,7 +1659,7 @@ const getLogindate = async () => {
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Installment:</span>
                             <span className="font-medium">
-                              {Number(installmentAmount || 0).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                              {formatCurrency(installmentAmount)}
                             </span>
                           </div>
                           <div className="flex justify-between text-sm">
@@ -1915,14 +1735,14 @@ const getLogindate = async () => {
                               tickLine={false}
                               axisLine={false}
                               width={64}
-                              tickFormatter={(v) => `₹${Number(v).toLocaleString("en-IN")}`}
+                              tickFormatter={(v) => `${formatCurrency(v)}`}
                             />
                             <ChartTooltip
                               content={
                                 <ChartTooltipContent
                                   labelFormatter={(label) => `Payout on ${label}`}
                                   formatter={(value) => [
-                                    Number(value).toLocaleString("en-IN", { style: "currency", currency: "INR" }),
+                                    formatCurrency(value),
                                     "Interest Payable",
                                   ]}
                                 />
@@ -1950,7 +1770,7 @@ const getLogindate = async () => {
                                 <TableCell className="text-xs">{p.dateLabel}</TableCell>
                                 <TableCell className="text-xs text-right">{p.days}</TableCell>
                                 <TableCell className="text-xs text-right font-semibold text-teal-600">
-                                  {p.interestPayable.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                                  {formatCurrency(p.interestPayable)}
                                 </TableCell>
                               </TableRow>
                             ))}
@@ -1959,9 +1779,7 @@ const getLogindate = async () => {
                             <TableRow>
                               <TableCell colSpan={3} className="text-xs font-semibold">Total Interest Payable</TableCell>
                               <TableCell className="text-xs text-right font-bold text-teal-600">
-                                {interestPayableSeries
-                                  .reduce((sum, p) => sum + p.interestPayable, 0)
-                                  .toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                                {formatCurrency(interestPayableSeries.reduce((sum, p) => sum + p.interestPayable, 0))}
                               </TableCell>
                             </TableRow>
                           </TableFooter>
@@ -1974,7 +1792,7 @@ const getLogindate = async () => {
                         Interest Payable at Maturity
                       </p>
                       <p className="mt-2 text-3xl font-bold text-teal-600">
-                        {interestPayableSeries[0].interestPayable.toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                        {formatCurrency(interestPayableSeries[0].interestPayable)}
                       </p>
                       <p className="mt-1 text-sm text-muted-foreground">
                         Payable on {interestPayableSeries[0].dateLabel}
@@ -2005,317 +1823,6 @@ const getLogindate = async () => {
               </DialogContent>
             </Dialog>
 
-            {/* Member Profile Modal */}
-            <Dialog open={viewMemberOpen} onOpenChange={setViewMemberOpen}>
-              <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col p-0">
-                {/* Fixed header */}
-                <div className="px-6 pt-6 pb-4 border-b shrink-0">
-                  <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2 text-teal-700 text-lg">
-                      <User className="h-5 w-5" />
-                      Member Profile
-                    </DialogTitle>
-                    <DialogDescription asChild>
-                      <div className="flex items-center gap-2 flex-wrap mt-1">
-                        <span className="font-mono text-sm font-medium text-foreground">
-                          {memberInfo?.membership_no}
-                        </span>
-                        <span className="text-muted-foreground">·</span>
-                        <span className="text-sm">{memberInfo?.full_name}</span>
-                        <Badge
-                          variant="outline"
-                          className={
-                            memberInfo?.status === "ACTIVE"
-                              ? "border-green-300 bg-green-50 text-green-700"
-                              : "border-red-300 bg-red-50 text-red-700"
-                          }
-                        >
-                          {memberInfo?.status}
-                        </Badge>
-                        {memberInfo?.member_type && (
-                          <Badge variant="outline" className="border-teal-300 text-teal-700">
-                            {memberInfo.member_type}
-                          </Badge>
-                        )}
-                        {memberInfo?.membership_class && (
-                          <Badge variant="secondary">{memberInfo.membership_class}</Badge>
-                        )}
-                      </div>
-                    </DialogDescription>
-                  </DialogHeader>
-                </div>
-
-                {/* Loading / error */}
-                {viewMemberLoading && (
-                  <div className="flex flex-1 items-center justify-center py-16">
-                    <Loader2 className="h-7 w-7 animate-spin text-teal-600" />
-                    <span className="ml-3 text-sm text-muted-foreground">Loading member details…</span>
-                  </div>
-                )}
-                {viewMemberError && !viewMemberLoading && (
-                  <div className="flex flex-1 items-center justify-center py-16">
-                    <p className="text-sm text-red-500">{viewMemberError}</p>
-                  </div>
-                )}
-
-                {/* Tabbed content */}
-                {!viewMemberLoading && !viewMemberError && (
-                  <Tabs value={viewMemberTab} onValueChange={setViewMemberTab} className="flex flex-col flex-1 min-h-0">
-                    <TabsList className="mx-6 mt-3 shrink-0 grid grid-cols-4 w-auto">
-                      <TabsTrigger value="personal" className="gap-1.5 text-xs">
-                        <User className="h-3.5 w-3.5" />Personal
-                      </TabsTrigger>
-                      <TabsTrigger value="address" className="gap-1.5 text-xs">
-                        <MapPin className="h-3.5 w-3.5" />Address & KYC
-                      </TabsTrigger>
-                      <TabsTrigger value="assets" className="gap-1.5 text-xs">
-                        <TrendingUp className="h-3.5 w-3.5" />Assets
-                      </TabsTrigger>
-                      <TabsTrigger value="liabilities" className="gap-1.5 text-xs">
-                        <TrendingDown className="h-3.5 w-3.5" />Liabilities
-                      </TabsTrigger>
-                    </TabsList>
-
-                    {/* ── Personal ─────────────────────────────────────── */}
-                    <TabsContent value="personal" className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
-                      {viewMemberProfile ? (
-                        <>
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Personal Information</p>
-                            <div className="grid grid-cols-2 gap-x-8 gap-y-3">
-                              {[
-                                ["Full Name",       viewMemberProfile.full_name],
-                                ["Father Name",     viewMemberProfile.father_name || "---"],
-                                ["Date of Birth",   viewMemberProfile.date_of_birth || "---"],
-                                ["Gender",          viewMemberProfile.gender ? viewMemberProfile.gender.charAt(0).toUpperCase() + viewMemberProfile.gender.slice(1) : "---"],
-                                ["Mobile",          viewMemberProfile.mobile_no || "---"],
-                                ["Email",           viewMemberProfile.customer_email || "---"],
-                                ["Marital Status",  viewMemberProfile.marital_status || "---"],
-                                ["Spouse Name",     viewMemberProfile.spouse_name || "---"],
-                                ["Occupation",      viewMemberProfile.occupation || "---"],
-                                ["Customer Type",   viewMemberProfile.customer_type || "---"],
-                                ["Customer Code",   viewMemberProfile.customer_code?.trim() || "---"],
-                              ].map(([label, value]) => (
-                                <div key={label}>
-                                  <p className="text-xs text-muted-foreground">{label}</p>
-                                  <p className="mt-0.5 text-sm font-medium break-all">{value}</p>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className="border-t pt-4">
-                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Membership Information</p>
-                            <div className="grid grid-cols-2 gap-x-8 gap-y-3">
-                              {[
-                                ["Membership No",          viewMemberProfile.membership_no],
-                                ["Member Type",            viewMemberProfile.member_type || "---"],
-                                ["Membership Class",       viewMemberProfile.membership_class || "---"],
-                                ["Status",                 viewMemberProfile.status || "---"],
-                                ["Join Date",              viewMemberProfile.join_date || "---"],
-                                ["Ledger Folio No",        viewMemberProfile.ledger_folio_number || "---"],
-                              ].map(([label, value]) => (
-                                <div key={label}>
-                                  <p className="text-xs text-muted-foreground">{label}</p>
-                                  <p className="mt-0.5 text-sm font-medium">{value}</p>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">No personal data available.</p>
-                      )}
-                    </TabsContent>
-
-                    {/* ── Address & KYC ────────────────────────────────── */}
-                    <TabsContent value="address" className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
-                      {viewMemberProfile ? (
-                        <>
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Current Address</p>
-                            <div className="grid grid-cols-2 gap-x-8 gap-y-3">
-                              {[
-                                ["House No",    viewMemberProfile.house_no || "---"],
-                                ["Street",      viewMemberProfile.street || "---"],
-                                ["Village",     viewMemberProfile.village || "---"],
-                                ["Taluk",       viewMemberProfile.thaluk || "---"],
-                                ["District",    viewMemberProfile.district || "---"],
-                                ["State",       viewMemberProfile.state || "---"],
-                                ["Pincode",     viewMemberProfile.pincode || "---"],
-                                ["Phone",       viewMemberProfile.address_phone || "---"],
-                              ].map(([label, value]) => (
-                                <div key={label}>
-                                  <p className="text-xs text-muted-foreground">{label}</p>
-                                  <p className="mt-0.5 text-sm font-medium">{value}</p>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className="border-t pt-4">
-                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-                              <ShieldCheck className="inline h-3.5 w-3.5 mr-1" />KYC Documents
-                            </p>
-                            <div className="grid grid-cols-2 gap-x-8 gap-y-3">
-                              {[
-                                ["Aadhaar No",         viewMemberProfile.aadhaar_no || "---"],
-                                ["PAN No",             viewMemberProfile.pan_no || "---"],
-                                ["Ration No",          viewMemberProfile.ration_no || "---"],
-                                ["Driving License",    viewMemberProfile.driving_license_no || "---"],
-                              ].map(([label, value]) => (
-                                <div key={label}>
-                                  <p className="text-xs text-muted-foreground">{label}</p>
-                                  <p className="mt-0.5 text-sm font-medium font-mono">{value}</p>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">No address data available.</p>
-                      )}
-                    </TabsContent>
-
-                    {/* ── Assets ───────────────────────────────────────── */}
-                    <TabsContent value="assets" className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-                      {viewMemberSummary && (
-                        <div className="grid grid-cols-3 gap-3">
-                          {[
-                            { label: "Total Assets",      value: fmt(viewMemberSummary.total_assets),      color: "text-teal-700 bg-teal-50 border-teal-200" },
-                            { label: "Total Accounts",    value: String(viewMemberAssets.length),          color: "text-blue-700 bg-blue-50 border-blue-200" },
-                            // { label: "Net Worth",         value: fmt(viewMemberSummary.net_worth),         color: "text-green-700 bg-green-50 border-green-200" },
-                          ].map(({ label, value, color }) => (
-                            <div key={label} className={`rounded-lg border p-3 text-center ${color}`}>
-                              <p className="text-xs opacity-70">{label}</p>
-                              <p className="text-base font-bold mt-0.5">{value}</p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {viewMemberAssets.length > 0 ? (
-                        <div className="rounded-lg border overflow-hidden">
-                          <Table>
-                            <TableHeader>
-                              <TableRow className="bg-muted/50">
-                                <TableHead className="text-xs">Type</TableHead>
-                                <TableHead className="text-xs">Account No</TableHead>
-                                <TableHead className="text-xs">Scheme</TableHead>
-                                <TableHead className="text-xs">Rate</TableHead>
-                                <TableHead className="text-xs text-right">Balance</TableHead>
-                                <TableHead className="text-xs">Status</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {viewMemberAssets.map((a, i) => (
-                                <TableRow key={i}>
-                                  <TableCell className="text-xs">
-                                    <Badge variant="secondary" className="text-xs font-normal">{a.account_type}</Badge>
-                                  </TableCell>
-                                  <TableCell className="font-mono text-xs">{a.account_number}</TableCell>
-                                  <TableCell className="text-xs">{a.scheme_name}</TableCell>
-                                  <TableCell className="text-xs">{a.interest_rate ? `${a.interest_rate}%` : "---"}</TableCell>
-                                  <TableCell className="text-xs text-right font-semibold">{fmt(a.balance)}</TableCell>
-                                  <TableCell className="text-xs">
-                                    <span className={`font-medium ${a.status === "ACTIVE" ? "text-green-600" : "text-muted-foreground"}`}>
-                                      {a.status}
-                                    </span>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
-                          <TrendingUp className="h-8 w-8 opacity-20 mb-2" />
-                          <p className="text-sm">No assets found for this member.</p>
-                        </div>
-                      )}
-                    </TabsContent>
-
-                    {/* ── Liabilities ──────────────────────────────────── */}
-                    <TabsContent value="liabilities" className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-                      {viewMemberLoans.length > 0 ? (
-                        <>
-                          <div className="grid grid-cols-3 gap-3">
-                            {(() => {
-                              const activeLoans = viewMemberLoans.filter(l => l.application_status === "ACTIVE")
-                              const totalOutstanding = viewMemberLoans.reduce((s, l) => s + Number(l.outstanding_balance || 0), 0)
-                              const totalOverdue = viewMemberLoans.reduce((s, l) => s + Number(l.overdue_installments || 0), 0)
-                              return [
-                                { label: "Active Loans",       value: String(activeLoans.length),  color: "text-orange-700 bg-orange-50 border-orange-200" },
-                                { label: "Total Outstanding",  value: fmt(totalOutstanding),        color: "text-red-700 bg-red-50 border-red-200" },
-                                { label: "Overdue EMIs",       value: String(totalOverdue),         color: totalOverdue > 0 ? "text-red-700 bg-red-50 border-red-200" : "text-green-700 bg-green-50 border-green-200" },
-                              ].map(({ label, value, color }) => (
-                                <div key={label} className={`rounded-lg border p-3 text-center ${color}`}>
-                                  <p className="text-xs opacity-70">{label}</p>
-                                  <p className="text-base font-bold mt-0.5">{value}</p>
-                                </div>
-                              ))
-                            })()}
-                          </div>
-
-                          <div className="rounded-lg border overflow-hidden">
-                            <Table>
-                              <TableHeader>
-                                <TableRow className="bg-muted/50">
-                                  <TableHead className="text-xs">Loan Scheme</TableHead>
-                                  <TableHead className="text-xs text-right">Sanctioned</TableHead>
-                                  <TableHead className="text-xs text-right">Outstanding</TableHead>
-                                  <TableHead className="text-xs text-right">EMI</TableHead>
-                                  <TableHead className="text-xs">EMIs Paid</TableHead>
-                                  <TableHead className="text-xs">Status</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {viewMemberLoans.map((loan, i) => (
-                                  <TableRow key={i}>
-                                    <TableCell className="text-xs">
-                                      <p className="font-medium">{loan.scheme_name}</p>
-                                      {loan.sanction_date && <p className="text-muted-foreground text-xs">{formatDisplayDate(loan.sanction_date)}</p>}
-                                    </TableCell>
-                                    <TableCell className="text-xs text-right">{fmt(loan.sanctioned_amount)}</TableCell>
-                                    <TableCell className="text-xs text-right font-semibold text-red-600">{fmt(loan.outstanding_balance)}</TableCell>
-                                    <TableCell className="text-xs text-right">{fmt(loan.emi_amount)}</TableCell>
-                                    <TableCell className="text-xs">
-                                      {loan.paid_installments}/{loan.total_installments}
-                                      {Number(loan.overdue_installments) > 0 && (
-                                        <span className="ml-1 text-red-500">({loan.overdue_installments} overdue)</span>
-                                      )}
-                                    </TableCell>
-                                    <TableCell className="text-xs">
-                                      <span className={`font-medium ${loan.application_status === "ACTIVE" ? "text-green-600" : loan.application_status === "OVERDUE" ? "text-red-600" : "text-muted-foreground"}`}>
-                                        {loan.application_status}
-                                      </span>
-                                    </TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        </>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
-                          <TrendingDown className="h-8 w-8 opacity-20 mb-2" />
-                          <p className="text-sm">No loan accounts found for this member.</p>
-                        </div>
-                      )}
-                    </TabsContent>
-                  </Tabs>
-                )}
-
-                {/* Footer */}
-                {!viewMemberLoading && (
-                  <div className="px-6 py-3 border-t shrink-0 flex justify-end">
-                    <Button variant="outline" size="sm" onClick={() => setViewMemberOpen(false)} className="bg-transparent">
-                      Close
-                    </Button>
-                  </div>
-                )}
-              </DialogContent>
-            </Dialog>
 
             {/* Member Search Dialog */}
             <Dialog open={searchDialogOpen} onOpenChange={setSearchDialogOpen}>
@@ -2443,14 +1950,14 @@ const getLogindate = async () => {
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Installment Amount:</span>
                             <span className="font-semibold text-foreground">
-                              {Number(successInfo.installment_amount).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                              {formatCurrency(successInfo.installment_amount)}
                             </span>
                           </div>
                         ) : successInfo?.deposit_amount != null && (
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Deposit Amount:</span>
                             <span className="font-semibold text-foreground">
-                              {Number(successInfo.deposit_amount).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                              {formatCurrency(successInfo.deposit_amount)}
                             </span>
                           </div>
                         )}
@@ -2464,7 +1971,7 @@ const getLogindate = async () => {
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Maturity Amount:</span>
                             <span className="font-semibold text-teal-600">
-                              {Number(successInfo.maturity_amount).toLocaleString("en-IN", { style: "currency", currency: "INR" })}
+                              {formatCurrency(successInfo.maturity_amount)}
                             </span>
                           </div>
                         )}

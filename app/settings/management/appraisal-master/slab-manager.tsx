@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Loader2, Pencil, Plus, Search } from "lucide-react"
+import { formatAmount as formatINRAmount, type Numeric } from "@/lib/number-format"
 
 interface AppraisalSlab {
   id: string
@@ -39,8 +40,7 @@ const emptySlab = {
   status: "ACTIVE" as "ACTIVE" | "INACTIVE",
 }
 
-const formatAmount = (value: string | null) =>
-  value === null || value === "" ? "-" : Number(value).toLocaleString("en-IN", { minimumFractionDigits: 2 })
+const formatAmount = (v: Numeric) => formatINRAmount(v, { empty: "-" })
 
 export function SlabManager({ master, onOpenChange, onChanged }: SlabManagerProps) {
   const [slabs, setSlabs] = useState<AppraisalSlab[]>([])
@@ -166,7 +166,7 @@ export function SlabManager({ master, onOpenChange, onChanged }: SlabManagerProp
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   className="pl-8 w-64"
-                  type="number"
+                  type="amount"
                   placeholder="Find slab for loan amount"
                   value={amountFilter}
                   onChange={(e) => setAmountFilter(e.target.value)}
@@ -186,7 +186,7 @@ export function SlabManager({ master, onOpenChange, onChanged }: SlabManagerProp
                     <Label htmlFor="loan_amount_from">Loan Amount From *</Label>
                     <Input
                       id="loan_amount_from"
-                      type="number"
+                      type="amount"
                       min={0}
                       value={formData.loan_amount_from}
                       onChange={(e) => f("loan_amount_from", e.target.value)}
@@ -196,7 +196,7 @@ export function SlabManager({ master, onOpenChange, onChanged }: SlabManagerProp
                     <Label htmlFor="loan_amount_to">Loan Amount To *</Label>
                     <Input
                       id="loan_amount_to"
-                      type="number"
+                      type="amount"
                       min={0}
                       value={formData.loan_amount_to}
                       onChange={(e) => f("loan_amount_to", e.target.value)}
@@ -231,7 +231,7 @@ export function SlabManager({ master, onOpenChange, onChanged }: SlabManagerProp
                     <Label htmlFor="minimum_charge">Minimum Charge</Label>
                     <Input
                       id="minimum_charge"
-                      type="number"
+                      type="amount"
                       min={0}
                       value={formData.minimum_charge}
                       onChange={(e) => f("minimum_charge", e.target.value)}
@@ -241,7 +241,7 @@ export function SlabManager({ master, onOpenChange, onChanged }: SlabManagerProp
                     <Label htmlFor="maximum_charge">Maximum Charge</Label>
                     <Input
                       id="maximum_charge"
-                      type="number"
+                      type="amount"
                       min={0}
                       value={formData.maximum_charge}
                       onChange={(e) => f("maximum_charge", e.target.value)}

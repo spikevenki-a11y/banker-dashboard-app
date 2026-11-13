@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertCircle, Eye, Loader2, Search } from "lucide-react"
+import { formatCurrency } from "@/lib/number-format"
 
 interface IncomeAccount {
   id: string
@@ -130,7 +131,7 @@ export default function AccountsList({ onViewAccount, refreshTrigger }: Accounts
                     <TableCell className="font-mono text-sm">{account.account_number}</TableCell>
                     <TableCell>{account.account_name}</TableCell>
                     <TableCell className="text-right font-mono">
-                      ₹{account.current_balance}
+                      {formatCurrency(account.current_balance)}
                     </TableCell>
                     <TableCell>
                       <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-green-100 text-green-800">

@@ -53,6 +53,7 @@ import {
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { SearchableSelect } from "@/components/ui/searchable-select"
+import { formatCurrency as fmt } from "@/lib/number-format"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -146,6 +147,7 @@ type VoucherDetails = {
   title: string
   voucherNo: string | number | null
   batchId: string | number | null
+  voucherType?: string
   date: string
   description: string
   amount: number
@@ -153,10 +155,6 @@ type VoucherDetails = {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function fmt(val: number | string) {
-  return `₹${Number(val || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-}
 
 function fmtDate(d: string) {
   if (!d) return "—"
@@ -368,6 +366,7 @@ export default function FixedAssetsPage() {
         title: "Purchase Confirmed",
         voucherNo: data.voucher_no,
         batchId: data.batch_id,
+        voucherType: vType,
         date: new Date().toISOString().split("T")[0],
         description: `${data.assets_created} individual asset record(s) created`,
         amount: 0,
@@ -497,6 +496,7 @@ export default function FixedAssetsPage() {
         title: saleDisposalType === "SALE" ? "Asset Sale Recorded" : "Asset Scrapped",
         voucherNo: data.voucher_no,
         batchId: data.batch_id,
+        voucherType: saleVoucherType,
         date: saleDate,
         description: `${asset?.asset_name} (${asset?.serial_number})`,
         amount: parseFloat(saleAmount || "0"),
@@ -973,7 +973,7 @@ export default function FixedAssetsPage() {
                           </td>
                           <td className="py-2 pr-2">
                             <Input
-                              type="number" placeholder="0.00" value={line.unit_cost}
+                              type="amount" placeholder="0.00" value={line.unit_cost}
                               onChange={e => updateLine(idx, "unit_cost", e.target.value)}
                               className="w-28"
                             />
@@ -1162,7 +1162,7 @@ export default function FixedAssetsPage() {
                     <div className="space-y-1.5">
                       <Label>Sale Amount *</Label>
                       <Input
-                        type="number" placeholder="0.00" value={saleAmount}
+                        type="amount" placeholder="0.00" value={saleAmount}
                         onChange={e => setSaleAmount(e.target.value)}
                       />
                     </div>
@@ -1323,7 +1323,8 @@ export default function FixedAssetsPage() {
                       <span className="font-mono font-semibold">{voucherDetails.voucherNo}</span>
                     </div>
                   )}
-                  {voucherDetails?.batchId && (
+                  {/* Batch ID is not shown for Cash transactions */}
+                  {voucherDetails?.batchId && voucherDetails.voucherType !== "CASH" && (
                     <div className="flex justify-between px-3 py-2">
                       <span className="text-muted-foreground">Batch ID</span>
                       <span className="font-mono">{voucherDetails.batchId}</span>

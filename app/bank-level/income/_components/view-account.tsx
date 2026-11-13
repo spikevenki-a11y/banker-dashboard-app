@@ -5,6 +5,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertCircle, ArrowLeft, Loader2 } from "lucide-react"
+import { formatCurrency } from "@/lib/number-format"
 
 interface IncomeAccount {
   id: string
@@ -138,7 +139,7 @@ export default function ViewAccount({ accountNumber, onBack }: ViewAccountProps)
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹{balance}</div>
+            <div className="text-2xl font-bold">{formatCurrency(balance)}</div>
           </CardContent>
         </Card>
 
@@ -149,7 +150,7 @@ export default function ViewAccount({ accountNumber, onBack }: ViewAccountProps)
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹{(account.opening_balance || 0)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(account.opening_balance)}</div>
           </CardContent>
         </Card>
 
@@ -161,7 +162,7 @@ export default function ViewAccount({ accountNumber, onBack }: ViewAccountProps)
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${changeFromOpening >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              ₹{changeFromOpening}
+              {formatCurrency(changeFromOpening)}
             </div>
           </CardContent>
         </Card>

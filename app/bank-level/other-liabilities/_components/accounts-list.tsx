@@ -10,6 +10,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Eye, Search, Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { formatCurrency } from "@/lib/number-format"
 
 interface OtherLiabilityAccount {
   uuid: string
@@ -71,9 +72,6 @@ export default function AccountsList({
       default: return "bg-gray-100 text-gray-800"
     }
   }
-
-  const formatCurrency = (val: number | string) =>
-    `₹${Number(val || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   if (loading) {
     return (

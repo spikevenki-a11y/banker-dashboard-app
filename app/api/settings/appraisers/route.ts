@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { getSession } from "@/lib/auth/session"
 import { recordAppraiserHistory, validateAccount } from "@/lib/appraiser-history"
+import { findIncomeAccount } from "@/lib/appraiser-account"
 
 export async function GET(req: Request) {
   const session = await getSession()
@@ -12,14 +13,19 @@ export async function GET(req: Request) {
 
   try {
     const { rows } = await pool.query(
-      `SELECT appraiser_id, appraiser_code, appraiser_name, license_no,
-              TO_CHAR(license_valid_till, 'YYYY-MM-DD') AS license_valid_till,
-              mobile_no, email, address,
-              account_number::text AS account_number, account_type, status
-       FROM appraiser_master
-       WHERE branch_id = $1
-         AND ($2::text IS NULL OR status = $2)
-       ORDER BY appraiser_code`,
+      `SELECT am.appraiser_id, am.appraiser_code, am.appraiser_name, am.license_no,
+              TO_CHAR(am.license_valid_till, 'YYYY-MM-DD') AS license_valid_till,
+              am.mobile_no, am.email, am.address,
+              am.account_number::text AS account_number, am.account_type,
+              am.income_account_code::text AS income_account_code,
+              coa.accountname AS income_account_name,
+              am.status
+       FROM appraiser_master am
+       LEFT JOIN chart_of_accounts coa
+              ON coa.branch_id = am.branch_id AND coa.accountcode = am.income_account_code
+       WHERE am.branch_id = $1
+         AND ($2::text IS NULL OR am.status = $2)
+       ORDER BY am.appraiser_code`,
       [session.branch, status === "ACTIVE" || status === "INACTIVE" ? status : null]
     )
 
@@ -37,22 +43,27 @@ export async function POST(req: Request) {
   try {
     const {
       appraiser_code, appraiser_name, license_no, license_valid_till, mobile_no, email, address,
-      account_number, account_type, status,
+      account_number, account_type, income_account_code, status,
     } = await req.json()
 
     if (!appraiser_code?.trim() || !appraiser_name?.trim()) {
       return NextResponse.json({ error: "Appraiser code and name are required" }, { status: 400 })
     }
-    const accountError = validateAccount(account_number, account_type)
+    const accountError = validateAccount(account_number, account_type, income_account_code)
     if (accountError) return NextResponse.json({ error: accountError }, { status: 400 })
+    const incomeCode = String(income_account_code ?? "").trim() || null
+    if (incomeCode) {
+      const income = await findIncomeAccount(client, session.branch, incomeCode)
+      if (income.error) return NextResponse.json({ error: income.error }, { status: 400 })
+    }
 
     await client.query("BEGIN")
 
     const { rows } = await client.query(
       `INSERT INTO appraiser_master
          (branch_id, appraiser_code, appraiser_name, license_no, license_valid_till,
-          mobile_no, email, address, account_number, account_type, status, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          mobile_no, email, address, account_number, account_type, income_account_code, status, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING appraiser_id`,
       [
         session.branch,
@@ -65,6 +76,7 @@ export async function POST(req: Request) {
         address?.trim() || null,
         String(account_number ?? "").trim() || null,
         account_type || null,
+        incomeCode,
         status === "INACTIVE" ? "INACTIVE" : "ACTIVE",
         session.userId,
       ]

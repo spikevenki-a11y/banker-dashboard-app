@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/auth/session"
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
+import { formatCurrency } from "@/lib/number-format"
 
 export async function GET(request: Request) {
   try {
@@ -138,7 +139,7 @@ export async function GET(request: Request) {
         id: activity.id,
         member: activity.member_name,
         action: activity.action,
-        amount: activity.amount > 0 ? `₹${Number(activity.amount).toLocaleString("en-IN")}` : "-",
+        amount: activity.amount > 0 ? `${formatCurrency(activity.amount)}` : "-",
         time: timeAgo,
         status: activity.status?.toLowerCase() || "completed",
         module: activity.module,

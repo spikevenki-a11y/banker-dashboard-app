@@ -43,32 +43,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  ArrowLeft,
-  Loader2,
-  CheckCircle2,
-  Wallet,
-  CreditCard,
-  Search,
-  User,
-  Phone,
-  Calendar,
-  IndianRupee,
-  Percent,
-  Clock,
-  Banknote,
-  Building2,
-  RefreshCw,
-  ChevronRight,
-  AlertCircle,
-  Receipt,
-  FileText,
-  Home,
-  Eye,
-} from "lucide-react"
+import { ArrowLeft, Loader2, CheckCircle2, Wallet, CreditCard, Search, User, Calendar, IndianRupee, Banknote, Building2, RefreshCw, ChevronRight, AlertCircle, Receipt, FileText, Home } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { APPRAISER_ACCOUNT_TYPES } from "@/lib/appraiser-history"
-import { ViewMemberPopup } from "@/components/view-member-popup"
+import { APPRAISER_SHARE_PERCENT, INCOME_SHARE_PERCENT, splitAppraiserCharge } from "@/lib/appraiser-account"
+import { MemberSummaryCard, useMemberSummary } from "@/components/member-summary-card"
+import { formatCurrency } from "@/lib/number-format"
 
 type LoanAppraiser = {
   appraiser_id: number
@@ -76,6 +56,8 @@ type LoanAppraiser = {
   appraiser_name: string
   account_number: string | null
   account_type: string | null
+  income_account_code: string | null
+  income_account_name: string | null
 }
 
 // Returns the reason the appraiser cannot receive the charge, or "" when the account is usable
@@ -86,6 +68,9 @@ function getAppraiserAccountError(appraiser: LoanAppraiser | undefined) {
   }
   if (!APPRAISER_ACCOUNT_TYPES.some((t) => t.value === appraiser.account_type)) {
     return `Account type ${appraiser.account_type} is not supported for appraiser ${appraiser.appraiser_name}. Update it in Settings > Management > Manage Appraiser Details.`
+  }
+  if (!appraiser.income_account_code) {
+    return `No income account is configured for appraiser ${appraiser.appraiser_name}. Update it in Settings > Management > Manage Appraiser Details.`
   }
   return ""
 }
@@ -129,10 +114,6 @@ const PAYMENT_MODE_LABELS: Record<PaymentMode, string> = {
   DEFAULT_TRANSFER: "DEFAULT TRANSFER",
 }
 
-function formatCurrency(val: number | string) {
-  return `₹${Number(val).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-}
-
 export default function LoanDisbursementPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -150,6 +131,12 @@ export default function LoanDisbursementPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedLoan, setSelectedLoan] = useState<SanctionedLoan | null>(null)
+  // Member Summary card (shared with other modules); the loan's member details show until loaded
+  const summaryMember = useMemberSummary(selectedLoan?.membership_no, selectedLoan ? {
+    full_name: selectedLoan.member_name,
+    mobile_no: selectedLoan.mobile_no,
+    aadhaar_no: selectedLoan.aadhaar_no,
+  } : undefined)
 
   // Disbursement form
   const [disbursementAmount, setDisbursementAmount] = useState("")
@@ -177,7 +164,6 @@ export default function LoanDisbursementPage() {
   // Submit state
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
-  const [viewMemberOpen, setViewMemberOpen] = useState(false)
   const [successOpen, setSuccessOpen] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
   const [formError, setFormError] = useState("")
@@ -200,6 +186,7 @@ export default function LoanDisbursementPage() {
   const selectedAppraiser = appraisers.find((a) => String(a.appraiser_id) === appraiserCharge.appraiser_id)
   const hasAppraiserCharge = !!selectedLoan?.appraiser_charge_allowed && Number(appraiserCharge.charge_amount) > 0
   const appraiserAccountError = hasAppraiserCharge ? getAppraiserAccountError(selectedAppraiser) : ""
+  const chargeSplit = hasAppraiserCharge ? splitAppraiserCharge(Number(appraiserCharge.charge_amount)) : null
 
   // Fetch sanctioned loans
   const fetchSanctionedLoans = useCallback(async () => {
@@ -450,8 +437,10 @@ export default function LoanDisbursementPage() {
         (data.batch_open
           ? `Posted to GL Batch ${data.batch_id}. Post the credit entry to complete this batch.\n`
           : "") +
-        (data.appraiser_account_no
-          ? `Appraiser charge credited to A/c: ${data.appraiser_account_no}\n`
+        (data.appraiser_charge_split
+          ? `Appraiser charge ${formatCurrency(data.appraiser_charge_split.total)}:\n` +
+            `  ${APPRAISER_SHARE_PERCENT}% ${formatCurrency(data.appraiser_charge_split.appraiser_share)} → Appraiser A/c ${data.appraiser_account_no}\n` +
+            `  ${INCOME_SHARE_PERCENT}% ${formatCurrency(data.appraiser_charge_split.income_share)} → Income A/c ${data.appraiser_charge_split.income_account_code}\n`
           : "") +
         // `Monthly EMI: ${formatCurrency(data.emi_amount)}\n` +
         // `Total EMIs: ${data.total_installments}\n` +
@@ -599,6 +588,9 @@ export default function LoanDisbursementPage() {
               </Card>
             ) : (
               <div className="space-y-4">
+                {/* Member Summary — shared card and View Member Details popup */}
+                <MemberSummaryCard memberInfo={summaryMember} />
+
                 {/* Loan Details Card */}
                 <Card>
                   <CardHeader className="pb-3">
@@ -613,16 +605,6 @@ export default function LoanDisbursementPage() {
                         </CardDescription>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setViewMemberOpen(true)}
-                          className="gap-2 bg-transparent"
-                        >
-                          <Eye className="h-4 w-4" />
-                          {/* View Member Details */}
-                        </Button>
                         {/* <Badge className="bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400">
                           <CheckCircle2 className="mr-1 h-3 w-3" />
                           Sanctioned
@@ -631,22 +613,8 @@ export default function LoanDisbursementPage() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    {/* Member Info */}
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                      <div className="rounded-lg border p-3 bg-muted/30">
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Phone className="h-3 w-3" />
-                          Mobile
-                        </div>
-                        <p className="mt-1 font-medium">{selectedLoan.mobile_no || "N/A"}</p>
-                      </div>
-                      <div className="rounded-lg border p-3 bg-muted/30">
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <CreditCard className="h-3 w-3" />
-                          Aadhaar
-                        </div>
-                        <p className="mt-1 font-medium">{selectedLoan.aadhaar_no ? `XXXX-XXXX-${selectedLoan.aadhaar_no.slice(-4)}` : "N/A"}</p>
-                      </div>
+                    {/* Loan scheme (member details are in the Member Summary card) */}
+                    <div className="grid gap-4 sm:grid-cols-2">
                       <div className="rounded-lg border p-3 bg-muted/30">
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <Building2 className="h-3 w-3" />
@@ -737,7 +705,7 @@ export default function LoanDisbursementPage() {
                             <IndianRupee className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
                               id="disbursement-amount"
-                              type="number"
+                              type="amount"
                               placeholder="Enter amount"
                               min="0"
                               max={selectedLoan.sanctioned_amount}
@@ -898,6 +866,39 @@ export default function LoanDisbursementPage() {
                             {selectedAppraiser.account_number}
                           </span>{" "}
                           ({APPRAISER_ACCOUNT_TYPES.find((t) => t.value === selectedAppraiser.account_type)?.label})
+                          {selectedAppraiser.income_account_code && (
+                            <>
+                              {" · "}Income account:{" "}
+                              <span className="font-semibold text-foreground">
+                                {selectedAppraiser.income_account_code}
+                              </span>
+                              {selectedAppraiser.income_account_name && ` (${selectedAppraiser.income_account_name})`}
+                            </>
+                          )}
+                        </div>
+                      )}
+                      {chargeSplit && !appraiserAccountError && chargeSplit.total > 0 && (
+                        <div className="rounded-md border text-sm">
+                          <div className="grid grid-cols-3 gap-2 border-b bg-muted/50 px-3 py-1.5 text-xs font-medium text-muted-foreground">
+                            <span>Account</span>
+                            <span className="text-right">Share</span>
+                            <span className="text-right">Amount</span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 px-3 py-1.5">
+                            <span>Appraiser Account</span>
+                            <span className="text-right">{APPRAISER_SHARE_PERCENT}%</span>
+                            <span className="text-right font-mono">{formatCurrency(chargeSplit.appraiserShare)}</span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 px-3 py-1.5">
+                            <span>Income Account</span>
+                            <span className="text-right">{INCOME_SHARE_PERCENT}%</span>
+                            <span className="text-right font-mono">{formatCurrency(chargeSplit.incomeShare)}</span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 border-t px-3 py-1.5 font-medium">
+                            <span>Total Charge</span>
+                            <span className="text-right">100%</span>
+                            <span className="text-right font-mono">{formatCurrency(chargeSplit.total)}</span>
+                          </div>
                         </div>
                       )}
                       {appraiserAccountError && (
@@ -954,7 +955,7 @@ export default function LoanDisbursementPage() {
                             )}
                           </Label>
                           <Input
-                            type="number"
+                            type="amount"
                             placeholder="0.00"
                             value={appraiserCharge.charge_amount}
                             onChange={(e) => ac("charge_amount", e.target.value)}
@@ -1178,11 +1179,6 @@ export default function LoanDisbursementPage() {
           </AlertDialogContent>
         </AlertDialog>
       </div>
-      <ViewMemberPopup
-        open={viewMemberOpen}
-        onOpenChange={setViewMemberOpen}
-        membershipNo={selectedLoan?.membership_no}
-      />
     </DashboardWrapper>
   )
 }

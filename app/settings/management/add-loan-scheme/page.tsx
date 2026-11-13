@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ArrowLeft, FilePlus2, Search, Loader2, Save, CheckCircle2, AlertCircle, Library, Building2 } from "lucide-react"
 import { DashboardWrapper } from "../../../_components/dashboard-wrapper"
 import { cn } from "@/lib/utils"
+import { formatCurrency as formatINR, type Numeric } from "@/lib/number-format"
 
 interface MasterScheme {
   id: string
@@ -39,7 +40,7 @@ type Message = { type: "success" | "error"; lines: string[] }
 
 const formatRate = (v: string | null) => (v != null ? `${Number(v)}%` : "—")
 const formatType = (v: string | null) => v?.replace(/_/g, " ") ?? "—"
-const formatAmount = (v: string | null) => (v != null ? `₹${Number(v).toLocaleString("en-IN")}` : "—")
+const formatAmount = (v: Numeric) => formatINR(v, { empty: "—" })
 
 function StatusBadge({ status }: { status: string | null }) {
   const active = status === "ACTIVE"

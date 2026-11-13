@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, ArrowLeft } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { formatCurrency } from "@/lib/number-format"
 
 interface ReserveAccount {
   uuid: string
@@ -50,9 +51,6 @@ export default function ViewAccount({ accountId, onBack }: { accountId: string; 
       default: return "bg-gray-100 text-gray-800"
     }
   }
-
-  const formatCurrency = (val: number | string) =>
-    `₹${Number(val || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   if (loading) {
     return (

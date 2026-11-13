@@ -13,8 +13,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Username and password required" }, { status: 400 })
 
     const { rows: [user] } = await pool.query(
-      `SELECT id, username, password, full_name, role, is_active, branch, two_factor_enabled, two_factor_secret
-       FROM users WHERE username = $1`,
+      `SELECT u.id, u.username, u.password, u.full_name, u.role, u.is_active, u.branch_id as branch,br.branch_name, u.two_factor_enabled, u.two_factor_secret
+              FROM users u
+        LEFT JOIN branchparameters br
+            ON br.branch_id = u.branch_id
+        WHERE u.username = $1`,
       [username]
     )
 
@@ -77,7 +80,7 @@ export async function POST(request: Request) {
         fullName: user.full_name,
         role: user.role,
         branch: user.branch,
-        branch_name: user.branch,
+        branch_name: user.branch_name,
         businessDate: businessDate,
       })
       return NextResponse.json({ requiresTwoFactor: true })
@@ -89,7 +92,7 @@ export async function POST(request: Request) {
       fullName: user.full_name,
       role: user.role,
       branch: user.branch,
-      branch_name: user.branch,
+      branch_name: user.branch_name,
       businessDate: businessDate,
     })
 

@@ -26,6 +26,7 @@ import {
   Lock, LockOpen, KeyRound, Users, X, Info,
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
+import { formatCurrency as fmt } from "@/lib/number-format"
 
 type MemberInfo = {
   membership_no: string
@@ -58,9 +59,6 @@ type AvailableLocker = {
   dimensions: string | null
   annual_rent: number
 }
-
-const fmt = (n: number | string | null | undefined) =>
-  `₹${Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`
 
 export default function CreateLockerDepositPage() {
   const router = useRouter()
@@ -397,7 +395,7 @@ export default function CreateLockerDepositPage() {
                       <Label htmlFor="deposit-amount">Deposit Amount (₹) *</Label>
                       <Input
                         id="deposit-amount"
-                        type="number"
+                        type="amount"
                         placeholder="Enter amount"
                         value={depositAmount}
                         onChange={(e) => setDepositAmount(e.target.value)}

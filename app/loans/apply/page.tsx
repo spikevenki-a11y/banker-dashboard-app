@@ -34,6 +34,8 @@ import { LoanSchemeDetailsCard, type LoanSchemeDetails } from "@/components/loan
 import { getEcDateError, getEcYearsError, calculateEcYears } from "@/lib/land-security"
 import { calculateAge, getSchemeAgeError } from "@/lib/member-age"
 import { calculateMaxSanctionAmount } from "@/lib/gold-guideline"
+import { formatCurrency } from "@/lib/number-format"
+import { getLoanSecurityError, getSecurityValue } from "@/lib/loan-security-value"
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -841,6 +843,10 @@ export default function LoanApplicationPage() {
         return
       }
     }
+    if (loanSecurityError) {
+      alert(loanSecurityError)
+      return
+    }
     setIsSubmitting(true)
 
     // Build security payload
@@ -1025,9 +1031,6 @@ export default function LoanApplicationPage() {
     setEmiAmount(null); setTotalInterest(null); setTotalPayment(null); setEmiSchedule([])
   }
 
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(amount)
-
   // ── Security type classification ───────────────────────────────────────────
 
   const secTypeId = Number(selectedSecurityId)
@@ -1043,6 +1046,24 @@ export default function LoanApplicationPage() {
   const isInsurance = secTypeId === 10
   const isSurety = secTypeId === 13
   const isGeneral = secTypeId > 0 && !isGold && !isProperty && !isVehicle && !isDeposit && !isInsurance && !isSurety
+
+  // Loan amount applied must be less than the security amount (same rule as the API)
+  const securityValueSource = secTypeId
+    ? {
+        security_type_id: secTypeId,
+        market_value: securityForm.market_value,
+        guideline_value: securityForm.guideline_value,
+        current_market_value: securityForm.current_market_value,
+        deposit_amount: securityForm.deposit_amount,
+        lien_amount: securityForm.lien_amount,
+        surrender_value: securityForm.surrender_value,
+        surety_eligible_security_amount: securityForm.surety_eligible_security_amount,
+      }
+    : null
+  const securityValue = getSecurityValue(securityValueSource)
+  const loanSecurityError = getLoanSecurityError(loanAmount, securityValueSource)
+  // Shown live once a security amount is entered; "enter the security value" only blocks submit
+  const showLoanSecurityError = !!loanSecurityError && (securityValue?.amount ?? 0) > 0
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -1164,7 +1185,20 @@ export default function LoanApplicationPage() {
                     <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label>Loan Amount Applied *</Label>
-                        <Input type="number" placeholder="Enter amount" value={loanAmount} onChange={(e) => setLoanAmount(e.target.value)} />
+                        <Input
+                          type="amount"
+                          placeholder="Enter amount"
+                          value={loanAmount}
+                          onChange={(e) => setLoanAmount(e.target.value)}
+                          aria-invalid={showLoanSecurityError || undefined}
+                        />
+                        {showLoanSecurityError ? (
+                          <p className="text-xs text-destructive">{loanSecurityError}</p>
+                        ) : securityValue && securityValue.amount > 0 ? (
+                          <p className="text-xs text-muted-foreground">
+                            Must be less than the security amount ({formatCurrency(securityValue.amount)})
+                          </p>
+                        ) : null}
                       </div>
                       <div className="space-y-2">
                         <Label>Tenure (Months) *</Label>
@@ -1369,7 +1403,7 @@ export default function LoanApplicationPage() {
                         <div className="grid grid-cols-3 gap-3">
                           <div className="space-y-1">
                             <Label className="text-xs">Gold Rate / Gram (₹)</Label>
-                            <Input className="h-8 text-xs" type="number" step="0.01" placeholder="0.00" value={securityForm.gold_rate_per_gram} onChange={(e) => sf("gold_rate_per_gram", e.target.value)} />
+                            <Input className="h-8 text-xs" type="amount" step="0.01" placeholder="0.00" value={securityForm.gold_rate_per_gram} onChange={(e) => sf("gold_rate_per_gram", e.target.value)} />
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs">Rate Date</Label>
@@ -1693,7 +1727,7 @@ export default function LoanApplicationPage() {
                           )}
                           <div className="space-y-1">
                             <Label className="text-xs">Guideline Value (₹)</Label>
-                            <Input className="h-8 text-xs" type="number" value={securityForm.guideline_value} onChange={(e) => sf("guideline_value", e.target.value)} />
+                            <Input className="h-8 text-xs" type="amount" value={securityForm.guideline_value} onChange={(e) => sf("guideline_value", e.target.value)} />
                           </div>
                           {!isLand && (
                             <div className="space-y-1">
@@ -1811,14 +1845,14 @@ export default function LoanApplicationPage() {
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs">Purchase Price (₹)</Label>
-                            <Input className="h-8 text-xs" type="number" value={securityForm.purchase_price} onChange={(e) => sf("purchase_price", e.target.value)} />
+                            <Input className="h-8 text-xs" type="amount" value={securityForm.purchase_price} onChange={(e) => sf("purchase_price", e.target.value)} />
                           </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1">
                             <Label className="text-xs">Current Market Value (₹)</Label>
-                            <Input className="h-8 text-xs" type="number" value={securityForm.current_market_value} onChange={(e) => { sf("current_market_value", e.target.value); sf("assessed_value", e.target.value) }} />
+                            <Input className="h-8 text-xs" type="amount" value={securityForm.current_market_value} onChange={(e) => { sf("current_market_value", e.target.value); sf("assessed_value", e.target.value) }} />
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs">&nbsp;</Label>
@@ -1874,7 +1908,7 @@ export default function LoanApplicationPage() {
                                       <SelectItem key={acc.accountNumber} value={acc.accountNumber}>
                                         <span className="font-mono">{acc.accountNumber}</span>
                                         <span className="ml-2 text-muted-foreground">
-                                          {acc.depositTypeLabel} · {acc.schemeName} · ₹{acc.depositAmount.toLocaleString("en-IN")}
+                                          {acc.depositTypeLabel} · {acc.schemeName} · {formatCurrency(acc.depositAmount)}
                                           {acc.maturityDate ? ` · Matures ${formatDate(acc.maturityDate)}` : ""}
                                         </span>
                                       </SelectItem>
@@ -1924,7 +1958,7 @@ export default function LoanApplicationPage() {
                           <div className="space-y-1">
                             <Label className="text-xs">Deposit Amount (₹) *</Label>
                             <Input className={`h-8 text-xs ${secTypeId === 8 && securityForm.deposit_account_no ? "bg-muted" : ""}`}
-                              type="number" value={securityForm.deposit_amount}
+                              type="amount" value={securityForm.deposit_amount}
                               readOnly={secTypeId === 8 && !!securityForm.deposit_account_no}
                               onChange={(e) => { sf("deposit_amount", e.target.value); sf("assessed_value", e.target.value) }} />
                           </div>
@@ -1955,13 +1989,13 @@ export default function LoanApplicationPage() {
                           <div className="space-y-1">
                             <Label className="text-xs">Maturity Amount (₹)</Label>
                             <Input className={`h-8 text-xs ${secTypeId === 8 && securityForm.deposit_account_no ? "bg-muted" : ""}`}
-                              type="number" value={securityForm.maturity_amount}
+                              type="amount" value={securityForm.maturity_amount}
                               readOnly={secTypeId === 8 && !!securityForm.deposit_account_no}
                               onChange={(e) => sf("maturity_amount", e.target.value)} />
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs">Lien Amount (₹)</Label>
-                            <Input className="h-8 text-xs" type="number" placeholder="Amount under lien"
+                            <Input className="h-8 text-xs" type="amount" placeholder="Amount under lien"
                               value={securityForm.lien_amount}
                               onChange={(e) => sf("lien_amount", e.target.value)} />
                           </div>
@@ -2013,11 +2047,11 @@ export default function LoanApplicationPage() {
                         <div className="grid grid-cols-3 gap-3">
                           <div className="space-y-1">
                             <Label className="text-xs">Sum Assured (₹)</Label>
-                            <Input className="h-8 text-xs" type="number" value={securityForm.sum_assured} onChange={(e) => sf("sum_assured", e.target.value)} />
+                            <Input className="h-8 text-xs" type="amount" value={securityForm.sum_assured} onChange={(e) => sf("sum_assured", e.target.value)} />
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs">Surrender Value (₹)</Label>
-                            <Input className="h-8 text-xs" type="number" value={securityForm.surrender_value} onChange={(e) => { sf("surrender_value", e.target.value); sf("assessed_value", e.target.value) }} />
+                            <Input className="h-8 text-xs" type="amount" value={securityForm.surrender_value} onChange={(e) => { sf("surrender_value", e.target.value); sf("assessed_value", e.target.value) }} />
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs">Surrender Value Date</Label>
@@ -2036,7 +2070,7 @@ export default function LoanApplicationPage() {
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs">Premium Amount (₹)</Label>
-                            <Input className="h-8 text-xs" type="number" value={securityForm.premium_amount} onChange={(e) => sf("premium_amount", e.target.value)} />
+                            <Input className="h-8 text-xs" type="amount" value={securityForm.premium_amount} onChange={(e) => sf("premium_amount", e.target.value)} />
                           </div>
                         </div>
 
@@ -2098,13 +2132,13 @@ export default function LoanApplicationPage() {
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1">
                             <Label className="text-xs">Annual Income (₹) *</Label>
-                            <Input className="h-8 text-xs" type="number" min={0} placeholder="Surety's annual income"
+                            <Input className="h-8 text-xs" type="amount" min={0} placeholder="Surety's annual income"
                               value={securityForm.surety_annual_income}
                               onChange={(e) => sf("surety_annual_income", e.target.value)} />
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs">Eligible Security Amount (₹) *</Label>
-                            <Input className="h-8 text-xs" type="number" min={0} placeholder="Amount the surety can guarantee"
+                            <Input className="h-8 text-xs" type="amount" min={0} placeholder="Amount the surety can guarantee"
                               value={securityForm.surety_eligible_security_amount}
                               onChange={(e) => { sf("surety_eligible_security_amount", e.target.value); sf("assessed_value", e.target.value) }} />
                           </div>
@@ -2131,7 +2165,7 @@ export default function LoanApplicationPage() {
                         {/* <div className="grid grid-cols-3 gap-3">
                           <div className="space-y-1 col-span-2">
                             <Label className="text-xs">Assessed Value (₹)</Label>
-                            <Input className="h-8 text-xs" type="number" placeholder="Current assessed value" value={securityForm.assessed_value} onChange={(e) => sf("assessed_value", e.target.value)} />
+                            <Input className="h-8 text-xs" type="amount" placeholder="Current assessed value" value={securityForm.assessed_value} onChange={(e) => sf("assessed_value", e.target.value)} />
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs">Valuation Date</Label>

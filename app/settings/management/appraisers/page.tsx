@@ -28,7 +28,14 @@ interface Appraiser {
   address: string | null
   account_number: string | null
   account_type: string | null
+  income_account_code: string | null
+  income_account_name: string | null
   status: "ACTIVE" | "INACTIVE"
+}
+
+interface IncomeAccount {
+  account_code: string
+  account_name: string
 }
 
 interface AppraiserHistoryEntry {
@@ -44,6 +51,7 @@ interface AppraiserHistoryEntry {
   address: string | null
   account_number: string | null
   account_type: string | null
+  income_account_code: string | null
   status: "ACTIVE" | "INACTIVE"
   changed_by_name: string | null
   changed_at: string
@@ -59,6 +67,7 @@ const FIELD_LABELS: Record<string, string> = {
   address: "Address",
   account_number: "Account No",
   account_type: "Account Type",
+  income_account_code: "Income Account",
   status: "Status",
 }
 
@@ -90,6 +99,7 @@ const emptyForm = {
   address: "",
   account_number: "",
   account_type: "",
+  income_account_code: "",
   status: "ACTIVE" as "ACTIVE" | "INACTIVE",
 }
 
@@ -106,6 +116,8 @@ export default function AppraisersPage() {
   const [formError, setFormError] = useState("")
   const [isSaving, setIsSaving] = useState(false)
 
+  const [incomeAccounts, setIncomeAccounts] = useState<IncomeAccount[]>([])
+
   const [historyFor, setHistoryFor] = useState<Appraiser | null>(null)
   const [history, setHistory] = useState<AppraiserHistoryEntry[]>([])
   const [isHistoryLoading, setIsHistoryLoading] = useState(false)
@@ -113,6 +125,10 @@ export default function AppraisersPage() {
 
   useEffect(() => {
     fetchAppraisers()
+    fetch("/api/settings/appraisers/income-accounts")
+      .then((res) => res.json())
+      .then((data) => setIncomeAccounts(data.accounts || []))
+      .catch(() => setIncomeAccounts([]))
   }, [])
 
   const fetchAppraisers = async () => {
@@ -157,6 +173,7 @@ export default function AppraisersPage() {
       address: a.address ?? "",
       account_number: a.account_number ?? "",
       account_type: a.account_type ?? "",
+      income_account_code: a.income_account_code ?? "",
       status: a.status,
     })
     setFormError("")
@@ -176,6 +193,10 @@ export default function AppraisersPage() {
     }
     if (formData.account_number && !formData.account_type) {
       setFormError("Select the account type for the account number")
+      return
+    }
+    if (formData.account_number && !formData.income_account_code) {
+      setFormError("Select the income account. It is required for appraisers eligible for charges")
       return
     }
 
@@ -316,6 +337,12 @@ export default function AppraisersPage() {
                           <div>
                             <div className="font-mono text-sm">{a.account_number}</div>
                             <div className="text-xs text-muted-foreground">{accountTypeLabel(a.account_type)}</div>
+                            {a.income_account_code && (
+                              <div className="text-xs text-muted-foreground">
+                                Income: {a.income_account_code}
+                                {a.income_account_name && ` - ${a.income_account_name}`}
+                              </div>
+                            )}
                           </div>
                         ) : (
                           "-"
@@ -431,6 +458,35 @@ export default function AppraisersPage() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="col-span-2 space-y-2">
+                <Label htmlFor="income_account_code">
+                  Income Account{formData.account_number ? " *" : ""}
+                </Label>
+                <Select
+                  value={formData.income_account_code}
+                  onValueChange={(v) => f("income_account_code", v)}
+                >
+                  <SelectTrigger id="income_account_code">
+                    <SelectValue placeholder={incomeAccounts.length ? "Select income GL account" : "No income ledger accounts"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {formData.income_account_code &&
+                      !incomeAccounts.some((acc) => acc.account_code === formData.income_account_code) && (
+                        <SelectItem value={formData.income_account_code}>
+                          {formData.income_account_code} (inactive or not found)
+                        </SelectItem>
+                      )}
+                    {incomeAccounts.map((acc) => (
+                      <SelectItem key={acc.account_code} value={acc.account_code}>
+                        {acc.account_code} - {acc.account_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Appraiser charges are split 80% to the appraiser&apos;s account and 20% to this income account.
+                </p>
               </div>
               <div className="col-span-2 space-y-2">
                 <Label htmlFor="address">Address</Label>

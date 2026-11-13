@@ -11,6 +11,7 @@ import { DashboardWrapper } from "@/app/_components/dashboard-wrapper";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Landmark } from "lucide-react";
 import { useRouter } from "next/navigation"
+import { formatCurrency } from "@/lib/number-format"
 
 export default function SundryDebtorsPage() {
   
@@ -28,10 +29,6 @@ export default function SundryDebtorsPage() {
     setSelectedAccountId(accountId);
     setActiveTab("view");
   };
-
-  function formatCurrency(val: number | string) {
-    return `₹${Number(val || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-  }
 
   return (
     <DashboardWrapper>

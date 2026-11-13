@@ -14,14 +14,12 @@ import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { useBranchInfo } from "../_components/use-branch-info"
 import { openPrintWindow } from "../_components/open-print-window"
 import { downloadPdf } from "../_components/download-pdf"
+import { formatCurrency, type Numeric } from "@/lib/number-format"
 
-const fmt = (n: number | string | null | undefined) =>
-  Number(n || 0) === 0
-    ? "—"
-    : `₹${Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+// Zero amounts are shown as "—" in the statement columns
+const fmt = (n: Numeric) => (Number(n || 0) === 0 ? "—" : formatCurrency(n))
 
-const fmtAmt = (n: number | string | null | undefined) =>
-  `₹${Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const fmtAmt = formatCurrency
 
 const fmtDate = (d: string | null) =>
   d ? formatDate(d) : "—"

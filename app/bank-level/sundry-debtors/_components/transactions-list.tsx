@@ -28,6 +28,7 @@ import {
   ArrowUpRight,
   History,
 } from "lucide-react"
+import { formatCurrency } from "@/lib/number-format"
 
 interface Transaction {
   id: string
@@ -227,7 +228,7 @@ export default function TransactionsList() {
 
       setMessage({
         type: "success",
-        text: data.message || `Transaction recorded successfully! Batch: ${data.batch_id}, Voucher: ${data.voucher_no}`,
+        text: data.message || `Transaction recorded successfully! ${voucherType === "CASH" ? "" : `Batch: ${data.batch_id}, `}Voucher: ${data.voucher_no}`,
       })
 
       // Reset form
@@ -254,10 +255,6 @@ export default function TransactionsList() {
     account.account_number.toLowerCase().includes(accountSearchTerm.toLowerCase()) ||
     account.account_name.toLowerCase().includes(accountSearchTerm.toLowerCase())
   )
-
-  const formatCurrency = (val: number | string) => {
-    return `₹${Number(val).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-  }
 
   const formatDate = (d: string) => {
     if (!d) return "---"
@@ -456,7 +453,7 @@ export default function TransactionsList() {
                           <div>
                             <Label className="text-xs text-muted-foreground">Amount (INR) *</Label>
                             <Input
-                              type="number"
+                              type="amount"
                               min="0"
                               step="0.01"
                               placeholder="0.00"

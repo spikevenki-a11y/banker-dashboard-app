@@ -6,9 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Loader2, User, TrendingUp, TrendingDown, ShieldCheck, Eye, MapPin, Camera, PenTool } from "lucide-react"
+import { Loader2, User, TrendingUp, TrendingDown, ShieldCheck, Eye, MapPin, Camera, PenTool, Users } from "lucide-react"
+import { formatCurrency as fmt } from "@/lib/number-format"
 
 // Member Summary card + "View Member Details" profile modal.
 // Same layout, fields and behaviour as Fixed Deposits → Create Deposit.
@@ -98,10 +99,37 @@ type MemberProfile = {
   state: string
   pincode: string
   address_phone: string
+  permanent_house_no?: string | null
+  permanent_street?: string | null
+  permanent_village?: string | null
+  permanent_thaluk?: string | null
+  permanent_district?: string | null
+  permanent_state?: string | null
+  permanent_pincode?: string | null
   aadhaar_no: string
   pan_no: string
   ration_no: string
+  ration_card_type?: string | null
   driving_license_no: string
+  passport_no?: string | null
+  eb_bill_no?: string | null
+  other_document_name?: string | null
+  other_document_no?: string | null
+}
+
+type NomineeItem = {
+  account_number: string
+  account_type?: string
+  nominee_name: string
+  nominee_relation: string
+  is_member: boolean
+  member_id: string | null
+  nominee_dob: string | null
+  nominee_gender: string | null
+  nominee_age: number | null
+  nominee_address: string | null
+  nominee_phone?: string | null
+  nominee_percentage: number | null
 }
 
 type AccountAsset = {
@@ -133,7 +161,27 @@ type LoanAccount = {
   loan_account_no: string
 }
 
-const fmt = (n: number) => `₹${Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`
+// Bank's perspective: the member's savings, deposits and shares are money the bank
+// holds (liabilities); the member's loans are money owed to the bank (assets).
+const LIABILITY_GROUPS = [
+  { key: "savings", label: "Savings Accounts" },
+  { key: "deposits", label: "Fixed / Term Deposits" },
+  { key: "shares", label: "Share Deposits" },
+] as const
+type LiabilityGroup = (typeof LIABILITY_GROUPS)[number]["key"]
+
+const liabilityGroupOf = (accountType: string): LiabilityGroup => {
+  const t = String(accountType || "").toLowerCase()
+  if (t.includes("saving")) return "savings"
+  if (t.includes("share")) return "shares"
+  return "deposits" // Term, Recurring and Pigmy deposits
+}
+
+// Same rule as /api/members/accounts: closed accounts are left out of the totals
+const CLOSED_STATUSES = ["CLOSED", "PREMATURE CLOSURE", "PREMATURE CLOSED", "REJECTED", "INACTIVE"]
+const isOpenAccount = (status: string) => !CLOSED_STATUSES.includes(String(status || "").toUpperCase())
+const sumOpen = (items: AccountAsset[]) =>
+  Math.round(items.filter((a) => isOpenAccount(a.status)).reduce((t, a) => t + Number(a.balance || 0), 0) * 100) / 100
 
 export function MemberSummaryCard({ memberInfo }: { memberInfo: MemberSummaryInfo | null }) {
   const [viewMemberOpen, setViewMemberOpen] = useState(false)
@@ -144,6 +192,33 @@ export function MemberSummaryCard({ memberInfo }: { memberInfo: MemberSummaryInf
   const [viewMemberLoans, setViewMemberLoans] = useState<LoanAccount[]>([])
   const [viewMemberLoading, setViewMemberLoading] = useState(false)
   const [viewMemberError, setViewMemberError] = useState("")
+  // Nominees load the first time the Nominees tab is opened
+  const [nominees, setNominees] = useState<NomineeItem[]>([])
+  const [nomineesLoading, setNomineesLoading] = useState(false)
+  const [nomineesFor, setNomineesFor] = useState<string | null>(null)
+
+  useEffect(() => {
+    const no = memberInfo?.membership_no ? String(memberInfo.membership_no) : ""
+    if (!viewMemberOpen || viewMemberTab !== "nominees" || !no || nomineesFor === no) return
+    let cancelled = false
+    setNomineesLoading(true)
+    fetch(`/api/members/nominees?membership_no=${encodeURIComponent(no)}`, { credentials: "include" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled) setNominees(data.success ? data.nominees || [] : [])
+      })
+      .catch(() => {
+        if (!cancelled) setNominees([])
+      })
+      .finally(() => {
+        if (cancelled) return
+        setNomineesLoading(false)
+        setNomineesFor(no)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [viewMemberOpen, viewMemberTab, memberInfo?.membership_no, nomineesFor])
 
   const handleViewMember = async () => {
     if (!memberInfo) return
@@ -155,6 +230,8 @@ export function MemberSummaryCard({ memberInfo }: { memberInfo: MemberSummaryInf
     setViewMemberAssets([])
     setViewMemberSummary(null)
     setViewMemberLoans([])
+    setNominees([])
+    setNomineesFor(null)
 
     try {
       const no = memberInfo.membership_no
@@ -259,7 +336,7 @@ export function MemberSummaryCard({ memberInfo }: { memberInfo: MemberSummaryInf
 
       {/* Member Profile Modal */}
       <Dialog open={viewMemberOpen} onOpenChange={setViewMemberOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+        <DialogContent className="w-[95vw] max-w-4xl sm:max-w-4xl h-[min(85dvh,760px)] overflow-hidden flex flex-col gap-0 p-0">
           {/* Fixed header */}
           <div className="px-6 pt-6 pb-4 border-b shrink-0">
             <DialogHeader>
@@ -312,8 +389,8 @@ export function MemberSummaryCard({ memberInfo }: { memberInfo: MemberSummaryInf
 
           {/* Tabbed content */}
           {!viewMemberLoading && !viewMemberError && (
-            <Tabs value={viewMemberTab} onValueChange={setViewMemberTab} className="flex flex-col flex-1 min-h-0">
-              <TabsList className="mx-6 mt-3 shrink-0 grid grid-cols-4 w-auto">
+            <Tabs value={viewMemberTab} onValueChange={setViewMemberTab} className="flex flex-col flex-1 min-h-0 gap-0">
+              <TabsList className="mx-6 mt-3 shrink-0 flex h-auto w-auto flex-wrap justify-start">
                 <TabsTrigger value="personal" className="gap-1.5 text-xs">
                   <User className="h-3.5 w-3.5" />Personal
                 </TabsTrigger>
@@ -327,15 +404,18 @@ export function MemberSummaryCard({ memberInfo }: { memberInfo: MemberSummaryInf
                 <TabsTrigger value="liabilities" className="gap-1.5 text-xs">
                   <TrendingDown className="h-3.5 w-3.5" />Liabilities
                 </TabsTrigger>
+                <TabsTrigger value="nominees" className="gap-1.5 text-xs">
+                  <Users className="h-3.5 w-3.5" />Nominees
+                </TabsTrigger>
               </TabsList>
 
               {/* ── Personal ─────────────────────────────────────── */}
-              <TabsContent value="personal" className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+              <TabsContent value="personal" className="mt-0 flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable] px-6 py-4 space-y-5">
                 {viewMemberProfile ? (
                   <>
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Personal Information</p>
-                      <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+                      <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
                         {[
                           ["Full Name",       viewMemberProfile.full_name],
                           ["Father Name",     viewMemberProfile.father_name || "---"],
@@ -359,7 +439,7 @@ export function MemberSummaryCard({ memberInfo }: { memberInfo: MemberSummaryInf
 
                     <div className="border-t pt-4">
                       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Membership Information</p>
-                      <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+                      <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
                         {[
                           ["Membership No",          viewMemberProfile.membership_no],
                           ["Member Type",            viewMemberProfile.member_type || "---"],
@@ -382,12 +462,12 @@ export function MemberSummaryCard({ memberInfo }: { memberInfo: MemberSummaryInf
               </TabsContent>
 
               {/* ── Address & KYC ────────────────────────────────── */}
-              <TabsContent value="address" className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+              <TabsContent value="address" className="mt-0 flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable] px-6 py-4 space-y-5">
                 {viewMemberProfile ? (
                   <>
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Current Address</p>
-                      <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+                      <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
                         {[
                           ["House No",    viewMemberProfile.house_no || "---"],
                           ["Street",      viewMemberProfile.street || "---"],
@@ -406,16 +486,48 @@ export function MemberSummaryCard({ memberInfo }: { memberInfo: MemberSummaryInf
                       </div>
                     </div>
 
+                    {[
+                      viewMemberProfile.permanent_house_no, viewMemberProfile.permanent_street,
+                      viewMemberProfile.permanent_village, viewMemberProfile.permanent_thaluk,
+                      viewMemberProfile.permanent_district, viewMemberProfile.permanent_state,
+                      viewMemberProfile.permanent_pincode,
+                    ].some(Boolean) && (
+                      <div className="border-t pt-4">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Permanent Address</p>
+                        <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
+                          {[
+                            ["House No",    viewMemberProfile.permanent_house_no || "---"],
+                            ["Street",      viewMemberProfile.permanent_street || "---"],
+                            ["Village",     viewMemberProfile.permanent_village || "---"],
+                            ["Taluk",       viewMemberProfile.permanent_thaluk || "---"],
+                            ["District",    viewMemberProfile.permanent_district || "---"],
+                            ["State",       viewMemberProfile.permanent_state || "---"],
+                            ["Pincode",     viewMemberProfile.permanent_pincode || "---"],
+                          ].map(([label, value]) => (
+                            <div key={label}>
+                              <p className="text-xs text-muted-foreground">{label}</p>
+                              <p className="mt-0.5 text-sm font-medium">{value}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="border-t pt-4">
                       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
                         <ShieldCheck className="inline h-3.5 w-3.5 mr-1" />KYC Documents
                       </p>
-                      <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+                      <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
                         {[
                           ["Aadhaar No",         viewMemberProfile.aadhaar_no || "---"],
                           ["PAN No",             viewMemberProfile.pan_no || "---"],
                           ["Ration No",          viewMemberProfile.ration_no || "---"],
+                          ["Ration Card Type",   viewMemberProfile.ration_card_type || "---"],
                           ["Driving License",    viewMemberProfile.driving_license_no || "---"],
+                          ["Passport No",        viewMemberProfile.passport_no || "---"],
+                          ["EB Bill No",         viewMemberProfile.eb_bill_no || "---"],
+                          [viewMemberProfile.other_document_name ? `Others (${viewMemberProfile.other_document_name})` : "Others",
+                                                 viewMemberProfile.other_document_no || "---"],
                         ].map(([label, value]) => (
                           <div key={label}>
                             <p className="text-xs text-muted-foreground">{label}</p>
@@ -431,25 +543,32 @@ export function MemberSummaryCard({ memberInfo }: { memberInfo: MemberSummaryInf
               </TabsContent>
 
               {/* ── Bank Liabilities: member's savings, deposits & shares ── */}
-              <TabsContent value="liabilities" className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-                {viewMemberSummary && (
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      // total_assets / total_liabilities come from the member-side API, so they are swapped here
-                      { label: "Total Liabilities", value: fmt(viewMemberSummary.total_assets),      color: "text-red-700 bg-red-50 border-red-200" },
-                      { label: "Total Accounts",    value: String(viewMemberAssets.length),          color: "text-blue-700 bg-blue-50 border-blue-200" },
-                      // { label: "Net Position",      value: fmt(Number(viewMemberSummary.total_liabilities || 0) - Number(viewMemberSummary.total_assets || 0)), color: "text-green-700 bg-green-50 border-green-200" },
-                    ].map(({ label, value, color }) => (
-                      <div key={label} className={`rounded-lg border p-3 text-center ${color}`}>
-                        <p className="text-xs opacity-70">{label}</p>
-                        <p className="text-base font-bold mt-0.5">{value}</p>
+              <TabsContent value="liabilities" className="mt-0 flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable] px-6 py-4 space-y-4">
+                {(() => {
+                  // Subtotal per category (open accounts) and the grand total
+                  const grouped = LIABILITY_GROUPS.map((g) => {
+                    const items = viewMemberAssets.filter((a) => liabilityGroupOf(a.account_type) === g.key)
+                    return { ...g, items, subtotal: sumOpen(items) }
+                  })
+                  const grandTotal = Math.round(grouped.reduce((t, g) => t + g.subtotal, 0) * 100) / 100
+                  return (
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      {grouped.map((g) => (
+                        <div key={g.key} className="rounded-lg border p-3 text-center">
+                          <p className="text-xs text-muted-foreground">{g.label}</p>
+                          <p className="mt-0.5 text-sm font-bold">{fmt(g.subtotal)}</p>
+                        </div>
+                      ))}
+                      <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-center text-red-700">
+                        <p className="text-xs opacity-70">Total Liabilities</p>
+                        <p className="mt-0.5 text-base font-bold">{fmt(grandTotal)}</p>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </div>
+                  )
+                })()}
 
                 {viewMemberAssets.length > 0 ? (
-                  <div className="rounded-lg border overflow-hidden">
+                  <div className="rounded-lg border overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-muted/50">
@@ -462,23 +581,41 @@ export function MemberSummaryCard({ memberInfo }: { memberInfo: MemberSummaryInf
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {viewMemberAssets.map((a, i) => (
-                          <TableRow key={i}>
-                            <TableCell className="text-xs">
-                              <Badge variant="secondary" className="text-xs font-normal">{a.account_type}</Badge>
-                            </TableCell>
-                            <TableCell className="font-mono text-xs">{a.account_number}</TableCell>
-                            <TableCell className="text-xs">{a.scheme_name}</TableCell>
-                            <TableCell className="text-xs">{a.interest_rate ? `${a.interest_rate}%` : "---"}</TableCell>
-                            <TableCell className="text-xs text-right font-semibold">{fmt(a.balance)}</TableCell>
-                            <TableCell className="text-xs">
-                              <span className={`font-medium ${a.status === "ACTIVE" ? "text-green-600" : "text-muted-foreground"}`}>
-                                {a.status}
-                              </span>
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {LIABILITY_GROUPS.map((g) => {
+                          const items = viewMemberAssets.filter((a) => liabilityGroupOf(a.account_type) === g.key)
+                          if (items.length === 0) return null
+                          return [
+                            ...items.map((a, i) => (
+                              <TableRow key={`${g.key}-${i}`}>
+                                <TableCell className="text-xs">
+                                  <Badge variant="secondary" className="text-xs font-normal">{a.account_type}</Badge>
+                                </TableCell>
+                                <TableCell className="font-mono text-xs">{a.account_number}</TableCell>
+                                <TableCell className="text-xs">{a.scheme_name}</TableCell>
+                                <TableCell className="text-xs">{a.interest_rate ? `${a.interest_rate}%` : "---"}</TableCell>
+                                <TableCell className="text-xs text-right font-semibold">{fmt(a.balance)}</TableCell>
+                                <TableCell className="text-xs">
+                                  <span className={`font-medium ${a.status === "ACTIVE" ? "text-green-600" : "text-muted-foreground"}`}>
+                                    {a.status}
+                                  </span>
+                                </TableCell>
+                              </TableRow>
+                            )),
+                            <TableRow key={`${g.key}-subtotal`} className="bg-muted/30">
+                              <TableCell colSpan={4} className="text-xs font-semibold">Subtotal — {g.label}</TableCell>
+                              <TableCell className="text-xs text-right font-bold">{fmt(sumOpen(items))}</TableCell>
+                              <TableCell />
+                            </TableRow>,
+                          ]
+                        })}
                       </TableBody>
+                      <TableFooter>
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-xs font-bold">Total Liabilities</TableCell>
+                          <TableCell className="text-xs text-right font-bold text-red-700">{fmt(sumOpen(viewMemberAssets))}</TableCell>
+                          <TableCell />
+                        </TableRow>
+                      </TableFooter>
                     </Table>
                   </div>
                 ) : (
@@ -490,7 +627,7 @@ export function MemberSummaryCard({ memberInfo }: { memberInfo: MemberSummaryInf
               </TabsContent>
 
               {/* ── Bank Assets: member's loans & outstanding balances ── */}
-              <TabsContent value="assets" className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+              <TabsContent value="assets" className="mt-0 flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable] px-6 py-4 space-y-4">
                 {viewMemberLoans.length > 0 ? (
                   <>
                     <div className="grid grid-cols-3 gap-3">
@@ -511,7 +648,7 @@ export function MemberSummaryCard({ memberInfo }: { memberInfo: MemberSummaryInf
                       })()}
                     </div>
 
-                    <div className="rounded-lg border overflow-hidden">
+                    <div className="rounded-lg border overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-muted/50">
@@ -547,6 +684,21 @@ export function MemberSummaryCard({ memberInfo }: { memberInfo: MemberSummaryInf
                             </TableRow>
                           ))}
                         </TableBody>
+                        <TableFooter>
+                          <TableRow>
+                            <TableCell className="text-xs font-bold">Total Assets (Loans)</TableCell>
+                            <TableCell className="text-xs text-right font-bold">
+                              {fmt(viewMemberLoans.reduce((t, l) => t + Number(l.sanctioned_amount || 0), 0))}
+                            </TableCell>
+                            <TableCell className="text-xs text-right font-bold text-red-600">
+                              {fmt(viewMemberLoans.reduce((t, l) => t + Number(l.outstanding_balance || 0), 0))}
+                            </TableCell>
+                            <TableCell className="text-xs text-right font-bold">
+                              {fmt(viewMemberLoans.reduce((t, l) => t + Number(l.emi_amount || 0), 0))}
+                            </TableCell>
+                            <TableCell colSpan={2} />
+                          </TableRow>
+                        </TableFooter>
                       </Table>
                     </div>
                   </>
@@ -557,17 +709,71 @@ export function MemberSummaryCard({ memberInfo }: { memberInfo: MemberSummaryInf
                   </div>
                 )}
               </TabsContent>
+
+              {/* ── Nominees ─────────────────────────────────────── */}
+              <TabsContent value="nominees" className="mt-0 flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable] px-6 py-4">
+                {nomineesLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    <span className="ml-2 text-sm text-muted-foreground">Loading nominees…</span>
+                  </div>
+                ) : nominees.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
+                    <Users className="h-8 w-8 opacity-20 mb-2" />
+                    <p className="text-sm">No nominees registered for this member.</p>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead className="text-xs">Account</TableHead>
+                          <TableHead className="text-xs">Nominee Name</TableHead>
+                          <TableHead className="text-xs">Relation</TableHead>
+                          <TableHead className="text-xs">DOB / Age</TableHead>
+                          <TableHead className="text-xs">Gender</TableHead>
+                          <TableHead className="text-xs">Member</TableHead>
+                          <TableHead className="text-xs">Phone</TableHead>
+                          <TableHead className="text-xs">Address</TableHead>
+                          <TableHead className="text-xs text-right">Share %</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {nominees.map((n, i) => (
+                          <TableRow key={`${n.account_number}-${i}`}>
+                            <TableCell className="text-xs">
+                              <p className="font-mono">{n.account_number}</p>
+                              {n.account_type && <p className="text-muted-foreground">{n.account_type}</p>}
+                            </TableCell>
+                            <TableCell className="text-xs font-medium">{n.nominee_name || "---"}</TableCell>
+                            <TableCell className="text-xs capitalize">{n.nominee_relation || "---"}</TableCell>
+                            <TableCell className="whitespace-nowrap text-xs">
+                              {formatDate(n.nominee_dob, "---")}
+                              {n.nominee_age != null && <span className="text-muted-foreground"> · {n.nominee_age} yrs</span>}
+                            </TableCell>
+                            <TableCell className="text-xs capitalize">{n.nominee_gender || "---"}</TableCell>
+                            <TableCell className="text-xs">{n.is_member ? `Yes${n.member_id ? ` (${n.member_id})` : ""}` : "No"}</TableCell>
+                            <TableCell className="whitespace-nowrap font-mono text-xs">{n.nominee_phone || "---"}</TableCell>
+                            <TableCell className="max-w-[200px] text-xs">{n.nominee_address || "---"}</TableCell>
+                            <TableCell className="text-right text-xs">
+                              {n.nominee_percentage != null ? `${n.nominee_percentage}%` : "---"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </TabsContent>
             </Tabs>
           )}
 
-          {/* Footer */}
-          {!viewMemberLoading && (
-            <div className="px-6 py-3 border-t shrink-0 flex justify-end">
-              <Button variant="outline" size="sm" onClick={() => setViewMemberOpen(false)} className="bg-transparent">
-                Close
-              </Button>
-            </div>
-          )}
+          {/* Footer (always shown so the popup layout stays the same while loading) */}
+          <div className="px-6 py-3 border-t shrink-0 flex justify-end">
+            <Button variant="outline" size="sm" onClick={() => setViewMemberOpen(false)} className="bg-transparent">
+              Close
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </>

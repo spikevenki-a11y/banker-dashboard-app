@@ -40,23 +40,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  ArrowLeft,
-  Search,
-  Loader2,
-  CheckCircle2,
-  User,
-  CreditCard,
-  Banknote,
-  ArrowDownRight,
-  Users,
-  X,
-  Eye,
-  History,
-} from "lucide-react"
+import { ArrowLeft, Search, Loader2, CheckCircle2, CreditCard, Banknote, ArrowDownRight, Users, X, History } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
-import { ViewMemberPopup } from "@/components/view-member-popup"
 import { MemberSummaryCard, useMemberSummary } from "@/components/member-summary-card"
+import { formatCurrency } from "@/lib/number-format"
 
 type MemberInfo = {
   membership_id: string
@@ -89,10 +76,6 @@ type ShareTransaction = {
   gl_batch_id: number
   status: string
   narration: string
-}
-
-function formatCurrency(val: number | string) {
-  return `₹${Number(val).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 function formatDate(d: string) {
@@ -143,7 +126,6 @@ function ShareDepositContent() {
   const [isPopupSearching, setIsPopupSearching] = useState(false)
 
   // View member details popup
-  const [viewMemberOpen, setViewMemberOpen] = useState(false)
 
   // Transaction history
   const [transactions, setTransactions] = useState<ShareTransaction[]>([])
@@ -357,17 +339,6 @@ function ShareDepositContent() {
                           <Search className="h-4 w-4" />
                           Search
                         </Button>
-                        {memberInfo && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setViewMemberOpen(true)}
-                            className="gap-2 bg-transparent"
-                          >
-                            <Eye className="h-4 w-4" />
-                            View
-                          </Button>
-                        )}
                       </div>
                       {isSearching && (
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -461,7 +432,7 @@ function ShareDepositContent() {
                         <Label htmlFor="deposit-amount">Deposit Amount (INR) *</Label>
                         <Input
                           id="deposit-amount"
-                          type="number"
+                          type="amount"
                           min="0"
                           step="0.01"
                           placeholder="Enter deposit amount"
@@ -916,12 +887,6 @@ function ShareDepositContent() {
           </main>
         </div>
       </div>
-
-      <ViewMemberPopup
-        open={viewMemberOpen}
-        onOpenChange={setViewMemberOpen}
-        membershipNo={memberInfo?.membership_no}
-      />
     </DashboardWrapper>
   )
 }

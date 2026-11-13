@@ -59,6 +59,7 @@ import {
 } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { MemberSummaryCard, useMemberSummary } from "@/components/member-summary-card"
+import { formatCurrency } from "@/lib/number-format"
 
 type AccountInfo = {
   account_number: string
@@ -92,10 +93,6 @@ type Transaction = {
   batch_status: string
   created_by: string
   transaction_date: string
-}
-
-function formatCurrency(val: number | string) {
-  return `₹${Number(val).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 function formatDate(d: string) {
@@ -527,7 +524,7 @@ export default function WithdrawPage() {
                                 <SelectItem key={acc.account_number} value={acc.account_number}>
                                   <span className="font-mono">{acc.account_number}</span>
                                   <span className="ml-2 text-muted-foreground">— {acc.scheme_name}</span>
-                                  <span className="ml-2 text-teal-600">₹{Number(acc.available_balance).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                                  <span className="ml-2 text-teal-600">{formatCurrency(acc.available_balance)}</span>
                                   <span className="ml-2 text-xs text-muted-foreground">({acc.account_status})</span>
                                 </SelectItem>
                               ))}
@@ -668,7 +665,7 @@ export default function WithdrawPage() {
                         <Label htmlFor="withdraw-amount">Withdrawal Amount (INR) *</Label>
                         <Input
                           id="withdraw-amount"
-                          type="number"
+                          type="amount"
                           min="0"
                           step="0.01"
                           placeholder="Enter withdrawal amount"
@@ -1025,7 +1022,7 @@ export default function WithdrawPage() {
                             <TableCell className="text-xs font-medium">{result.full_name}</TableCell>
                             <TableCell className="font-mono text-xs text-muted-foreground">{result.membership_no}</TableCell>
                             <TableCell className="text-xs text-muted-foreground">{result.scheme_name}</TableCell>
-                            <TableCell className="text-xs font-medium">{`\u20B9${Number(result.available_balance).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`}</TableCell>
+                            <TableCell className="text-xs font-medium">{`${formatCurrency(result.available_balance)}`}</TableCell>
                             <TableCell>
                               <Badge className={`text-[10px] ${result.account_status?.toLowerCase() === "active" ? "bg-teal-100 text-teal-700" : result.account_status?.toLowerCase() === "closed" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
                                 {result.account_status}
