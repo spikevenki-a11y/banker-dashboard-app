@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { getSession } from "@/lib/auth/session"
+import { requireRole } from "@/lib/auth/require-role"
 
 // GET: Fetch all chart of accounts for the branch
 export async function GET(req: NextRequest) {
@@ -50,8 +51,9 @@ export async function GET(req: NextRequest) {
 
 // POST: Create a new account
 export async function POST(req: NextRequest) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await requireRole("admin")
+  if (auth instanceof NextResponse) return auth
+  const session = auth.session
 
   const branchId = session.branch
 
@@ -96,8 +98,9 @@ export async function POST(req: NextRequest) {
 
 // PUT: Update an existing account
 export async function PUT(req: NextRequest) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await requireRole("admin")
+  if (auth instanceof NextResponse) return auth
+  const session = auth.session
 
   const branchId = session.branch
 

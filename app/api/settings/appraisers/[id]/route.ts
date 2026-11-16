@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
-import { getSession } from "@/lib/auth/session"
+import { requireRole } from "@/lib/auth/require-role"
 import { diffAppraiser, historyAction, recordAppraiserHistory, validateAccount } from "@/lib/appraiser-history"
 import { findIncomeAccount } from "@/lib/appraiser-account"
 
@@ -11,8 +11,9 @@ const SNAPSHOT_COLUMNS = `appraiser_code, appraiser_name, license_no,
        income_account_code::text AS income_account_code, status`
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await requireRole("admin")
+  if (auth instanceof NextResponse) return auth
+  const session = auth.session
 
   const { id } = await params
   const appraiserId = Number(id)

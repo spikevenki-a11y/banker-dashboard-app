@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/connection/db"
 import { getSession } from "@/lib/auth/session"
+import { requireRole } from "@/lib/auth/require-role"
 
 // GET - List all interest policies with their conditions
 export async function GET(request: NextRequest) {
@@ -63,8 +64,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
 
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await requireRole("admin")
+  if (auth instanceof NextResponse) return auth
 
 
     const body = await request.json();

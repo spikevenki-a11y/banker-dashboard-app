@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { getSession } from "@/lib/auth/session"
+import { requireRole } from "@/lib/auth/require-role"
 import { insertLoanSchemeFromMaster } from "@/lib/loan-scheme-import"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -38,8 +39,9 @@ export async function GET() {
 // Maps the selected master schemes to the current branch.
 // Schemes the branch already has are skipped, not duplicated.
 export async function POST(req: Request) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await requireRole("admin")
+  if (auth instanceof NextResponse) return auth
+  const session = auth.session
 
   let masterIds: string[]
   try {

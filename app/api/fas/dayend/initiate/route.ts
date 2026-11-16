@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
-import { getSession } from "@/lib/auth/session"
+import { requireRole } from "@/lib/auth/require-role"
 
 const ALL_STEPS = [
   "SAVINGS_ACCRUAL",
@@ -14,8 +14,9 @@ const ALL_STEPS = [
 ] as const
 
 export async function POST() {
-  const u = await getSession()
-  if (!u) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await requireRole("admin")
+  if (auth instanceof NextResponse) return auth
+  const u = auth.session
   console.log("User session data:", u)
   const branchId = u.branch
   const businessDate: string = u.businessDate

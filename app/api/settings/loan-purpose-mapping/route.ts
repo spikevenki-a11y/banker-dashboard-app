@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { getSession } from "@/lib/auth/session"
+import { requireRole } from "@/lib/auth/require-role"
 
 const MAX_NAME_LENGTH = 255
 
@@ -54,8 +55,9 @@ export async function GET(req: Request) {
 
 // Replaces the full set of purposes allowed for one scheme
 export async function PUT(req: Request) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await requireRole("admin")
+  if (auth instanceof NextResponse) return auth
+  const session = auth.session
 
   const client = await pool.connect()
   try {
@@ -124,8 +126,9 @@ export async function PUT(req: Request) {
 
 // Adds a new purpose to the master
 export async function POST(req: Request) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await requireRole("admin")
+  if (auth instanceof NextResponse) return auth
+  const session = auth.session
 
   const client = await pool.connect()
   try {
@@ -168,8 +171,8 @@ export async function POST(req: Request) {
 
 // Renames a purpose and/or activates or deactivates it
 export async function PATCH(req: Request) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await requireRole("admin")
+  if (auth instanceof NextResponse) return auth
 
   try {
     const { purpose_id, purpose_name, is_active } = await req.json()

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import bcrypt from "bcryptjs"
-import { getSession } from "@/lib/auth/session"
+import { requireRole } from "@/lib/auth/require-role"
 
 const ALLOWED_ROLES = ["admin", "banker", "manager", "auditor"]
 
@@ -10,9 +10,8 @@ const ALLOWED_ROLES = ["admin", "banker", "manager", "auditor"]
 const SAFE_COLUMNS = "id, empid, full_name, role, is_active, created_at"
 
 export async function GET() {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  if (session.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  const auth = await requireRole("admin")
+  if (auth instanceof NextResponse) return auth
 
   try {
     const result = await pool.query(
@@ -26,9 +25,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  if (session.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  const auth = await requireRole("admin")
+  if (auth instanceof NextResponse) return auth
 
   try {
     const { empid, full_name, role, password } = await request.json()
@@ -63,9 +61,9 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  if (session.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  const auth = await requireRole("admin")
+  if (auth instanceof NextResponse) return auth
+  const session = auth.session
 
   try {
     const { id, is_active } = await request.json()
