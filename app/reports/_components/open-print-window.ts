@@ -1,4 +1,6 @@
 import type { BranchInfo } from "./use-branch-info"
+import { buildReportHeaderHtml } from "@/lib/print/report-header"
+import { waitForImages } from "@/lib/print/report-logo"
 
 export function openPrintWindow(
   reportTitle: string,
@@ -9,15 +11,6 @@ export function openPrintWindow(
 ) {
   const win = window.open("", "_blank", "width=1100,height=750")
   if (!win) return
-
-  const bank    = branchInfo?.bank_name    || ""
-  const branch  = branchInfo?.branch_name  || ""
-  const address = [branchInfo?.address, branchInfo?.city, branchInfo?.state, branchInfo?.postal_code]
-    .filter(Boolean).join(", ")
-  const contact = [
-    branchInfo?.phone_number ? `Ph: ${branchInfo.phone_number}` : "",
-    branchInfo?.email        ? `Email: ${branchInfo.email}`     : "",
-  ].filter(Boolean).join("  |  ")
 
   win.document.write(`<!DOCTYPE html>
 <html>
@@ -38,16 +31,6 @@ export function openPrintWindow(
       text-align: center;
       z-index: 9999;
     }
-    .rpt-header .bank-name   { font-size: 17px; font-weight: 700; letter-spacing: .3px; }
-    .rpt-header .branch-name { font-size: 13px; font-weight: 600; margin-top: 1px; }
-    .rpt-header .address     { font-size: 10.5px; color: #555; margin-top: 2px; }
-    .rpt-header .contact     { font-size: 10.5px; color: #555; }
-    .rpt-header .report-info {
-      margin-top: 5px; padding-top: 5px;
-      border-top: 1px solid #ddd;
-    }
-    .rpt-header .report-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
-    .rpt-header .date-range   { font-size: 11px; color: #555; margin-top: 1px; }
 
     /* ── Body pushed below the header ── */
     .rpt-body { padding: 140px 20px 20px; }
@@ -67,15 +50,7 @@ export function openPrintWindow(
   </style>
 </head>
 <body>
-  <div class="rpt-header">
-    ${bank    ? `<div class="bank-name">${bank}</div>`       : ""}
-    ${branch  ? `<div class="branch-name">${branch}</div>`   : ""}
-    ${address ? `<div class="address">${address}</div>`      : ""}
-    ${contact ? `<div class="contact">${contact}</div>`      : ""}
-    <div class="report-info">
-      <div class="report-title">${reportTitle}</div>
-      ${dateRange ? `<div class="date-range">${dateRange}</div>` : ""}
-    </div>
+  <div class="rpt-header">${buildReportHeaderHtml(reportTitle, dateRange, branchInfo)}
   </div>
   <div class="rpt-body">
     ${contentHtml}
@@ -85,5 +60,6 @@ export function openPrintWindow(
 
   win.document.close()
   win.focus()
-  if (autoPrint) setTimeout(() => win.print(), 500)
+  // Print only once the header logo has loaded, so it is never blank on paper
+  if (autoPrint) waitForImages(win.document).then(() => setTimeout(() => win.print(), 200))
 }

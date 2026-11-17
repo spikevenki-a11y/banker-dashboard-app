@@ -8,6 +8,7 @@
  * day on its own page(s) and works with downloadHtmlAsPdf().
  */
 import { escapeHtml as esc } from "./print-html"
+import { reportLogoImgHtml } from "./report-logo"
 import { rupeesInWords } from "./day-book"
 
 export type CashBookLine = {
@@ -31,7 +32,6 @@ export type CashBookData = {
   regionOffice?: string
   generatedBy?: string
   generatedOn?: Date
-  logoUrl?: string
   days: CashBookDay[]
 }
 
@@ -73,9 +73,9 @@ function daySheet(d: CashBookData, day: CashBookDay): string {
 
   return `<section class="sheet">
 <div class="band">
-  ${d.logoUrl ? `<img class="logo" src="${esc(d.logoUrl)}" alt="" onerror="this.style.visibility='hidden'">` : "<div></div>"}
-  <div class="titles"><div class="bank">${esc(d.bankName)}</div><div class="rep">CASH BOOK</div></div>
   <div></div>
+  <div class="titles"><div class="bank">${esc(d.bankName)}</div><div class="rep">CASH BOOK</div></div>
+  <div class="logo-cell">${reportLogoImgHtml()}</div>
   <div class="meta"><div>${d.regionOffice ? `R.O : ${esc(d.regionOffice)}` : ""}</div><div class="dt">DATE <span>${esc(dmy(day.date))}</span></div></div>
 </div>
 
@@ -135,8 +135,8 @@ export function buildCashBookHtml(d: CashBookData): string {
   .sheet { break-after: page; page-break-after: always; }
   .sheet:last-child { break-after: auto; page-break-after: auto; }
 
-  .band { background: #daf0d3; display: grid; grid-template-columns: 20mm 1fr 8mm; align-items: center; padding-top: 1mm; }
-  .logo { width: 19mm; height: 19mm; object-fit: contain; }
+  .band { background: #daf0d3; display: grid; grid-template-columns: 20mm 1fr 20mm; align-items: center; padding-top: 1mm; }
+  .logo-cell { display: flex; justify-content: flex-end; padding-right: 1mm; }
   .titles { text-align: center; }
   .bank { font-size: 9.5pt; font-weight: 700; white-space: nowrap; }
   .rep  { font-size: 11pt; font-weight: 700; margin-top: 5mm; }

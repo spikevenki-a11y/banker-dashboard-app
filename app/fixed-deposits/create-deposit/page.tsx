@@ -30,6 +30,7 @@ import { NomineeEditor, nomineeTotals, type NomineeEntry } from "@/components/no
 import { MemberSummaryCard } from "@/components/member-summary-card"
 import { computeTermMaturity, labelOf, COMPOUNDING_FREQUENCIES, type AppliedPolicy } from "@/lib/fd-interest-policy"
 import { formatCurrency } from "@/lib/number-format"
+import { reportLogoImgHtml } from "@/lib/print/report-logo"
 
 type MemberInfo = {
   membership_no: string
@@ -510,6 +511,7 @@ const getLogindate = async () => {
   body { font-family: Arial, Helvetica, sans-serif; color: #111; font-size: 12px; margin: 0; }
   h1 { font-size: 18px; margin: 0 0 2px; }
   .sub { color: #555; margin: 0 0 14px; }
+  .rpt-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 4px; }
   .details { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px; border: 1px solid #ccc; border-radius: 6px; padding: 10px 12px; margin-bottom: 14px; }
   .details div { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px dotted #ddd; padding: 3px 0; }
   .details span:first-child { color: #555; }
@@ -523,12 +525,14 @@ const getLogindate = async () => {
   tfoot td { font-weight: 700; background: #fafafa; }
   .foot { margin-top: 12px; color: #777; font-size: 10px; }
 </style></head><body>
+<div class="rpt-head"><div>
 <h1>Interest Payable Chart</h1>
 <p class="sub">${esc(
       interestPayableSeries.length > 1
         ? `Interest payable at each ${freqLabel.toLowerCase()} payout across the deposit term.`
         : "Interest is paid out once, in full, at maturity."
     )}</p>
+</div>${reportLogoImgHtml()}</div>
 <div class="details">${details.map(([k, v]) => `<div><span>${esc(k)}</span><span>${esc(v)}</span></div>`).join("")}</div>
 <table>
   <thead><tr><th>Payout Period</th><th>Payout Date</th><th class="num">Days</th><th class="num">Interest Payable</th></tr></thead>

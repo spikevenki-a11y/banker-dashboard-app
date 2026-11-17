@@ -59,51 +59,63 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate account number using sequence
-    const { rows: [seq] } = await pool.query(
-      `UPDATE nextnumber
-       SET nextvalue = nextvalue + 1
-       WHERE branch_id = $1 AND accounttype = 61
-       RETURNING nextvalue`,
-      [branchId]
-    )
+    const client = await pool.connect()
+    try {
+      await client.query("BEGIN")
 
-    let runningNo: string
-    if (seq) {
-      runningNo = String(seq["nextvalue"]).padStart(7, "0")
-    } else {
-      await pool.query(
-        `INSERT INTO nextnumber (branch_id, accounttype, nextvalue) VALUES ($1, 61, 1)
-         ON CONFLICT (branch_id, accounttype) DO UPDATE SET nextvalue = nextnumber.nextvalue + 1`,
+      // Generate account number using sequence
+      const { rows: [seq] } = await client.query(
+        `UPDATE nextnumber
+         SET nextvalue = nextvalue + 1
+         WHERE branch_id = $1 AND accounttype = 61
+         RETURNING nextvalue`,
         [branchId]
       )
-      runningNo = "0000001"
+
+      let runningNo: string
+      if (seq) {
+        runningNo = String(seq["nextvalue"]).padStart(7, "0")
+      } else {
+        await client.query(
+          `INSERT INTO nextnumber (branch_id, accounttype, nextvalue) VALUES ($1, 61, 1)
+           ON CONFLICT (branch_id, accounttype) DO UPDATE SET nextvalue = nextnumber.nextvalue + 1`,
+          [branchId]
+        )
+        runningNo = "0000001"
+      }
+
+      const nextAccountNumber = `${branchId}${runningNo}`
+
+      const result = await client.query(
+          `INSERT INTO sundry_creditors (
+              branch_id,
+              parent_account_number,
+              account_number,
+              account_name,
+              account_description,
+              account_opened_date,
+              ledger_balance,
+              clear_balance,
+              unclear_balance,
+              account_status,
+              account_closed_date,
+              created_by
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,0.00,0.00,'ACTIVE',NULL,$8)
+          RETURNING *`,
+          [branchId, parent_account_number, nextAccountNumber, account_name, description, businessDate, opening_balance || 0, userId]
+      )
+
+          const data = result.rows
+
+      await client.query("COMMIT")
+
+      return NextResponse.json({ data: data[0] }, { status: 201 });
+    } catch (err) {
+      await client.query("ROLLBACK")
+      throw err
+    } finally {
+      client.release()
     }
-
-    const nextAccountNumber = `${branchId}${runningNo}`
-
-    const result = await pool.query(
-        `INSERT INTO sundry_creditors (
-            branch_id,
-            parent_account_number,
-            account_number,
-            account_name,
-            account_description,
-            account_opened_date,
-            ledger_balance,
-            clear_balance,
-            unclear_balance,
-            account_status,
-            account_closed_date,
-            created_by
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,0.00,0.00,'ACTIVE',NULL,$8)
-        RETURNING *`,
-        [branchId, parent_account_number, nextAccountNumber, account_name, description, businessDate, opening_balance || 0, userId]
-    )
-
-        const data = result.rows
-
-    return NextResponse.json({ data: data[0] }, { status: 201 });
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to create account" },

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { requireRole } from "@/lib/auth/require-role"
+import { sum, toPaise, toRupees } from "@/lib/money"
 
 export async function GET() {
   const auth = await requireRole("admin")
@@ -99,8 +100,10 @@ export async function GET() {
     )
 
     const data = rows.map((r: any) => {
-      const isReceipt = Number(r.cash_debit) > 0  // DR Cash = money received
+      const isReceipt = toPaise(r.cash_debit) > 0  // DR Cash = money received
+      const amountPaise = toPaise(isReceipt ? r.cash_debit : r.cash_credit)
       return {
+        amountPaise,
         id: r.id,
         batchId: Number(r.batch_id),
         voucherId: Number(r.voucher_id),
@@ -109,7 +112,7 @@ export async function GET() {
         flowType: isReceipt ? "RECEIPT" : "PAYMENT",
         cashAccountCode: Number(r.cash_accountcode),
         cashAccountName: r.cash_accountname,
-        amount: isReceipt ? Number(r.cash_debit) : Number(r.cash_credit),
+        amount: toRupees(amountPaise),
         counterAccountNames: r.counter_account_names || "—",
         narration: r.narration || "—",
         makerName: r.maker_name || "N/A",
@@ -119,15 +122,17 @@ export async function GET() {
     })
 
     // ── Totals ────────────────────────────────────────────────────────────
-    const totalReceipts = data.filter((d) => d.flowType === "RECEIPT").reduce((s, d) => s + d.amount, 0)
-    const totalPayments = data.filter((d) => d.flowType === "PAYMENT").reduce((s, d) => s + d.amount, 0)
+    // Summed in exact paise; returned as rupees
+    const totalReceipts = sum(data.filter((d) => d.flowType === "RECEIPT").map((d) => d.amountPaise))
+    const totalPayments = sum(data.filter((d) => d.flowType === "PAYMENT").map((d) => d.amountPaise))
 
     return NextResponse.json({
       success: true,
       businessDate,
-      totalReceipts,
-      totalPayments,
-      data,
+      totalReceipts: toRupees(totalReceipts),
+      totalPayments: toRupees(totalPayments),
+      // amountPaise is internal; the response keeps its existing shape
+      data: data.map(({ amountPaise, ...row }) => row),
     })
   } catch (e) {
     console.error("Cash flows error:", e)

@@ -16,6 +16,7 @@ import { openPrintWindow } from "../_components/open-print-window"
 import { downloadPdf } from "../_components/download-pdf"
 import { formatCurrency, type Numeric } from "@/lib/number-format"
 import { printDayBook } from "@/lib/print/print-day-book"
+import { ReportLogo } from "@/components/report-logo"
 import { printCashBook } from "@/lib/print/print-cash-book"
 
 // Zero amounts are shown as "—" in the statement columns
@@ -103,6 +104,16 @@ function AccountingReportContent() {
     : ""
 
   async function handleDownloadPdf() {
+    // Day Book downloads in the same bank format (and header logo) as its print
+    if (type === "day-book") {
+      setPdfLoading(true)
+      try {
+        await printDayBook(fromDate, "pdf")
+      } catch (e: any) {
+        setError(e.message || "Failed to download day book")
+      } finally { setPdfLoading(false) }
+      return
+    }
     if (type === "cash-book") {
       setPdfLoading(true)
       try {
@@ -192,7 +203,10 @@ function AccountingReportContent() {
                   {meta.label}
                   {dateLabel && <span className="text-sm font-normal text-muted-foreground">— {dateLabel}</span>}
                 </CardTitle>
-                <Badge variant="outline">{rows.length} {rows.length === 1 ? "row" : "rows"}</Badge>
+                <div className="flex items-center gap-3">
+                  <Badge variant="outline">{rows.length} {rows.length === 1 ? "row" : "rows"}</Badge>
+                  {type === "day-book" && <ReportLogo />}
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">

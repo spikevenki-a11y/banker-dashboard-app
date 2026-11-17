@@ -4,6 +4,7 @@ import pool from "@/lib/connection/db"
 import { parseSelectedBatch, validateSelectedBatch, BatchValidationError } from "@/lib/validate-batch"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
 import { formatCurrency } from "@/lib/number-format"
+import { add, parseAmountInput, sub, toPaise, toRupees, toSql } from "@/lib/money"
 
 export async function GET(request: NextRequest) {
   const session = await getSession()
@@ -147,9 +148,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Valid voucher type (CASH/TRANSFER) is required" }, { status: 400 })
     }
 
-    const amt = parseFloat(amount)
-    if (isNaN(amt) || amt <= 0) {
-      return NextResponse.json({ error: "Amount must be positive" }, { status: 400 })
+    const amt = parseAmountInput(amount)
+    if (amt === null || amt <= 0) {
+      return NextResponse.json({ error: "Amount must be positive, with at most 2 decimal places" }, { status: 400 })
     }
 
     const dayendErr = await checkDayEndRestriction(branchId, businessDate)
@@ -179,10 +180,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Account is not active. Interest can only be paid on active accounts." }, { status: 400 })
     }
 
-    const interestDue = parseFloat(account.interestdueforpayment) || 0
-    if (amt - interestDue > 0.01) {
+    const interestDue = toPaise(account.interestdueforpayment)
+    // Exact paise comparison: the old 0.01 float tolerance is no longer needed
+    if (amt > interestDue) {
       await client.query("ROLLBACK")
-      return NextResponse.json({ error: `Payment amount cannot exceed interest due (${interestDue}).` }, { status: 400 })
+      return NextResponse.json({ error: `Payment amount cannot exceed interest due (${toRupees(interestDue)}).` }, { status: 400 })
     }
     if (interestDue <= 0) {
       await client.query("ROLLBACK")
@@ -248,7 +250,7 @@ export async function POST(request: NextRequest) {
     `, [
       branchId, batchId, businessDate,
       interestPayableGlAccount, String(accountNumber),
-      amt,
+      toSql(amt),
       voucherNo,
       txnNarration,
       session.userId
@@ -257,8 +259,8 @@ export async function POST(request: NextRequest) {
     // CR Savings Account(s) or Cash (interest payout to member)
     if (creditAccounts && Array.isArray(creditAccounts) && creditAccounts.length > 0) {
       for (const credit of creditAccounts) {
-        const creditAmt = parseFloat(credit.amount)
-        if (isNaN(creditAmt) || creditAmt <= 0) continue
+        const creditAmt = parseAmountInput(credit.amount)
+        if (creditAmt === null || creditAmt <= 0) continue
 
         const { rows: savingsRows } = await client.query(
           `SELECT sa.*, ss.savings_gl_account
@@ -276,7 +278,7 @@ export async function POST(request: NextRequest) {
 
         const savingsAccount = savingsRows[0]
         const savingsGl = savingsAccount.savings_gl_account
-        const newSavingsBalance = parseFloat(savingsAccount.available_balance) + creditAmt
+        const newSavingsBalance = add(toPaise(savingsAccount.available_balance), creditAmt)
 
         // CR Savings GL (liability increases)
         await client.query(`
@@ -289,7 +291,7 @@ export async function POST(request: NextRequest) {
         `, [
           branchId, batchId, businessDate,
           savingsGl, String(credit.accountNumber),
-          creditAmt,
+          toSql(creditAmt),
           voucherNo,
           `Interest Payment credit from Deposit A/c ${accountNumber}`,
           session.userId
@@ -315,7 +317,7 @@ export async function POST(request: NextRequest) {
         `, [
           branchId, credit.accountNumber,
           businessDate,
-          creditAmt, newSavingsBalance,
+          toSql(creditAmt), toSql(newSavingsBalance),
           `Interest Payment credit from Deposit A/c ${accountNumber}`,
           voucherNo, batchId,
           session.userId
@@ -326,7 +328,7 @@ export async function POST(request: NextRequest) {
           `UPDATE savings_accounts
            SET available_balance = $1, clear_balance = $1, updated_at = NOW()
            WHERE account_number = $2 AND branch_id = $3`,
-          [newSavingsBalance, credit.accountNumber, branchId]
+          [toSql(newSavingsBalance), credit.accountNumber, branchId]
         )
       }
     } else if (voucherType === "CASH") {
@@ -341,7 +343,7 @@ export async function POST(request: NextRequest) {
       `, [
         branchId, batchId, businessDate,
         23100000, '0',
-        amt,
+        toSql(amt),
         voucherNo,
         txnNarration,
         session.userId
@@ -349,14 +351,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Reduce interest due and accumulate interest paid on the deposit account
-    const newInterestDue = interestDue - amt
-    const newInterestPaid = (parseFloat(account.interestpaidamount) || 0) + amt
+    const newInterestDue = sub(interestDue, amt)
+    const newInterestPaid = add(toPaise(account.interestpaidamount), amt)
     await client.query(
       `UPDATE deposit_account
        SET interestdueforpayment = $1,
            interestpaidamount = $2
        WHERE accountnumber = $3 AND branch_id = $4`,
-      [newInterestDue, newInterestPaid, accountNumber, branchId]
+      [toSql(newInterestDue), toSql(newInterestPaid), accountNumber, branchId]
     )
 
     // Record interest payment in module transaction table
@@ -373,7 +375,7 @@ export async function POST(request: NextRequest) {
         branchId, accountNumber,
         businessDate,
         voucherType,
-        amt, parseFloat(account.clearbalance),
+        toSql(amt), toSql(toPaise(account.clearbalance)),
         txnNarration, voucherNo, batchId,
         session.userId,
       ]
@@ -385,8 +387,8 @@ export async function POST(request: NextRequest) {
       success: true,
       voucher_no: voucherNo,
       batch_id: batchId,
-      newInterestDue,
-      message: `Interest payment of ${formatCurrency(amt)} processed successfully. ${voucherType === "CASH" ? "" : `Batch: ${batchId}, `}Voucher: ${voucherNo}. Remaining interest due: ${formatCurrency(newInterestDue)}`,
+      newInterestDue: toRupees(newInterestDue),
+      message: `Interest payment of ${formatCurrency(toRupees(amt))} processed successfully. ${voucherType === "CASH" ? "" : `Batch: ${batchId}, `}Voucher: ${voucherNo}. Remaining interest due: ${formatCurrency(toRupees(newInterestDue))}`,
     })
   } catch (err: any) {
     await client.query("ROLLBACK")

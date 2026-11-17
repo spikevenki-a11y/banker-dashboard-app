@@ -19,6 +19,8 @@
 // Fixed Principal only): Yes adds interest-only instalments at the Repayment Frequency
 // during the moratorium (installment_type MORATORIUM_INTEREST); No adds none.
 
+import { add, divideBy, interestForMonths, sub, toPaise, toRupees, type Paise } from "./money"
+
 export type RepaymentMethod = "ON_MATURITY" | "FIXED_PRINCIPAL"
 export type RepaymentFrequency = "MONTHLY" | "QUARTERLY" | "HALF_YEARLY" | "YEARLY" | "CLOSING_TIME"
 
@@ -98,8 +100,7 @@ export const isMoratoriumInterestApplicable = (method: RepaymentMethod, moratori
 export const firstRegularInstallment = (rows: RepaymentScheduleRow[]) =>
   rows.find((r) => r.installment_type === "REGULAR") ?? rows[0]
 
-const round2 = (n: number) => Math.round(n * 100) / 100
-const pad = (n: number) => String(n).padStart(2, "0")
+const pad =(n: number) => String(n).padStart(2, "0")
 
 // Calendar date as YYYY-MM-DD. Strings already in that form are kept as-is; Date
 // objects use their local calendar day (DB DATE values arrive as local midnight).
@@ -185,7 +186,13 @@ export function buildRepaymentSchedule(params: {
   frequency: string | null | undefined
   startDate: string | Date // sanction date (preview) or disbursement date (saved schedule)
 }): RepaymentScheduleRow[] {
-  const P = round2(Number(params.principal))
+  // Amounts are worked in integer paise (lib/money) and returned as rupees.
+  let P: Paise
+  try {
+    P = toPaise(params.principal)
+  } catch {
+    return []
+  }
   const rate = Number(params.annualRate) || 0
   const T = Math.floor(Number(params.tenureMonths))
   const moratorium = Math.max(0, Math.floor(Number(params.moratoriumMonths) || 0))
@@ -200,13 +207,13 @@ export function buildRepaymentSchedule(params: {
   // On Maturity (Closing Time): one instalment on the maturity date — full principal plus
   // simple interest for the whole tenure (unchanged; the moratorium doesn't move maturity)
   if (frequency === "CLOSING_TIME") {
-    const interest = round2((P * rate * T) / 1200)
+    const interest = interestForMonths(P, rate, T)
     return [{
       installment_no: 1,
       due_date: maturityDate(start, T),
-      principal: P,
-      interest,
-      total: round2(P + interest),
+      principal: toRupees(P),
+      interest: toRupees(interest),
+      total: toRupees(add(P, interest)),
       balance: 0,
       installment_type: "REGULAR",
     }]
@@ -225,14 +232,14 @@ export function buildRepaymentSchedule(params: {
       // The last moratorium period may be shorter when it isn't a whole number of periods
       const endMonth = Math.min(j * periodMonths, moratorium)
       const monthsInPeriod = endMonth - (j - 1) * periodMonths
-      const interest = round2((P * rate * monthsInPeriod) / 1200)
+      const interest = interestForMonths(P, rate, monthsInPeriod)
       rows.push({
         installment_no: rows.length + 1,
         due_date: addMonths(start, endMonth),
         principal: 0,
-        interest,
-        total: interest,
-        balance: P,
+        interest: toRupees(interest),
+        total: toRupees(interest),
+        balance: toRupees(P),
         installment_type: "MORATORIUM_INTEREST",
       })
     }
@@ -241,24 +248,24 @@ export function buildRepaymentSchedule(params: {
   // Fixed Principal: principal repaid after the moratorium; the remaining repayment
   // period is split into instalments of the chosen frequency, the last ending at maturity
   const n = Math.ceil(R / periodMonths)
-  const principalPer = round2(P / n)
+  const principalPer = divideBy(P, n)
 
   let balance = P
   for (let i = 1; i <= n; i++) {
     // The last period may be shorter when the repayment period isn't a whole number of periods
     const endMonth = Math.min(i * periodMonths, R)
     const monthsInPeriod = endMonth - (i - 1) * periodMonths
-    const interest = round2((balance * rate * monthsInPeriod) / 1200)
+    const interest = interestForMonths(balance, rate, monthsInPeriod)
     const principal = i === n ? balance : principalPer // last instalment clears any rounding
-    balance = round2(balance - principal)
+    balance = sub(balance, principal)
     rows.push({
       installment_no: rows.length + 1, // numbered after any moratorium-interest instalments
       // moratorium + endMonth ≤ T, so the final instalment is on the maturity date
       due_date: addMonths(start, moratorium + endMonth),
-      principal: round2(principal),
-      interest,
-      total: round2(principal + interest),
-      balance,
+      principal: toRupees(principal),
+      interest: toRupees(interest),
+      total: toRupees(add(principal, interest)),
+      balance: toRupees(balance),
       installment_type: "REGULAR",
     })
   }

@@ -1,4 +1,6 @@
 import type { BranchInfo } from "./use-branch-info"
+import { buildReportHeaderHtml } from "@/lib/print/report-header"
+import { waitForImages } from "@/lib/print/report-logo"
 
 const CONTAINER_WIDTH_PX  = 1040
 const A4_WIDTH_MM         = 210
@@ -46,14 +48,8 @@ export async function downloadPdf(
     import("html2canvas"),
   ])
 
-  const bank    = branchInfo?.bank_name    || ""
-  const branch  = branchInfo?.branch_name  || ""
-  const address = [branchInfo?.address, branchInfo?.city, branchInfo?.state, branchInfo?.postal_code]
-    .filter(Boolean).join(", ")
-  const contact = [
-    branchInfo?.phone_number ? `Ph: ${branchInfo.phone_number}` : "",
-    branchInfo?.email        ? `Email: ${branchInfo.email}`     : "",
-  ].filter(Boolean).join("  |  ")
+  // Container px per physical mm, so the header logo prints at its real size
+  const mm = (n: number) => `${Math.round(n * (CONTAINER_WIDTH_PX / PRINTABLE_WIDTH_MM) * 100) / 100}px`
 
   // Off-screen container — mirrors open-print-window styles exactly
   const wrapper = document.createElement("div")
@@ -66,16 +62,7 @@ export async function downloadPdf(
     <div id="pdf-hdr" style="
         background:#fff;border-bottom:2px solid #111;
         padding:${px(8)} 24px ${px(6)};text-align:center;">
-      ${bank    ? `<div style="font-size:${px(17)};font-weight:700;letter-spacing:.3px;">${bank}</div>`       : ""}
-      ${branch  ? `<div style="font-size:${px(13)};font-weight:600;margin-top:1px;">${branch}</div>`          : ""}
-      ${address ? `<div style="font-size:${px(10.5)};color:#555;margin-top:2px;">${address}</div>`            : ""}
-      ${contact ? `<div style="font-size:${px(10.5)};color:#555;">${contact}</div>`                           : ""}
-      <div style="margin-top:${px(5)};padding-top:${px(5)};border-top:1px solid #ddd;">
-        <div style="font-size:${px(13)};font-weight:700;text-transform:uppercase;letter-spacing:.5px;">
-          ${reportTitle}
-        </div>
-        ${dateRange ? `<div style="font-size:${px(11)};color:#555;margin-top:1px;">${dateRange}</div>` : ""}
-      </div>
+      ${buildReportHeaderHtml(reportTitle, dateRange, branchInfo, { px, mm })}
     </div>
     <div id="pdf-body" style="padding:${px(8)} 20px 20px;">
       <style>
@@ -105,6 +92,9 @@ export async function downloadPdf(
   try {
     const hdrEl  = wrapper.querySelector<HTMLElement>("#pdf-hdr")!
     const bodyEl = wrapper.querySelector<HTMLElement>("#pdf-body")!
+
+    // The header logo must be decoded (or replaced by its "missing" notice) before capture
+    await waitForImages(hdrEl)
 
     // Row bottoms (CSS px from the top of the body) — page breaks may only fall here
     const bodyTop = bodyEl.getBoundingClientRect().top

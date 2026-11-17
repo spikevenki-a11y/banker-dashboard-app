@@ -3,7 +3,6 @@
 import { buildCashBookHtml, type CashBookData } from "./cash-book"
 import { downloadHtmlAsPdf } from "./html-to-pdf"
 import { printHtml } from "./print-html"
-import { DAY_BOOK_LOGO } from "./print-day-book"
 
 /**
  * Loads the Cash Book for a date (or range, max 31 days) and prints it,
@@ -26,7 +25,6 @@ export async function printCashBook(
 
     const html = buildCashBookHtml({
       ...(data as CashBookData),
-      logoUrl: `${window.location.origin}${DAY_BOOK_LOGO}`,
       generatedOn: new Date(),
     })
 

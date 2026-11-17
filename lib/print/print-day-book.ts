@@ -1,16 +1,15 @@
 "use client"
 
 import { buildDayBookHtml, type DayBookData } from "./day-book"
+import { downloadHtmlAsPdf } from "./html-to-pdf"
 import { printHtml } from "./print-html"
 
-/** Bank logo shown at the top-left. Put the file at public/images/bank-logo.png */
-export const DAY_BOOK_LOGO = "/images/bank-logo.png"
-
 /**
- * Loads the Day Book for a date and either prints it (hidden iframe) or opens
- * it in a new tab as a preview. Throws with the API's message on failure.
+ * Loads the Day Book for a date and prints it (hidden iframe), opens it in a new
+ * tab ("preview"), or saves it as an A4 landscape PDF ("pdf"). All three use the
+ * same bank-format document, logo included. Throws with the API's message on failure.
  */
-export async function printDayBook(date: string, mode: "print" | "preview" = "print"): Promise<void> {
+export async function printDayBook(date: string, mode: "print" | "preview" | "pdf" = "print"): Promise<void> {
   // Open the tab first so the browser treats it as part of the click (popup blockers)
   const win = mode === "preview" ? window.open("", "_blank") : null
 
@@ -21,11 +20,12 @@ export async function printDayBook(date: string, mode: "print" | "preview" = "pr
 
     const html = buildDayBookHtml({
       ...(data as DayBookData),
-      logoUrl: `${window.location.origin}${DAY_BOOK_LOGO}`,
       generatedOn: new Date(),
     })
 
-    if (win) {
+    if (mode === "pdf") {
+      await downloadHtmlAsPdf(html, `Day-Book-${date}.pdf`)
+    } else if (win) {
       win.document.open()
       win.document.write(html)
       win.document.close()
