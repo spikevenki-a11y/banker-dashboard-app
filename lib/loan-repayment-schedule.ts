@@ -76,7 +76,7 @@ export function effectiveFrequency(method: RepaymentMethod, frequency: string | 
 export type InstallmentType = "REGULAR" | "MORATORIUM_INTEREST"
 
 export const installmentTypeLabel = (t: string | null | undefined) =>
-  t === "MORATORIUM_INTEREST" ? "Moratorium Interest" : "Regular"
+  t === "MORATORIUM_INTEREST" ? "Gestation Interest" : "Regular"
 
 export type RepaymentScheduleRow = {
   installment_no: number

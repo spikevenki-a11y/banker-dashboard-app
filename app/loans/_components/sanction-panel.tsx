@@ -81,6 +81,7 @@ export interface SanctionApplication {
   scheme_name: string
   loan_type: string
   loan_purpose: string
+  loan_purpose_name?: string | null
   applied_loan_amount: number
   application_date: string
   application_status: string
@@ -715,10 +716,10 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
           </div>
 
           {/* Purpose */}
-          {selectedApp.loan_purpose && (
+          {(selectedApp.loan_purpose_name || selectedApp.loan_purpose) && (
             <div className="mt-4 rounded-lg border p-3 bg-muted/30">
               <p className="text-xs text-muted-foreground">Loan Purpose</p>
-              <p className="mt-1 text-sm">{selectedApp.loan_purpose}</p>
+              <p className="mt-1 text-sm">{selectedApp.loan_purpose_name || selectedApp.loan_purpose}</p>
             </div>
           )}
 
@@ -1017,7 +1018,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                   </div>
                   {effectiveMoratoriumInterest && (
                     <div>
-                      <p className="text-xs text-muted-foreground">Moratorium Interest</p>
+                      <p className="text-xs text-muted-foreground">Gestation Interest</p>
                       <p className="font-medium">
                         {formatCurrency(
                           emiSchedule.filter((r) => r.installment_type === "MORATORIUM_INTEREST").reduce((s, r) => s + r.interest, 0)
@@ -1124,7 +1125,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
           <DialogHeader>
             <DialogTitle>Repayment Schedule</DialogTitle>
             <DialogDescription>
-              Monthly EMI: {formatCurrency(calculatedEMI || 0)} | Total Installments: {emiSchedule.length}
+              Monthly Due: {formatCurrency(calculatedEMI || 0)} | Total Installments: {emiSchedule.length}
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto">
@@ -1136,7 +1137,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
                   <TableHead className="text-xs">Type</TableHead>
                   <TableHead className="text-xs text-right">Principal</TableHead>
                   <TableHead className="text-xs text-right">Interest</TableHead>
-                  <TableHead className="text-xs text-right">Total EMI</TableHead>
+                  <TableHead className="text-xs text-right">Total Due</TableHead>
                   <TableHead className="text-xs text-right">Balance</TableHead>
                 </TableRow>
               </TableHeader>
@@ -1228,7 +1229,7 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
               <span>{moratoriumNum} months</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Interest Payable During Moratorium:</span>
+              <span className="text-muted-foreground">Interest Payable During Gestation period:</span>
               <span>{effectiveMoratoriumInterest ? "Yes" : "No"}</span>
             </div>
             <div className="flex justify-between text-sm">

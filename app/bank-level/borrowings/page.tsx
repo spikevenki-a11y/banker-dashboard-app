@@ -55,6 +55,7 @@ import { formatCurrency } from "@/lib/number-format"
 type BorrowingAccount = {
   id: string
   account_number: string
+  borrowing_head?: string | number | null
   borrowing_agency: string
   investment_head: string | null
   branch_id: number
@@ -183,6 +184,19 @@ export default function BorrowingsPage() {
   const [iodAmount, setIodAmount] = useState("0")
   const [penalInterestAmount, setPenalInterestAmount] = useState("0")
   const [selectedRepaymentAccount, setSelectedRepaymentAccount] = useState<BorrowingAccount | null>(null)
+  const [isLookingUpRepayment, setIsLookingUpRepayment] = useState(false)
+  const [lookupError, setLookupError] = useState("")
+
+  // Repayment account search popup
+  const [isAccountSearchOpen, setIsAccountSearchOpen] = useState(false)
+  const [searchLedger, setSearchLedger] = useState("")
+  const [searchName, setSearchName] = useState("")
+  const [searchAccountNo, setSearchAccountNo] = useState("")
+  const [searchOpenDate, setSearchOpenDate] = useState("")
+  const [searchResults, setSearchResults] = useState<BorrowingAccount[]>([])
+  const [isSearchingAccounts, setIsSearchingAccounts] = useState(false)
+  const [hasSearchedAccounts, setHasSearchedAccounts] = useState(false)
+  const [searchValidationError, setSearchValidationError] = useState("")
 
   // Transaction history
   const [transactions, setTransactions] = useState<BorrowingTransaction[]>([])
@@ -274,18 +288,144 @@ export default function BorrowingsPage() {
     setSelectedDrawalAccount(account || null)
   }
 
-  // Handle ledger selection for repayment
-  const handleRepaymentLedgerSelect = (ledgerCode: string) => {
-    setRepaymentLedger(ledgerCode)
-    setRepaymentAccount("")
-    setSelectedRepaymentAccount(null)
+  // Apply a looked-up borrowing account to the repayment form.
+  // The ledger is derived from the account's borrowing head so the
+  // repayment submission payload stays unchanged.
+  const applyRepaymentAccount = (account: BorrowingAccount) => {
+    setRepaymentAccount(account.account_number)
+    setRepaymentLedger(account.borrowing_head != null ? String(account.borrowing_head) : "")
+    setSelectedRepaymentAccount(account)
   }
 
-  // Handle account selection for repayment
-  const handleRepaymentAccountSelect = (accountNumber: string) => {
-    setRepaymentAccount(accountNumber)
-    const account = accounts.find(a => a.account_number === accountNumber)
-    setSelectedRepaymentAccount(account || null)
+  // Typing in the account number field invalidates any loaded account
+  const handleRepaymentAccountInput = (value: string) => {
+    setRepaymentAccount(value)
+    if (selectedRepaymentAccount && selectedRepaymentAccount.account_number !== value.trim()) {
+      setSelectedRepaymentAccount(null)
+      setRepaymentLedger("")
+    }
+  }
+
+  // Look up a borrowing account by exact account number (on blur / Enter)
+  const lookupRepaymentAccount = async (rawAccountNumber: string) => {
+    const accountNumber = rawAccountNumber.trim()
+    if (!accountNumber) {
+      setSelectedRepaymentAccount(null)
+      setRepaymentLedger("")
+      return
+    }
+    if (selectedRepaymentAccount?.account_number === accountNumber) return
+
+    setIsLookingUpRepayment(true)
+    try {
+      const res = await fetch(`/api/borrowings?accountNumber=${encodeURIComponent(accountNumber)}`)
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+
+      const match = (data.accounts || []).find(
+        (a: BorrowingAccount) => a.account_number?.toLowerCase() === accountNumber.toLowerCase()
+      )
+      if (!match) {
+        setSelectedRepaymentAccount(null)
+        setRepaymentLedger("")
+        setLookupError(`No borrowing account found with account number "${accountNumber}".`)
+        return
+      }
+      if (match.status !== "ACTIVE") {
+        setSelectedRepaymentAccount(null)
+        setRepaymentLedger("")
+        setLookupError(`Borrowing account "${accountNumber}" is ${match.status?.toLowerCase() || "inactive"}. Repayments can only be recorded for active accounts.`)
+        return
+      }
+      applyRepaymentAccount(match)
+    } catch (error: any) {
+      setSelectedRepaymentAccount(null)
+      setRepaymentLedger("")
+      setLookupError(error.message || "Failed to load borrowing account details.")
+    } finally {
+      setIsLookingUpRepayment(false)
+    }
+  }
+
+  // Normalise a date value from the API to YYYY-MM-DD (local time)
+  const toYmd = (d: string | null | undefined) => {
+    if (!d) return ""
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d
+    const dt = new Date(d)
+    if (isNaN(dt.getTime())) return String(d).slice(0, 10)
+    const m = String(dt.getMonth() + 1).padStart(2, "0")
+    const day = String(dt.getDate()).padStart(2, "0")
+    return `${dt.getFullYear()}-${m}-${day}`
+  }
+
+  const getLedgerName = (code: string | number | null | undefined) =>
+    code != null ? ledgerAccounts.find((l) => String(l.accountcode) === String(code))?.accountname ?? "" : ""
+
+  const openAccountSearch = () => {
+    setSearchAccountNo(repaymentAccount.trim())
+    setSearchValidationError("")
+    setIsAccountSearchOpen(true)
+  }
+
+  const resetAccountSearch = () => {
+    setSearchLedger("")
+    setSearchName("")
+    setSearchAccountNo("")
+    setSearchOpenDate("")
+    setSearchResults([])
+    setHasSearchedAccounts(false)
+    setSearchValidationError("")
+  }
+
+  // Search active borrowing accounts using any combination of filters
+  const searchBorrowingAccounts = async () => {
+    const name = searchName.trim().toLowerCase()
+    const accNo = searchAccountNo.trim()
+    if (!searchLedger && !name && !accNo && !searchOpenDate) {
+      setSearchValidationError("Enter at least one search criterion.")
+      return
+    }
+
+    setSearchValidationError("")
+    setIsSearchingAccounts(true)
+    try {
+      const params = new URLSearchParams({ status: "ACTIVE" })
+      if (accNo) params.append("accountNumber", accNo)
+      const res = await fetch(`/api/borrowings?${params}`)
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+
+      const results = (data.accounts || []).filter((a: BorrowingAccount) => {
+        if (searchLedger && String(a.borrowing_head ?? "") !== searchLedger) return false
+        if (searchOpenDate && toYmd(a.date_of_sanction) !== searchOpenDate) return false
+        if (name) {
+          const haystack = [
+            getLedgerName(a.borrowing_head),
+            a.borrowing_agency,
+            a.description,
+            a.purpose,
+            a.reference_number,
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase()
+          if (!haystack.includes(name)) return false
+        }
+        return true
+      })
+      setSearchResults(results)
+    } catch (error: any) {
+      setSearchResults([])
+      setSearchValidationError(error.message || "Failed to search borrowing accounts.")
+    } finally {
+      setHasSearchedAccounts(true)
+      setIsSearchingAccounts(false)
+    }
+  }
+
+  const selectSearchedAccount = (account: BorrowingAccount) => {
+    applyRepaymentAccount(account)
+    setIsAccountSearchOpen(false)
   }
 
   // Calculate principal automatically
@@ -410,7 +550,11 @@ export default function BorrowingsPage() {
 
   // Submit repayment
   const submitRepayment = async () => {
-    if (!repaymentLedger || !repaymentAccount || !repaymentAmount || !repaymentDate) {
+    if (!selectedRepaymentAccount || !repaymentLedger) {
+      setFormError("Please enter a valid borrowing account number")
+      return
+    }
+    if (!repaymentAccount || !repaymentAmount || !repaymentDate) {
       setFormError("Please fill all required fields")
       return
     }
@@ -527,9 +671,6 @@ export default function BorrowingsPage() {
   // Ledger-filtered accounts for each form
   const drawalFilteredAccounts = drawalLedger
     ? activeAccounts.filter(a => String(a.borrowing_head) === drawalLedger)
-    : activeAccounts
-  const repaymentFilteredAccounts = repaymentLedger
-    ? activeAccounts.filter(a => String(a.borrowing_head) === repaymentLedger)
     : activeAccounts
 
   // Stats
@@ -1180,37 +1321,60 @@ export default function BorrowingsPage() {
                       <CardContent className="space-y-4">
                         <div className="grid gap-4 sm:grid-cols-2">
                           <div className="space-y-2 sm:col-span-2">
-                            <Label>Select Ledger *</Label>
-                            <SearchableSelect
-                              value={repaymentLedger}
-                              onValueChange={handleRepaymentLedgerSelect}
-                              placeholder="Select ledger account"
-                              searchPlaceholder="Search ledger..."
-                              options={ledgerAccounts.map((l) => ({
-                                value: String(l.accountcode),
-                                label: l.accountname,
-                              }))}
-                            />
-                          </div>
-
-                          <div className="space-y-2 sm:col-span-2">
-                            <Label>Select Account *</Label>
-                            <SearchableSelect
-                              value={repaymentAccount}
-                              onValueChange={handleRepaymentAccountSelect}
-                              placeholder={repaymentLedger ? "Select borrowing account" : "Select a ledger first"}
-                              searchPlaceholder="Search by account no. or agency..."
-                              disabled={!repaymentLedger}
-                              options={repaymentFilteredAccounts.map((acc) => ({
-                                value: acc.account_number,
-                                label: `${acc.account_number} - ${acc.borrowing_agency || "N/A"} (Balance: ${formatCurrency(acc.ledger_balance)})`,
-                              }))}
-                            />
+                            <Label htmlFor="repayment-account-number">Account Number *</Label>
+                            <div className="flex gap-2">
+                              <div className="relative flex-1">
+                                <Input
+                                  id="repayment-account-number"
+                                  placeholder="Enter borrowing account number"
+                                  value={repaymentAccount}
+                                  autoComplete="off"
+                                  onChange={(e) => handleRepaymentAccountInput(e.target.value)}
+                                  onBlur={(e) => lookupRepaymentAccount(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault()
+                                      lookupRepaymentAccount(repaymentAccount)
+                                    }
+                                  }}
+                                />
+                                {isLookingUpRepayment && (
+                                  <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+                                )}
+                              </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="gap-2 shrink-0"
+                                // Keep focus on the input so the blur lookup doesn't fire when opening search
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={openAccountSearch}
+                              >
+                                <Search className="h-4 w-4" />
+                                Search
+                              </Button>
+                            </div>
                           </div>
 
                           {selectedRepaymentAccount && (
                             <div className="sm:col-span-2 rounded-lg border border-border bg-muted/50 p-4">
                               <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                  <span className="text-muted-foreground">Account Number:</span>
+                                  <p className="font-mono font-medium">{selectedRepaymentAccount.account_number}</p>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Ledger:</span>
+                                  <p className="font-medium">{getLedgerName(selectedRepaymentAccount.borrowing_head) || "---"}</p>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Type:</span>
+                                  <p className="font-medium">{selectedRepaymentAccount.type_of_borrowing === "cash_credit" ? "Cash Credit" : "Term Loan"}</p>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Open Date:</span>
+                                  <p className="font-medium">{formatDate(selectedRepaymentAccount.date_of_sanction)}</p>
+                                </div>
                                 <div>
                                   <span className="text-muted-foreground">Outstanding Balance:</span>
                                   <p className="font-medium text-orange-600">{formatCurrency(selectedRepaymentAccount.ledger_balance)}</p>
@@ -1389,6 +1553,159 @@ export default function BorrowingsPage() {
                 </div>
               </TabsContent>
             </Tabs>
+
+            {/* Repayment Account Search Dialog */}
+            <Dialog
+              open={isAccountSearchOpen}
+              onOpenChange={(open) => {
+                setIsAccountSearchOpen(open)
+                if (!open) resetAccountSearch()
+              }}
+            >
+              <DialogContent className="w-[calc(100vw-2rem)] max-w-4xl max-h-[85vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Search className="h-5 w-5" />
+                    Search Borrowing Account
+                  </DialogTitle>
+                  <DialogDescription>Search active borrowing accounts using any combination of fields</DialogDescription>
+                </DialogHeader>
+
+                <form
+                  className="space-y-4"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    searchBorrowingAccounts()
+                  }}
+                >
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Ledger</Label>
+                      <SearchableSelect
+                        value={searchLedger}
+                        onValueChange={setSearchLedger}
+                        placeholder="Select ledger account"
+                        searchPlaceholder="Search ledger..."
+                        options={ledgerAccounts.map((l) => ({
+                          value: String(l.accountcode),
+                          label: l.accountname,
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="search-name">Name</Label>
+                      <Input
+                        id="search-name"
+                        placeholder="Ledger name, description or purpose"
+                        value={searchName}
+                        onChange={(e) => setSearchName(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="search-account-no">Account Number</Label>
+                      <Input
+                        id="search-account-no"
+                        placeholder="Full or partial account number"
+                        value={searchAccountNo}
+                        onChange={(e) => setSearchAccountNo(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="search-open-date">Open Date</Label>
+                      <Input
+                        id="search-open-date"
+                        type="date"
+                        value={searchOpenDate}
+                        onChange={(e) => setSearchOpenDate(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {searchValidationError && (
+                    <p className="text-sm text-destructive">{searchValidationError}</p>
+                  )}
+
+                  <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                    <Button type="button" variant="outline" onClick={resetAccountSearch}>
+                      Clear
+                    </Button>
+                    <Button type="submit" className="gap-2" disabled={isSearchingAccounts}>
+                      {isSearchingAccounts ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                      Search
+                    </Button>
+                  </div>
+                </form>
+
+                {hasSearchedAccounts && !searchValidationError && (
+                  searchResults.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
+                      No matching active borrowing accounts found.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto rounded-lg border border-border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Account No</TableHead>
+                            <TableHead>Ledger</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Open Date</TableHead>
+                            <TableHead className="text-right">Balance</TableHead>
+                            <TableHead className="text-center">Action</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {searchResults.map((acc) => (
+                            <TableRow
+                              key={acc.id}
+                              className="cursor-pointer"
+                              onClick={() => selectSearchedAccount(acc)}
+                            >
+                              <TableCell className="font-mono font-medium">{acc.account_number}</TableCell>
+                              <TableCell>{getLedgerName(acc.borrowing_head) || "---"}</TableCell>
+                              <TableCell>
+                                <Badge className={getTypeBadge(acc.type_of_borrowing)}>
+                                  {acc.type_of_borrowing === "cash_credit" ? "Cash Credit" : "Loan"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="whitespace-nowrap">{formatDate(acc.date_of_sanction)}</TableCell>
+                              <TableCell className="text-right font-medium text-orange-600">
+                                {formatCurrency(acc.ledger_balance)}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    selectSearchedAccount(acc)
+                                  }}
+                                >
+                                  Select
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )
+                )}
+              </DialogContent>
+            </Dialog>
+
+            {/* Account Lookup Error Popup */}
+            <AlertDialog open={!!lookupError} onOpenChange={(open) => { if (!open) setLookupError("") }}>
+              <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-md">
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Invalid Account Number</AlertDialogTitle>
+                  <AlertDialogDescription>{lookupError}</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogAction onClick={() => setLookupError("")}>OK</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
             {/* Transaction History Dialog */}
             <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
