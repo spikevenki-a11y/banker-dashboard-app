@@ -33,6 +33,7 @@ const DAYEND_EXEMPT_READONLY_POSTS = new Set([
   "/api/loans/calculate-emi",
   "/api/lockers/check-availability",
   "/api/memberships/view_member",
+  "/api/report-chat",
   "/api/savings/account-search",
   "/api/savings/member-lookup",
   "/api/savings/member-search",

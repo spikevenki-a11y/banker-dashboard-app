@@ -709,10 +709,10 @@ function LoanCollectionContent() {
                       <span className="text-muted-foreground">Loan Account</span>
                       <p className="font-mono font-medium">{accountInfo.loan_account_no}</p>
                     </div>
-                    <div>
+                    {/* <div>
                       <span className="text-muted-foreground">Membership</span>
                       <p className="font-medium">{accountInfo.membership_no}</p>
-                    </div>
+                    </div> */}
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 text-sm">
@@ -726,11 +726,11 @@ function LoanCollectionContent() {
                     </div>
                   </div>
 
-                  <div>
+                  {/* <div>
                     <span className="text-sm text-muted-foreground">Member Name</span>
                     <p className="font-medium">{accountInfo.member_name}</p>
                     <p className="text-sm text-muted-foreground">{accountInfo.mobile_no}</p>
-                  </div>
+                  </div> */}
 
                   <div className="border-t pt-4">
                     <div className="grid grid-cols-2 gap-3 text-sm">
