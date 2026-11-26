@@ -1,7 +1,7 @@
 "use client"
 
-import { formatDate, formatDateTime } from "@/lib/date-format"
-import { useState, useRef } from "react"
+import { formatDate } from "@/lib/date-format"
+import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -9,8 +9,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table"
 import {
   FileText,
   TrendingUp,
@@ -23,14 +21,13 @@ import {
   Download,
   Search,
   Printer,
-  Eye,
   Loader2,
   XCircle,
 } from "lucide-react"
 import { DashboardWrapper } from "../_components/dashboard-wrapper"
-import { formatAmount } from "@/lib/number-format"
-import { ReportLogo } from "@/components/report-logo"
-import { REPORT_LOGO_WIDTH_MM } from "@/lib/print/report-logo"
+import { buildVoucherDocument, type VoucherPrintData } from "@/lib/print/voucher"
+import { printHtml } from "@/lib/print/print-html"
+import { downloadHtmlAsPdf } from "@/lib/print/html-to-pdf"
 
 const reportCategories = [
   {
@@ -132,36 +129,6 @@ const reportCategories = [
   },
 ]
 
-// --- Number to words utility (Indian system) ---
-function numberToWords(num: number): string {
-  if (num === 0) return "Zero"
-  const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
-    "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"]
-  const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"]
-
-  function convertGroup(n: number): string {
-    if (n === 0) return ""
-    if (n < 20) return ones[n]
-    if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? " " + ones[n % 10] : "")
-    return ones[Math.floor(n / 100)] + " Hundred" + (n % 100 ? " and " + convertGroup(n % 100) : "")
-  }
-
-  const crore = Math.floor(num / 10000000)
-  const lakh = Math.floor((num % 10000000) / 100000)
-  const thousand = Math.floor((num % 100000) / 1000)
-  const remainder = Math.floor(num % 1000)
-  const paise = Math.round((num % 1) * 100)
-
-  let result = ""
-  if (crore) result += convertGroup(crore) + " Crore "
-  if (lakh) result += convertGroup(lakh) + " Lakh "
-  if (thousand) result += convertGroup(thousand) + " Thousand "
-  if (remainder) result += convertGroup(remainder)
-  result = result.trim() + " Rupees"
-  if (paise > 0) result += " and " + convertGroup(paise) + " Paise"
-  result += " Only"
-  return result
-}
 
 interface VoucherLine {
   id: string
@@ -199,6 +166,7 @@ interface VoucherData {
     phone: string
     email: string
   }
+  member: VoucherPrintData["member"]
 }
 
 export default function ReportsPage() {
@@ -212,7 +180,6 @@ export default function ReportsPage() {
   const [pvLoading, setPvLoading] = useState(false)
   const [pvError, setPvError] = useState("")
   const [pvData, setPvData] = useState<VoucherData | null>(null)
-  const printRef = useRef<HTMLDivElement>(null)
 
   function handleReportClick(report: { name: string; description: string; href: string }) {
     if (report.name === "Print Voucher") {
@@ -257,49 +224,24 @@ export default function ReportsPage() {
     }
   }
 
+  const voucherHtml = useMemo(() => (pvData ? buildVoucherDocument(pvData) : ""), [pvData])
+  const [pvDownloading, setPvDownloading] = useState(false)
+
   function handlePrintVoucher() {
-    if (!printRef.current) return
-    const printContents = printRef.current.innerHTML
-    const win = window.open("", "_blank", "width=800,height=600")
-    if (!win) return
-    win.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Voucher No. ${pvData?.voucher.voucherNo}</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: 'Segoe UI', Arial, sans-serif; padding: 24px; color: #1a1a1a; font-size: 13px; }
-          table { width: 100%; border-collapse: collapse; margin: 12px 0; }
-          th, td { border: 1px solid #d1d5db; padding: 6px 10px; text-align: left; }
-          th { background: #f3f4f6; font-weight: 600; font-size: 12px; }
-          .text-right { text-align: right; }
-          .text-center { text-align: center; }
-          .font-bold { font-weight: 700; }
-          .header { text-align: center; margin-bottom: 16px; border-bottom: 2px solid #1a1a1a; padding-bottom: 12px; }
-          .header h1 { font-size: 18px; font-weight: 700; }
-          .header h2 { font-size: 14px; font-weight: 600; margin-top: 2px; }
-          .header p { font-size: 11px; color: #6b7280; }
-          .voucher-title { text-align: center; font-size: 15px; font-weight: 700; margin: 14px 0 6px; text-transform: uppercase; letter-spacing: 1px; }
-          .meta-row { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 12px; }
-          .meta-row span { display: inline-block; }
-          .amount-words { font-style: italic; margin: 10px 0; font-size: 12px; padding: 6px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px; }
-          .signatures { display: flex; justify-content: space-between; margin-top: 48px; font-size: 12px; }
-          .signatures div { text-align: center; min-width: 140px; }
-          .signatures .line { border-top: 1px solid #1a1a1a; padding-top: 4px; margin-top: 40px; }
-          .footer-note { text-align: center; margin-top: 24px; font-size: 10px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 8px; }
-          tfoot td { font-weight: 700; background: #f3f4f6; }
-          @media print { body { padding: 12px; } }
-        </style>
-      </head>
-      <body>
-        ${printContents}
-      </body>
-      </html>
-    `)
-    win.document.close()
-    win.focus()
-    setTimeout(() => { win.print() }, 400)
+    if (voucherHtml) printHtml(voucherHtml)
+  }
+
+  async function handleDownloadVoucher() {
+    if (!voucherHtml || !pvData) return
+    setPvDownloading(true)
+    try {
+      await downloadHtmlAsPdf(voucherHtml, `Voucher_${pvData.voucher.voucherNo}_${formatDate(pvData.voucher.businessDate)}.pdf`)
+    } catch (error) {
+      console.error("Voucher PDF download failed:", error)
+      setPvError("Could not create the PDF. Please try again.")
+    } finally {
+      setPvDownloading(false)
+    }
   }
 
   const filteredCategories = reportCategories
@@ -459,168 +401,28 @@ export default function ReportsPage() {
                 </Button>
                 <div className="flex-1" />
                 <Button variant="outline" size="sm" className="gap-2 bg-transparent" onClick={handlePrintVoucher}>
-                  <Eye className="h-4 w-4" />
-                  Preview / Print
+                  <Printer className="h-4 w-4" />
+                  Print
                 </Button>
-                <Button size="sm" className="gap-2" onClick={handlePrintVoucher}>
-                  <Download className="h-4 w-4" />
-                  Download PDF
+                <Button size="sm" className="gap-2" onClick={handleDownloadVoucher} disabled={pvDownloading}>
+                  {pvDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  {pvDownloading ? "Preparing PDF..." : "Download PDF"}
                 </Button>
               </div>
 
-              {/* Printable Voucher Content */}
-              <div
-                ref={printRef}
-                className="rounded-lg border border-border bg-card p-6 text-foreground"
-              >
-                {/* Header */}
-                <div
-                  className="header mb-4 border-b-2 border-foreground pb-3 text-center"
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: `${REPORT_LOGO_WIDTH_MM}mm minmax(0, 1fr) ${REPORT_LOGO_WIDTH_MM}mm`,
-                    columnGap: 8,
-                    alignItems: "center",
-                  }}
-                >
-                  <div />
-                  <div>
-                    <h1 className="text-lg font-bold">{pvData.branch.bankName}</h1>
-                    <h2 className="text-sm font-semibold">{pvData.branch.branchName}</h2>
-                    {pvData.branch.address && (
-                      <p className="text-xs text-muted-foreground">
-                        {[pvData.branch.address, pvData.branch.city, pvData.branch.state, pvData.branch.postalCode]
-                          .filter(Boolean)
-                          .join(", ")}
-                      </p>
-                    )}
-                    {pvData.branch.phone && (
-                      <p className="text-xs text-muted-foreground">
-                        Ph: {pvData.branch.phone}
-                        {pvData.branch.email ? ` | Email: ${pvData.branch.email}` : ""}
-                      </p>
-                    )}
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "flex-end", alignSelf: "start" }}>
-                    <ReportLogo />
-                  </div>
-                </div>
+              {pvError && (
+                <Alert variant="destructive">
+                  <XCircle className="h-4 w-4" />
+                  <AlertDescription>{pvError}</AlertDescription>
+                </Alert>
+              )}
 
-                {/* Voucher title */}
-                <div className="voucher-title mb-3 text-center text-sm font-bold uppercase tracking-widest">
-                  {pvData.voucher.voucherType === "CASH" ? "Cash Voucher" : "Transfer Voucher"}
-                </div>
-
-                {/* Meta info */}
-                <div className="mb-4 grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
-                  <div className="flex justify-between">
-                    <span className="font-medium text-muted-foreground">Voucher No:</span>
-                    <span className="font-semibold">{pvData.voucher.voucherNo}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="font-medium text-muted-foreground">Batch No:</span>
-                    <span className="font-semibold">{pvData.voucher.batchId}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="font-medium text-muted-foreground">Date:</span>
-                    <span className="font-semibold">
-                      {formatDate(pvData.voucher.businessDate)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="font-medium text-muted-foreground">Status:</span>
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-semibold text-green-700 border-green-300 bg-green-50">
-                      {pvData.voucher.status}
-                    </Badge>
-                  </div>
-                </div>
-
-                {/* Transaction Lines Table */}
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-24 text-xs">GL Code</TableHead>
-                      <TableHead className="text-xs">Account Name</TableHead>
-                      <TableHead className="text-xs">Ref A/c</TableHead>
-                      <TableHead className="text-right text-xs">Debit (Rs.)</TableHead>
-                      <TableHead className="text-right text-xs">Credit (Rs.)</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pvData.lines.map((line) => (
-                      <TableRow key={line.id}>
-                        <TableCell className="text-xs font-mono">{line.accountCode}</TableCell>
-                        <TableCell className="text-xs">{line.accountName}</TableCell>
-                        <TableCell className="text-xs font-mono">
-                          {line.refAccountId && line.refAccountId !== "0" ? line.refAccountId : "-"}
-                        </TableCell>
-                        <TableCell className="text-right text-xs font-mono">
-                          {line.debitAmount > 0
-                            ? formatAmount(line.debitAmount)
-                            : "-"}
-                        </TableCell>
-                        <TableCell className="text-right text-xs font-mono">
-                          {line.creditAmount > 0
-                            ? formatAmount(line.creditAmount)
-                            : "-"}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                  <TableFooter>
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-xs font-bold">Total</TableCell>
-                      <TableCell className="text-right text-xs font-bold font-mono">
-                        {formatAmount(pvData.totals.totalDebit)}
-                      </TableCell>
-                      <TableCell className="text-right text-xs font-bold font-mono">
-                        {formatAmount(pvData.totals.totalCredit)}
-                      </TableCell>
-                    </TableRow>
-                  </TableFooter>
-                </Table>
-
-                {/* Narration */}
-                {pvData.lines[0]?.narration && (
-                  <div className="mt-3 text-xs">
-                    <span className="font-medium text-muted-foreground">Narration: </span>
-                    <span>{pvData.lines[0].narration}</span>
-                  </div>
-                )}
-
-                {/* Amount in words */}
-                <div className="amount-words mt-3 rounded border border-border bg-muted/50 p-2 text-xs italic">
-                  <span className="font-medium">Amount in words: </span>
-                  {numberToWords(pvData.totals.totalDebit)}
-                </div>
-
-                {/* Signatures */}
-                <div className="signatures mt-12 flex justify-between text-xs">
-                  <div className="text-center">
-                    <div className="line mt-10 border-t border-foreground pt-1">
-                      Prepared By
-                    </div>
-                    <div className="text-muted-foreground">{pvData.voucher.makerName}</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="line mt-10 border-t border-foreground pt-1">
-                      Approved By
-                    </div>
-                    <div className="text-muted-foreground">{pvData.voucher.checkerName}</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="line mt-10 border-t border-foreground pt-1">
-                      Authorized Signatory
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className="footer-note mt-6 border-t border-border pt-2 text-center text-[10px] text-muted-foreground">
-                  This is a computer-generated voucher. Printed on{" "}
-                  {formatDateTime(new Date())}
-                </div>
-              </div>
+              {/* Voucher preview: the same HTML that is printed and saved as PDF */}
+              <iframe
+                title={`Voucher No. ${pvData.voucher.voucherNo}`}
+                srcDoc={voucherHtml}
+                className="h-[70vh] w-full rounded-lg border border-border bg-white"
+              />
             </div>
           )}
         </DialogContent>

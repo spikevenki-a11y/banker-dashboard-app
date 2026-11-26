@@ -19,6 +19,19 @@ const COLORS: Record<DepositSegment["color"], string> = {
   violet: "var(--ardb-chart-mfd)",
 }
 
+// Donut geometry: a 160px ring, 16px thick, leaving a 128px hole for the total
+const CHART_SIZE = 160
+const OUTER_RADIUS = CHART_SIZE / 2
+const INNER_RADIUS = OUTER_RADIUS - 16
+
+/** Short Indian-style figure for the donut centre (₹18.76 Cr, ₹4.82 L); the legend keeps the exact amount. */
+function formatShort(amount: number, formatAmount: (amount: number) => string) {
+  const abs = Math.abs(amount)
+  if (abs >= 1e7) return `₹${(amount / 1e7).toFixed(2)} Cr`
+  if (abs >= 1e5) return `₹${(amount / 1e5).toFixed(2)} L`
+  return formatAmount(amount)
+}
+
 type DepositMixCardProps = {
   segments: DepositSegment[]
   formatAmount: (amount: number) => string
@@ -39,14 +52,16 @@ export function DepositMixCard({ segments, formatAmount, loading }: DepositMixCa
       </div>
 
       <div className="flex flex-wrap items-center gap-6">
-        <div className="relative size-32 shrink-0">
+        <div className="relative mx-auto shrink-0 sm:mx-0" style={{ width: CHART_SIZE, height: CHART_SIZE }}>
           {loading ? (
-            <Skeleton className="size-32 rounded-full" />
+            <Skeleton className="size-full rounded-full" />
           ) : (
-            <ChartContainer config={config} className="aspect-square size-32">
+            <ChartContainer config={config} className="aspect-square size-full">
               <PieChart>
                 {total > 0 && (
                   <ChartTooltip
+                    // Keep the hover tooltip above the centre total
+                    wrapperStyle={{ zIndex: 10 }}
                     content={<ChartTooltipContent hideLabel nameKey="label" formatter={(v, name) => `${name}: ${formatAmount(Number(v))}`} />}
                   />
                 )}
@@ -54,8 +69,8 @@ export function DepositMixCard({ segments, formatAmount, loading }: DepositMixCa
                   data={pieData}
                   dataKey="amount"
                   nameKey="label"
-                  innerRadius={48}
-                  outerRadius={64}
+                  innerRadius={INNER_RADIUS}
+                  outerRadius={OUTER_RADIUS}
                   startAngle={90}
                   endAngle={-270}
                   strokeWidth={0}
@@ -69,9 +84,13 @@ export function DepositMixCard({ segments, formatAmount, loading }: DepositMixCa
             </ChartContainer>
           )}
           {!loading && (
-            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-xs leading-4">
-              <span className="font-semibold text-ardb-ink">{formatAmount(total)}</span>
-              <span className="text-ardb-muted">Total</span>
+            <div
+              className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-0.5 px-6 text-center"
+            >
+              <span className="max-w-full truncate text-base font-semibold leading-6 text-ardb-ink tabular-nums">
+                {formatShort(total, formatAmount)}
+              </span>
+              <span className="text-xs leading-4 text-ardb-muted">Total deposits</span>
             </div>
           )}
         </div>

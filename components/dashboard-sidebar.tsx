@@ -13,7 +13,6 @@ import {
   TrendingUp,
   Settings,
   Bot,
-  Building2,
   Calculator,
   BarChart3,
   ShieldAlert,
@@ -22,6 +21,21 @@ import {
   PanelLeftOpen,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
+import { REPORT_LOGO_ALT, REPORT_LOGO_NATURAL, REPORT_LOGO_PATH } from "@/lib/print/report-logo"
+
+/** NCARDB logo for the sidebar header; `className` sets its height (width follows). */
+function SidebarLogo({ className }: { className?: string }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={REPORT_LOGO_PATH}
+      alt={REPORT_LOGO_ALT}
+      width={REPORT_LOGO_NATURAL.width}
+      height={REPORT_LOGO_NATURAL.height}
+      className={cn("w-auto shrink-0 object-contain", className)}
+    />
+  )
+}
 
 const routes = [
   {
@@ -139,14 +153,19 @@ function useSidebarState() {
   return { collapsed: isNarrow || pref, isNarrow, toggle: () => setPref(!readPref()) }
 }
 
+// Menu item (Figma sidebar): 36px tall, 6px radius, 20px icon, 12px gaps; the active
+// item is filled with the brand blue
 const itemClass = (active: boolean, collapsed: boolean) =>
   cn(
-    "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+    "flex h-9 w-full items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
     collapsed && "justify-center px-0",
     active
       ? "bg-sidebar-primary text-sidebar-primary-foreground"
       : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
   )
+
+const ICON_PROPS = { className: "h-5 w-5 shrink-0", strokeWidth: 1.75 } as const
 
 export function DashboardSidebar() {
   const pathname = usePathname()
@@ -163,51 +182,58 @@ export function DashboardSidebar() {
   return (
     <div
       className={cn(
-        "flex h-full shrink-0 flex-col border-r border-border bg-sidebar transition-[width] duration-200 ease-in-out",
+        "flex h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200 ease-in-out",
         collapsed ? "w-16" : "w-64",
       )}
     >
-      <div
-        className={cn(
-          "flex h-16 items-center border-b border-sidebar-border",
-          collapsed ? "justify-center" : "pl-6 pr-3",
-        )}
-      >
-        {collapsed && !isNarrow ? (
-          // Collapsed (wide screens): the logo stays visible; hovering or focusing it
-          // swaps in the expand icon, and clicking expands the sidebar
-          <button
-            type="button"
-            onClick={toggle}
-            title="Expand sidebar"
-            aria-label="Expand sidebar"
-            aria-expanded={false}
-            className="group relative flex h-10 w-10 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-sidebar-accent focus-visible:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-          >
-            <Building2 className="h-6 w-6 text-sidebar-primary transition-all duration-200 group-hover:scale-75 group-hover:opacity-0 group-focus-visible:scale-75 group-focus-visible:opacity-0" />
-            <PanelLeftOpen className="absolute h-5 w-5 scale-75 text-sidebar-accent-foreground opacity-0 transition-all duration-200 group-hover:scale-100 group-hover:opacity-100 group-focus-visible:scale-100 group-focus-visible:opacity-100" />
-          </button>
-        ) : (
-          <Building2 className="h-6 w-6 shrink-0 text-sidebar-primary" />
-        )}
-        {!collapsed && <span className="ml-2 text-lg font-semibold text-sidebar-foreground">NextZen</span>}
+      {collapsed ? (
+        // Collapsed: small logo only
+        <div className="flex h-[72px] shrink-0 items-center justify-center border-b border-sidebar-border bg-ardb-surface">
+          {!isNarrow ? (
+            // Wide screens: hovering or focusing the logo swaps in the expand icon;
+            // clicking expands the sidebar
+            <button
+              type="button"
+              onClick={toggle}
+              title="Expand sidebar"
+              aria-label="Expand sidebar"
+              aria-expanded={false}
+              className="group relative flex h-10 w-10 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-sidebar-accent focus-visible:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+            >
+              <SidebarLogo className="h-8 transition-all duration-200 group-hover:scale-75 group-hover:opacity-0 group-focus-visible:scale-75 group-focus-visible:opacity-0" />
+              <PanelLeftOpen className="absolute h-5 w-5 scale-75 text-sidebar-accent-foreground opacity-0 transition-all duration-200 group-hover:scale-100 group-hover:opacity-100 group-focus-visible:scale-100 group-focus-visible:opacity-100" />
+            </button>
+          ) : (
+            <SidebarLogo className="h-8" />
+          )}
+        </div>
+      ) : (
+        // Expanded: brand block — emblem, name and tagline, then a divider (Figma "Brand")
+        <div className="relative shrink-0 bg-ardb-surface px-6 py-6">
+          <div className="flex flex-col items-center gap-2 text-center">
+            <SidebarLogo className="h-32" />
+            <p className="text-xl font-bold leading-7 text-ardb-ink">TNSCARDB</p>
+            <p className="text-xs leading-4 text-ardb-muted">People · Agriculture · Prosperity</p>
+          </div>
+          <div className="mt-6 h-px bg-ardb-border" />
 
-        {/* Collapse toggle — shown when expanded; hidden on narrow screens, where the sidebar stays collapsed */}
-        {!isNarrow && !collapsed && (
-          <button
-            type="button"
-            onClick={toggle}
-            title="Collapse sidebar"
-            aria-label="Collapse sidebar"
-            aria-expanded={true}
-            className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          >
-            <PanelLeftClose className="h-5 w-5" />
-          </button>
-        )}
-      </div>
+          {/* Collapse toggle — hidden on narrow screens, where the sidebar stays collapsed */}
+          {!isNarrow && (
+            <button
+              type="button"
+              onClick={toggle}
+              title="Collapse sidebar"
+              aria-label="Collapse sidebar"
+              aria-expanded={true}
+              className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-md text-ardb-muted transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+            >
+              <PanelLeftClose className="h-5 w-5" />
+            </button>
+          )}
+        </div>
+      )}
 
-      <nav className={cn("min-h-0 flex-1 space-y-1 overflow-y-auto py-4", collapsed ? "px-2" : "px-3")}>
+      <nav className={cn("min-h-0 flex-1 space-y-[5px] overflow-y-auto py-4", collapsed ? "px-2" : "pl-[15px] pr-[5px]")}>
         {visibleRoutes.map((route) => (
           <Link
             key={route.href}
@@ -216,20 +242,20 @@ export function DashboardSidebar() {
             aria-label={collapsed ? route.label : undefined}
             className={itemClass(pathname === route.href, collapsed)}
           >
-            <route.icon className="h-5 w-5 shrink-0" />
+            <route.icon {...ICON_PROPS} />
             {!collapsed && route.label}
           </Link>
         ))}
       </nav>
 
-      <div className={cn("space-y-1 border-t border-sidebar-border", collapsed ? "p-2" : "p-4")}>
+      <div className={cn("space-y-[5px] border-t border-sidebar-border py-3", collapsed ? "px-2" : "pl-[15px] pr-[5px]")}>
         <Link
           href="/report-bot"
           title={collapsed ? "Report bot" : undefined}
           aria-label={collapsed ? "Report bot" : undefined}
           className={itemClass(pathname === "/report-bot" || pathname.startsWith("/report-bot/"), collapsed)}
         >
-          <Bot className="h-5 w-5 shrink-0" />
+          <Bot {...ICON_PROPS} />
           {!collapsed && "Report bot"}
         </Link>
         <Link
@@ -238,7 +264,7 @@ export function DashboardSidebar() {
           aria-label={collapsed ? "Settings" : undefined}
           className={itemClass(pathname === "/settings", collapsed)}
         >
-          <Settings className="h-5 w-5 shrink-0" />
+          <Settings {...ICON_PROPS} />
           {!collapsed && "Settings"}
         </Link>
       </div>

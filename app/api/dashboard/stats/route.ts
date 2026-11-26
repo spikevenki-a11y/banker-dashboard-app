@@ -33,7 +33,7 @@ export async function GET(request: Request) {
 
     // Get total deposits (savings + fixed deposits)
     const savingsResult = await client.query(
-      `SELECT COALESCE(SUM(clear_balance), 0) as total_savings 
+      `SELECT COALESCE(SUM(clear_balance), 0) as total_savings, COUNT(*) as savings_count
       FROM savings_accounts 
       WHERE branch_id = $1 AND account_status = 'Active'`,
       [branchId]
@@ -98,6 +98,7 @@ export async function GET(request: Request) {
     const activeMembers = parseInt(membersResult.rows[0]?.active_members || "0")
     const activeLoans = parseInt(loansResult.rows[0]?.active_loans || "0")
     const totalSavings = parseFloat(savingsResult.rows[0]?.total_savings || "0")
+    const savingsCount = parseInt(savingsResult.rows[0]?.savings_count || "0")
     const totalDeposits = parseFloat(depositsResult.rows[0]?.total_deposits || "0")
     const totalMFD = parseFloat(maturedDepositsResult.rows[0]?.total_deposits || "0")
     const fdCount = parseInt(fdResult.rows[0]?.fd_count || "0")
@@ -113,6 +114,8 @@ export async function GET(request: Request) {
       activeMembers,
       activeLoans,
       totalDeposits: totalDepositsAmount,
+      totalSavings,
+      savingsCount,
       fdCount,
       mfdCount,
       totalMFD,

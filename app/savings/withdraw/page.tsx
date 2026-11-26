@@ -339,6 +339,8 @@ export default function WithdrawPage() {
     setSearchContact("")
     setSearchResults([])
     setSearchResultsPage(1)
+    // Show the selected account's membership number in the Account Information card
+    setMembershipNo(result.membership_no != null ? String(result.membership_no) : "")
     loadAccount(result.account_number)
   }
 
@@ -490,7 +492,12 @@ export default function WithdrawPage() {
                             }
                             setMemberSearchError("")
                           }}
-                          onBlur={() => { if (membershipNo.trim() && !isMemberSearching) handleMemberLookup() }}
+                          onBlur={() => {
+                            // Skip when it's still the loaded account's own number (e.g. filled from Search),
+                            // so leaving the field doesn't reset the selected account
+                            if (accountInfo && String(accountInfo.membership_no) === membershipNo.trim()) return
+                            if (membershipNo.trim() && !isMemberSearching) handleMemberLookup()
+                          }}
                           onKeyDown={(e) => e.key === "Enter" && handleMemberLookup()}
                           className="flex-1"
                         />
