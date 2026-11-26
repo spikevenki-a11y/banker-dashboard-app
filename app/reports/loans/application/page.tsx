@@ -56,6 +56,7 @@ export default function LoanApplicationReportPage() {
   const router = useRouter()
   const { user } = useAuth()
   const branchName = (user as any)?.branch_name as string | undefined
+  const userFullName = ((user as any)?.fullName as string | undefined) ?? ""
 
   const [membershipNo, setMembershipNo] = useState("")
   const [searchOpen, setSearchOpen] = useState(false)
@@ -131,7 +132,11 @@ export default function LoanApplicationReportPage() {
     if (!selected) return
     setBusy("generate")
     try {
-      const doc = await buildLoanApplicationDocument({ loanApplicationId: selected.loan_application_id, branchName })
+      const doc = await buildLoanApplicationDocument({
+        loanApplicationId: selected.loan_application_id,
+        branchName,
+        generatedBy: userFullName,
+      })
       setGenerated({ id: String(selected.loan_application_id), ...doc })
     } catch (e: any) {
       popup.error(e?.message || "Failed to generate the application form")

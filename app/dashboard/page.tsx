@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { DashboardWrapper } from "../_components/dashboard-wrapper"
-import { SummaryCard } from "./_components/summary-card"
+import { SummaryCarousel, type SummaryItem } from "./_components/summary-carousel"
 import { TrendChartCard, type TrendPoint } from "./_components/trend-chart-card"
 import { QuickActionsCard } from "./_components/quick-actions-card"
 import { DepositMixCard, type DepositSegment } from "./_components/deposit-mix-card"
@@ -15,6 +15,8 @@ interface DashboardStats {
   activeMembers: number
   activeLoans: number
   totalDeposits: number // savings + active term deposits
+  totalSavings: number // active savings accounts
+  savingsCount: number
   fdCount: number
   mfdCount: number
   totalMFD: number
@@ -69,7 +71,7 @@ export default function DashboardPage() {
       .catch(() => setBranchName(null))
   }, [])
 
-  const summary = [
+  const summary: SummaryItem[] = [
     {
       icon: "members",
       label: "Members",
@@ -81,6 +83,12 @@ export default function DashboardPage() {
       label: "Total deposits",
       value: formatAmount(stats?.totalDeposits ?? 0),
       detail: `FD ${formatCount(stats?.fdCount)} · MFD ${formatCount(stats?.mfdCount)}`,
+    },
+    {
+      icon: "bank",
+      label: "Total savings",
+      value: formatAmount(stats?.totalSavings ?? 0),
+      detail: `${formatCount(stats?.savingsCount)} active accounts`,
     },
     {
       icon: "loans",
@@ -124,11 +132,7 @@ export default function DashboardPage() {
             <p className="text-sm leading-5 text-ardb-muted">Here&apos;s what&apos;s happening in the bank today.</p>
           </header>
 
-          <section aria-label="Summary" className="grid gap-6 @xl:grid-cols-2 @5xl:grid-cols-4">
-            {summary.map((card) => (
-              <SummaryCard key={card.label} {...card} loading={statsLoading} />
-            ))}
-          </section>
+          <SummaryCarousel items={summary} loading={statsLoading} />
 
           <div className="grid items-start gap-6 @5xl:grid-cols-[minmax(0,1fr)_336px]">
             <div className="@container flex min-w-0 flex-col gap-6">

@@ -30,14 +30,15 @@
   --chart-4: oklch(0.75 0.12 200);
   --chart-5: oklch(0.45 0.12 270);
   --radius: 0.5rem;
-  --sidebar: oklch(0.98 0.005 240);
-  --sidebar-foreground: oklch(0.3 0.01 240);
-  --sidebar-primary: oklch(0.48 0.15 250);
-  --sidebar-primary-foreground: oklch(0.99 0.002 240);
-  --sidebar-accent: oklch(0.95 0.01 240);
-  --sidebar-accent-foreground: oklch(0.3 0.01 240);
-  --sidebar-border: oklch(0.92 0.005 240);
-  --sidebar-ring: oklch(0.48 0.15 250);
+  /* Sidebar (Figma: ARDB Homepage – Dev Handoff, Sidebar) */
+  --sidebar: #f5f9fb;
+  --sidebar-foreground: #292f34;
+  --sidebar-primary: #005fad;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e8f1fc;
+  --sidebar-accent-foreground: #172c57;
+  --sidebar-border: #e3ecf4;
+  --sidebar-ring: #005fad;
 
   /* ARDB homepage tokens (Figma: ARDB Homepage – Dev Handoff) */
   --ardb-page: #f0f7fd;

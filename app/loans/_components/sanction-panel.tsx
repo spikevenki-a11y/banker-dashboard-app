@@ -61,6 +61,8 @@ import {
   type RepaymentMethod,
 } from "@/lib/loan-repayment-schedule"
 import { formatCurrency } from "@/lib/number-format"
+import { useMemberSummary, ViewMemberDetailsButton } from "@/components/member-summary-card"
+import { CustomerPhotoSignature } from "@/components/customer-photo-signature"
 import { getMoratoriumError, getTenureError, getTenureLimits } from "@/lib/loan-tenure"
 
 // Sanction form for one pending loan application: application details, sanction terms,
@@ -150,6 +152,14 @@ const formatDueDatePdf = (value: string) => {
 export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCancel }: SanctionPanelProps) {
   // Identity for business date
   const [identity, setIdentity] = useState<{ businessDate?: string } | null>(null)
+
+  // Member profile for the View Member Details popup and the photo / signature
+  // (same as Loan Disbursement); the application's member details show until loaded
+  const summaryMember = useMemberSummary(selectedApp?.membership_no, selectedApp ? {
+    full_name: selectedApp.member_name,
+    mobile_no: selectedApp.mobile_no,
+    aadhaar_no: selectedApp.aadhaar_no,
+  } : undefined)
 
   const [securities, setSecurities] = useState<SecurityDetail[]>([])
   const [loadingDetails, setLoadingDetails] = useState(true)
@@ -646,20 +656,28 @@ export function SanctionPanel({ app: selectedApp, onApproved, onRejected, onCanc
       {/* Application Details Card */}
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-start justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <User className="h-5 w-5 text-primary" />
-                {selectedApp.member_name || "N/A"}
-              </CardTitle>
-              <CardDescription className="mt-1">
-                Reference: {selectedApp.reference_no} | Membership: {selectedApp.membership_no}
-              </CardDescription>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-3">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <User className="h-5 w-5 text-primary" />
+                  {selectedApp.member_name || "N/A"}
+                </CardTitle>
+                <CardDescription className="mt-1">
+                  Reference: {selectedApp.reference_no} | Membership: {selectedApp.membership_no}
+                </CardDescription>
+              </div>
+              {/* Same member profile popup as Loan Disbursement */}
+              <ViewMemberDetailsButton memberInfo={summaryMember} />
             </div>
-            <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-              <Clock className="mr-1 h-3 w-3" />
-              Pending Review
-            </Badge>
+            <div className="flex flex-col items-start gap-3 sm:items-end">
+              <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                <Clock className="mr-1 h-3 w-3" />
+                Pending Review
+              </Badge>
+              {/* Member photo & signature, for verification before sanctioning */}
+              <CustomerPhotoSignature customerCode={summaryMember?.customer_code} enlargeable className="shrink-0" />
+            </div>
           </div>
         </CardHeader>
         <CardContent>

@@ -66,7 +66,7 @@ export async function POST(request: Request) {
 
     // Successful login cleanup + audit
     await pool.query(`DELETE FROM staff_login_failures WHERE staff_id = $1`, [user.id])
-
+    console.log("Login successful for user:", user.username)
     await pool.query(
       `INSERT INTO staff_login_audit (staff_id, branch_id, ip_address, success)
        VALUES ($1, $2, $3, $4)`,
