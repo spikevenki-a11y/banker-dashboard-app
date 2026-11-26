@@ -1,10 +1,11 @@
 import pool from "@/lib/connection/db"
 import { NextResponse } from "next/server"
-import { getSession } from "@/lib/auth/session"
+import { requirePermission } from "@/lib/auth/require-role"
 
 export async function GET() {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await requirePermission("MEMBER_VIEW")
+  if (auth instanceof NextResponse) return auth
+  const { session } = auth
 
   const { rows } = await pool.query(
     `SELECT * FROM members

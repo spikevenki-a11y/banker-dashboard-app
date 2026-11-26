@@ -1,4 +1,5 @@
 import type { PoolClient } from "pg"
+import { sub, toPaise, toRupees, toSql } from "./money"
 
 export class InsufficientSharesError extends Error {
   readonly status = 400
@@ -35,9 +36,13 @@ export async function lockShareBalance(
     [membershipNo, branchId]
   )
 
-  const approved = Number(share.share_balance)
-  const pendingWithdrawals = Number(pending.pending_withdrawals)
-  return { approved, pendingWithdrawals, available: approved - pendingWithdrawals }
+  const approved = toPaise(share.share_balance)
+  const pendingWithdrawals = toPaise(pending.pending_withdrawals)
+  return {
+    approved: toRupees(approved),
+    pendingWithdrawals: toRupees(pendingWithdrawals),
+    available: toRupees(sub(approved, pendingWithdrawals)),
+  }
 }
 
 // Applies the share transactions of a batch being approved to member_shares,
@@ -58,13 +63,13 @@ export async function applyApprovedShareTransactions(
   )
 
   for (const r of rows) {
-    const net = Number(r.net)
+    const net = toPaise(r.net)
     const { rows: [updated] } = await client.query(
       `UPDATE member_shares
           SET share_balance = COALESCE(share_balance, 0) + $1, updated_at = NOW()
         WHERE membership_no = $2 AND branch_id = $3 AND status = 'ACTIVE'
         RETURNING share_balance`,
-      [net, r.membership_no, branchId]
+      [toSql(net), r.membership_no, branchId]
     )
 
     if (net < 0 && !updated) {
@@ -72,7 +77,7 @@ export async function applyApprovedShareTransactions(
         `Share account for member ${r.membership_no} is not active; cannot approve withdrawal`
       )
     }
-    if (updated && Number(updated.share_balance) < 0) {
+    if (updated && toPaise(updated.share_balance) < 0) {
       throw new InsufficientSharesError(
         `Approving this voucher would leave member ${r.membership_no} with a negative share balance`
       )

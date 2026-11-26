@@ -6,6 +6,7 @@
  * "Generated On / By" print in the footer band of every page.
  */
 import { escapeHtml as esc } from "./print-html"
+import { reportLogoImgHtml } from "./report-logo"
 
 export type DayBookLine = {
   voucherNo: number | string
@@ -25,7 +26,6 @@ export type DayBookData = {
   regionOffice?: string
   generatedBy?: string
   generatedOn?: Date
-  logoUrl?: string
   groups: DayBookGroup[]
   openingBalance: number
   closingBalance?: number // defaults to opening + cash receipts − cash payments
@@ -143,7 +143,7 @@ ${rows}
          -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
   .band { background: #daf0d3; display: grid; grid-template-columns: 22mm 1fr 22mm; align-items: center; padding: 2mm 0 0; }
-  .logo { width: 20mm; height: 20mm; object-fit: contain; margin-left: 1mm; }
+  .logo-cell { display: flex; justify-content: flex-end; padding-right: 1mm; }
   .titles { text-align: center; }
   .bank { font-size: 13pt; font-weight: 700; }
   .rep  { font-size: 10pt; font-weight: 700; margin-top: 3mm; }
@@ -177,11 +177,12 @@ ${rows}
   .sigs div:nth-child(4) { text-align: right; padding-right: 22mm; }
   .closing { break-inside: avoid; }
 </style></head><body>
+<section class="sheet landscape">
 
 <div class="band">
-  ${d.logoUrl ? `<img class="logo" src="${esc(d.logoUrl)}" alt="" onerror="this.style.visibility='hidden'">` : "<div></div>"}
-  <div class="titles"><div class="bank">${esc(d.bankName)}</div><div class="rep">DAY BOOK</div></div>
   <div></div>
+  <div class="titles"><div class="bank">${esc(d.bankName)}</div><div class="rep">DAY BOOK</div></div>
+  <div class="logo-cell">${reportLogoImgHtml()}</div>
   <div class="meta"><div>${d.regionOffice ? `R.O : ${esc(d.regionOffice)}` : ""}</div><div class="dt">DATE <span>${esc(dmy(d.date))}</span></div></div>
 </div>
 
@@ -199,7 +200,7 @@ ${rows}
   ${body || `<tbody><tr><td colspan="9" class="c" style="padding:6mm">No passed vouchers for this date</td></tr></tbody>`}
 </table>
 
-<div class="closing">
+<div class="closing keep">
 <table class="totals">
   <colgroup>
     <col style="width:6.5%"><col style="width:10%"><col style="width:20%">
@@ -219,5 +220,6 @@ ${rows}
 <div class="sigs"><div></div><div>C.E.O.</div><div>PRESIDENT</div><div>AUDITOR</div></div>
 </div>
 
+</section>
 </body></html>`
 }

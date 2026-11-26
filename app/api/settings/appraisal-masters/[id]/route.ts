@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
-import { getSession } from "@/lib/auth/session"
+import { requireRole } from "@/lib/auth/require-role"
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // appraisal_master_id is not editable: appraisal_slab and loan_schemes reference it
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await requireRole("admin")
+  if (auth instanceof NextResponse) return auth
 
   const { id } = await params
   if (!UUID_RE.test(id)) return NextResponse.json({ error: "Invalid appraisal master id" }, { status: 400 })

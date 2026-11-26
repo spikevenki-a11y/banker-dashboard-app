@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { getSession } from "@/lib/auth/session"
+import { requireRole } from "@/lib/auth/require-role"
 import { getCurrentGoldGuideline, getGoldGuidelineHistory } from "@/lib/gold-guideline"
 
 // Gold Guidelines Value per Gram for the user's branch.
@@ -23,8 +24,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await requireRole("admin")
+  if (auth instanceof NextResponse) return auth
+  const session = auth.session
 
   try {
     const body = await req.json().catch(() => ({}))

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { getSession } from "@/lib/auth/session"
+import { requireRole } from "@/lib/auth/require-role"
 import {
   findOverlappingPolicy,
   getPolicyHistory,
@@ -69,8 +70,9 @@ async function loadForUpdate(client: any, branchId: string, policyId: number) {
 }
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await requireRole("admin")
+  if (auth instanceof NextResponse) return auth
+  const session = auth.session
   const policyId = await policyIdOf(params)
   if (!policyId) return NextResponse.json({ error: "Invalid policy" }, { status: 400 })
 
@@ -110,8 +112,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await requireRole("admin")
+  if (auth instanceof NextResponse) return auth
+  const session = auth.session
   const policyId = await policyIdOf(params)
   if (!policyId) return NextResponse.json({ error: "Invalid policy" }, { status: 400 })
 

@@ -12,6 +12,7 @@ import {
   CreditCard,
   TrendingUp,
   Settings,
+  Bot,
   Building2,
   Calculator,
   BarChart3,
@@ -221,7 +222,16 @@ export function DashboardSidebar() {
         ))}
       </nav>
 
-      <div className={cn("border-t border-sidebar-border", collapsed ? "p-2" : "p-4")}>
+      <div className={cn("space-y-1 border-t border-sidebar-border", collapsed ? "p-2" : "p-4")}>
+        <Link
+          href="/report-bot"
+          title={collapsed ? "Report bot" : undefined}
+          aria-label={collapsed ? "Report bot" : undefined}
+          className={itemClass(pathname === "/report-bot" || pathname.startsWith("/report-bot/"), collapsed)}
+        >
+          <Bot className="h-5 w-5 shrink-0" />
+          {!collapsed && "Report bot"}
+        </Link>
         <Link
           href="/settings"
           title={collapsed ? "Settings" : undefined}

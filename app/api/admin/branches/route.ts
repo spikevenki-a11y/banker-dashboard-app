@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
-import { getSession } from "@/lib/auth/session"
+import { requireRole } from "@/lib/auth/require-role"
 
 export async function GET() {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  if (session.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  const auth = await requireRole("admin")
+  if (auth instanceof NextResponse) return auth
 
   try {
     const result = await pool.query(
@@ -20,9 +19,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  if (session.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  const auth = await requireRole("admin")
+  if (auth instanceof NextResponse) return auth
 
   try {
     const { branch_name, branch_code, city, state, phone_number, email, is_head_office } = await request.json()

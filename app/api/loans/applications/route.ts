@@ -59,6 +59,14 @@ export async function GET(request: NextRequest) {
         m.customer_code,
         c.full_name as member_name,
         c.mobile_no,
+        -- Purpose name from the master (la.loan_purpose holds the purpose_id); falls
+        -- back to the stored value for older applications that saved the name itself
+        COALESCE(
+          (SELECT lpm.purpose_name FROM loan_purpose_master lpm
+            WHERE CAST(lpm.purpose_id AS TEXT) = TRIM(CAST(la.loan_purpose AS TEXT))
+            LIMIT 1),
+          la.loan_purpose
+        ) AS loan_purpose_name,
         -- Gold security cap (Guidelines Value per Gram × Net Weight); null when not gold
         (SELECT SUM(gd.max_sanction_amount)::float8
            FROM loan_securities sec

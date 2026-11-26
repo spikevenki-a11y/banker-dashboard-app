@@ -29,6 +29,8 @@ import {
 } from "lucide-react"
 import { DashboardWrapper } from "../_components/dashboard-wrapper"
 import { formatAmount } from "@/lib/number-format"
+import { ReportLogo } from "@/components/report-logo"
+import { REPORT_LOGO_WIDTH_MM } from "@/lib/print/report-logo"
 
 const reportCategories = [
   {
@@ -472,22 +474,36 @@ export default function ReportsPage() {
                 className="rounded-lg border border-border bg-card p-6 text-foreground"
               >
                 {/* Header */}
-                <div className="header mb-4 border-b-2 border-foreground pb-3 text-center">
-                  <h1 className="text-lg font-bold">{pvData.branch.bankName}</h1>
-                  <h2 className="text-sm font-semibold">{pvData.branch.branchName}</h2>
-                  {pvData.branch.address && (
-                    <p className="text-xs text-muted-foreground">
-                      {[pvData.branch.address, pvData.branch.city, pvData.branch.state, pvData.branch.postalCode]
-                        .filter(Boolean)
-                        .join(", ")}
-                    </p>
-                  )}
-                  {pvData.branch.phone && (
-                    <p className="text-xs text-muted-foreground">
-                      Ph: {pvData.branch.phone}
-                      {pvData.branch.email ? ` | Email: ${pvData.branch.email}` : ""}
-                    </p>
-                  )}
+                <div
+                  className="header mb-4 border-b-2 border-foreground pb-3 text-center"
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: `${REPORT_LOGO_WIDTH_MM}mm minmax(0, 1fr) ${REPORT_LOGO_WIDTH_MM}mm`,
+                    columnGap: 8,
+                    alignItems: "center",
+                  }}
+                >
+                  <div />
+                  <div>
+                    <h1 className="text-lg font-bold">{pvData.branch.bankName}</h1>
+                    <h2 className="text-sm font-semibold">{pvData.branch.branchName}</h2>
+                    {pvData.branch.address && (
+                      <p className="text-xs text-muted-foreground">
+                        {[pvData.branch.address, pvData.branch.city, pvData.branch.state, pvData.branch.postalCode]
+                          .filter(Boolean)
+                          .join(", ")}
+                      </p>
+                    )}
+                    {pvData.branch.phone && (
+                      <p className="text-xs text-muted-foreground">
+                        Ph: {pvData.branch.phone}
+                        {pvData.branch.email ? ` | Email: ${pvData.branch.email}` : ""}
+                      </p>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "flex-end", alignSelf: "start" }}>
+                    <ReportLogo />
+                  </div>
                 </div>
 
                 {/* Voucher title */}

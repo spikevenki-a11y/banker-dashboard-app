@@ -84,41 +84,53 @@ export async function POST(request: NextRequest) {
     if (!unit) return NextResponse.json({ error: "Asset not found" }, { status: 404 })
     const serialNumber = unit.serial_number
 
-    // Manual upsert (schema has no UNIQUE constraint on serial_number in dep master)
-    const { rows: [existing] } = await pool.query(
-      `SELECT id FROM asset_depreciation_master WHERE serial_number = $1 AND branch_id = $2`,
-      [serialNumber, branchId]
-    )
+    const client = await pool.connect()
+    try {
+      await client.query("BEGIN")
 
-    let cfg: any
-    if (existing) {
-      const { rows: [updated] } = await pool.query(
-        `UPDATE asset_depreciation_master
-         SET method = $1, depreciation_rate = $2
-         WHERE serial_number = $3 AND branch_id = $4
-         RETURNING *`,
-        [method, parseFloat(depreciation_rate), serialNumber, branchId]
+      // Manual upsert (schema has no UNIQUE constraint on serial_number in dep master)
+      const { rows: [existing] } = await client.query(
+        `SELECT id FROM asset_depreciation_master WHERE serial_number = $1 AND branch_id = $2`,
+        [serialNumber, branchId]
       )
-      cfg = updated
-    } else {
-      // Sequential depreciation_id per branch
-      const { rows: [countRow] } = await pool.query(
-        `SELECT COUNT(*) AS count FROM asset_depreciation_master WHERE branch_id = $1`,
-        [branchId]
-      )
-      const depId = parseInt(countRow.count) + 1
 
-      const { rows: [inserted] } = await pool.query(
-        `INSERT INTO asset_depreciation_master
-           (branch_id, serial_number, depreciation_id, method, depreciation_rate)
-         VALUES ($1,$2,$3,$4,$5)
-         RETURNING *`,
-        [branchId, serialNumber, depId, method, parseFloat(depreciation_rate)]
-      )
-      cfg = inserted
+      let cfg: any
+      if (existing) {
+        const { rows: [updated] } = await client.query(
+          `UPDATE asset_depreciation_master
+           SET method = $1, depreciation_rate = $2
+           WHERE serial_number = $3 AND branch_id = $4
+           RETURNING *`,
+          [method, parseFloat(depreciation_rate), serialNumber, branchId]
+        )
+        cfg = updated
+      } else {
+        // Sequential depreciation_id per branch
+        const { rows: [countRow] } = await client.query(
+          `SELECT COUNT(*) AS count FROM asset_depreciation_master WHERE branch_id = $1`,
+          [branchId]
+        )
+        const depId = parseInt(countRow.count) + 1
+
+        const { rows: [inserted] } = await client.query(
+          `INSERT INTO asset_depreciation_master
+             (branch_id, serial_number, depreciation_id, method, depreciation_rate)
+           VALUES ($1,$2,$3,$4,$5)
+           RETURNING *`,
+          [branchId, serialNumber, depId, method, parseFloat(depreciation_rate)]
+        )
+        cfg = inserted
+      }
+
+      await client.query("COMMIT")
+
+      return NextResponse.json({ success: true, config: cfg })
+    } catch (err) {
+      await client.query("ROLLBACK")
+      throw err
+    } finally {
+      client.release()
     }
-
-    return NextResponse.json({ success: true, config: cfg })
   } catch (error: any) {
     console.error("Fixed Assets Depreciation POST error:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })

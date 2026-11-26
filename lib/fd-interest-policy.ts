@@ -10,6 +10,7 @@
 
 import { calculateAge } from "@/lib/member-age"
 import { formatDate } from "@/lib/date-format"
+import { addSimpleInterest, compound, sub, toPaise, toRupees, type Rounding } from "@/lib/money"
 
 type Queryable = { query: (text: string, values?: any[]) => Promise<{ rows: any[] }> }
 
@@ -350,20 +351,21 @@ export function computeTermMaturity(params: {
   const { maturityDate, totalDays } = termPeriod(openDate, months, days)
   const perYear = params.cumulative === false ? 0 : COMPOUNDING_FREQUENCIES.find((c) => c.value === params.compounding)?.perYear || 0
 
-  const gross =
-    perYear > 0
-      ? principal * Math.pow(1 + annualRate / (100 * perYear), (perYear * totalDays) / 365)
-      : principal + (principal * annualRate * totalDays) / (365 * 100)
-
+  // Worked in integer paise (lib/money); the maturity amount is rounded once, from the
+  // exact value, to the policy's unit using banker's rounding (or down, for ROUND_DOWN_RUPEE).
+  const P = toPaise(principal)
   const rounding = params.rounding || "NEAREST_RUPEE"
-  const maturityAmount =
-    rounding === "NEAREST_PAISE" ? Math.round(gross * 100) / 100 : rounding === "ROUND_DOWN_RUPEE" ? Math.floor(gross) : Math.round(gross)
+  const mode: Rounding = rounding === "NEAREST_PAISE" ? "PAISA" : rounding === "ROUND_DOWN_RUPEE" ? "RUPEE_DOWN" : "RUPEE"
+  const maturity =
+    perYear > 0
+      ? compound(P, annualRate, perYear, (perYear * totalDays) / 365, mode)
+      : addSimpleInterest(P, annualRate, totalDays, 365, mode)
 
   return {
     maturityDate,
     totalDays,
-    maturityAmount,
-    interest: Math.round((maturityAmount - principal) * 100) / 100,
+    maturityAmount: toRupees(maturity),
+    interest: toRupees(sub(maturity, P)),
     compounded: perYear > 0,
   }
 }

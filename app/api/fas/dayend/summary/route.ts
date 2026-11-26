@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
-import { getSession } from "@/lib/auth/session"
+import { requireRole } from "@/lib/auth/require-role"
+import { add, sub, sum, toPaise, toRupees, ZERO_PAISE } from "@/lib/money"
 
 export async function GET() {
-  const u = await getSession()
-  if (!u) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const auth = await requireRole("admin")
+  if (auth instanceof NextResponse) return auth
+  const u = auth.session
   const branchId = u.branch
   const businessDate: string = u.businessDate
 
@@ -30,14 +32,13 @@ export async function GET() {
     const cashAccountCodes: number[] = cashCodesRes.rows.map((r: any) => Number(r.accountcode))
 
     // Current cash balance from chart_of_accounts (closing / live balance)
-    const currentCashBalance = cashCodesRes.rows.reduce(
-      (s: number, r: any) => s + Number(r.accountbalance || 0), 0
-    )
+    // Cash figures are summed in exact integer paise (lib/money) and returned as rupees
+    const currentCashBalance = sum(cashCodesRes.rows.map((r: any) => toPaise(r.accountbalance)))
 
     // ── 2. Opening cash balance ────────────────────────────────────────────
     //    = sealed closing balance from day_end_balances for the most recent
     //      prior business date. Falls back to current balance when no seal exists.
-    let openingCashBalance = 0
+    let openingCashBalance = ZERO_PAISE
     if (cashAccountCodes.length > 0) {
       const openingRes = await pool.query(
         `SELECT COALESCE(SUM(closing_balance), 0) AS opening_cash
@@ -52,16 +53,15 @@ export async function GET() {
            )`,
         [branchId, cashAccountCodes, businessDate]
       )
-      const sealed = Number(openingRes.rows[0]?.opening_cash ?? null)
       // If no prior seal exists, derive opening from closing minus today's net
-      openingCashBalance = isNaN(sealed) || openingRes.rows[0]?.opening_cash === null
+      openingCashBalance = openingRes.rows[0]?.opening_cash === null
         ? currentCashBalance  // will be same as closing if no txns today
-        : sealed
+        : toPaise(openingRes.rows[0]?.opening_cash)
     }
 
     // ── 3. Cash receipts (debit to cash accounts from COMPLETED CASH batches today) ──
-    let cashReceipts = 0
-    let cashPayments = 0
+    let cashReceipts = ZERO_PAISE
+    let cashPayments = ZERO_PAISE
     if (cashAccountCodes.length > 0) {
       const flowRes = await pool.query(
         `SELECT
@@ -78,11 +78,11 @@ export async function GET() {
            AND l.accountcode   = ANY($3::bigint[])`,
         [branchId, businessDate, cashAccountCodes]
       )
-      cashReceipts = Number(flowRes.rows[0]?.total_receipts || 0)
-      cashPayments = Number(flowRes.rows[0]?.total_payments || 0)
+      cashReceipts = toPaise(flowRes.rows[0]?.total_receipts)
+      cashPayments = toPaise(flowRes.rows[0]?.total_payments)
     }
 
-    const closingCashBalance = openingCashBalance + cashReceipts - cashPayments
+    const closingCashBalance = sub(add(openingCashBalance, cashReceipts), cashPayments)
 
     // ── 4. Pending & unbalanced vouchers ──────────────────────────────────
     const pendingVouchersRes = await pool.query(
@@ -145,15 +145,15 @@ export async function GET() {
       businessDate,
 
       // Cash position
-      openingCashBalance,
-      cashReceipts,
-      cashPayments,
-      closingCashBalance,
-      currentCashBalance,
+      openingCashBalance: toRupees(openingCashBalance),
+      cashReceipts: toRupees(cashReceipts),
+      cashPayments: toRupees(cashPayments),
+      closingCashBalance: toRupees(closingCashBalance),
+      currentCashBalance: toRupees(currentCashBalance),
       cashAccounts: cashCodesRes.rows.map((r: any) => ({
         code: Number(r.accountcode),
         name: r.accountname,
-        balance: Number(r.accountbalance || 0),
+        balance: toRupees(toPaise(r.accountbalance)),
       })),
 
       // Voucher stats

@@ -63,6 +63,7 @@ type LoanAccountInfo = {
   membership_no: string
   member_name: string
   mobile_no: string
+  loan_type: string
   scheme_name: string
   sanctioned_amount: number
   interest_rate: number
@@ -165,6 +166,7 @@ function LoanCollectionContent() {
       membership_no: acc.membership_no,
       member_name: acc.member_name,
       mobile_no: acc.mobile_no,
+      loan_type: acc.loan_type,
       scheme_name: acc.scheme_name,
       sanctioned_amount: parseFloat(acc.sanctioned_amount) || 0,
       interest_rate: parseFloat(acc.interest_rate) || 0,
@@ -707,17 +709,28 @@ function LoanCollectionContent() {
                       <span className="text-muted-foreground">Loan Account</span>
                       <p className="font-mono font-medium">{accountInfo.loan_account_no}</p>
                     </div>
-                    <div>
+                    {/* <div>
                       <span className="text-muted-foreground">Membership</span>
                       <p className="font-medium">{accountInfo.membership_no}</p>
+                    </div> */}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Loan Type</span>
+                      <p className="font-medium">{accountInfo.loan_type || "—"}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Loan Scheme</span>
+                      <p className="font-medium">{accountInfo.scheme_name || "—"}</p>
                     </div>
                   </div>
 
-                  <div>
+                  {/* <div>
                     <span className="text-sm text-muted-foreground">Member Name</span>
                     <p className="font-medium">{accountInfo.member_name}</p>
                     <p className="text-sm text-muted-foreground">{accountInfo.mobile_no}</p>
-                  </div>
+                  </div> */}
 
                   <div className="border-t pt-4">
                     <div className="grid grid-cols-2 gap-3 text-sm">
