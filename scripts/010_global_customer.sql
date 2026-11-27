@@ -12,7 +12,7 @@ create table public.customers (
   customer_type text not null,
   spouse_name character varying null,
   marital_status character varying null,
-  -- blood_group character varying null,
+  blood_group character varying null,
   caste_category character varying null,
   occupation character varying null,
   qualification character varying null,
@@ -21,6 +21,9 @@ create table public.customers (
   mobile_no character varying(15) null,
   branch_id numeric null,
   dccbaccountnumber text null,
+  religion character varying(50) null,
+  annual_income numeric(15, 2) null,
+  dccb_branch character varying(100) null,
   constraint customers_pkey primary key (id),
   constraint customers_customer_code_key unique (customer_code),
   constraint customers_gender_check check (

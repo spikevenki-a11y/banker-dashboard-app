@@ -24,6 +24,7 @@ export type MemberSummaryInfo = {
   mobile_no: string
   aadhaar_no: string
   ledger_folio_number?: string
+  religion?: string | null
   // Returned by the member lookup; used to load the photo & signature
   customer_code?: string
 }
@@ -216,6 +217,10 @@ export function MemberSummaryCard({ memberInfo }: { memberInfo: MemberSummaryInf
               <div>
                 <p className="text-xs text-muted-foreground">Father's Name</p>
                 <p className="text-sm font-semibold">{memberInfo.father_name || "---"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Religion</p>
+                <p className="text-sm font-semibold">{memberInfo.religion || "---"}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Aadhaar Number</p>

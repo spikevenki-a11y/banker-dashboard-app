@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/connection/db"
 import { checkDayEndRestriction } from "@/lib/dayend-check"
 import { getSession } from "@/lib/auth/session"
+import { parseSelectedBatch, validateSelectedBatch, BatchValidationError } from "@/lib/validate-batch"
 
 export async function POST(request: NextRequest) {
   const session = await getSession()
@@ -22,6 +23,7 @@ export async function POST(request: NextRequest) {
       transaction_date,
       voucher_no: inputVoucherNo,
       voucher_type,
+      selected_batch,
     } = body
 
     if (!ledger_account || !account_number || !drawal_amount || !transaction_date) {
@@ -64,54 +66,68 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generate batch ID
-    const { rows: [batchRow] } = await client.query(
-      `UPDATE gl_batch_sequences
-       SET last_batch_id = last_batch_id + 1
-       WHERE branch_id = $1
-       RETURNING last_batch_id`,
-      [branchId]
-    )
-    const batchId = batchRow.last_batch_id
+    // Batch & voucher: a Transfer can join an open (PENDING) GL batch the user picked,
+    // the same as the other transaction modules; otherwise a new batch and voucher are created.
+    const selectedBatchId = voucher_type === "TRANSFER" ? parseSelectedBatch(selected_batch) : 0
+    let batchId: number
+    let voucherNo: number
 
-    // Generate voucher number
-    const { rows: [voucherRow] } = await client.query(
-      `INSERT INTO voucher_sequences (branch_id, business_date, last_voucher_no)
-       VALUES ($1, $2, 1)
-       ON CONFLICT (branch_id, business_date)
-       DO UPDATE SET last_voucher_no = voucher_sequences.last_voucher_no + 1
-       RETURNING last_voucher_no`,
-      [branchId, businessDate]
-    )
-    const voucherNo = voucherRow.last_voucher_no
+    if (selectedBatchId > 0) {
+      const batch = await validateSelectedBatch(client, selectedBatchId, session)
+      batchId = batch.batch_id
+      voucherNo = batch.voucher_id
+    } else {
+      const { rows: [batchRow] } = await client.query(
+        `UPDATE gl_batch_sequences
+         SET last_batch_id = last_batch_id + 1
+         WHERE branch_id = $1
+         RETURNING last_batch_id`,
+        [branchId]
+      )
+      batchId = batchRow.last_batch_id
 
-    // Create GL batch header
-    await client.query(
-      `INSERT INTO gl_batches (
-        business_date, branch_id, batch_id, voucher_id,
-        voucher_type, maker_id, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, 'PENDING')`,
-      [transaction_date, branchId, batchId, voucherNo, voucher_type || "CASH", userId]
-    )
+      const { rows: [voucherRow] } = await client.query(
+        `INSERT INTO voucher_sequences (branch_id, business_date, last_voucher_no)
+         VALUES ($1, $2, 1)
+         ON CONFLICT (branch_id, business_date)
+         DO UPDATE SET last_voucher_no = voucher_sequences.last_voucher_no + 1
+         RETURNING last_voucher_no`,
+        [branchId, businessDate]
+      )
+      voucherNo = voucherRow.last_voucher_no
+
+      await client.query(
+        `INSERT INTO gl_batches (
+          business_date, branch_id, batch_id, voucher_id,
+          voucher_type, maker_id, status
+        ) VALUES ($1, $2, $3, $4, $5, $6, 'PENDING')`,
+        [transaction_date, branchId, batchId, voucherNo, voucher_type || "CASH", userId]
+      )
+    }
 
     const narration = `Borrowing Drawal - ${account_number}`
-    const cashGlAccount = voucher_type === "TRANSFER" ? "11100000" : "23100000"
+    // Cash vouchers post the Cash-in-Hand side here. Transfer vouchers post only this
+    // account's lines; the other side is entered in the same batch (as in other modules).
+    const isCash = voucher_type !== "TRANSFER"
+    const cashGlAccount = "23100000"
 
-    // DR: Cash / Bank (asset increases — money received from lender)
-    await client.query(
-      `INSERT INTO gl_batch_lines (
-        branch_id, batch_id, business_date,
-        accountcode, ref_account_id,
-        debit_amount, credit_amount,
-        voucher_id, narration, created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, 0, $7, $8, $9)`,
-      [
-        branchId, batchId, transaction_date,
-        cashGlAccount, "0",
-        drawal_amount,
-        voucherNo, narration, userId,
-      ]
-    )
+    if (isCash) {
+      // DR: Cash / Bank (asset increases — money received from lender)
+      await client.query(
+        `INSERT INTO gl_batch_lines (
+          branch_id, batch_id, business_date,
+          accountcode, ref_account_id,
+          debit_amount, credit_amount,
+          voucher_id, narration, created_by
+        ) VALUES ($1, $2, $3, $4, $5, $6, 0, $7, $8, $9)`,
+        [
+          branchId, batchId, transaction_date,
+          cashGlAccount, "0",
+          drawal_amount,
+          voucherNo, narration, userId,
+        ]
+      )
+    }
 
     // CR: Borrowings Ledger GL (liability increases)
     await client.query(
@@ -168,6 +184,9 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     await client.query("ROLLBACK")
+    if (error instanceof BatchValidationError) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
+    }
     console.error("Borrowings Drawal POST error:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   } finally {

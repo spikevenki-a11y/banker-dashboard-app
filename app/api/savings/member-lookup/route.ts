@@ -19,7 +19,9 @@ export async function POST(req: Request) {
     const { rows } = await pool.query(
       `SELECT m.membership_no, m.member_type, m.status, m.membership_class, m.ledger_folio_number,
               c.full_name, c.father_name, c.date_of_birth, c.mobile_no,
-              c.customer_code, c.gender, ck.aadhaar_no
+              c.customer_code, c.gender, ck.aadhaar_no,
+              -- Read through JSON so the lookup keeps working before migration 079 adds the column
+              to_jsonb(c) ->> 'religion' AS religion
        FROM memberships m
        JOIN customers c ON m.customer_code = c.customer_code
        LEFT JOIN customer_kycdetails ck ON ck.customer_code = m.customer_code
