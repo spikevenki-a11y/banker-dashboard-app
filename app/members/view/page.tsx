@@ -734,7 +734,7 @@ export default function ViewMemberPage() {
             </Card>
 
             {/* Stats Row */}
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            {/* <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
               <Card>
                 <CardContent className="py-4">
                   <p className="text-xs font-medium text-muted-foreground">Customer Type</p>
@@ -767,7 +767,7 @@ export default function ViewMemberPage() {
                   </p>
                 </CardContent>
               </Card>
-            </div>
+            </div> */}
 
             {/* Tabbed Details */}
             <Card>

@@ -16,7 +16,7 @@
  */
 import { formatDate, formatDateTime } from "@/lib/date-format"
 import { escapeHtml, printHtml } from "./print-html"
-import { ageFrom, buildLtLoanApplicationDocument, fetchMember, joinAddr } from "./print-lt-loan-application"
+import { ageFrom, buildLtLoanApplicationDocument, fetchMember, joinAddr, rationCardText } from "./print-lt-loan-application"
 import { codeLabel, type FormContext, type PrintPerson } from "./loan-forms/base"
 import { buildBuildingLoanApplicationHtml } from "./loan-forms/building-loan-form"
 import { buildDepositLoanApplicationHtml } from "./loan-forms/deposit-loan-form"
@@ -62,7 +62,7 @@ function personFromMember(m: any, fallback: { membershipNo?: string; name?: stri
     email: m?.email || m?.address_email,
     aadhaar: m?.aadhaar_no?.trim(),
     pan: m?.pan_no?.trim(),
-    rationCard: m?.ration_no,
+    rationCard: rationCardText(m),
     voterId: m?.voter_id,
     occupation: m?.occupation,
     monthlyIncome: m?.annual_income ? Math.round(Number(m.annual_income) / 12) : undefined,
