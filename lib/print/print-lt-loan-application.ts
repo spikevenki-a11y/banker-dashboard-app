@@ -37,6 +37,15 @@ export function ageFrom(dob?: string | null): number | undefined {
 }
 
 /** Fetches the member's full profile (KYC, address, community) for the form. */
+/** Ration card as printed on the forms: "<type> <number>" (e.g. "PHH 1234567890"); skips missing parts. */
+export function rationCardText(m: any): string | undefined {
+  const clean = (v: unknown) => {
+    const t = v == null ? "" : String(v).trim()
+    return t && !/^(null|undefined)$/i.test(t) ? t : ""
+  }
+  return [clean(m?.ration_card_type), clean(m?.ration_no)].filter(Boolean).join(" ") || undefined
+}
+
 export async function fetchMember(membershipNo?: string) {
   if (!membershipNo) return null
   try {
@@ -107,7 +116,7 @@ export async function buildLtLoanApplicationDocument(opts: LtLoanPrintOptions = 
     email: m?.email,
     aadhaar: m?.aadhaar_no?.trim(),
     pan: m?.pan_no?.trim(),
-    rationCard: m?.ration_no,
+    rationCard: rationCardText(m),
     voterId: m?.voter_id,
     occupation: m?.occupation,
     monthlyIncome: m?.annual_income ? Math.round(Number(m.annual_income) / 12) : undefined,
