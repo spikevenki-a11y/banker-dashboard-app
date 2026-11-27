@@ -327,6 +327,7 @@ function LoanCollectionContent() {
         membership_class: (memberInfo as any).membership_class || "",
         status: memberInfo.status || "",
         ledger_folio_number: (memberInfo as any).ledger_folio_number,
+        religion: (memberInfo as any).religion,
       }
     : null
 

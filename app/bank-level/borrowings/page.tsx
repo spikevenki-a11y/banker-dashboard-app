@@ -170,6 +170,7 @@ export default function BorrowingsPage() {
   const [drawalVoucher, setDrawalVoucher] = useState("")
   const [drawalTransactionType, setDrawalTransactionType] = useState("CASH")
   const [selectedDrawalAccount, setSelectedDrawalAccount] = useState<BorrowingAccount | null>(null)
+  const [isLookingUpDrawal, setIsLookingUpDrawal] = useState(false)
 
   // Repayment Form
   const [repaymentLedger, setRepaymentLedger] = useState("")
@@ -187,8 +188,40 @@ export default function BorrowingsPage() {
   const [isLookingUpRepayment, setIsLookingUpRepayment] = useState(false)
   const [lookupError, setLookupError] = useState("")
 
-  // Repayment account search popup
+  // GL batch for Transfer vouchers (0 = new batch), same as the other transaction modules
+  const [drawalBatch, setDrawalBatch] = useState<number>(0)
+  const [repaymentBatch, setRepaymentBatch] = useState<number>(0)
+  const [isBatchPopupOpen, setIsBatchPopupOpen] = useState(false)
+  const [batchPopupTarget, setBatchPopupTarget] = useState<"drawal" | "repayment">("drawal")
+  const [incompleteBatches, setIncompleteBatches] = useState<
+    { batch_id: number; total_debit: number; total_credit: number; difference: number }[]
+  >([])
+
+  const fetchIncompleteBatches = async () => {
+    try {
+      const res = await fetch("/api/fas/incomplete-batches", { credentials: "include" })
+      const data = await res.json()
+      if (res.ok && data.data) setIncompleteBatches(data.data)
+    } catch {
+      // silent
+    }
+  }
+
+  const openBatchPopup = (target: "drawal" | "repayment") => {
+    setBatchPopupTarget(target)
+    fetchIncompleteBatches()
+    setIsBatchPopupOpen(true)
+  }
+
+  const chooseBatch = (batchId: number) => {
+    if (batchPopupTarget === "drawal") setDrawalBatch(batchId)
+    else setRepaymentBatch(batchId)
+    setIsBatchPopupOpen(false)
+  }
+
+  // Account search popup (shared by Record Drawal and Record Repayment)
   const [isAccountSearchOpen, setIsAccountSearchOpen] = useState(false)
+  const [accountSearchTarget, setAccountSearchTarget] = useState<"drawal" | "repayment">("repayment")
   const [searchLedger, setSearchLedger] = useState("")
   const [searchName, setSearchName] = useState("")
   const [searchAccountNo, setSearchAccountNo] = useState("")
@@ -274,18 +307,60 @@ export default function BorrowingsPage() {
     }
   }
 
-  // Handle ledger selection for drawal
-  const handleDrawalLedgerSelect = (ledgerCode: string) => {
-    setDrawalLedger(ledgerCode)
-    setDrawalAccount("")
-    setSelectedDrawalAccount(null)
+  // Apply a looked-up borrowing account to the drawal form. As in Repayment, the
+  // ledger is derived from the account's borrowing head, so the drawal payload is unchanged.
+  const applyDrawalAccount = (account: BorrowingAccount) => {
+    setDrawalAccount(account.account_number)
+    setDrawalLedger(account.borrowing_head != null ? String(account.borrowing_head) : "")
+    setSelectedDrawalAccount(account)
   }
 
-  // Handle account selection for drawal
-  const handleDrawalAccountSelect = (accountNumber: string) => {
-    setDrawalAccount(accountNumber)
-    const account = accounts.find(a => a.account_number === accountNumber)
-    setSelectedDrawalAccount(account || null)
+  const clearDrawalAccount = () => {
+    setSelectedDrawalAccount(null)
+    setDrawalLedger("")
+  }
+
+  // Typing in the account number field invalidates any loaded account
+  const handleDrawalAccountInput = (value: string) => {
+    setDrawalAccount(value)
+    if (selectedDrawalAccount && selectedDrawalAccount.account_number !== value.trim()) clearDrawalAccount()
+  }
+
+  // Look up a borrowing account by exact account number (on blur / Enter)
+  const lookupDrawalAccount = async (rawAccountNumber: string) => {
+    const accountNumber = rawAccountNumber.trim()
+    if (!accountNumber) {
+      clearDrawalAccount()
+      return
+    }
+    if (selectedDrawalAccount?.account_number === accountNumber) return
+
+    setIsLookingUpDrawal(true)
+    try {
+      const res = await fetch(`/api/borrowings?accountNumber=${encodeURIComponent(accountNumber)}`)
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+
+      const match = (data.accounts || []).find(
+        (a: BorrowingAccount) => a.account_number?.toLowerCase() === accountNumber.toLowerCase()
+      )
+      if (!match) {
+        clearDrawalAccount()
+        setLookupError(`No borrowing account found with account number "${accountNumber}".`)
+        return
+      }
+      if (match.status !== "ACTIVE") {
+        clearDrawalAccount()
+        setLookupError(`Borrowing account "${accountNumber}" is ${match.status?.toLowerCase() || "inactive"}. Drawals can only be recorded for active accounts.`)
+        return
+      }
+      applyDrawalAccount(match)
+    } catch (error: any) {
+      clearDrawalAccount()
+      setLookupError(error.message || "Failed to load borrowing account details.")
+    } finally {
+      setIsLookingUpDrawal(false)
+    }
   }
 
   // Apply a looked-up borrowing account to the repayment form.
@@ -361,8 +436,9 @@ export default function BorrowingsPage() {
   const getLedgerName = (code: string | number | null | undefined) =>
     code != null ? ledgerAccounts.find((l) => String(l.accountcode) === String(code))?.accountname ?? "" : ""
 
-  const openAccountSearch = () => {
-    setSearchAccountNo(repaymentAccount.trim())
+  const openAccountSearch = (target: "drawal" | "repayment") => {
+    setAccountSearchTarget(target)
+    setSearchAccountNo((target === "drawal" ? drawalAccount : repaymentAccount).trim())
     setSearchValidationError("")
     setIsAccountSearchOpen(true)
   }
@@ -424,7 +500,8 @@ export default function BorrowingsPage() {
   }
 
   const selectSearchedAccount = (account: BorrowingAccount) => {
-    applyRepaymentAccount(account)
+    if (accountSearchTarget === "drawal") applyDrawalAccount(account)
+    else applyRepaymentAccount(account)
     setIsAccountSearchOpen(false)
   }
 
@@ -518,7 +595,8 @@ export default function BorrowingsPage() {
           drawal_amount: parseFloat(drawalAmount),
           transaction_date: drawalDate,
           voucher_no: drawalVoucher,
-          voucher_type: drawalTransactionType
+          voucher_type: drawalTransactionType,
+          selected_batch: drawalTransactionType === "TRANSFER" ? drawalBatch : 0
         })
       })
 
@@ -573,6 +651,7 @@ export default function BorrowingsPage() {
           transaction_date: repaymentDate,
           voucher_no: repaymentVoucher,
           voucher_type: repaymentTransactionType,
+          selected_batch: repaymentTransactionType === "TRANSFER" ? repaymentBatch : 0,
           principal_amount: parseFloat(principalAmount) || 0,
           interest_amount: parseFloat(interestAmountPaid) || 0,
           charge_amount: parseFloat(chargeAmount) || 0,
@@ -637,6 +716,7 @@ export default function BorrowingsPage() {
     setDrawalAmount("")
     setDrawalVoucher("")
     setDrawalTransactionType("CASH")
+    setDrawalBatch(0)
     setSelectedDrawalAccount(null)
     setFormError("")
   }
@@ -647,6 +727,7 @@ export default function BorrowingsPage() {
     setRepaymentAmount("")
     setRepaymentVoucher("")
     setRepaymentTransactionType("CASH")
+    setRepaymentBatch(0)
     setPrincipalAmount("")
     setInterestAmountPaid("")
     setChargeAmount("0")
@@ -664,14 +745,6 @@ export default function BorrowingsPage() {
     const matchesStatus = statusFilter === "all" || acc.status?.toUpperCase() === statusFilter.toUpperCase()
     return matchesSearch && matchesStatus
   })
-
-  // Active accounts for drawal/repayment
-  const activeAccounts = accounts.filter(a => a.status === "ACTIVE")
-  console.log("Active accounts:", activeAccounts)
-  // Ledger-filtered accounts for each form
-  const drawalFilteredAccounts = drawalLedger
-    ? activeAccounts.filter(a => String(a.borrowing_head) === drawalLedger)
-    : activeAccounts
 
   // Stats
   const totalSanctioned = accounts.reduce((sum, acc) => sum + parseFloat(acc.amount_sanctioned?.toString() || "0"), 0)
@@ -1165,37 +1238,60 @@ export default function BorrowingsPage() {
                       <CardContent className="space-y-4">
                         <div className="grid gap-4 sm:grid-cols-2">
                           <div className="space-y-2 sm:col-span-2">
-                            <Label>Select Ledger *</Label>
-                            <SearchableSelect
-                              value={drawalLedger}
-                              onValueChange={handleDrawalLedgerSelect}
-                              placeholder="Select ledger account"
-                              searchPlaceholder="Search ledger..."
-                              options={ledgerAccounts.map((l) => ({
-                                value: String(l.accountcode),
-                                label: l.accountname,
-                              }))}
-                            />
-                          </div>
-
-                          <div className="space-y-2 sm:col-span-2">
-                            <Label>Select Account *</Label>
-                            <SearchableSelect
-                              value={drawalAccount}
-                              onValueChange={handleDrawalAccountSelect}
-                              placeholder={drawalLedger ? "Select borrowing account" : "Select a ledger first"}
-                              searchPlaceholder="Search by account no. or agency..."
-                              disabled={!drawalLedger}
-                              options={drawalFilteredAccounts.map((acc) => ({
-                                value: acc.account_number,
-                                label: `${acc.account_number} - ${acc.borrowing_agency || "N/A"} (${formatCurrency(acc.amount_sanctioned - (acc.ledger_balance || 0))} available)`,
-                              }))}
-                            />
+                            <Label htmlFor="drawal-account-number">Account Number *</Label>
+                            <div className="flex gap-2">
+                              <div className="relative flex-1">
+                                <Input
+                                  id="drawal-account-number"
+                                  placeholder="Enter borrowing account number"
+                                  value={drawalAccount}
+                                  autoComplete="off"
+                                  onChange={(e) => handleDrawalAccountInput(e.target.value)}
+                                  onBlur={(e) => lookupDrawalAccount(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault()
+                                      lookupDrawalAccount(drawalAccount)
+                                    }
+                                  }}
+                                />
+                                {isLookingUpDrawal && (
+                                  <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+                                )}
+                              </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="gap-2 shrink-0"
+                                // Keep focus on the input so the blur lookup doesn't fire when opening search
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => openAccountSearch("drawal")}
+                              >
+                                <Search className="h-4 w-4" />
+                                Search
+                              </Button>
+                            </div>
                           </div>
 
                           {selectedDrawalAccount && (
                             <div className="sm:col-span-2 rounded-lg border border-border bg-muted/50 p-4">
                               <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                  <span className="text-muted-foreground">Account Number:</span>
+                                  <p className="font-mono font-medium">{selectedDrawalAccount.account_number}</p>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Ledger:</span>
+                                  <p className="font-medium">{getLedgerName(selectedDrawalAccount.borrowing_head) || "---"}</p>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Type:</span>
+                                  <p className="font-medium">{selectedDrawalAccount.type_of_borrowing === "cash_credit" ? "Cash Credit" : "Term Loan"}</p>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Open Date:</span>
+                                  <p className="font-medium">{formatDate(selectedDrawalAccount.date_of_sanction)}</p>
+                                </div>
                                 <div>
                                   <span className="text-muted-foreground">Sanctioned:</span>
                                   <p className="font-medium">{formatCurrency(selectedDrawalAccount.amount_sanctioned)}</p>
@@ -1246,7 +1342,7 @@ export default function BorrowingsPage() {
                           </div>
 
                           <div className="space-y-2">
-                            <Label>Voucher Number</Label>
+                            <Label>Challan Number</Label>
                             <Input
                               placeholder="Optional"
                               value={drawalVoucher}
@@ -1256,7 +1352,13 @@ export default function BorrowingsPage() {
 
                           <div className="space-y-2">
                             <Label>Voucher Type *</Label>
-                            <Select value={drawalTransactionType} onValueChange={setDrawalTransactionType}>
+                            <Select
+                              value={drawalTransactionType}
+                              onValueChange={(v) => {
+                                setDrawalTransactionType(v)
+                                if (v !== "TRANSFER") setDrawalBatch(0)
+                              }}
+                            >
                               <SelectTrigger>
                                 <SelectValue placeholder="Select voucher type" />
                               </SelectTrigger>
@@ -1266,6 +1368,28 @@ export default function BorrowingsPage() {
                               </SelectContent>
                             </Select>
                           </div>
+                          {/* GL Batch Selection - only for TRANSFER */}
+                          {drawalTransactionType === "TRANSFER" && (
+                            <div className="space-y-2">
+                              <Label htmlFor="drawal-gl-batch-id">GL Batch ID</Label>
+                              <div className="flex gap-2">
+                                <Input
+                                  id="drawal-gl-batch-id"
+                                  value={drawalBatch && drawalBatch !== 0 ? drawalBatch : "New Batch"}
+                                  readOnly
+                                  placeholder="Select or create batch"
+                                />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="bg-transparent"
+                                  onClick={() => openBatchPopup("drawal")}
+                                >
+                                  Select
+                                </Button>
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         {formError && (
@@ -1288,18 +1412,69 @@ export default function BorrowingsPage() {
                   <div>
                     <Card>
                       <CardHeader>
-                        <CardTitle className="text-lg">Quick Info</CardTitle>
+                        <CardTitle className="text-lg">Account Summary</CardTitle>
                       </CardHeader>
-                      <CardContent className="space-y-3 text-sm">
-                        <p className="text-muted-foreground">
-                          Record drawdowns (disbursements) from your borrowing/cash credit accounts.
-                        </p>
-                        <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
-                          <li>Select an active borrowing account</li>
-                          <li>Enter the amount being drawn</li>
-                          <li>Drawal cannot exceed available limit</li>
-                          <li>Balance will be updated automatically</li>
-                        </ul>
+                      <CardContent className="space-y-3">
+                        {selectedDrawalAccount ? (
+                          (() => {
+                            // Display only: shows the effect of the entered amount; the server still validates and posts the drawal
+                            const sanctioned = Number(selectedDrawalAccount.amount_sanctioned) || 0
+                            const balance = Number(selectedDrawalAccount.ledger_balance) || 0
+                            const amount = parseFloat(drawalAmount) || 0
+                            const exceedsLimit = amount > sanctioned - balance
+                            return (
+                              <div className="space-y-2">
+                                <div className="flex justify-between gap-4 text-sm">
+                                  <span className="text-muted-foreground">Account Number</span>
+                                  <span className="font-mono font-medium">{selectedDrawalAccount.account_number}</span>
+                                </div>
+                                <div className="flex justify-between gap-4 text-sm">
+                                  <span className="text-muted-foreground">Ledger</span>
+                                  <span className="text-right font-medium">{getLedgerName(selectedDrawalAccount.borrowing_head) || "---"}</span>
+                                </div>
+                                <div className="flex justify-between gap-4 text-sm">
+                                  <span className="text-muted-foreground">Type</span>
+                                  <span className="font-medium">{selectedDrawalAccount.type_of_borrowing === "cash_credit" ? "Cash Credit" : "Term Loan"}</span>
+                                </div>
+                                <hr className="my-2" />
+                                <div className="flex justify-between gap-4 text-sm">
+                                  <span className="text-muted-foreground">Sanctioned</span>
+                                  <span className="font-medium">{formatCurrency(sanctioned)}</span>
+                                </div>
+                                <div className="flex justify-between gap-4 text-sm">
+                                  <span className="text-muted-foreground">Current Balance</span>
+                                  <span className="font-medium text-orange-600">{formatCurrency(balance)}</span>
+                                </div>
+                                <div className="flex justify-between gap-4 text-sm">
+                                  <span className="text-muted-foreground">Available Limit</span>
+                                  <span className="font-medium text-teal-600">{formatCurrency(sanctioned - balance)}</span>
+                                </div>
+                                <div className="flex justify-between gap-4 text-sm">
+                                  <span className="text-muted-foreground">Drawal Amount</span>
+                                  <span className="font-medium">{amount ? formatCurrency(amount) : "---"}</span>
+                                </div>
+                                <hr className="my-2" />
+                                <div className="flex justify-between gap-4 text-sm font-semibold">
+                                  <span>Balance After Drawal</span>
+                                  <span className="text-orange-600">{amount ? formatCurrency(balance + amount) : "---"}</span>
+                                </div>
+                                <div className="flex justify-between gap-4 text-sm font-semibold">
+                                  <span>Available After Drawal</span>
+                                  <span className={exceedsLimit ? "text-destructive" : "text-teal-600"}>
+                                    {amount ? formatCurrency(sanctioned - balance - amount) : "---"}
+                                  </span>
+                                </div>
+                                {amount > 0 && exceedsLimit && (
+                                  <p className="text-xs text-destructive">Drawal amount exceeds the available limit.</p>
+                                )}
+                              </div>
+                            )
+                          })()
+                        ) : (
+                          <p className="text-sm text-muted-foreground">
+                            Enter or search for a borrowing account to see its summary.
+                          </p>
+                        )}
                       </CardContent>
                     </Card>
                   </div>
@@ -1348,7 +1523,7 @@ export default function BorrowingsPage() {
                                 className="gap-2 shrink-0"
                                 // Keep focus on the input so the blur lookup doesn't fire when opening search
                                 onMouseDown={(e) => e.preventDefault()}
-                                onClick={openAccountSearch}
+                                onClick={() => openAccountSearch("repayment")}
                               >
                                 <Search className="h-4 w-4" />
                                 Search
@@ -1479,7 +1654,7 @@ export default function BorrowingsPage() {
                           </div>
 
                           <div className="space-y-2">
-                            <Label>Voucher Number</Label>
+                            <Label>Challan Number</Label>
                             <Input
                               placeholder="Optional"
                               value={repaymentVoucher}
@@ -1489,7 +1664,13 @@ export default function BorrowingsPage() {
 
                           <div className="space-y-2">
                             <Label>Voucher Type *</Label>
-                            <Select value={repaymentTransactionType} onValueChange={setRepaymentTransactionType}>
+                            <Select
+                              value={repaymentTransactionType}
+                              onValueChange={(v) => {
+                                setRepaymentTransactionType(v)
+                                if (v !== "TRANSFER") setRepaymentBatch(0)
+                              }}
+                            >
                               <SelectTrigger>
                                 <SelectValue placeholder="Select voucher type" />
                               </SelectTrigger>
@@ -1499,6 +1680,28 @@ export default function BorrowingsPage() {
                               </SelectContent>
                             </Select>
                           </div>
+                          {/* GL Batch Selection - only for TRANSFER */}
+                          {repaymentTransactionType === "TRANSFER" && (
+                            <div className="space-y-2">
+                              <Label htmlFor="repayment-gl-batch-id">GL Batch ID</Label>
+                              <div className="flex gap-2">
+                                <Input
+                                  id="repayment-gl-batch-id"
+                                  value={repaymentBatch && repaymentBatch !== 0 ? repaymentBatch : "New Batch"}
+                                  readOnly
+                                  placeholder="Select or create batch"
+                                />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="bg-transparent"
+                                  onClick={() => openBatchPopup("repayment")}
+                                >
+                                  Select
+                                </Button>
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         {formError && (
@@ -1691,6 +1894,55 @@ export default function BorrowingsPage() {
                     </div>
                   )
                 )}
+              </DialogContent>
+            </Dialog>
+
+            {/* GL Batch Selection Dialog (Transfer vouchers) */}
+            <Dialog open={isBatchPopupOpen} onOpenChange={setIsBatchPopupOpen}>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Select Incomplete GL Batch</DialogTitle>
+                </DialogHeader>
+                <div className="max-h-[400px] overflow-y-auto">
+                  {incompleteBatches.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-muted-foreground">No incomplete batches found. A new batch will be created.</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Batch ID</TableHead>
+                          <TableHead>Total Debit</TableHead>
+                          <TableHead>Total Credit</TableHead>
+                          <TableHead>Difference</TableHead>
+                          <TableHead className="text-right">Action</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {incompleteBatches.map((b) => (
+                          <TableRow key={b.batch_id}>
+                            <TableCell>{b.batch_id}</TableCell>
+                            <TableCell>{formatCurrency(b.total_debit)}</TableCell>
+                            <TableCell>{formatCurrency(b.total_credit)}</TableCell>
+                            <TableCell className="text-red-600">{formatCurrency(b.difference)}</TableCell>
+                            <TableCell className="text-right">
+                              <Button size="sm" variant="outline" className="bg-transparent" onClick={() => chooseBatch(b.batch_id)}>
+                                Select
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </div>
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button variant="outline" className="bg-transparent" onClick={() => chooseBatch(0)}>
+                    New Batch
+                  </Button>
+                  <Button variant="outline" className="bg-transparent" onClick={() => setIsBatchPopupOpen(false)}>
+                    Cancel
+                  </Button>
+                </div>
               </DialogContent>
             </Dialog>
 

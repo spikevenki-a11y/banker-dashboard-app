@@ -6,7 +6,7 @@
 // 4. If none: confirmation popup → POST /api/members/closure (which re-checks everything
 //    in a transaction) → member status CLOSED with date, reason and closing user.
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -16,9 +16,10 @@ import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ArrowLeft, Search, Loader2, Users, XCircle, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react"
+import { ArrowLeft, Loader2, Users, XCircle, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react"
 import { DashboardWrapper } from "@/app/_components/dashboard-wrapper"
 import { MemberSearchDialog, type MemberSearchResult } from "@/components/member-search-dialog"
+import { MemberSummaryCard, useMemberSummary } from "@/components/member-summary-card"
 import { formatCurrency } from "@/lib/number-format"
 import { formatDate } from "@/lib/date-format"
 import { popup } from "@/lib/popup"
@@ -105,6 +106,22 @@ export default function MemberClosurePage() {
   const [isClosing, setIsClosing] = useState(false)
 
   const isClosed = String(member?.status || "").toUpperCase() === "CLOSED"
+  // Closure is allowed only when every account in the Account Check is Closed or Rejected
+  const hasOpenAccounts = blockers.some(
+    (b) => !["CLOSED", "REJECTED"].includes(String(b.status || "").trim().toUpperCase())
+  )
+
+  // Member Summary card (shared with Share Deposit); the closure check's member
+  // details show until the lookup returns, and for closed members (the lookup
+  // only returns active ones)
+  const summaryMember = useMemberSummary(member?.membership_no, member ? {
+    full_name: member.full_name || "",
+    father_name: member.father_name || "",
+    mobile_no: member.mobile_no || "",
+    member_type: member.member_type || "---",
+    membership_class: member.membership_class || "",
+    status: member.status || "",
+  } : undefined)
 
   const fetchCheck = async (no: string): Promise<CheckResponse> => {
     const res = await fetch(`/api/members/closure?membership_no=${encodeURIComponent(no)}`, { credentials: "include" })
@@ -113,28 +130,63 @@ export default function MemberClosurePage() {
     return data as CheckResponse
   }
 
-  const loadMember = async (no: string) => {
+  // Membership number whose lookup is in flight: skips duplicate calls and lets a
+  // response for a number the user has since changed be ignored
+  const pendingLookupRef = useRef<string | null>(null)
+
+  const loadMember = async (no: string, { popupOnError = false } = {}) => {
     const trimmed = no.trim()
     if (!trimmed) {
       setLoadError("Please enter a membership number")
       return
     }
+    pendingLookupRef.current = trimmed
     setIsLoading(true)
     setLoadError("")
     setFormError("")
     try {
       const data = await fetchCheck(trimmed)
+      if (pendingLookupRef.current !== trimmed) return // superseded
       setMember(data.member)
       setBlockers(data.blockers || [])
       setMembershipNoInput(trimmed)
       setReason("")
       setRemarks("")
     } catch (e: any) {
+      if (pendingLookupRef.current !== trimmed) return // superseded
       setMember(null)
       setBlockers([])
-      setLoadError(e.message)
+      if (popupOnError) popup.error(e.message || "Member not found", { title: "Member Not Found" })
+      else setLoadError(e.message)
     } finally {
+      if (pendingLookupRef.current === trimmed) {
+        pendingLookupRef.current = null
+        setIsLoading(false)
+      }
+    }
+  }
+
+  // Focus-out lookup: only when the number differs from the member already
+  // loaded and isn't already being looked up
+  const handleMembershipNoBlur = () => {
+    const trimmed = membershipNoInput.trim()
+    if (!trimmed || trimmed === member?.membership_no || pendingLookupRef.current === trimmed) return
+    loadMember(trimmed, { popupOnError: true })
+  }
+
+  // Editing or clearing the number drops the previously loaded member
+  const handleMembershipNoChange = (value: string) => {
+    setMembershipNoInput(value)
+    if (value.trim() === member?.membership_no) return
+    if (member || loadError || pendingLookupRef.current) {
+      pendingLookupRef.current = null
       setIsLoading(false)
+      setMember(null)
+      setBlockers([])
+      setLoadError("")
+      setFormError("")
+      setReason("")
+      setRemarks("")
     }
   }
 
@@ -236,30 +288,34 @@ export default function MemberClosurePage() {
 
         <div className="space-y-6">
           {/* Find member */}
-          <Card>
+          <Card >
             <CardHeader>
               <CardTitle className="text-lg">Select Member</CardTitle>
-              <CardDescription>Enter the membership number or search for the member</CardDescription>
+              <CardDescription>Enter the membership number and move out of the field, or search for the member</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                 <div className="flex-1 space-y-2">
                   <Label htmlFor="closure-membership-no">Membership Number</Label>
-                  <Input
-                    id="closure-membership-no"
-                    placeholder="Enter membership number"
-                    value={membershipNoInput}
-                    onChange={(e) => setMembershipNoInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") loadMember(membershipNoInput)
-                    }}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="closure-membership-no"
+                      placeholder="Enter membership number"
+                      value={membershipNoInput}
+                      onChange={(e) => handleMembershipNoChange(e.target.value)}
+                      onBlur={handleMembershipNoBlur}
+                      onKeyDown={(e) => {
+                        // Enter moves focus out, which runs the same lookup as onBlur
+                        if (e.key === "Enter") e.currentTarget.blur()
+                      }}
+                      className="pr-9"
+                    />
+                    {isLoading && (
+                      <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+                    )}
+                  </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button onClick={() => loadMember(membershipNoInput)} disabled={isLoading}>
-                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
-                    Load
-                  </Button>
                   <Button variant="outline" onClick={() => setSearchOpen(true)} className="bg-transparent">
                     <Users className="mr-2 h-4 w-4" />
                     Search Member
@@ -271,7 +327,8 @@ export default function MemberClosurePage() {
           </Card>
 
           {member && (
-            <>
+            <div className="grid gap-6 lg:grid-cols-3">
+              <div className="space-y-6 lg:col-span-2">
               {/* Member details */}
               <Card>
                 <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
@@ -404,8 +461,17 @@ export default function MemberClosurePage() {
                         </p>
                       </div>
                       {formError && <p className="text-sm text-destructive">{formError}</p>}
-                      <div className="flex justify-end">
-                        <Button variant="destructive" onClick={handleClose} disabled={isClosing || isLoading}>
+                      <div className="flex flex-col items-end gap-2">
+                        {hasOpenAccounts && (
+                          <p className="text-right text-sm text-muted-foreground">
+                            Close or reject all accounts listed in the Account Check to enable closure.
+                          </p>
+                        )}
+                        <Button
+                          variant="destructive"
+                          onClick={handleClose}
+                          disabled={isClosing || isLoading || hasOpenAccounts}
+                        >
                           {isClosing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />}
                           Close Membership
                         </Button>
@@ -414,7 +480,13 @@ export default function MemberClosurePage() {
                   </Card>
                 </>
               )}
-            </>
+              </div>
+
+              {/* Right Column - Member Summary (shared with Share Deposit) */}
+              <div className="space-y-6">
+                <MemberSummaryCard memberInfo={summaryMember} />
+              </div>
+            </div>
           )}
         </div>
       </main>

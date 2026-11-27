@@ -17,6 +17,7 @@ import {
   BarChart3,
   ShieldAlert,
   Lock,
+  Landmark,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react"
@@ -73,6 +74,11 @@ const routes = [
     label: "Loans",
     icon: CreditCard,
     href: "/loans",
+  },
+  {
+    label: "Borrowings",
+    icon: Landmark,
+    href: "/bank-level/borrowings",
   },
   {
     label: "Bank Level",
